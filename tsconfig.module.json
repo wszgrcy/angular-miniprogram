@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": ["./src/platform/index.ts"],
+  "compilerOptions": {
+    "baseUrl": "./src/platform",
+    "noImplicitThis": true,
+    "outDir": "dist",
+    "declaration": true,
+    "target": "ES2015",
+    "module": "esnext",
+    "strict": true
+  },
+  "exclude": [
+    "./src/**/*.template.ts",
+    "./src/**/*.d.ts",
+    "**/*.spec.ts",
+    "test"
+  ],
+  "angularCompilerOptions": {
+    "enableIvy": false
+  }
+}

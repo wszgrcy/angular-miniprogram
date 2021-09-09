@@ -1,0 +1,26 @@
+{
+  "name": "angular-miniprogram",
+  "version": "0.0.1",
+  "description": "使用Angular开发小程序",
+  "keywords": [
+    "Angular",
+    "miniprogram",
+    "wechat",
+    "weixin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wszgrcy/angular-miniprogram.git"
+  },
+  "author": "wszgrcy",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/wszgrcy/angular-miniprogram/issues"
+  },
+  "homepage": "https://github.com/wszgrcy/angular-miniprogram#readme",
+  "dependencies": {
+    "cyia-code-util": "^1.3.0",
+    "webpack-bootstrap-assets-plugin": "^2.0.2"
+  },
+  "builders": "./builder/builders.json"
+}

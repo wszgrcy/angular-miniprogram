@@ -1,0 +1,10 @@
+{
+  "$schema": "../../node_modules/@angular-devkit/architect/src/builders-schema.json",
+  "builders": {
+    "browser": {
+      "implementation": "./browser",
+      "schema": "./browser/schema.json",
+      "description": "小程序构建builder"
+    }
+  }
+}

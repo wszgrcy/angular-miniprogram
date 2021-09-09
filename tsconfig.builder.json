@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": ["./src/builder"],
+  "files": [],
+  "compilerOptions": {
+    "noImplicitThis": true,
+    "outDir": "dist/builder",
+    "declaration": true,
+    "strict": true
+  },
+  "exclude": [
+    "./src/**/*.template.ts",
+    "./src/**/*.d.ts",
+    "**/*.spec.ts",
+    "test"
+  ]
+}

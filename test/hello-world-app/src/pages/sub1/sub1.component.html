@@ -1,0 +1,13 @@
+<p class="myclass">hello test</p>
+这是我的一小步,是ng社区的一大步
+<app-cp1 [testInputValue]="title" (custom)="testApp($event)"></app-cp1>
+<app-cp1 [testInputValue]="title" (custom)="testApp($event)"></app-cp1>
+<button (tap)="toggle()">点击后切换</button>
+<div *ngIf="num; else test">显示的内容</div>
+<div *ngIf="display; else test" class="test">显示的内容</div>
+<ng-template #test> 不显示的模板 </ng-template>
+<button (tap)="changeTest($event)"></button>
+<p>待变化</p>
+<p>{{ randomValue }}</p>
+<button (tap)="eventTest($event)">测试异步</button>
+<p>{{ randomValue }}</p>

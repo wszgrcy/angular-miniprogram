@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {},
+  "include": [],
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.builder.json" },
+    { "path": "./tsconfig.module.json" },
+    { "path": "./tsconfig.spec.json" }
+  ]
+}

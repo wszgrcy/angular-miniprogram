@@ -1,0 +1,53 @@
+{
+  "name": "angular-miniprogram",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest --config ./jest.builder.config.ts",
+    "prebuild": "rimraf ./dist",
+    "build": "npm run build:platform && npm run build:builder && npm run copy:assets",
+    "copy:assets": "cpx \"./src/builder/**/*.json\" ./dist/builder && cpx \"./src/builder/**/*.js\" ./dist/builder && cpx ./readme.md ./dist",
+    "build:platform": "ts-node ./script/build-ng-package.ts",
+    "build:builder": "tsc -p tsconfig.builder.json",
+    "prepare": "husky install"
+  },
+  "private": false,
+  "author": "wszgrcy",
+  "license": "MIT",
+  "devDependencies": {
+    "@angular-devkit/architect": "^0.1200.4",
+    "@angular-devkit/build-angular": "^12.0.4",
+    "@angular-devkit/core": "^12.0.4",
+    "@angular-devkit/schematics": "^12.0.4",
+    "@angular/common": "^12.0.4",
+    "@angular/compiler": "^12.0.4",
+    "@angular/compiler-cli": "^12.0.4",
+    "@angular/core": "^12.0.4",
+    "@commitlint/cli": "^13.1.0",
+    "@commitlint/config-conventional": "^13.1.0",
+    "@ngtools/webpack": "^12.0.4",
+    "@types/fs-extra": "^9.0.12",
+    "@types/jasmine": "^3.7.7",
+    "@types/jest": "^26.0.23",
+    "cpx": "^1.5.0",
+    "fs-extra": "^10.0.0",
+    "husky": "^7.0.0",
+    "jest": "^27.0.4",
+    "miniprogram-api-typings": "^3.3.2",
+    "ng-packagr": "^12.2.1",
+    "prettier": "^2.4.0",
+    "pretty-quick": "^3.1.1",
+    "rimraf": "^3.0.2",
+    "rxjs": "6.6.7",
+    "ts-jest": "^27.0.3",
+    "ts-node": "^10.2.1",
+    "typescript": "4.2.4",
+    "webpack": "5.38.1",
+    "zone.js": "^0.11.4"
+  },
+  "dependencies": {
+    "cyia-code-util": "^1.3.0",
+    "webpack-bootstrap-assets-plugin": "^2.0.2"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "pages": ["pages/sub1/sub1.entry", "pages/sub2/sub2.entry"],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#fff",
+    "navigationBarTitleText": "Weixin",
+    "navigationBarTextStyle": "black"
+  },
+  "style": "v2"
+}
