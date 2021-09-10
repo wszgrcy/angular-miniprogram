@@ -3,6 +3,14 @@
 - 通过修改`Angular`实现使用`Angular`开发小程序
 - 本项目实现的目的很简单也很纯粹,就是告诉大家.框架无高低,使用的人,有高低
 
+## 视频简介
+
+- [https://www.bilibili.com/video/BV1wh411p7bB/](https://www.bilibili.com/video/BV1wh411p7bB/)
+
+## 开发模板
+
+- [https://github.com/wszgrcy/angular-miniprogram-template](https://github.com/wszgrcy/angular-miniprogram-template)
+
 ## 修改内容
 
 - builder
