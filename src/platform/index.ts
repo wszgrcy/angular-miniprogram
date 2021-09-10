@@ -6,3 +6,5 @@ export * from './module/component.module.base';
 export * from './type';
 export * from './module/weixin-mini-program.module';
 export * from './module/token/component.token';
+export * from './module/token/page.token';
+export * from './module/token/app.token';
