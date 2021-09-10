@@ -12,7 +12,7 @@
     "build:builder": "tsc -p tsconfig.builder.json",
     "prepare": "husky install"
   },
-  "private": false,
+  "private": true,
   "author": "wszgrcy",
   "license": "MIT",
   "devDependencies": {
