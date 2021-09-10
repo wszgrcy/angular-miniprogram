@@ -155,6 +155,21 @@ export class ExportWeiXinAssetsPlugin {
             this.WXMLMap.forEach((value, key) => {
               compilation.assets[key] = new RawSource(value) as any;
             });
+            for (const fileName in compilation.assets) {
+              if (
+                Object.prototype.hasOwnProperty.call(
+                  compilation.assets,
+                  fileName
+                )
+              ) {
+                const element = compilation.assets[fileName];
+                if (fileName.endsWith('.css')) {
+                  delete compilation.assets[fileName];
+                  compilation.assets[fileName.replace(/\.css$/, '.wxss')] =
+                    element;
+                }
+              }
+            }
             cb();
           }
         );

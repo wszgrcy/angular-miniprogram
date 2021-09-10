@@ -7,6 +7,7 @@ import {
 import { WebpackConfigurationChange } from '../builder/webpack-configuration-change';
 import * as fs from 'fs-extra';
 import * as path from 'path';
+import { join, normalize } from '@angular-devkit/core';
 let angularConfig = { ...DEFAULT_ANGULAR_CONFIG, platform: 'wx' };
 
 describeBuilder(
@@ -31,6 +32,11 @@ describeBuilder(
         expect(result.error).toBeFalsy();
         expect(result.logs[0].level !== 'error').toBeTruthy();
         expect(result.result.success).toBeTruthy();
+        harness
+          .expectFile(
+            join(normalize(DEFAULT_ANGULAR_CONFIG.outputPath), 'styles.wxss')
+          )
+          .toExist();
         const realTestPath: string = result.result.outputPath as string;
         let appTestPath = path.resolve(process.cwd(), '__test-app');
         fs.copySync(realTestPath, path.resolve(process.cwd(), '__test-app'));
