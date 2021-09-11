@@ -55,6 +55,7 @@ export class WebpackConfigurationChange {
     this.exportWeiXinAssetsPlugin();
     this.componentTemplateLoader();
     this.definePlugin();
+    this.changeStylesExportSuffix();
   }
   private async pageHandle() {
     this.workspaceRoot = normalize(this.context.workspaceRoot);
@@ -228,5 +229,26 @@ export class WebpackConfigurationChange {
       defineObject['ngDevMode'] = `${this.platformInfo.globalObject}.ngDevMode`;
     }
     this.config.plugins!.push(new DefinePlugin(defineObject));
+  }
+  private changeStylesExportSuffix() {
+    let index = this.config.plugins?.findIndex(
+      (plugin) =>
+        Object.getPrototypeOf(plugin).constructor.name ===
+        'MiniCssExtractPlugin'
+    );
+    if (typeof index === 'number') {
+      let pluginInstance = this.config.plugins![index] as any;
+      let pluginPrototype = Object.getPrototypeOf(pluginInstance);
+      this.config.plugins?.splice(
+        index,
+        1,
+        new pluginPrototype.constructor({
+          filename: (pluginInstance.options.filename as string).replace(
+            /\.css$/,
+            '.wxss'
+          ),
+        })
+      );
+    }
   }
 }
