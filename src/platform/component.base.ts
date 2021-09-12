@@ -3,7 +3,6 @@ import {
   ComponentRef,
   NgZone,
   OnChanges,
-  OnInit,
   SimpleChange,
   SimpleChanges,
   Type,
@@ -21,10 +20,12 @@ export function generateWxComponent<C>(
   const inputs: Record<string, string[] | string> = (component as any).ɵcmp
     .inputs;
   const outputs: Record<string, string> = (component as any).ɵcmp.outputs;
+
   let fnList: string[] = [];
   let tmpComponent = component.prototype;
+
   while (tmpComponent) {
-    if (tmpComponent.constructor && tmpComponent.constructor === Object) {
+    if (tmpComponent.constructor === Object) {
       break;
     }
     let list = Object.getOwnPropertyNames(tmpComponent).filter(
@@ -33,6 +34,7 @@ export function generateWxComponent<C>(
     fnList.push(...list);
     tmpComponent = tmpComponent.__proto__;
   }
+
   return (componentInitFactory: ComponentInitFactory, isPage?: boolean) => {
     const inputNameList = Object.keys(inputs);
     let observers: Record<string, (...args: any[]) => any> | undefined =
@@ -81,6 +83,7 @@ export function generateWxComponent<C>(
             })
           );
         });
+
         wxComponentInstance.__unchangedInputs = new Set<string>(
           Object.keys(inputs)
         );
@@ -88,32 +91,37 @@ export function generateWxComponent<C>(
         return componentRef.instance;
       }));
     };
+
     type LifetimeKey = keyof WechatMiniprogram.Component.Lifetimes['lifetimes'];
+
     let lifetimes: { [p in LifetimeKey]: (...args: any[]) => any } = (
       ['attached', 'detached', 'error', 'moved', 'ready'] as LifetimeKey[]
     ).reduce((pre, lifetime) => {
       pre[lifetime] = function () {
         this.__waitNgComponentInit.then((instance: WxLifetimes) => {
-          if (instance.wxLifetimes && instance.wxLifetimes[lifetime]) {
-            (instance.wxLifetimes[lifetime] as any)(...Array.from(arguments));
+          if (instance.wxLifetimes?.[lifetime]) {
+            (instance.wxLifetimes[lifetime] as any)(...arguments);
           }
         });
       };
       return pre;
     }, {} as any);
+
     type PageLifetimeKey = keyof WechatMiniprogram.Component.PageLifetimes;
+
     let pageLifetimes: { [p in PageLifetimeKey]: (...args: any[]) => any } = (
       ['hide', 'resize', 'show'] as PageLifetimeKey[]
     ).reduce((pre, cur) => {
       pre[cur] = function () {
         this.__waitNgComponentInit.then((instance: WxLifetimes) => {
-          if (instance.wxPageLifetimes && instance.wxPageLifetimes[cur]) {
-            (instance.wxPageLifetimes[cur] as any)(...Array.from(arguments));
+          if (instance.wxPageLifetimes?.[cur]) {
+            (instance.wxPageLifetimes[cur] as any)(...arguments);
           }
         });
       };
       return pre;
     }, {} as any);
+
     Component({
       options: componentOptions.options,
       externalClasses: componentOptions.externalClasses,
@@ -131,7 +139,7 @@ export function generateWxComponent<C>(
           return ngZone.run(() => {
             this.__ngComponentInstance[cur].apply(
               this.__ngComponentInstance,
-              Array.from(arguments)
+              arguments
             );
           });
         };
