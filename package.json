@@ -47,7 +47,7 @@
     "zone.js": "^0.11.4"
   },
   "dependencies": {
-    "cyia-code-util": "^1.3.0",
+    "cyia-code-util": "^1.3.2",
     "webpack-bootstrap-assets-plugin": "^2.0.2"
   }
 }

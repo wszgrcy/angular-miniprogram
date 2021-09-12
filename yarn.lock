@@ -3427,10 +3427,10 @@ cuint@^0.2.2:
   resolved "https://registry.yarnpkg.com/cuint/-/cuint-0.2.2.tgz#408086d409550c2631155619e9fa7bcadc3b991b"
   integrity sha1-QICG1AlVDCYxFVYZ6fp7ytw7mRs=
 
-cyia-code-util@^1.3.0:
-  version "1.3.0"
-  resolved "https://registry.yarnpkg.com/cyia-code-util/-/cyia-code-util-1.3.0.tgz#1dc6b71d75a3889e8542a1015f2927ade5555965"
-  integrity sha512-NkPDtc1Z5nsYwngtsvTegz/GYtikliG7zzLrEMHX9h0TmZDo/u4co1YpjvRRtUf9xgtvsmPxEZ+bmWC3lCSVoQ==
+cyia-code-util@^1.3.2:
+  version "1.3.2"
+  resolved "https://registry.yarnpkg.com/cyia-code-util/-/cyia-code-util-1.3.2.tgz#1c777db18949e54460bdd7bf59c4b7bea430c3c3"
+  integrity sha512-078VLjL6UbPjuH0cERFObbBhtjg90M7QI8MzRY88dRZ7L7bpjh7+l8cM2dV2mehZoCov6O9Z2rIiK+g0OMYWGw==
   dependencies:
     "@angular/compiler" "^11.0.7"
     css-what "^4.0.0"
