@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+env:
+  REPOSITORY_PATH: https://${{secrets.ACCESS_TOKEN}}@github.com/
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: init
+        run: |
+          git config --global user.name "${GITHUB_ACTOR}"
+          git config --global user.email "${GITHUB_ACTOR}@gmail.com"
+      - name: pull-code
+        uses: actions/checkout@v2
+      - name: install-node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+      - name: install-dependencies
+        run: |
+          yarn
+      - name: test
+        run: |
+          yarn test
+      - name: build
+        run: |
+          yarn build
+      - id: publish
+        name: publish
+        uses: JS-DevTools/npm-publish@v1
+        with:
+          token: ${{ secrets.NPM_PUBLISH_TOKEN }}
+          package: ./dist/package.json
+      - if: steps.publish.outputs.type != 'none'
+        run: |
+          echo "[${{ steps.publish.outputs.type }}]Version changed: ${{ steps.publish.outputs.old-version }} => ${{ steps.publish.outputs.version }}"
+          git tag v${{steps.publish.outputs.version}}
+          git push origin v${{steps.publish.outputs.version}}
