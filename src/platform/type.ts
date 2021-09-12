@@ -6,6 +6,7 @@ import {
   Type,
 } from '@angular/core';
 import 'miniprogram-api-typings';
+
 export interface AppOptions {
   __ngStartPage<M, C>(
     module: Type<M>,
@@ -23,10 +24,7 @@ export interface AppOptions {
   __pageModuleLoadedMap: Map<any, Promise<ModuleInitResult>>;
   __pageModuleLoadingMap: Map<any, (result: ModuleInitResult) => void>;
 }
-export interface WxLifetimes {
-  wxLifetimes?: WechatMiniprogram.Component.Lifetimes['lifetimes'];
-  wxPageLifetimes?: Partial<WechatMiniprogram.Component.PageLifetimes>;
-}
+
 export type WxComponentInstance = WechatMiniprogram.Component.Instance<
   Record<string, any>,
   {},
