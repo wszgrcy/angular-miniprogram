@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Binary,
   Conditional,
@@ -19,6 +20,7 @@ import {
   isPrefixNot,
   isPropertyRead,
 } from './type-protection';
+
 export interface ExpressionIterationOptions {
   Binary: (ast: Binary) => any;
   PropertyRead: (ast: PropertyRead) => any;

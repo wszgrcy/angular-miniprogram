@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Binary,
   Conditional,
@@ -9,13 +10,13 @@ import {
   PropertyRead,
 } from '@angular/compiler';
 import {
-  BoundText,
   BoundAttribute,
-  Node,
-  Element,
-  Text,
-  Template,
+  BoundText,
   Content,
+  Element,
+  Node,
+  Template,
+  Text,
 } from '@angular/compiler/src/render3/r3_ast';
 
 export function isElement(node: Node): node is Element {

@@ -1,9 +1,18 @@
-import * as webpack from 'webpack';
-import {
-  createWebpackSystem,
-  InputFileSystemSync,
-} from '@ngtools/webpack/src/ivy/system';
+import { dirname, join, normalize, strings } from '@angular-devkit/core';
+import { ResolvedValue } from '@angular/compiler-cli/src/ngtsc/partial_evaluator';
+import { readConfiguration } from '@angular/compiler-cli/src/perform_compile';
 import { externalizePath, normalizePath } from '@ngtools/webpack/src/ivy/paths';
+import {
+  InputFileSystemSync,
+  createWebpackSystem,
+} from '@ngtools/webpack/src/ivy/system';
+import { WebpackResourceLoader } from '@ngtools/webpack/src/resource_loader';
+import { TsChange } from 'cyia-code-util';
+import {
+  DeleteChange,
+  InsertChange,
+} from 'cyia-code-util/dist/change/content-change';
+import * as path from 'path';
 import ts, {
   CallExpression,
   CompilerOptions,
@@ -11,25 +20,17 @@ import ts, {
   SourceFile,
   TypeChecker,
 } from 'typescript';
+import * as webpack from 'webpack';
 
-import { readConfiguration } from '@angular/compiler-cli/src/perform_compile';
-import { TsChange } from 'cyia-code-util';
-import * as path from 'path';
-import {
-  DeleteChange,
-  InsertChange,
-} from 'cyia-code-util/dist/change/content-change';
 import { RawSource } from 'webpack-sources';
-import { PagePattern } from '../type';
 import { ExportWeiXinAssetsPluginSymbol } from '../const';
-import { dirname, join, normalize, strings } from '@angular-devkit/core';
 import { TemplateCompiler } from '../html/template-compiler';
+import { PlatformInfo } from '../platform/platform-info';
 import { DecoratorMetaDataResolver } from '../ts/decorator-metadata-resolver';
-import { ResolvedValue } from '@angular/compiler-cli/src/ngtsc/partial_evaluator';
+import { PagePattern } from '../type';
 import { RawUpdater } from '../util/raw-updater';
 import { NgComponentCssExtractPlugin } from './ng-component-css-extract.plugin';
-import { PlatformInfo } from '../platform/platform-info';
-import { WebpackResourceLoader } from '@ngtools/webpack/src/resource_loader';
+
 export interface ExportWeiXinAssetsPluginOptions {
   /** tsConfig配置路径 */
   tsConfig: string;
@@ -37,7 +38,7 @@ export interface ExportWeiXinAssetsPluginOptions {
   componentList: PagePattern[];
   platformInfo: PlatformInfo;
 }
-/**导出微信的wxml与wxss */
+/** 导出微信的wxml与wxss */
 export class ExportWeiXinAssetsPlugin {
   private system!: ts.System;
   private WXMLMap = new Map<string, string>();
@@ -53,6 +54,7 @@ export class ExportWeiXinAssetsPlugin {
     { sizeOffset: number; content: string }
   >();
   private htmlContext = new Map<string, string[]>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private originInputFileSystemSync: { readFileSync: any; statSync: any } = {
     readFileSync: undefined,
     statSync: undefined,
@@ -61,11 +63,11 @@ export class ExportWeiXinAssetsPlugin {
   constructor(private options: ExportWeiXinAssetsPluginOptions) {}
   apply(compiler: webpack.Compiler) {
     this.compiler = compiler;
-    let resourceLoader = new WebpackResourceLoader(compiler.watchMode);
-    let ifs = this.compiler.inputFileSystem as InputFileSystemSync;
+    const resourceLoader = new WebpackResourceLoader(compiler.watchMode);
+    const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
     this.originInputFileSystemSync.readFileSync = ifs.readFileSync;
     this.originInputFileSystemSync.statSync = ifs.statSync;
-    let config = readConfiguration(this.options.tsConfig, undefined);
+    const config = readConfiguration(this.options.tsConfig, undefined);
     compiler.hooks.thisCompilation.tap(
       'ExportWeiXinAssetsPlugin',
       (compilation) => {
@@ -75,7 +77,7 @@ export class ExportWeiXinAssetsPlugin {
         );
         this.restore();
         this.compilation = compilation;
-        let host = ts.createIncrementalCompilerHost(
+        const host = ts.createIncrementalCompilerHost(
           config.options,
           this.system
         );
@@ -97,19 +99,19 @@ export class ExportWeiXinAssetsPlugin {
         this.resolver.getModuleMetaMap().forEach((value, key) => {
           if (value['declarations'] && value['declarations'].length) {
             if (value['declarations'].length > 1) {
-              throw '类声明组件超过一个';
+              throw new Error('类声明组件超过一个');
             }
-            let ref = value['declarations'][0];
-            let sf = ref.node.getSourceFile();
+            const ref = value['declarations'][0];
+            const sf = ref.node.getSourceFile();
             this.componentToModule.set(sf, key.getSourceFile());
           }
         });
         this.resolver.getComponentMetaMap().forEach((value, key) => {
-          let WXMLTemplate = this.buildWxmlTemplate(key, value);
-          let module = this.componentToModule.get(key.getSourceFile());
-          let entry = this.getModuleEntry(module!);
+          const WXMLTemplate = this.buildWxmlTemplate(key, value);
+          const module = this.componentToModule.get(key.getSourceFile());
+          const entry = this.getModuleEntry(module!);
           if (!entry) {
-            throw '没有找到对应的出口信息';
+            throw new Error('没有找到对应的出口信息');
           }
           this.WXMLMap.set(entry.outputWXML, WXMLTemplate.content);
           if (WXMLTemplate.template) {
@@ -129,12 +131,13 @@ export class ExportWeiXinAssetsPlugin {
           );
         });
         this.hookFileSystemFile();
-        let ngComponentCssExtractPlugin = new NgComponentCssExtractPlugin(
+        const ngComponentCssExtractPlugin = new NgComponentCssExtractPlugin(
           this.resolver.getComponentMetaMap(),
           resourceLoader
         );
         ngComponentCssExtractPlugin.run(compilation);
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (compilation as any)[ExportWeiXinAssetsPluginSymbol] = {
           htmlContextMap: this.htmlContext,
           platformInfo: this.options.platformInfo,
@@ -142,17 +145,19 @@ export class ExportWeiXinAssetsPlugin {
         compilation.hooks.processAssets.tapAsync(
           'ExportWeiXinAssetsPlugin',
           async (assets, cb) => {
-            let cssMap = ngComponentCssExtractPlugin.getAllCss();
+            const cssMap = ngComponentCssExtractPlugin.getAllCss();
             for (const [key, value] of cssMap.entries()) {
-              let entry = this.getModuleEntry(
+              const entry = this.getModuleEntry(
                 this.componentToModule.get(key.getSourceFile())!
               );
               compilation.assets[entry!.outputWXSS] = new RawSource(
                 await value
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ) as any;
             }
 
             this.WXMLMap.forEach((value, key) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               compilation.assets[key] = new RawSource(value) as any;
             });
 
@@ -168,8 +173,8 @@ export class ExportWeiXinAssetsPlugin {
     );
   }
   private addCleanDependency(host: ts.CompilerHost) {
-    let oldReadFile = host.readFile;
-    let _this = this;
+    const oldReadFile = host.readFile;
+    const _this = this;
     host.readFile = function (fileName) {
       if (fileName.includes('node_modules')) {
         _this.cleanDependencyFileCacheSet.add(externalizePath(fileName));
@@ -186,13 +191,12 @@ export class ExportWeiXinAssetsPlugin {
       host.getCanonicalFileName.bind(host),
       compilerOptions
     );
-    let oldResolveModuleNames = host.resolveModuleNames;
+    const oldResolveModuleNames = host.resolveModuleNames;
     if (oldResolveModuleNames) {
-      (host as any).resolveModuleNames = (
-        moduleNames: string[],
-        ...args: any[]
-      ) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      host.resolveModuleNames = (moduleNames: string[], ...args: any[]) => {
         return moduleNames.map((name) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const result = (oldResolveModuleNames! as any).call(
             host,
             [name],
@@ -234,7 +238,7 @@ export class ExportWeiXinAssetsPlugin {
     moduleName: string,
     module: ts.ResolvedModule
   ) {
-    let useList =
+    const useList =
       this.dependencyUseModule.get(path.normalize(module.resolvedFileName)) ||
       [];
     useList.push(filePath);
@@ -245,12 +249,12 @@ export class ExportWeiXinAssetsPlugin {
   }
 
   private getModuleEntry(sf: SourceFile) {
-    let findList = [sf.fileName];
+    const findList = [sf.fileName];
     let maybeEntryPath: PagePattern | undefined;
 
     while (findList.length) {
-      let module = findList.pop();
-      let moduleList = this.dependencyUseModule.get(path.normalize(module!));
+      const module = findList.pop();
+      const moduleList = this.dependencyUseModule.get(path.normalize(module!));
       if (moduleList && moduleList.length) {
         findList.push(...moduleList);
       } else {
@@ -269,13 +273,13 @@ export class ExportWeiXinAssetsPlugin {
     objectNode: ObjectLiteralExpression,
     sf: SourceFile
   ) {
-    let change = new TsChange(sf);
-    let list: (InsertChange | DeleteChange)[] = change.deleteChildNode(
+    const change = new TsChange(sf);
+    const list: (InsertChange | DeleteChange)[] = change.deleteChildNode(
       objectNode,
       (node) => {
         let value: string;
-        let propertyName = (node as any).name;
         if (ts.isPropertyAssignment(node)) {
+          const propertyName = node.name;
           if (
             ts.isIdentifier(propertyName) ||
             ts.isStringLiteral(propertyName) ||
@@ -299,7 +303,7 @@ export class ExportWeiXinAssetsPlugin {
     list.sort((a, b) => {
       return b.start - a.start;
     });
-    let content = RawUpdater.update(sf.text, list);
+    const content = RawUpdater.update(sf.text, list);
     this.changeFileMap.set(path.normalize(sf.fileName), {
       sizeOffset: sf.text.length - content.length,
       content: content,
@@ -310,7 +314,7 @@ export class ExportWeiXinAssetsPlugin {
     meta: Record<string, ResolvedValue>
   ) {
     let templateContent = '';
-    let templateUrl = meta['templateUrl'] as string;
+    const templateUrl = meta['templateUrl'] as string;
     if (templateUrl) {
       templateContent = this.system.readFile(templateUrl)!;
       this.compilation.fileDependencies.add(templateUrl);
@@ -318,10 +322,10 @@ export class ExportWeiXinAssetsPlugin {
       templateContent = meta['template'] as string;
     }
     if (typeof templateContent !== 'string') {
-      throw '解析错误';
+      throw new Error('解析错误');
     }
-    let interpolation = meta['interpolation'] as string[];
-    let instance = new TemplateCompiler(
+    const interpolation = meta['interpolation'] as string[];
+    const instance = new TemplateCompiler(
       classDeclaration.getSourceFile().fileName,
       templateContent,
       this.options.platformInfo.templateTransform,
@@ -330,7 +334,7 @@ export class ExportWeiXinAssetsPlugin {
     return instance.transform();
   }
   private restore() {
-    let ifs = this.compiler.inputFileSystem as InputFileSystemSync;
+    const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
     ifs.readFileSync = this.originInputFileSystemSync.readFileSync;
     ifs.statSync = this.originInputFileSystemSync.statSync;
     this.changeFileMap = new Map();
@@ -340,20 +344,22 @@ export class ExportWeiXinAssetsPlugin {
     this.componentToModule = new Map();
   }
   private hookFileSystemFile() {
-    let _this = this;
-    let ifs = this.compiler.inputFileSystem as InputFileSystemSync;
-    let oldReadFileSync = ifs.readFileSync;
+    const _this = this;
+    const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
+    const oldReadFileSync = ifs.readFileSync;
     ifs.readFileSync = function (filePath: string) {
-      let changeFile = _this.changeFileMap.get(path.normalize(filePath));
+      const changeFile = _this.changeFileMap.get(path.normalize(filePath));
       if (changeFile) {
         return Buffer.from(changeFile.content);
       }
       return oldReadFileSync.call(this, filePath);
     };
-    let oldStatSync = ifs.statSync;
-    ifs.statSync = function (filePath: string) {
-      let stat = (oldStatSync as any).apply(this, Array.from(arguments));
-      let changeFile = _this.changeFileMap.get(path.normalize(filePath));
+    const oldStatSync = ifs.statSync;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ifs.statSync = function (filePath: string, ...args: any[]) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const stat = (oldStatSync as any).apply(this, [filePath, ...args]);
+      const changeFile = _this.changeFileMap.get(path.normalize(filePath));
       if (changeFile) {
         stat.size = stat.size - changeFile.sizeOffset;
       }

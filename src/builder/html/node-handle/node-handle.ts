@@ -22,8 +22,8 @@ export function generateParsedNode(
 ): ParsedNode<NgNodeMeta> {
   return nodeIteration(node, {
     Element: (node) => {
-      let instance = new ParsedNgElement(node, parent);
-      let childrenInstance = instance
+      const instance = new ParsedNgElement(node, parent);
+      const childrenInstance = instance
         .getOriginChildren()
         .map((node) => generateParsedNode(node, instance, globalContext));
       instance.setNgNodeChildren(childrenInstance);
@@ -36,9 +36,9 @@ export function generateParsedNode(
       return new ParsedNgText(node, parent);
     },
     Template: (node) => {
-      let instance = new NgTemplate(node, parent);
+      const instance = new NgTemplate(node, parent);
 
-      let childrenInstance = instance
+      const childrenInstance = instance
         .getOriginChildren()
         .map((node) => generateParsedNode(node, instance, globalContext));
       instance.setNgNodeChildren(childrenInstance);
@@ -48,7 +48,7 @@ export function generateParsedNode(
       return new ParsedNgContent(node, parent);
     },
     default: (node) => {
-      throw '未实现';
+      throw new Error('未实现');
     },
   });
 }

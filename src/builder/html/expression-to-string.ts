@@ -10,7 +10,7 @@ export class ExpressionConvert {
       Binary: (ast) =>
         this.toString(ast.left) + ast.operation + this.toString(ast.right),
       PropertyRead: (ast) => {
-        let receiver = this.toString(ast.receiver);
+        const receiver = this.toString(ast.receiver);
         if (!receiver) {
           this.propertyReadList.push(ast.name);
         }
@@ -34,7 +34,7 @@ export class ExpressionConvert {
         let result = '{';
         for (let i = 0; i < ast.keys.length; i++) {
           const key = ast.keys[i];
-          let value = ast.values[i];
+          const value = ast.values[i];
           result += key.quoted ? `'${key.key}'` : key.key;
           result += ':';
           result += this.toString(value);

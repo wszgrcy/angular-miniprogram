@@ -1,14 +1,15 @@
-import { TemplateCompiler } from './template-compiler';
 import { WxTransform } from '../template-transform-strategy/wx.transform';
+import { TemplateCompiler } from './template-compiler';
+
 describe('template-compiler', () => {
   function defaultTransform(content: string) {
-    let instance = new TemplateCompiler('', content, new WxTransform());
+    const instance = new TemplateCompiler('', content, new WxTransform());
     return instance.transform();
   }
   // todo 标签
   it('一些标签->view', () => {
     ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].forEach((tag) => {
-      let result = defaultTransform(`<${tag}></${tag}>`);
+      const result = defaultTransform(`<${tag}></${tag}>`);
       expect(result.content).toContain(`<view`);
       expect(result.content).toContain(`</view>`);
       expect(result.content).toContain(`origin-tag-${tag}`);
@@ -16,7 +17,7 @@ describe('template-compiler', () => {
     });
   });
   it('单闭合标签', () => {
-    let result = defaultTransform(`<input>`);
+    const result = defaultTransform(`<input>`);
     expect(result.content).toContain(`input`);
     expect(result.content).not.toContain(`</input>`);
     expect(result.context).toEqual([]);
@@ -46,7 +47,7 @@ describe('template-compiler', () => {
     expect(result.template).toContain('name="thenBlock"');
   });
   it('ng-template->template', () => {
-    let result = defaultTransform(
+    const result = defaultTransform(
       `<ng-template #templateRef>content1</ng-template>`
     );
     expect(result.template).toContain('name="templateRef"');
@@ -121,7 +122,7 @@ describe('template-compiler', () => {
     expect(result.content).toContain(`wx:for-index="i"`);
   });
   it('ngSwitch=>wx:if', () => {
-    let result = defaultTransform(`<span [ngSwitch]="title">
+    const result = defaultTransform(`<span [ngSwitch]="title">
     <p *ngSwitchCase="abc">1</p>
     <p *ngSwitchCase="false"></p>
     <p *ngSwitchDefault>2</p>
@@ -133,13 +134,13 @@ describe('template-compiler', () => {
     expect(result.content).not.toContain(`ngSwitch`);
   });
   it('event', () => {
-    let result = defaultTransform(`<div (bind:tap)="test($event);"></div>`);
+    const result = defaultTransform(`<div (bind:tap)="test($event);"></div>`);
     expect(result.content).toContain('bind:tap');
     expect(result.content).toContain('test');
     expect(result.content).not.toContain('$event');
   });
   it('内容', () => {
-    let result = defaultTransform(`测试`);
+    const result = defaultTransform(`测试`);
     expect(result.content).toContain('测试');
     expect(result.context).toEqual([]);
   });

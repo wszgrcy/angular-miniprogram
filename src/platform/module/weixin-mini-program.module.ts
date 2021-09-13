@@ -1,13 +1,14 @@
+import { CommonModule } from '@angular/common';
 import {
+  ApplicationModule,
   ErrorHandler,
   NgModule,
   RendererFactory2,
   ɵINJECTOR_SCOPE,
-  ApplicationModule,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { WeixinMiniProgramRendererFactory } from './weixin-mini-program.renderer.factory';
 import { PageService } from './service/page.service';
+import { WeixinMiniProgramRendererFactory } from './weixin-mini-program.renderer.factory';
+
 export function errorHandler(): ErrorHandler {
   return new ErrorHandler();
 }

@@ -1,14 +1,15 @@
-import { TestProjectHost } from '@angular-devkit/architect/testing';
-import { join, json, normalize } from '@angular-devkit/core';
-export const workspaceRoot = join(normalize(__dirname), `../hello-world-app/`);
-export const host = new TestProjectHost(workspaceRoot);
 import { BuilderHandlerFn } from '@angular-devkit/architect';
-import { readFileSync } from 'fs';
+import { TestProjectHost } from '@angular-devkit/architect/testing';
 import { BuilderHarness } from '@angular-devkit/build-angular/src/testing/builder-harness';
 import {
   HarnessFileMatchers,
   expectFile,
 } from '@angular-devkit/build-angular/src/testing/jasmine-helpers';
+import { join, json, normalize } from '@angular-devkit/core';
+import { readFileSync } from 'fs';
+
+export const workspaceRoot = join(normalize(__dirname), `../hello-world-app/`);
+export const host = new TestProjectHost(workspaceRoot);
 /**
  * @license
  * Copyright Google Inc. All Rights Reserved.

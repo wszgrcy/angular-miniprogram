@@ -1,28 +1,28 @@
 import {
-  DeclarationNode,
-  Decorator,
-  reflectObjectLiteral,
-  TypeScriptReflectionHost,
-} from '@angular/compiler-cli/src/ngtsc/reflection';
-import {
   findAngularDecorator,
   forwardRefResolver,
   unwrapExpression,
 } from '@angular/compiler-cli/src/ngtsc/annotations/src/util';
-import ts, { Program, SourceFile, TypeChecker } from 'typescript';
-import { nodeIteration } from './node-Iteration';
 import { isAngularCorePackage } from '@angular/compiler-cli/src/ngtsc/core';
-import {
-  PartialEvaluator,
-  ResolvedValue,
-} from '@angular/compiler-cli/src/ngtsc/partial_evaluator';
 import {
   ErrorCode,
   FatalDiagnosticError,
 } from '@angular/compiler-cli/src/ngtsc/diagnostics';
 import { Reference } from '@angular/compiler-cli/src/ngtsc/imports';
+import {
+  PartialEvaluator,
+  ResolvedValue,
+} from '@angular/compiler-cli/src/ngtsc/partial_evaluator';
+import {
+  DeclarationNode,
+  Decorator,
+  TypeScriptReflectionHost,
+  reflectObjectLiteral,
+} from '@angular/compiler-cli/src/ngtsc/reflection';
 import { ClassDeclaration } from '@angular/compiler-cli/src/ngtsc/reflection/src/host';
 import * as path from 'path';
+import ts, { Program, SourceFile, TypeChecker } from 'typescript';
+import { nodeIteration } from './node-Iteration';
 
 export class DecoratorMetaDataResolver {
   private moduleMetaMap = new Map<
@@ -47,7 +47,7 @@ export class DecoratorMetaDataResolver {
     );
   }
   resolverSourceFile(sf: SourceFile) {
-    let list: ts.ClassDeclaration[] = [];
+    const list: ts.ClassDeclaration[] = [];
     nodeIteration(sf, (node) => {
       if (ts.isClassDeclaration(node) && node.decorators) {
         list.push(node);
@@ -55,7 +55,7 @@ export class DecoratorMetaDataResolver {
     });
     list.forEach((item) => {
       if (this.reflector.isClass(item)) {
-        let decoratorList = this.reflector.getDecoratorsOfDeclaration(item)!;
+        const decoratorList = this.reflector.getDecoratorsOfDeclaration(item)!;
         this.findComponentDecorator(decoratorList, item);
         this.findModuleDecorator(decoratorList, item);
       }
@@ -71,14 +71,17 @@ export class DecoratorMetaDataResolver {
     decoratorList: Decorator[],
     classDeclaration: ts.ClassDeclaration
   ) {
-    let decorator = findAngularDecorator(
+    const decorator = findAngularDecorator(
       decoratorList,
       'Component',
       this.isCore
     );
-    if (!decorator) return;
+    if (!decorator) {
+      return;
+    }
     const meta: ts.ObjectLiteralExpression = unwrapExpression(
       decorator.args![0]
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ) as any;
     if (!ts.isObjectLiteralExpression(meta)) {
       throw new FatalDiagnosticError(
@@ -117,15 +120,18 @@ export class DecoratorMetaDataResolver {
     decoratorList: Decorator[],
     item: ts.ClassDeclaration
   ) {
-    let decorator = findAngularDecorator(
+    const decorator = findAngularDecorator(
       decoratorList,
       'NgModule',
       this.isCore
     );
-    if (!decorator) return;
+    if (!decorator) {
+      return;
+    }
 
     const meta: ts.ObjectLiteralExpression = unwrapExpression(
       decorator.args![0]
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ) as any;
     if (!ts.isObjectLiteralExpression(meta)) {
       throw new FatalDiagnosticError(
@@ -143,7 +149,7 @@ export class DecoratorMetaDataResolver {
   }
   private getReferenceList(node: ts.Expression) {
     const declarationMeta = this.evaluator.evaluate(node, forwardRefResolver);
-    let declarationRefs = this.resolveTypeList(
+    const declarationRefs = this.resolveTypeList(
       node,
       declarationMeta,
 
@@ -161,7 +167,7 @@ export class DecoratorMetaDataResolver {
   ): Reference<ClassDeclaration>[] {
     const refList: Reference<ClassDeclaration>[] = [];
     if (!Array.isArray(resolvedList)) {
-      throw '';
+      throw new Error('');
     }
 
     resolvedList.forEach((entry, idx) => {
@@ -174,13 +180,13 @@ export class DecoratorMetaDataResolver {
         refList.push(...this.resolveTypeList(expr, entry, arrayName));
       } else if (entry instanceof Reference) {
         if (!this.reflector.isClass(entry.node)) {
-          throw '';
+          throw new Error('');
         }
 
         refList.push(entry as Reference<ClassDeclaration>);
       } else {
         // TODO(alxhub): Produce a better diagnostic here - the array index may be an inner array.
-        throw '';
+        throw new Error('');
       }
     });
 

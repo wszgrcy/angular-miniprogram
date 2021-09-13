@@ -1,0 +1,141 @@
+{
+  "root": true,
+  "env": {
+    "es6": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:import/typescript",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking",
+    "prettier"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "tsconfig.json",
+    "sourceType": "module"
+  },
+  "plugins": ["eslint-plugin-import", "@typescript-eslint"],
+  "rules": {
+    "@typescript-eslint/consistent-type-assertions": "warn",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-non-null-assertion": "off",
+    "@typescript-eslint/no-unnecessary-qualifier": "warn",
+    "@typescript-eslint/no-unused-expressions": "warn",
+    "curly": "warn",
+    "import/first": "warn",
+    "import/newline-after-import": "warn",
+    "import/no-absolute-path": "warn",
+    "import/no-duplicates": "warn",
+    "import/no-extraneous-dependencies": ["off", { "devDependencies": false }],
+    "import/no-unassigned-import": [
+      "warn",
+      { "allow": ["miniprogram-api-typings"] }
+    ],
+    "import/order": [
+      "warn",
+      {
+        "alphabetize": { "order": "asc" },
+        "groups": [["builtin", "external"], "parent", "sibling", "index"]
+      }
+    ],
+    "max-len": [
+      "warn",
+      {
+        "code": 140,
+        "ignoreUrls": true,
+        "ignoreStrings": true,
+        "ignoreTemplateLiterals": true,
+        "ignoreComments": true,
+        "ignoreRegExpLiterals": true
+      }
+    ],
+    "max-lines-per-function": ["warn", { "max": 200 }],
+    "no-caller": "error",
+    "no-console": "warn",
+    "no-empty": ["warn", { "allowEmptyCatch": true }],
+    "no-eval": "error",
+    "no-multiple-empty-lines": ["warn"],
+    "no-throw-literal": "warn",
+    "sort-imports": ["warn", { "ignoreDeclarationSort": true }],
+    "spaced-comment": [
+      "warn",
+      "always",
+      {
+        "markers": ["/"]
+      }
+    ],
+    /* TODO: evaluate usage of these rules and fix issues as needed */
+    "no-case-declarations": "off",
+    "no-fallthrough": "off",
+    "no-underscore-dangle": "off",
+    "@typescript-eslint/await-thenable": "off",
+    "@typescript-eslint/ban-types": "off",
+    "@typescript-eslint/no-empty-function": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-implied-eval": "off",
+    "@typescript-eslint/no-var-requires": "off",
+    "@typescript-eslint/no-unnecessary-type-assertion": "off",
+    "@typescript-eslint/no-unsafe-assignment": "off",
+    "@typescript-eslint/no-unsafe-call": "off",
+    "@typescript-eslint/no-unsafe-member-access": "off",
+    "@typescript-eslint/no-unsafe-return": "off",
+    "@typescript-eslint/no-unused-vars": "off",
+    "@typescript-eslint/prefer-regexp-exec": "off",
+    "@typescript-eslint/require-await": "off",
+    "@typescript-eslint/restrict-plus-operands": "off",
+    "@typescript-eslint/restrict-template-expressions": "off",
+    "@typescript-eslint/unbound-method": "off",
+    "prefer-const": "warn",
+    "prefer-rest-params": "error",
+    "prefer-spread": "warn",
+    "@typescript-eslint/no-floating-promises": "warn",
+    "@typescript-eslint/no-inferrable-types": "off",
+    "@typescript-eslint/no-misused-promises": [
+      "warn",
+      { "checksVoidReturn": false }
+    ],
+    "@typescript-eslint/no-this-alias": ["warn", { "allowedNames": ["_this"] }]
+  },
+  "overrides": [
+    {
+      "files": ["**/*.spec.ts", "./test/**/*.ts"],
+      "parserOptions": {
+        "project": "tsconfig.spec.json"
+      },
+      "rules": {
+        "import/no-extraneous-dependencies": [
+          "warn",
+          { "devDependencies": true, "packageDir": "./" }
+        ],
+        "max-lines-per-function": "off",
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["./src/builder/**/*.ts"],
+      "excludedFiles": [
+        "./src/**/*.template.ts",
+        "./src/**/*.d.ts",
+        "**/*.spec.ts",
+        "test"
+      ],
+      "parserOptions": {
+        "project": "tsconfig.builder.json"
+      }
+    },
+    {
+      "files": ["./src/index.ts", "./src/platform/**/*.ts"],
+      "excludedFiles": [
+        "./src/**/*.template.ts",
+        "./src/**/*.d.ts",
+        "**/*.spec.ts",
+        "test"
+      ],
+      "parserOptions": {
+        "project": "tsconfig.module.json"
+      }
+    }
+  ]
+}

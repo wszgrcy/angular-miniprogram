@@ -1,20 +1,21 @@
-import * as webpack from 'webpack';
 import { BuilderContext } from '@angular-devkit/architect';
 import {
   AssetPattern,
   BrowserBuilderOptions,
 } from '@angular-devkit/build-angular';
 import { normalizeAssetPatterns } from '@angular-devkit/build-angular/src/utils/normalize-asset-patterns';
-import { getSystemPath, normalize, Path, resolve } from '@angular-devkit/core';
-import * as path from 'path';
+import { Path, getSystemPath, normalize, resolve } from '@angular-devkit/core';
+import * as fs from 'fs';
 import * as glob from 'glob';
+import * as path from 'path';
+import * as webpack from 'webpack';
+import { DefinePlugin } from 'webpack';
 import { BootstrapAssetsPlugin } from 'webpack-bootstrap-assets-plugin';
+import { PlatformType } from './platform/platform';
+import { PlatformInfo, getPlatformInfo } from './platform/platform-info';
 import { ExportWeiXinAssetsPlugin } from './plugin/export-weixin-assets.plugin';
 import { PagePattern } from './type';
-import * as fs from 'fs';
-import { getPlatformInfo, PlatformInfo } from './platform/platform-info';
-import { PlatformType } from './platform/platform';
-import { DefinePlugin } from 'webpack';
+
 type OptimizationOptions = NonNullable<webpack.Configuration['optimization']>;
 type OptimizationSplitChunksOptions = Exclude<
   OptimizationOptions['splitChunks'],
@@ -63,7 +64,7 @@ export class WebpackConfigurationChange {
     if (!projectName) {
       throw new Error('The builder requires a target.');
     }
-    let projectMetadata = await this.context.getProjectMetadata(projectName);
+    const projectMetadata = await this.context.getProjectMetadata(projectName);
     this.absoluteProjectRoot = normalize(
       getSystemPath(
         resolve(
@@ -72,40 +73,45 @@ export class WebpackConfigurationChange {
         )
       )
     );
-    let relativeSourceRoot = projectMetadata.sourceRoot as string | undefined;
-    let absoluteSourceRootPath =
+    const relativeSourceRoot = projectMetadata.sourceRoot as string | undefined;
+    const absoluteSourceRootPath =
       typeof relativeSourceRoot === 'string'
         ? resolve(this.workspaceRoot, normalize(relativeSourceRoot))
         : undefined;
-    this.absoluteProjectSourceRoot =
-      relativeSourceRoot &&
-      (normalize(getSystemPath(absoluteSourceRootPath!)) as any);
+    if (relativeSourceRoot) {
+      this.absoluteProjectSourceRoot = normalize(
+        getSystemPath(absoluteSourceRootPath!)
+      )!;
+    }
 
     this.pageList = await this.generateModuleInfo(this.options.pages);
     this.componentList = await this.generateModuleInfo(this.options.components);
-    let list = [...this.pageList, ...this.componentList];
+    const list = [...this.pageList, ...this.componentList];
     // 入口
     for (let i = 0; i < list.length; i++) {
       const item = list[i];
-
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (this.config.entry as Record<string, any>)[item.entryName] = [item.src];
     }
     // 出口
-    let oldFileName = this.config.output!.filename as Function;
+    const oldFileName = this.config.output!.filename as Function;
     this.config.output!.filename = (chunkData) => {
-      let page = list.find((item) => item.entryName === chunkData.chunk!.name);
+      const page = list.find(
+        (item) => item.entryName === chunkData.chunk!.name
+      );
       if (page) {
         return page.outputWXS;
       }
       return oldFileName(chunkData);
     };
     // 共享依赖
-    let oldChunks = (this.config.optimization!.splitChunks as any).cacheGroups
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const oldChunks = (this.config.optimization!.splitChunks as any).cacheGroups
       .defaultVendors.chunks;
     (
       (
         this.config.optimization!
-          .splitChunks! as any as OptimizationSplitChunksOptions
+          .splitChunks! as unknown as OptimizationSplitChunksOptions
       ).cacheGroups!.defaultVendors as OptimizationSplitChunksCacheGroup
     ).chunks = (chunk) => {
       if (list.find((item) => item.entryName === chunk.name)) {
@@ -116,7 +122,7 @@ export class WebpackConfigurationChange {
     ((this.config.optimization!.splitChunks as OptimizationSplitChunksOptions)
       .cacheGroups!['moduleChunks'] as OptimizationSplitChunksCacheGroup) = {
       test: (module: webpack.NormalModule) => {
-        let name = module.nameForCondition();
+        const name = module.nameForCondition();
         return (
           name && name.endsWith('.ts') && !/[\\/]node_modules[\\/]/.test(name)
         );
@@ -127,7 +133,7 @@ export class WebpackConfigurationChange {
       chunks: 'all',
     };
     // 出口保留必要加载
-    let assetsPlugin = new BootstrapAssetsPlugin();
+    const assetsPlugin = new BootstrapAssetsPlugin();
     assetsPlugin.hooks.removeChunk.tap('pageHandle', (chunk) => {
       if (
         list.some((page) => page.entryName === chunk.name) ||
@@ -162,13 +168,13 @@ export class WebpackConfigurationChange {
     );
   }
   async generateModuleInfo(list: AssetPattern[]) {
-    let patternList = normalizeAssetPatterns(
+    const patternList = normalizeAssetPatterns(
       list,
       this.workspaceRoot,
       this.absoluteProjectRoot,
       this.absoluteProjectSourceRoot
     );
-    let moduleList: PagePattern[] = [];
+    const moduleList: PagePattern[] = [];
     for (const pattern of patternList) {
       const cwd = path.resolve(this.context.workspaceRoot, pattern.input);
       /** 当前匹配匹配到的文件 */
@@ -182,7 +188,7 @@ export class WebpackConfigurationChange {
 
       moduleList.push(
         ...files.map((file) => {
-          let object: Partial<PagePattern> = {
+          const object: Partial<PagePattern> = {
             entryName: path.basename(file, '.ts').replace(/\./g, '-'),
             fileName: file,
             src: path.join(cwd, file),
@@ -202,6 +208,7 @@ export class WebpackConfigurationChange {
   private componentTemplateLoader() {
     this.config.module!.rules!.unshift({
       test: /\.ts$/,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       loader: (require as any).resolve(
         path.join(__dirname, './loader/component-template.loader')
       ),
@@ -231,14 +238,15 @@ export class WebpackConfigurationChange {
     this.config.plugins!.push(new DefinePlugin(defineObject));
   }
   private changeStylesExportSuffix() {
-    let index = this.config.plugins?.findIndex(
+    const index = this.config.plugins?.findIndex(
       (plugin) =>
         Object.getPrototypeOf(plugin).constructor.name ===
         'MiniCssExtractPlugin'
     );
     if (typeof index === 'number') {
-      let pluginInstance = this.config.plugins![index] as any;
-      let pluginPrototype = Object.getPrototypeOf(pluginInstance);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pluginInstance = this.config.plugins![index] as any;
+      const pluginPrototype = Object.getPrototypeOf(pluginInstance);
       this.config.plugins?.splice(
         index,
         1,

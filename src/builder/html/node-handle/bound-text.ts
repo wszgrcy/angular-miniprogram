@@ -2,11 +2,11 @@ import { ASTWithSource, Interpolation } from '@angular/compiler';
 import { BoundText } from '@angular/compiler/src/render3/r3_ast';
 import { ExpressionConvert } from '../expression-to-string';
 import {
-  ParsedNode,
-  NgElementMeta,
   NgBoundTextMeta,
+  NgElementMeta,
   NgNodeKind,
   NgNodeMeta,
+  ParsedNode,
 } from './interface';
 import { BindValue, PlainValue } from './value';
 
@@ -19,11 +19,11 @@ export class ParsedNgBoundText implements ParsedNode<NgBoundTextMeta> {
     public parent: ParsedNode<NgNodeMeta> | undefined
   ) {}
   analysis() {
-    let ast = (this.node.value as ASTWithSource).ast as Interpolation;
+    const ast = (this.node.value as ASTWithSource).ast as Interpolation;
     ast.strings.forEach((item, i) => {
       this.valueList.push(new PlainValue(item));
-      let expressionConvert = new ExpressionConvert();
-      let result = expressionConvert.toString(ast.expressions[i]);
+      const expressionConvert = new ExpressionConvert();
+      const result = expressionConvert.toString(ast.expressions[i]);
       if (result) {
         this.bindValueList.push(...expressionConvert.propertyReadList);
         this.valueList.push(new BindValue(result));
@@ -39,7 +39,7 @@ export class ParsedNgBoundText implements ParsedNode<NgBoundTextMeta> {
     };
   }
   getBindValueList() {
-    let parentList = this.getParentBindValueList();
+    const parentList = this.getParentBindValueList();
     return this.bindValueList.filter((item) => !parentList.includes(item));
   }
   getParentBindValueList() {

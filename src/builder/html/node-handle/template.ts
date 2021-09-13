@@ -1,26 +1,26 @@
 import { ASTWithSource } from '@angular/compiler';
+import { TypeCheckShimGenerator } from '@angular/compiler-cli/src/ngtsc/typecheck';
 import {
   BoundAttribute,
   Template,
   TextAttribute,
 } from '@angular/compiler/src/render3/r3_ast';
-import { isElement } from './type-predicate';
+import { ExpressionConvert } from '../expression-to-string';
 import { ParsedNgElement } from './element';
+import { GlobalContext } from './global-context';
 import {
-  NgNodeMeta,
+  NgDefaultDirective,
+  NgDirective,
+  NgForDirective,
+  NgIfDirective,
   NgNodeKind,
+  NgNodeMeta,
+  NgSwitchDirective,
   NgTemplateMeta,
   ParsedNode,
-  NgDirective,
-  NgIfDirective,
-  NgForDirective,
-  NgSwitchDirective,
-  NgDefaultDirective,
 } from './interface';
+import { isElement } from './type-predicate';
 import { BindValue, PlainValue } from './value';
-import { TypeCheckShimGenerator } from '@angular/compiler-cli/src/ngtsc/typecheck';
-import { GlobalContext } from './global-context';
-import { ExpressionConvert } from '../expression-to-string';
 
 export class NgTemplate implements ParsedNode<NgTemplateMeta> {
   kind = NgNodeKind.Template;
@@ -38,7 +38,7 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
   getOriginChildren() {
     return this.node.children;
   }
-  setNgNodeChildren(children: any[]) {
+  setNgNodeChildren(children: ParsedNode<NgNodeMeta>[]) {
     this.children = children;
   }
   private transform(): NgDirective | undefined {
@@ -47,11 +47,11 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
      *
      */
     this.attrs = this.node.templateAttrs;
-    let isNgIf = this.attrs.some((item) => item.name === 'ngIf');
-    let isNgFor = this.attrs.some(
+    const isNgIf = this.attrs.some((item) => item.name === 'ngIf');
+    const isNgFor = this.attrs.some(
       (item) => item.name === 'ngFor' || item.name === 'ngForOf'
     );
-    let isSwitch = this.attrs.some(
+    const isSwitch = this.attrs.some(
       (item) => item.name === 'ngSwitchCase' || item.name === 'ngSwitchDefault'
     );
 
@@ -64,7 +64,7 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
     } else if (this.node.tagName === 'ng-template') {
       return this.defaultTransform();
     } else {
-      throw '没有找到对应指令.目前仅支持ngIf,ngFor,ngSwitch';
+      throw new Error('没有找到对应指令.目前仅支持ngIf,ngFor,ngSwitch');
     }
   }
   private defaultTransform(): NgDefaultDirective {
@@ -77,9 +77,9 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
     };
   }
   private ngIfTransform(): NgIfDirective {
-    let ngIf = this.attrs.find((item) => item.name === 'ngIf')!;
-    let ngIfElse = this.attrs.find((item) => item.name === 'ngIfElse')!;
-    let ngIfThen = this.attrs.find((item) => item.name === 'ngIfThen')!;
+    const ngIf = this.attrs.find((item) => item.name === 'ngIf')!;
+    const ngIfElse = this.attrs.find((item) => item.name === 'ngIfElse')!;
+    const ngIfThen = this.attrs.find((item) => item.name === 'ngIfThen')!;
     return {
       type: 'if',
       assert: this.getAttrValue(ngIf),
@@ -88,13 +88,15 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
     };
   }
   private ngForTramsform(): NgForDirective {
-    let ngFor = this.attrs.find((item) => item.name === 'ngForOf')!;
-    let ngForValue = this.getAttrValue(ngFor);
-    let ngForItem = this.node.variables.find(
+    const ngFor = this.attrs.find((item) => item.name === 'ngForOf')!;
+    const ngForValue = this.getAttrValue(ngFor);
+    const ngForItem = this.node.variables.find(
       (item) => item.value === '$implicit'
     )!;
     this.autoGenerateValueList.push(ngForItem.name);
-    let ngForIndex = this.node.variables.find((item) => item.value === 'index');
+    const ngForIndex = this.node.variables.find(
+      (item) => item.value === 'index'
+    );
     if (ngForIndex) {
       this.autoGenerateValueList.push(ngForIndex.name);
     }
@@ -106,10 +108,12 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
     };
   }
   private ngSwitchTransform(): NgDirective {
-    let ngSwitchDefault = this.attrs.find(
+    const ngSwitchDefault = this.attrs.find(
       (item) => item.name === 'ngSwitchDefault'
     );
-    let ngSwitchCase = this.attrs.find((item) => item.name === 'ngSwitchCase');
+    const ngSwitchCase = this.attrs.find(
+      (item) => item.name === 'ngSwitchCase'
+    );
     let parent = this.parent;
     let result: { first: boolean; ngSwitch: BoundAttribute } | undefined;
     while (parent) {
@@ -121,8 +125,8 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
       }
       parent = parent.parent;
     }
-    let switchValueExpression = new ExpressionConvert();
-    let switchValue = switchValueExpression.toString(
+    const switchValueExpression = new ExpressionConvert();
+    const switchValue = switchValueExpression.toString(
       (result!.ngSwitch.value as ASTWithSource).ast
     );
     this.bindValueList.push(...switchValueExpression.propertyReadList);
@@ -141,9 +145,9 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
     if (typeof value.value === 'string') {
       return new PlainValue(value.value);
     } else {
-      let instance = new ExpressionConvert();
-      let string = instance.toString((value.value as ASTWithSource).ast);
-      let result = new BindValue(string);
+      const instance = new ExpressionConvert();
+      const string = instance.toString((value.value as ASTWithSource).ast);
+      const result = new BindValue(string);
       if (record) {
         this.bindValueList.push(...instance.propertyReadList);
       }
@@ -151,9 +155,9 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
     }
   }
   getNodeMeta(globalContext: GlobalContext): NgTemplateMeta {
-    let directive = this.transform()!;
+    const directive = this.transform()!;
 
-    let meta: NgTemplateMeta = {
+    const meta: NgTemplateMeta = {
       kind: NgNodeKind.Template,
       children: this.children.map((child) => child.getNodeMeta(globalContext)),
       directive: directive,
@@ -165,7 +169,7 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
     return meta;
   }
   getBindValueList() {
-    let list = [
+    const list = [
       ...this.bindValueList,
       ...this.children
         .map((item) => item.getBindValueList())
@@ -174,7 +178,7 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
           return pre;
         }, []),
     ];
-    let parentList = this.getParentBindValueList();
+    const parentList = this.getParentBindValueList();
     return list.filter((item) => !parentList.includes(item));
   }
   getParentBindValueList() {

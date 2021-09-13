@@ -9,25 +9,29 @@ import {
   Type,
 } from '@angular/core';
 import { Observable, Subscription } from 'rxjs';
-import { ComponentInitFactory, WxComponentInstance, WxLifetimes } from './type';
+import {
+  ComponentInitFactory,
+  NgCompileComponent,
+  WxComponentInstance,
+  WxLifetimes,
+} from './type';
 import { strictEquals } from './utils';
 
 export function generateWxComponent<C>(
-  component: Type<C>,
+  component: Type<C> & NgCompileComponent,
   componentOptions: Partial<
     WechatMiniprogram.Component.Options<{}, {}, {}>
   > = {}
 ) {
-  const inputs: Record<string, string[] | string> = (component as any).ɵcmp
-    .inputs;
-  const outputs: Record<string, string> = (component as any).ɵcmp.outputs;
-  let fnList: string[] = [];
+  const inputs = component.ɵcmp.inputs;
+  const outputs = component.ɵcmp.outputs;
+  const fnList: string[] = [];
   let tmpComponent = component.prototype;
   while (tmpComponent) {
     if (tmpComponent.constructor && tmpComponent.constructor === Object) {
       break;
     }
-    let list = Object.getOwnPropertyNames(tmpComponent).filter(
+    const list = Object.getOwnPropertyNames(tmpComponent).filter(
       (item) => !/(constructor)/.test(item)
     );
     fnList.push(...list);
@@ -35,7 +39,8 @@ export function generateWxComponent<C>(
   }
   return (componentInitFactory: ComponentInitFactory, isPage?: boolean) => {
     const inputNameList = Object.keys(inputs);
-    let observers: Record<string, (...args: any[]) => any> | undefined =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let observers: Record<string, (...args: any[]) => void> | undefined =
       undefined;
     if (inputNameList.length) {
       observers = {
@@ -48,17 +53,17 @@ export function generateWxComponent<C>(
       };
     }
 
-    let bootStrapFn = (wxComponentInstance: WxComponentInstance) => {
+    const bootStrapFn = (wxComponentInstance: WxComponentInstance) => {
       return (wxComponentInstance.__waitNgComponentInit = componentInitFactory(
         wxComponentInstance
       ).then((value) => {
-        let componentRef = value.componentRef;
+        const componentRef = value.componentRef;
         wxComponentInstance.__ngComponentInstance = componentRef.instance;
         wxComponentInstance.__ngComponentInjector = componentRef.injector;
         wxComponentInstance.__ngZone = componentRef.injector.get(NgZone);
         wxComponentInstance.__ngComponentRef = componentRef;
 
-        let subscriptionList: Subscription[] = [];
+        const subscriptionList: Subscription[] = [];
         wxComponentInstance.__ngComponentDestroy = () => {
           componentRef.destroy();
           subscriptionList.forEach((item) => {
@@ -67,7 +72,8 @@ export function generateWxComponent<C>(
         };
 
         Object.keys(outputs).forEach((output) => {
-          let ob: Observable<{
+          const ob: Observable<{
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             detail?: any;
             options?: WechatMiniprogram.Component.TriggerEventOption;
           }> = componentRef.instance[output];
@@ -89,50 +95,67 @@ export function generateWxComponent<C>(
       }));
     };
     type LifetimeKey = keyof WechatMiniprogram.Component.Lifetimes['lifetimes'];
-    let lifetimes: { [p in LifetimeKey]: (...args: any[]) => any } = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lifetimes = (
       ['attached', 'detached', 'error', 'moved', 'ready'] as LifetimeKey[]
     ).reduce((pre, lifetime) => {
-      pre[lifetime] = function () {
-        this.__waitNgComponentInit.then((instance: WxLifetimes) => {
-          if (instance.wxLifetimes && instance.wxLifetimes[lifetime]) {
-            (instance.wxLifetimes[lifetime] as any)(...Array.from(arguments));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pre[lifetime] = function (this: WxComponentInstance, ...args: any[]) {
+        this.__waitNgComponentInit.then(
+          (instance: WxLifetimes) => {
+            if (instance.wxLifetimes && instance.wxLifetimes[lifetime]) {
+              (instance.wxLifetimes[lifetime] as Function)(...args);
+            }
+          },
+          (rej) => {
+            throw rej;
           }
-        });
+        );
       };
       return pre;
-    }, {} as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }, {} as { [p in LifetimeKey]: (...args: any[]) => void });
     type PageLifetimeKey = keyof WechatMiniprogram.Component.PageLifetimes;
-    let pageLifetimes: { [p in PageLifetimeKey]: (...args: any[]) => any } = (
+    const pageLifetimes = (
       ['hide', 'resize', 'show'] as PageLifetimeKey[]
     ).reduce((pre, cur) => {
-      pre[cur] = function () {
-        this.__waitNgComponentInit.then((instance: WxLifetimes) => {
-          if (instance.wxPageLifetimes && instance.wxPageLifetimes[cur]) {
-            (instance.wxPageLifetimes[cur] as any)(...Array.from(arguments));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pre[cur] = function (this: WxComponentInstance, ...args: any[]) {
+        this.__waitNgComponentInit.then(
+          (instance: WxLifetimes) => {
+            if (instance.wxPageLifetimes && instance.wxPageLifetimes[cur]) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (instance.wxPageLifetimes[cur] as any)(...args);
+            }
+          },
+          (rej) => {
+            throw rej;
           }
-        });
+        );
       };
       return pre;
-    }, {} as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }, {} as { [p in PageLifetimeKey]: (...args: any[]) => void });
     Component({
       options: componentOptions.options,
       externalClasses: componentOptions.externalClasses,
       observers: observers,
       properties: Object.keys(inputs).reduce(
-        (pre: Record<string, any>, cur) => {
+        (pre, cur) => {
           pre[cur] = { value: null, type: null };
           return pre;
         },
-        {}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        {} as Record<string, any>
       ),
-      methods: fnList.reduce((pre: Record<string, any>, cur) => {
-        pre[cur] = function (this: WxComponentInstance) {
-          let ngZone = this.__ngComponentInjector.get(NgZone);
+      methods: fnList.reduce((pre: Record<string, Function>, cur) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        pre[cur] = function (this: WxComponentInstance, ...args: any[]) {
+          const ngZone = this.__ngComponentInjector.get(NgZone);
           return ngZone.run(() => {
-            this.__ngComponentInstance[cur].apply(
-              this.__ngComponentInstance,
-              Array.from(arguments)
-            );
+            (this.__ngComponentInstance[cur] as Function).bind(
+              this.__ngComponentInstance
+            )(...args);
           });
         };
         return pre;
@@ -141,18 +164,28 @@ export function generateWxComponent<C>(
       lifetimes: {
         ...lifetimes,
         created(this: WxComponentInstance) {
-          let ref = bootStrapFn(this);
-          ref.then((ngComponentInstance) => {
-            if (this.__firstChangeFunction) {
-              this.__firstChangeFunction(ngComponentInstance);
+          const ref = bootStrapFn(this);
+          ref.then(
+            (ngComponentInstance) => {
+              if (this.__firstChangeFunction) {
+                this.__firstChangeFunction(ngComponentInstance);
+              }
+              this.__ngComponentInjector.get(ChangeDetectorRef).detectChanges();
+            },
+            (rej) => {
+              throw rej;
             }
-            this.__ngComponentInjector.get(ChangeDetectorRef).detectChanges();
-          });
+          );
         },
         detached(this: WxComponentInstance) {
-          this.__waitNgComponentInit.then((ref) => {
-            this.__ngComponentDestroy();
-          });
+          this.__waitNgComponentInit.then(
+            (ref) => {
+              this.__ngComponentDestroy();
+            },
+            (rej) => {
+              throw rej;
+            }
+          );
         },
       },
       pageLifetimes: isPage ? pageLifetimes : {},
@@ -165,16 +198,19 @@ export function generateWxComponent<C>(
 
 function valueChange(
   wxComponentInstance: WxComponentInstance,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   changeList: any[] = [],
   inputNameList: string[] = []
 ) {
-  let changeObject = changeList.reduce((pre, cur, index) => {
+  const changeObject = changeList.reduce((pre, cur, index) => {
     pre[inputNameList[index]] = cur;
     return pre;
   }, Object.create(null));
-  let ngComponentInstance: OnChanges & Record<string, any> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ngComponentInstance: OnChanges & Record<string, any> =
     wxComponentInstance.__ngComponentInstance;
-  let componentRef: ComponentRef<any> = wxComponentInstance.__ngComponentRef;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const componentRef: ComponentRef<any> = wxComponentInstance.__ngComponentRef;
   if (typeof ngComponentInstance == 'undefined') {
     wxComponentInstance.__firstChangeFunction =
       wxComponentInstance.__firstChangeFunction ||
@@ -208,7 +244,7 @@ function valueChange(
       }
     }
   }
-  let simpleChanges: SimpleChanges = {};
+  const simpleChanges: SimpleChanges = {};
   for (const propertyName in changeObject) {
     if (Object.prototype.hasOwnProperty.call(changeObject, propertyName)) {
       const currentValue = changeObject[propertyName];

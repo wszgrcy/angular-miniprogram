@@ -1,8 +1,9 @@
 import { Renderer2 } from '@angular/core';
+
 class NoopNode {}
 export class WeixinMiniProgramRenderer implements Renderer2 {
   constructor() {}
-  data: { [key: string]: any } = Object.create(null);
+  data = Object.create(null);
   destroy() {}
   createElement(name: string, namespace?: string | null) {
     return new NoopNode();
@@ -14,18 +15,21 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
     return new NoopNode();
   }
   destroyNode() {}
-  appendChild(parent: any, newChild: any) {}
-  insertBefore(parent: any, newChild: any, refChild: any, isMove?: boolean) {}
+  appendChild() {}
+  insertBefore() {}
   removeChild() {}
-  selectRootElement(selectorOrNode: string | any, preserveContent?: boolean) {
+  selectRootElement(
+    selectorOrNode: string | unknown,
+    preserveContent?: boolean
+  ) {
     return new NoopNode();
   }
-  parentNode(node: any) {
+  parentNode(node: unknown) {
     return new NoopNode();
   }
   nextSibling() {}
   setAttribute(
-    el: any,
+    el: unknown,
     name: string,
     value: string,
     namespace?: string | null
@@ -36,7 +40,7 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
   setStyle() {}
   removeStyle() {}
   setProperty() {}
-  setValue(node: any, value: string) {}
+  setValue(node: unknown, value: string) {}
   listen() {
     return () => {};
   }

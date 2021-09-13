@@ -1,9 +1,12 @@
-import { PLATFORM_INITIALIZER, StaticProvider } from '@angular/core';
-import { createPlatformFactory } from '@angular/core';
-import { platformCore } from '@angular/core';
-import { AppOptions } from './type';
-import { APP_TOKEN } from './module/token/app.token';
+import {
+  PLATFORM_INITIALIZER,
+  StaticProvider,
+  createPlatformFactory,
+  platformCore,
+} from '@angular/core';
 import { componentTemplateHookFactory } from './component-template-hook.factory';
+import { APP_TOKEN } from './module/token/app.token';
+import { AppOptions } from './type';
 
 export function platformWeixinMiniProgram(
   extraProviders: StaticProvider[] = [],
@@ -23,12 +26,7 @@ export function platformWeixinMiniProgram(
 export function loadWeixinApp(
   app: Parameters<WechatMiniprogram.App.Constructor>[0] = {}
 ) {
-  App({
-    ...app,
-    onLaunch(options) {
-      app && app.onLaunch && app.onLaunch(options);
-    },
-  });
+  App(app);
   const appInstance = getApp<AppOptions>();
   return appInstance;
 }

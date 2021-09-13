@@ -1,6 +1,7 @@
 import { Injector, Type } from '@angular/core';
-import { AppOptions, ModuleInitResult, WxComponentInstance } from './type';
 import { generateWxComponent } from './component.base';
+import { AppOptions, ModuleInitResult, WxComponentInstance } from './type';
+
 export function componentRegistry<M, C>(
   module: Type<M>,
   component: Type<C>,
@@ -10,7 +11,7 @@ export function componentRegistry<M, C>(
 ) {
   const app = getApp<AppOptions>();
   module.prototype.initComponent = function (injector: Injector) {
-    let promise = app.__pageModuleLoadingMap.get(module);
+    const promise = app.__pageModuleLoadingMap.get(module);
     if (promise) {
       promise({ injector, instance: this });
     } else {
@@ -21,12 +22,12 @@ export function componentRegistry<M, C>(
     }
   };
 
-  let ngInitFactory = async (wxComponentInstance_1: WxComponentInstance) => {
+  const ngInitFactory = async (wxComponentInstance_1: WxComponentInstance) => {
     let result = app.__pageModuleLoadedMap.get(module);
     if (!result) {
       let resolve!: (value_2: ModuleInitResult) => void;
       let reject;
-      let p = new Promise<ModuleInitResult>((res, rej) => {
+      const p = new Promise<ModuleInitResult>((res, rej) => {
         resolve = res;
         reject = rej;
       });
@@ -35,7 +36,7 @@ export function componentRegistry<M, C>(
       result = p;
     }
     const { injector, instance } = await result;
-    let componentRef = app.__ngStartComponent(
+    const componentRef = app.__ngStartComponent(
       injector,
       component,
       wxComponentInstance_1
@@ -43,6 +44,10 @@ export function componentRegistry<M, C>(
     return { ngModuleInstance: instance, componentRef };
   };
 
-  let wxComponentFactory = generateWxComponent(component, componentOptions);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const wxComponentFactory = generateWxComponent(
+    component as any,
+    componentOptions
+  );
   wxComponentFactory(ngInitFactory);
 }

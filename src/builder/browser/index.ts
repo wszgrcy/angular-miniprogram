@@ -1,19 +1,26 @@
 import { BuilderContext, createBuilder } from '@angular-devkit/architect';
 import {
+  AssetPattern,
   BrowserBuilderOptions,
   executeBrowserBuilder,
 } from '@angular-devkit/build-angular';
 import * as webpack from 'webpack';
+import { PlatformType } from '../platform/platform';
 import { WebpackConfigurationChange } from '../webpack-configuration-change';
+
 export default createBuilder(
   (
-    angularOptions: BrowserBuilderOptions,
+    angularOptions: BrowserBuilderOptions & {
+      pages: AssetPattern[];
+      components: AssetPattern[];
+      platform: PlatformType;
+    },
     context: BuilderContext
   ): ReturnType<typeof executeBrowserBuilder> => {
     return executeBrowserBuilder(angularOptions, context, {
       webpackConfiguration: async (options: webpack.Configuration) => {
-        let config = new WebpackConfigurationChange(
-          angularOptions as any,
+        const config = new WebpackConfigurationChange(
+          angularOptions,
           context,
           options
         );

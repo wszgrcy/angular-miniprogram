@@ -35,30 +35,30 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     } else if (isNgTemplateMeta(node)) {
       return this.ngTemplateTransform(node);
     } else {
-      throw '未知的ng节点元数据';
+      throw new Error('未知的ng节点元数据');
     }
   }
   compileTemplate(node: NgNodeMeta) {
     return this._compileTemplate(node);
   }
   compile(nodes: NgNodeMeta[]) {
-    let result = nodes
+    const result = nodes
       .map((ngModeMeta) => this.compileTemplate(ngModeMeta))
       .join('');
-    let templateImport = this.exportTemplateList.length
+    const templateImport = this.exportTemplateList.length
       ? `<import src="./template.wxml"/>`
       : '';
     return `${templateImport}<template name="main-template">${result}</template><template is="main-template" data="{{...${this.viewContextName}}}"></template>`;
   }
   private ngElementTransform(node: NgElementMeta): string {
-    let children = node.children.map((child) => this._compileTemplate(child));
-    let attributeStr = Object.entries(node.attributes)
+    const children = node.children.map((child) => this._compileTemplate(child));
+    const attributeStr = Object.entries(node.attributes)
       .map(([key, value]) => `${key}="${value}"`)
       .join(' ');
-    let inputStr = Object.entries(node.inputs)
+    const inputStr = Object.entries(node.inputs)
       .map(([key, value]) => `${key}="{{${value}}}"`)
       .join(' ');
-    let outputStr = node.outputs
+    const outputStr = node.outputs
       .map(
         (item) => `${item.name}="${item.handler.source!.replace(/\(.*$/, '')}"`
       )
@@ -79,7 +79,7 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     return node.name ? `<slot name="${node.name}"></slot>` : `<slot></slot>`;
   }
   private ngTemplateTransform(node: NgTemplateMeta): string {
-    let children = node.children.map((child) => this._compileTemplate(child));
+    const children = node.children.map((child) => this._compileTemplate(child));
     let content = '';
     if (node.directive.type === 'none') {
       this.exportTemplateList.push({
@@ -133,10 +133,10 @@ export abstract class WxTransformLike extends TemplateTransformBase {
           ''
         )}</block>`;
       } else {
-        throw '未知的解析指令';
+        throw new Error('未知的解析指令');
       }
     } else {
-      throw '未知的解析节点';
+      throw new Error('未知的解析节点');
     }
   }
   private ngTextTransform(node: NgTextMeta): string {
@@ -153,7 +153,7 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     return this.globalContext.findTemplate(name)!.data.join(',');
   }
   private getTemplateDataStr(name: string) {
-    let templateData = this.getTemplateData(name);
+    const templateData = this.getTemplateData(name);
     if (templateData) {
       return `data="{{${templateData}}}"`;
     }

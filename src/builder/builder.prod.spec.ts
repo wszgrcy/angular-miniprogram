@@ -1,12 +1,12 @@
 import { describeBuilder } from '../../test/plugin-describe-builder';
 import {
+  BROWSER_BUILDER_INFO,
   DEFAULT_ANGULAR_CONFIG,
   buildWebpackBrowserGenerate,
-  BROWSER_BUILDER_INFO,
 } from '../../test/test-builder/browser';
 import { WebpackConfigurationChange } from '../builder/webpack-configuration-change';
 
-let angularConfig = {
+const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,
   platform: 'wx',
   buildOptimizer: true,
@@ -16,7 +16,8 @@ let angularConfig = {
 describeBuilder(
   buildWebpackBrowserGenerate((options, context) => {
     return async (config) => {
-      let webpackConfigurationChange = new WebpackConfigurationChange(
+      const webpackConfigurationChange = new WebpackConfigurationChange(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         options as any,
         context,
         config
@@ -30,7 +31,7 @@ describeBuilder(
     describe('builder-prod', () => {
       it('运行', async () => {
         harness.useTarget('build', angularConfig);
-        let result = await harness.executeOnce();
+        const result = await harness.executeOnce();
         expect(result).toBeTruthy();
         expect(result.error).toBeFalsy();
         expect(result.logs[0].level !== 'error').toBeTruthy();

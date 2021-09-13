@@ -9,6 +9,7 @@ import { BindValue, PlainValue } from './value';
 
 export interface ParsedNode<T> {
   kind: NgNodeKind;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parent: ParsedNode<any> | undefined;
   bindValueList: string[];
   autoGenerateValueList?: string[];

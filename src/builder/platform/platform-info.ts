@@ -8,6 +8,6 @@ export function getPlatformInfo(platform: PlatformType) {
     case PlatformType.wx:
       return new WxPlatformInfo();
     default:
-      throw '未能匹配到相关平台';
+      throw new Error('未能匹配到相关平台');
   }
 }

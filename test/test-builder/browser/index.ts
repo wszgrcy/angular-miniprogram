@@ -1,11 +1,12 @@
 import { BuilderContext } from '@angular-devkit/architect';
 import {
   BrowserBuilderOptions,
-  executeBrowserBuilder,
   ExecutionTransformer,
+  executeBrowserBuilder,
 } from '@angular-devkit/build-angular';
-import * as webpack from 'webpack';
 import * as path from 'path';
+import * as webpack from 'webpack';
+
 export type CustomWebpackBrowserSchema = BrowserBuilderOptions;
 
 export function buildWebpackBrowserGenerate(

@@ -1,5 +1,5 @@
 import { Content } from '@angular/compiler/src/render3/r3_ast';
-import { ParsedNode, NgNodeMeta, NgContentMeta, NgNodeKind } from './interface';
+import { NgContentMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
 
 export class ParsedNgContent implements ParsedNode<NgContentMeta> {
   kind = NgNodeKind.Content;
@@ -9,7 +9,7 @@ export class ParsedNgContent implements ParsedNode<NgContentMeta> {
     public parent: ParsedNode<NgNodeMeta> | undefined
   ) {}
   getNodeMeta(): NgContentMeta {
-    let nameAttr = this.node.attributes.find((item) => item.name === 'name');
+    const nameAttr = this.node.attributes.find((item) => item.name === 'name');
 
     return {
       kind: NgNodeKind.Content,

@@ -1,10 +1,4 @@
-import {
-  isBoundText,
-  isContent,
-  isElement,
-  isTemplate,
-  isText,
-} from './type-protection';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   BoundText,
   Content,
@@ -13,6 +7,14 @@ import {
   Template,
   Text,
 } from '@angular/compiler/src/render3/r3_ast';
+import {
+  isBoundText,
+  isContent,
+  isElement,
+  isTemplate,
+  isText,
+} from './type-protection';
+
 export interface NodeIterationOptions {
   Element: (node: Element) => any;
   BoundText: (node: BoundText) => any;

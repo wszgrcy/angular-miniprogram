@@ -24,6 +24,9 @@ jobs:
       - name: install-dependencies
         run: |
           yarn
+      - name: lint
+        run: |
+          yarn lint
       - name: test
         run: |
           yarn test

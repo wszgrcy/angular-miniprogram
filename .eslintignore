@@ -1,0 +1,9 @@
+/tests/
+.yarn/
+dist/
+node_modules/
+test/test-project-host-hello-world-app-*
+test/hello-world-app
+jest.builder.config.ts
+build-ng-package.ts
+schema-merge.ts
