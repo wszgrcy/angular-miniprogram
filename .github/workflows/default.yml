@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - test-ci
 env:
   REPOSITORY_PATH: https://${{secrets.ACCESS_TOKEN}}@github.com/
 jobs:
@@ -36,7 +36,7 @@ jobs:
       - id: publish
         name: publish
         uses: JS-DevTools/npm-publish@v1
-        if: ${{ github.repository_owner	== 'wszgrcy' }}
+        if: ${{ github.repository_owner	== 'wszgrcy1' }}
         with:
           token: ${{ secrets.NPM_PUBLISH_TOKEN }}
           package: ./dist/package.json
