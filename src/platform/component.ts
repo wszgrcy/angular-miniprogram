@@ -44,8 +44,8 @@ export function componentRegistry<M, C>(
     return { ngModuleInstance: instance, componentRef };
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wxComponentFactory = generateWxComponent(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     component as any,
     componentOptions
   );

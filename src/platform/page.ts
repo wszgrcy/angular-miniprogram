@@ -7,8 +7,8 @@ export function pageStartup<M, C>(
   component: Type<C>,
   componentOptions?: Partial<WechatMiniprogram.Component.Options<{}, {}, {}>>
 ) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const wxComponentFactory = generateWxComponent(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     component as any,
     componentOptions
   );
