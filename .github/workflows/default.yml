@@ -36,10 +36,11 @@ jobs:
       - id: publish
         name: publish
         uses: JS-DevTools/npm-publish@v1
+        if: ${{ github.repository_owner	== 'wszgrcy' }}
         with:
           token: ${{ secrets.NPM_PUBLISH_TOKEN }}
           package: ./dist/package.json
-      - if: steps.publish.outputs.type != 'none'
+      - if: ${{ steps.publish && steps.publish.outputs.type != 'none' }}
         run: |
           echo "[${{ steps.publish.outputs.type }}]Version changed: ${{ steps.publish.outputs.old-version }} => ${{ steps.publish.outputs.version }}"
           git tag v${{steps.publish.outputs.version}}
