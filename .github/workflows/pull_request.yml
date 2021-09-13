@@ -1,0 +1,30 @@
+name: PR
+
+on:
+  pull_request:
+    branches:
+      - master
+env:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: pull-code
+        uses: actions/checkout@v2
+      - name: install-node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+      - name: install-dependencies
+        run: |
+          yarn
+      - name: lint
+        run: |
+          yarn lint
+      - name: test
+        run: |
+          yarn test
+      - name: build
+        run: |
+          yarn build
