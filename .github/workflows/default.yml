@@ -40,7 +40,7 @@ jobs:
         with:
           token: ${{ secrets.NPM_PUBLISH_TOKEN }}
           package: ./dist/package.json
-      - if: ${{ steps.publish && steps.publish.outputs.type != 'none' }}
+      - if: ${{ steps.publish && steps.publish.outputs && steps.publish.outputs.type != 'none' }}
         run: |
           echo "[${{ steps.publish.outputs.type }}]Version changed: ${{ steps.publish.outputs.old-version }} => ${{ steps.publish.outputs.version }}"
           git tag v${{steps.publish.outputs.version}}
