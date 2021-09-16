@@ -34,12 +34,12 @@ import { NgComponentCssExtractPlugin } from './ng-component-css-extract.plugin';
 export interface ExportWeiXinAssetsPluginOptions {
   /** tsConfig配置路径 */
   tsConfig: string;
-  pageList: PagePattern[];
-  componentList: PagePattern[];
   platformInfo: PlatformInfo;
 }
 /** 导出微信的wxml与wxss */
 export class ExportWeiXinAssetsPlugin {
+  private pageList!: PagePattern[];
+  private componentList!: PagePattern[];
   private system!: ts.System;
   private WXMLMap = new Map<string, string>();
   private dependencyUseModule = new Map<string, string[]>();
@@ -67,10 +67,10 @@ export class ExportWeiXinAssetsPlugin {
     const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
     this.originInputFileSystemSync.readFileSync = ifs.readFileSync;
     this.originInputFileSystemSync.statSync = ifs.statSync;
-    const config = readConfiguration(this.options.tsConfig, undefined);
     compiler.hooks.thisCompilation.tap(
       'ExportWeiXinAssetsPlugin',
       (compilation) => {
+        const config = readConfiguration(this.options.tsConfig, undefined);
         this.system = createWebpackSystem(
           compiler.inputFileSystem as InputFileSystemSync,
           normalizePath(compiler.context)
@@ -258,10 +258,9 @@ export class ExportWeiXinAssetsPlugin {
       if (moduleList && moduleList.length) {
         findList.push(...moduleList);
       } else {
-        maybeEntryPath = [
-          ...this.options.pageList,
-          ...this.options.componentList,
-        ].find((item) => path.normalize(item.src) === path.normalize(module!));
+        maybeEntryPath = [...this.pageList, ...this.componentList].find(
+          (item) => path.normalize(item.src) === path.normalize(module!)
+        );
         if (maybeEntryPath) {
           break;
         }
@@ -365,5 +364,9 @@ export class ExportWeiXinAssetsPlugin {
       }
       return stat;
     };
+  }
+  public setEntry(pageList: PagePattern[], componentList: PagePattern[]) {
+    this.pageList = pageList;
+    this.componentList = componentList;
   }
 }

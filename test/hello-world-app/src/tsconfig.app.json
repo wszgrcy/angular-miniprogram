@@ -5,11 +5,6 @@
     "types": [],
     "skipLibCheck": true
   },
-  "files": [
-    "main.ts",
-    "pages/sub1/sub1.entry.ts",
-    "pages/sub2/sub2.entry.ts",
-    "components/cp1/cp1.entry.ts"
-  ],
-  "include": ["**/*.d.ts"]
+  "files": ["main.ts"],
+  "include": ["**/*.d.ts", "pages/**/*.entry.ts", "components/**/*.entry.ts"]
 }
