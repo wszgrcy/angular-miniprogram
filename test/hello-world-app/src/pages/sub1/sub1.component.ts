@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { COMPONENT_TOKEN } from '../../../../../src/platform/module/token/component.token';
 
 @Component({
@@ -7,7 +7,7 @@ import { COMPONENT_TOKEN } from '../../../../../src/platform/module/token/compon
   styleUrls: ['./sub1.component.css'],
   // interpolation:["((","))"]
 })
-export class Sub1Component {
+export class Sub1Component implements OnInit {
   title = 'app666';
   display = false;
   num = 0;
