@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {},
-  "exclude": [],
-  "include": ["**/*.spec.ts"]
+  "exclude": ["**/fixture/**"],
+  "files": [],
+  "include": ["src/builder"]
 }

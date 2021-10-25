@@ -9,9 +9,10 @@ import {
   PrefixNot,
   PropertyRead,
 } from '@angular/compiler';
-import { AST } from '@angular/compiler/src/expression_parser/ast';
+import { AST, BindingPipe } from '@angular/compiler/src/expression_parser/ast';
 import {
   isBinary,
+  isBindingPipe,
   isConditional,
   isKeyedRead,
   isLiteralArray,
@@ -30,6 +31,7 @@ export interface ExpressionIterationOptions {
   LiteralMap: (ast: LiteralMap) => any;
   Conditional: (ast: Conditional) => any;
   KeyedRead: (ast: KeyedRead) => any;
+  BindingPipe: (ast: BindingPipe) => any;
   default: (ast: any) => any;
   empty: (ast: any) => any;
 }
@@ -57,6 +59,8 @@ export function expressionIteration(
     return options.Conditional(ast);
   } else if (isKeyedRead(ast)) {
     return options.KeyedRead(ast);
+  } else if (isBindingPipe(ast)) {
+    return options.BindingPipe(ast);
   }
   return options.default(ast);
 }

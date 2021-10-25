@@ -13,6 +13,7 @@ import {
   InsertChange,
 } from 'cyia-code-util/dist/change/content-change';
 import * as path from 'path';
+import { Inject, Injectable } from 'static-injector';
 import ts, {
   CallExpression,
   CompilerOptions,
@@ -25,7 +26,9 @@ import * as webpack from 'webpack';
 import { RawSource } from 'webpack-sources';
 import { ExportWeiXinAssetsPluginSymbol } from '../const';
 import { TemplateCompiler } from '../html/template-compiler';
+import { BuildPlatform } from '../platform/platform';
 import { PlatformInfo } from '../platform/platform-info';
+import { TS_CONFIG_TOKEN } from '../token/project.token';
 import { DecoratorMetaDataResolver } from '../ts/decorator-metadata-resolver';
 import { PagePattern } from '../type';
 import { RawUpdater } from '../util/raw-updater';
@@ -37,6 +40,7 @@ export interface ExportWeiXinAssetsPluginOptions {
   platformInfo: PlatformInfo;
 }
 /** 导出微信的wxml与wxss */
+@Injectable()
 export class ExportWeiXinAssetsPlugin {
   private pageList!: PagePattern[];
   private componentList!: PagePattern[];
@@ -60,7 +64,16 @@ export class ExportWeiXinAssetsPlugin {
     statSync: undefined,
   };
   private cleanDependencyFileCacheSet = new Set<string>();
-  constructor(private options: ExportWeiXinAssetsPluginOptions) {}
+  private options: ExportWeiXinAssetsPluginOptions;
+  constructor(
+    @Inject(TS_CONFIG_TOKEN) tsConfig: string,
+    buildPlatform: BuildPlatform
+  ) {
+    this.options = {
+      tsConfig: tsConfig,
+      platformInfo: buildPlatform,
+    };
+  }
   apply(compiler: webpack.Compiler) {
     this.compiler = compiler;
     const resourceLoader = new WebpackResourceLoader(compiler.watchMode);

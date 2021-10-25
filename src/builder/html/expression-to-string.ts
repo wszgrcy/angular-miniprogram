@@ -3,7 +3,7 @@ import { expressionIteration } from './expression-iteration';
 
 export class ExpressionConvert {
   propertyReadList: string[] = [];
-
+  pipeList: string[] = [];
   toString(expression: AST): string {
     return expressionIteration(expression, {
       empty: () => '',
@@ -50,6 +50,12 @@ export class ExpressionConvert {
       },
       KeyedRead: (ast) => {
         return `${this.toString(ast.obj)}[${this.toString(ast.key)}]`;
+      },
+      BindingPipe: (ast) => {
+        this.pipeList.push(ast.name);
+        return `getPipe(${ast.name},${this.toString(ast.exp)},${ast.args
+          .map((arg: AST) => this.toString(arg))
+          .join(',')})`;
       },
       default: (ast) => {
         return '';

@@ -195,6 +195,9 @@ const config: InitialOptionsTsJest = {
   globals: {
     'ts-jest': {
       tsconfig: 'tsconfig.spec.json',
+      astTransformers: {
+        before: ['./test/util/jest-test-transformer-loader.js'],
+      },
     },
   },
 };

@@ -7,13 +7,15 @@ import { Path, getSystemPath, normalize, resolve } from '@angular-devkit/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { filter } from 'rxjs/operators';
+import { Injector } from 'static-injector';
 import * as webpack from 'webpack';
 import { DefinePlugin } from 'webpack';
 import { BootstrapAssetsPlugin } from 'webpack-bootstrap-assets-plugin';
-import { PlatformType } from './platform/platform';
+import { BuildPlatform, PlatformType } from './platform/platform';
 import { PlatformInfo, getPlatformInfo } from './platform/platform-info';
 import { DynamicWatchEntryPlugin } from './plugin/dynamic-watch-entry.plugin';
 import { ExportWeiXinAssetsPlugin } from './plugin/export-weixin-assets.plugin';
+import { TS_CONFIG_TOKEN } from './token/project.token';
 import { PagePattern } from './type';
 
 type OptimizationOptions = NonNullable<webpack.Configuration['optimization']>;
@@ -33,6 +35,7 @@ export class WebpackConfigurationChange {
   exportWeiXinAssetsPluginInstance!: ExportWeiXinAssetsPlugin;
   private platformInfo: PlatformInfo;
   private entryList!: PagePattern[];
+  injector: Injector;
   constructor(
     private options: BrowserBuilderOptions & {
       pages: AssetPattern[];
@@ -42,7 +45,20 @@ export class WebpackConfigurationChange {
     private context: BuilderContext,
     private config: webpack.Configuration
   ) {
-    this.platformInfo = getPlatformInfo(options.platform);
+    this.injector = Injector.create({
+      providers: [
+        { provide: BuildPlatform, useValue: getPlatformInfo(options.platform) },
+        { provide: ExportWeiXinAssetsPlugin },
+        {
+          provide: TS_CONFIG_TOKEN,
+          useValue: path.resolve(
+            this.context.workspaceRoot,
+            this.options.tsConfig
+          ),
+        },
+      ],
+    });
+    this.platformInfo = this.injector.get(BuildPlatform);
     config.output!.globalObject = this.platformInfo.globalObject;
   }
 
@@ -159,10 +175,9 @@ export class WebpackConfigurationChange {
     this.config.plugins!.push(assetsPlugin);
   }
   exportWeiXinAssetsPlugin() {
-    this.exportWeiXinAssetsPluginInstance = new ExportWeiXinAssetsPlugin({
-      tsConfig: path.resolve(this.context.workspaceRoot, this.options.tsConfig),
-      platformInfo: this.platformInfo,
-    });
+    this.exportWeiXinAssetsPluginInstance = this.injector.get(
+      ExportWeiXinAssetsPlugin
+    );
     this.config.plugins!.unshift(this.exportWeiXinAssetsPluginInstance);
   }
 

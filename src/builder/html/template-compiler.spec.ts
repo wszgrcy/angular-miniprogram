@@ -144,4 +144,9 @@ describe('template-compiler', () => {
     expect(result.content).toContain('测试');
     expect(result.context).toEqual([]);
   });
+  xit('pipe', () => {
+    const result = defaultTransform(`{{123456|json:1:2:title}}`);
+    expect(result.content).toContain('');
+    expect(result.context).toEqual([]);
+  });
 });

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Binary,
+  BindingPipe,
   Conditional,
   KeyedRead,
   LiteralArray,
@@ -83,5 +84,11 @@ export function isKeyedRead(node: any): node is KeyedRead {
   return (
     node instanceof KeyedRead ||
     node?.__proto__?.constructor?.name === 'KeyedRead'
+  );
+}
+export function isBindingPipe(node: any): node is BindingPipe {
+  return (
+    node instanceof BindingPipe ||
+    node?.__proto__?.constructor?.name === 'BindingPipe'
   );
 }
