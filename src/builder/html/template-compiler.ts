@@ -110,6 +110,7 @@ export class TemplateCompiler {
       content: content,
       template: template,
       context: Array.from(new Set(context)),
+      logic: this.templateTransform.getLogic(),
     };
   }
 

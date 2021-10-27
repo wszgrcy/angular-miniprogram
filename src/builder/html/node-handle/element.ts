@@ -18,6 +18,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   bindValueList: string[] = [];
   ngSwitch: BoundAttribute | undefined;
   ngSwitchFirst = true;
+  ngSwitchIndex = 0;
   singleClosedTag = false;
 
   constructor(
@@ -104,7 +105,12 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     if (this.ngSwitch) {
       const first = this.ngSwitchFirst;
       this.ngSwitchFirst = false;
-      return { first: first, ngSwitch: this.ngSwitch };
+
+      return {
+        first: first,
+        ngSwitch: this.ngSwitch,
+        index: this.ngSwitchIndex++,
+      };
     }
     return undefined;
   }

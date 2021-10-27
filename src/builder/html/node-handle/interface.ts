@@ -69,6 +69,7 @@ export interface NgSwitchDirective {
   default: boolean;
   first: boolean;
   templateName: string;
+  index: number;
 }
 export interface NgDefaultDirective {
   type: 'none';

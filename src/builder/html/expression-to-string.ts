@@ -4,7 +4,7 @@ import { expressionIteration } from './expression-iteration';
 export class ExpressionConvert {
   private propertyReadList: string[] = [];
   private pipeList: string[] = [];
-  contextPrefix: string;
+  contextPrefix: string | undefined;
   toString(expression: AST): string {
     return expressionIteration(expression, {
       empty: () => '',
@@ -55,7 +55,7 @@ export class ExpressionConvert {
       },
       BindingPipe: (ast) => {
         this.pipeList.push(ast.name);
-        return `getPipe(${ast.name},${this.toString(ast.exp)},${ast.args
+        return `getPipe('${ast.name}',${this.toString(ast.exp)},${ast.args
           .map((arg: AST) => this.toString(arg))
           .join(',')})`;
       },

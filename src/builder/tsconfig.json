@@ -1,9 +1,9 @@
 {
-  "extends": "./tsconfig.base.json",
-  "files": ["./src/builder/browser/index.ts"],
+  "extends": "../../tsconfig.base.json",
+  "files": ["./browser/index.ts"],
   "compilerOptions": {
     "noImplicitThis": true,
-    "outDir": "dist/builder",
+    "outDir": "../../dist/builder",
     "declaration": true,
     "strict": true
   },

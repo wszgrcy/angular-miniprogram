@@ -130,7 +130,9 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
       (item) => item.name === 'ngSwitchCase'
     );
     let parent = this.parent;
-    let result: { first: boolean; ngSwitch: BoundAttribute } | undefined;
+    let result:
+      | { first: boolean; ngSwitch: BoundAttribute; index: number }
+      | undefined;
     while (parent) {
       if (isElement(parent)) {
         result = parent.getNgSwitch();
@@ -155,6 +157,7 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
         switchValue: switchValue,
         first: result!.first,
         templateName: ngSwitchTemplateName,
+        index: result!.index,
       },
       {
         type: 'none',

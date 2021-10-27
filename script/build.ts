@@ -10,7 +10,7 @@ export function main() {
   let config = ts.parseJsonSourceFileConfigFileContent(
     jsonSourceFile,
     ts.sys,
-    ''
+    path.dirname(filePath)
   );
   let program = ts.createProgram({
     rootNames: config.fileNames,

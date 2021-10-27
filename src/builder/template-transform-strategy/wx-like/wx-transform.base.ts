@@ -10,14 +10,17 @@ export abstract class WxTransformLike extends TemplateTransformBase {
   constructor() {
     super();
   }
-
+  private logic!: string;
   compile(nodes: NgNodeMeta[]) {
     const container = new WxContainer();
+    container.setContainerContext('Main');
     container.directivePrefix = this.directivePrefix;
     nodes.forEach((node) => {
       container.compileNode(node);
     });
+    this.exportTemplateList = container.getExportTemplate();
     const result = container.export();
+    this.logic = `${result.logic};ctx=wxContainerMain(ctx);`;
     const templateImport = this.exportTemplateList.length
       ? `<import src="./template.wxml"/>`
       : '';
@@ -26,5 +29,8 @@ export abstract class WxTransformLike extends TemplateTransformBase {
 
   getExportTemplate() {
     return this.exportTemplateList.map((item) => `${item.content}`).join(',');
+  }
+  getLogic() {
+    return this.logic;
   }
 }

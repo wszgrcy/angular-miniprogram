@@ -22,7 +22,9 @@ export class ParsedNgBoundText implements ParsedNode<NgBoundTextMeta> {
   analysis() {
     const ast = (this.node.value as ASTWithSource).ast as Interpolation;
     ast.strings.forEach((item, i) => {
-      this.valueList.push(new PlainValue(item));
+      if (item !== '') {
+        this.valueList.push(new PlainValue(item));
+      }
       if (ast.expressions[i]) {
         const result =
           this.templateInterpolationService.expressionConvertToString(

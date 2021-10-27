@@ -7,7 +7,10 @@ export class BindValue {
 export class PlainValue {
   constructor(public value: any) {}
   toString() {
-    return this.value;
+    if (/^\s+$/.test(this.value)) {
+      return `' '`;
+    }
+    return typeof this.value === 'string' ? `'${this.value}'` : this.value;
   }
 }
 export function isBindValue(value: BindValue | PlainValue): value is BindValue {
