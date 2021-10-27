@@ -1,14 +1,15 @@
 import { NgDefaultDirective, NgTemplateMeta } from './interface';
-import { NgTemplate } from './template';
 
-export class GlobalContext {
+export class TemplateGlobalContext {
   private templateList: NgTemplateMeta<NgDefaultDirective>[] = [];
   addTemplate(template: NgTemplateMeta<NgDefaultDirective>) {
     this.templateList.push(template);
   }
   findTemplate(name: string) {
     return this.templateList.find((item) =>
-      item.directive.name.some((item) => item.name === name)
+      item.directive
+        .filter((item) => item.type === 'none')
+        .find((directive) => directive.name.some((item) => item.name === name))
     );
   }
 }

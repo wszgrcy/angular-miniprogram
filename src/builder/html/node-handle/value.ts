@@ -1,11 +1,11 @@
 export class BindValue {
-  constructor(public value: string) {}
-  toString() {
-    return this.value;
+  constructor(public value: (str?: string) => string) {}
+  toString(contextPrefix: string) {
+    return this.value(contextPrefix);
   }
 }
 export class PlainValue {
-  constructor(public value: string) {}
+  constructor(public value: any) {}
   toString() {
     return this.value;
   }

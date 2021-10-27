@@ -14,7 +14,7 @@ export function isNgElementMeta(node: NgNodeMeta): node is NgElementMeta {
 export function isNgBoundTextMeta(node: NgNodeMeta): node is NgBoundTextMeta {
   return node.kind === NgNodeKind.BoundText;
 }
-export function isNgConetentMeta(node: NgNodeMeta): node is NgContentMeta {
+export function isNgContentMeta(node: NgNodeMeta): node is NgContentMeta {
   return node.kind === NgNodeKind.Content;
 }
 export function isNgTemplateMeta(node: NgNodeMeta): node is NgTemplateMeta {

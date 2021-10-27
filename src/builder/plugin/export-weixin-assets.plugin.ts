@@ -13,7 +13,7 @@ import {
   InsertChange,
 } from 'cyia-code-util/dist/change/content-change';
 import * as path from 'path';
-import { Inject, Injectable } from 'static-injector';
+import { Inject, Injectable, Injector } from 'static-injector';
 import ts, {
   CallExpression,
   CompilerOptions,
@@ -25,9 +25,17 @@ import * as webpack from 'webpack';
 
 import { RawSource } from 'webpack-sources';
 import { ExportWeiXinAssetsPluginSymbol } from '../const';
+import { TemplateGlobalContext } from '../html/node-handle/global-context';
 import { TemplateCompiler } from '../html/template-compiler';
+import { TemplateInterpolationService } from '../html/template-interpolation.service';
 import { BuildPlatform } from '../platform/platform';
 import { PlatformInfo } from '../platform/platform-info';
+import { TemplateTransformBase } from '../template-transform-strategy/transform.base';
+import {
+  COMPONENT_FILE_NAME_TOKEN,
+  COMPONENT_TEMPLATE_CONTENT_TOKEN,
+  TEMPLATE_COMPILER_OPTIONS_TOKEN,
+} from '../token/component.token';
 import { TS_CONFIG_TOKEN } from '../token/project.token';
 import { DecoratorMetaDataResolver } from '../ts/decorator-metadata-resolver';
 import { PagePattern } from '../type';
@@ -67,7 +75,8 @@ export class ExportWeiXinAssetsPlugin {
   private options: ExportWeiXinAssetsPluginOptions;
   constructor(
     @Inject(TS_CONFIG_TOKEN) tsConfig: string,
-    buildPlatform: BuildPlatform
+    buildPlatform: BuildPlatform,
+    private injector: Injector
   ) {
     this.options = {
       tsConfig: tsConfig,
@@ -337,12 +346,31 @@ export class ExportWeiXinAssetsPlugin {
       throw new Error('解析错误');
     }
     const interpolation = meta['interpolation'] as string[];
-    const instance = new TemplateCompiler(
-      classDeclaration.getSourceFile().fileName,
-      templateContent,
-      this.options.platformInfo.templateTransform,
-      { interpolation }
-    );
+    const injector = Injector.create({
+      parent: this.injector,
+      providers: [
+        { provide: TemplateCompiler },
+        {
+          provide: COMPONENT_FILE_NAME_TOKEN,
+          useValue: classDeclaration.getSourceFile().fileName,
+        },
+        {
+          provide: COMPONENT_TEMPLATE_CONTENT_TOKEN,
+          useValue: templateContent,
+        },
+        {
+          provide: TEMPLATE_COMPILER_OPTIONS_TOKEN,
+          useValue: { interpolation },
+        },
+        {
+          provide: TemplateTransformBase,
+          useValue: this.options.platformInfo.templateTransform,
+        },
+        { provide: TemplateInterpolationService },
+        { provide: TemplateGlobalContext },
+      ],
+    });
+    const instance = injector.get(TemplateCompiler);
     return instance.transform();
   }
   private restore() {

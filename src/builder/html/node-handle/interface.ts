@@ -1,10 +1,6 @@
-import {
-  BoundAttribute,
-  BoundEvent,
-  Node,
-} from '@angular/compiler/src/render3/r3_ast';
+import { TemplateInterpolationService } from '../template-interpolation.service';
 import { TagEventMeta } from './event';
-import { GlobalContext } from './global-context';
+import { TemplateGlobalContext } from './global-context';
 import { BindValue, PlainValue } from './value';
 
 export interface ParsedNode<T> {
@@ -13,7 +9,8 @@ export interface ParsedNode<T> {
   parent: ParsedNode<any> | undefined;
   bindValueList: string[];
   autoGenerateValueList?: string[];
-  getNodeMeta(globalContext: GlobalContext): T;
+  templateInterpolationService: TemplateInterpolationService;
+  getNodeMeta(globalContext: TemplateGlobalContext): T;
   getBindValueList(): string[];
   getParentBindValueList(): string[];
 }
@@ -32,7 +29,7 @@ export interface NgElementMeta extends NgNodeMeta {
   tagName: string;
   children: NgNodeMeta[];
   attributes: Record<string, string>;
-  inputs: Record<string, string>;
+  inputs: Record<string, PlainValue | BindValue>;
   outputs: TagEventMeta[];
   singleClosedTag: boolean;
   data: string[];
@@ -63,13 +60,15 @@ export interface NgForDirective {
   for: BindValue | PlainValue;
   item: string;
   index: string;
+  templateName: string;
 }
 export interface NgSwitchDirective {
   type: 'switch';
-  switchValue: string;
+  switchValue: BindValue | PlainValue;
   case: BindValue | PlainValue | undefined;
   default: boolean;
   first: boolean;
+  templateName: string;
 }
 export interface NgDefaultDirective {
   type: 'none';
@@ -78,7 +77,7 @@ export interface NgDefaultDirective {
 export interface NgTemplateMeta<T = NgDirective> extends NgNodeMeta {
   kind: NgNodeKind.Template;
   children: NgNodeMeta[];
-  directive: T;
+  directive: T[];
   data: string[];
 }
 export interface NgContentMeta extends NgNodeMeta {

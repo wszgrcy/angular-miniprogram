@@ -2,8 +2,9 @@ import { AST } from '@angular/compiler/src/expression_parser/ast';
 import { expressionIteration } from './expression-iteration';
 
 export class ExpressionConvert {
-  propertyReadList: string[] = [];
-  pipeList: string[] = [];
+  private propertyReadList: string[] = [];
+  private pipeList: string[] = [];
+  contextPrefix: string;
   toString(expression: AST): string {
     return expressionIteration(expression, {
       empty: () => '',
@@ -13,6 +14,7 @@ export class ExpressionConvert {
         const receiver = this.toString(ast.receiver);
         if (!receiver) {
           this.propertyReadList.push(ast.name);
+          return this.contextPrefix + ast.name;
         }
         return (receiver ? receiver + '.' : '') + ast.name;
       },

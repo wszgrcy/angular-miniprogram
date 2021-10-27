@@ -149,4 +149,22 @@ describe('template-compiler', () => {
     expect(result.content).toContain('');
     expect(result.context).toEqual([]);
   });
+  xit('索引变量', () => {
+    const result = defaultTransform(`<div>
+    {{ a }}
+    <div *ngFor="let item of [1, 2, 3]; let i = index">
+      {{ item }}{{ i }}{{ a }}
+    </div>
+  </div>`);
+    expect(result.content).toContain('');
+    expect(result.context).toEqual([]);
+  });
+  it('纯插值', () => {
+    const result = defaultTransform(`{{'111'}}`);
+    expect(result.content).toContain('');
+  });
+  fit('变量插值', () => {
+    const result = defaultTransform(`{{a[b]}}}`);
+    expect(result.content).toContain('');
+  });
 });
