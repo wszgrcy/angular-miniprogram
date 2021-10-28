@@ -1,5 +1,5 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { COMPONENT_TOKEN } from '../../../../../src/platform/module/token/component.token';
+import { COMPONENT_TOKEN } from '../../../../../src/platform';
 
 @Component({
   selector: 'app-sub1',
@@ -13,6 +13,8 @@ export class Sub1Component implements OnInit {
   num = 0;
   obj = { a: '' };
   randomValue = 0;
+  jsonObj = { a: '被格式化的对象' };
+  today = new Date();
   constructor(@Inject(COMPONENT_TOKEN) component: any) {
     console.log('Sub1Component构造', component);
   }

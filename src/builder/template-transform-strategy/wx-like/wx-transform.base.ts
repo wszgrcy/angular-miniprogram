@@ -20,7 +20,7 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     });
     this.exportTemplateList = container.getExportTemplate();
     const result = container.export();
-    this.logic = `${result.logic};ctx=wxContainerMain(ctx);`;
+    this.logic = `${result.logic};`;
     const templateImport = this.exportTemplateList.length
       ? `<import src="./template.wxml"/>`
       : '';

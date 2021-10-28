@@ -5,6 +5,7 @@ export class ExpressionConvert {
   private propertyReadList: string[] = [];
   private pipeList: string[] = [];
   contextPrefix: string | undefined;
+  globalVariablePrefix!: string;
   toString(expression: AST): string {
     return expressionIteration(expression, {
       empty: () => '',
@@ -55,7 +56,9 @@ export class ExpressionConvert {
       },
       BindingPipe: (ast) => {
         this.pipeList.push(ast.name);
-        return `getPipe('${ast.name}',${this.toString(ast.exp)},${ast.args
+        return `${this.globalVariablePrefix}.__getPipe('${
+          ast.name
+        }',${this.toString(ast.exp)},${ast.args
           .map((arg: AST) => this.toString(arg))
           .join(',')})`;
       },
@@ -63,5 +66,8 @@ export class ExpressionConvert {
         return '';
       },
     });
+  }
+  getPipeList() {
+    return this.pipeList;
   }
 }

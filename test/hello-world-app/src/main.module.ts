@@ -1,7 +1,7 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DoBootstrap } from '@angular/core';
-import { WeixinMiniProgramModule } from '../../../src/platform/module/weixin-mini-program.module';
+import { WeixinMiniProgramModule } from '../../../src/platform';
 @NgModule({
   declarations: [],
   imports: [WeixinMiniProgramModule],

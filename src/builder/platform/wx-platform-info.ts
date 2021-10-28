@@ -1,6 +1,12 @@
+import { Injectable } from 'static-injector';
 import { WxTransform } from '../template-transform-strategy/wx.transform';
+import { BuildPlatform } from './platform';
 
-export class WxPlatformInfo {
+@Injectable()
+export class WxPlatformInfo extends BuildPlatform {
   globalObject = 'wx';
-  templateTransform = new WxTransform();
+  globalVariablePrefix = 'wx.__window';
+  constructor(public templateTransform: WxTransform) {
+    super(templateTransform);
+  }
 }

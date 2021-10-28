@@ -45,7 +45,7 @@ import { NgComponentCssExtractPlugin } from './ng-component-css-extract.plugin';
 export interface ExportWeiXinAssetsPluginOptions {
   /** tsConfig配置路径 */
   tsConfig: string;
-  platformInfo: PlatformInfo;
+  buildPlatform: PlatformInfo;
 }
 /** 导出微信的wxml与wxss */
 @Injectable()
@@ -65,7 +65,7 @@ export class ExportWeiXinAssetsPlugin {
     string,
     { sizeOffset: number; content: string }
   >();
-  private htmlContext = new Map<string, string[]>();
+  private updateLogicMap = new Map<string, string>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private originInputFileSystemSync: { readFileSync: any; statSync: any } = {
     readFileSync: undefined,
@@ -80,7 +80,7 @@ export class ExportWeiXinAssetsPlugin {
   ) {
     this.options = {
       tsConfig: tsConfig,
-      platformInfo: buildPlatform,
+      buildPlatform: buildPlatform,
     };
   }
   apply(compiler: webpack.Compiler) {
@@ -145,11 +145,12 @@ export class ExportWeiXinAssetsPlugin {
           this.removeTemplateAndStyleInTs(
             (key.decorators![0].expression as CallExpression)
               .arguments[0] as ObjectLiteralExpression,
-            key.getSourceFile()
+            key.getSourceFile(),
+            WXMLTemplate.htmlTemplate
           );
-          this.htmlContext.set(
+          this.updateLogicMap.set(
             path.normalize(key.getSourceFile().fileName),
-            WXMLTemplate.context
+            WXMLTemplate.logic
           );
         });
         this.hookFileSystemFile();
@@ -161,8 +162,8 @@ export class ExportWeiXinAssetsPlugin {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (compilation as any)[ExportWeiXinAssetsPluginSymbol] = {
-          htmlContextMap: this.htmlContext,
-          platformInfo: this.options.platformInfo,
+          htmlContextMap: this.updateLogicMap,
+          platformInfo: this.options.buildPlatform,
         };
         compilation.hooks.processAssets.tapAsync(
           'ExportWeiXinAssetsPlugin',
@@ -292,7 +293,8 @@ export class ExportWeiXinAssetsPlugin {
   }
   private removeTemplateAndStyleInTs(
     objectNode: ObjectLiteralExpression,
-    sf: SourceFile
+    sf: SourceFile,
+    htmlString: string
   ) {
     const change = new TsChange(sf);
     const list: (InsertChange | DeleteChange)[] = change.deleteChildNode(
@@ -315,12 +317,17 @@ export class ExportWeiXinAssetsPlugin {
         } else {
           return false;
         }
+
         return /^(templateUrl|template|styleUrls|styles)$/.test(
           value as string
         );
       }
     );
-    list.push(change.insertChildNode(objectNode, `template:''`));
+    if (typeof htmlString === 'string' && htmlString) {
+      list.push(change.insertChildNode(objectNode, `template:"${htmlString}"`));
+    } else {
+      list.push(change.insertChildNode(objectNode, `template:''`));
+    }
     list.sort((a, b) => {
       return b.start - a.start;
     });
@@ -364,7 +371,7 @@ export class ExportWeiXinAssetsPlugin {
         },
         {
           provide: TemplateTransformBase,
-          useValue: this.options.platformInfo.templateTransform,
+          useValue: this.options.buildPlatform.templateTransform,
         },
         { provide: TemplateInterpolationService },
         { provide: TemplateGlobalContext },
@@ -378,7 +385,7 @@ export class ExportWeiXinAssetsPlugin {
     ifs.readFileSync = this.originInputFileSystemSync.readFileSync;
     ifs.statSync = this.originInputFileSystemSync.statSync;
     this.changeFileMap = new Map();
-    this.htmlContext = new Map();
+    this.updateLogicMap = new Map();
     this.cleanDependencyFileCacheSet = new Set();
     this.dependencyUseModule = new Map();
     this.componentToModule = new Map();

@@ -90,7 +90,7 @@ export class WxContainer {
     let content = '';
     const directiveList = node.directive;
     const directiveIndex = this.directiveIndex++;
-    this.logic.push(`ctx.directive[${directiveIndex}]={}`);
+    this.logic.push(`directive[${directiveIndex}]={}`);
     for (let i = 0; i < directiveList.length; i++) {
       const directive = directiveList[i];
       if (directive.type === 'none') {
@@ -118,9 +118,9 @@ export class WxContainer {
             `'then'`
           )}></template></block>`;
           this.logic.push(() => {
-            return `ctx.directive[${directiveIndex}]['then']=wxContainer${directive.thenTemplateRef!.value(
+            return `directive[${directiveIndex}]['then']=wxContainer${directive.thenTemplateRef!.value(
               ''
-            )}({varList:varList,originVar:{...ctx,${this.getCurrentContext()
+            )}({originVar:{...ctx,${this.getCurrentContext()
               .map((item) => item + ':' + item)
               .join(',')}}})`;
           });
@@ -135,9 +135,9 @@ export class WxContainer {
             `'else'`
           )}></template></block>`;
           this.logic.push(() => {
-            return `ctx.directive[${directiveIndex}]['else']=wxContainer${directive.falseTemplateRef.value(
+            return `directive[${directiveIndex}]['else']=wxContainer${directive.falseTemplateRef.value(
               ''
-            )}({varList:varList,originVar:{...ctx,${this.getCurrentContext()
+            )}({originVar:{...ctx,${this.getCurrentContext()
               .map((item) => item + ':' + item)
               .join(',')}}})`;
           });
@@ -161,9 +161,9 @@ export class WxContainer {
             forResult.logic
           }.length; ${directive.index}++) {
               const ${directive.item} = ${forResult.logic}[${directive.index}];
-             ctx.directive[${directiveIndex}][${directive.index}]=wxContainer${
+             directive[${directiveIndex}][${directive.index}]=wxContainer${
             directive.templateName
-          }({varList:varList,originVar:{...ctx.originVar,${this.getCurrentContext()
+          }({originVar:{...ctx.originVar,${this.getCurrentContext()
             .map((item) => item + ':' + item)
             .join(',')}}})
             }`;
@@ -207,7 +207,7 @@ export class WxContainer {
             directive.index
           }]=wxContainer${
             directive.templateName
-          }({varList:varList,originVar:{...ctx,${this.getCurrentContext()
+          }({originVar:{...ctx,${this.getCurrentContext()
             .map((item) => item + ':' + item)
             .join(',')}})`;
         });
@@ -238,7 +238,7 @@ export class WxContainer {
     const index = this.index++;
     return {
       template: `varList[${index}]`,
-      logic: `computeExpression(${
+      logic: `wx.__window.__computeExpression(${
         expression instanceof PlainValue
           ? expression.toString()
           : expression.toString('ctx.originVar.')
@@ -246,11 +246,8 @@ export class WxContainer {
       index: index,
     };
   }
-  private getCurrentContext(): string[] {
-    return [
-      ...this.currentContext,
-      ...(this.parent ? this.parent.currentContext : []),
-    ];
+  private getCurrentContext(otherList: string[] = []): string[] {
+    return Array.from(new Set([...this.currentContext, ...otherList]));
   }
   export(): { logic: string; wxmlTemplate: string } {
     return {
@@ -258,9 +255,9 @@ export class WxContainer {
         .map((child) => child.export().logic)
         .join('\n')};\nfunction wxContainer${
         this.containerName
-      }(ctx){let varList=[];ctx.directive=[];${this.logic
+      }(ctx){let varList={};let directive={};${this.logic
         .map((item) => (typeof item === 'string' ? item : item()))
-        .join(';\n')};return {...ctx,varList:varList}}`,
+        .join(';\n')};return {varList:varList,directive:directive}}`,
       wxmlTemplate: this.wxmlTemplate,
     };
   }

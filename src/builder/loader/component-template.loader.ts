@@ -24,29 +24,17 @@ export default function (this: webpack.LoaderContext<any>, data: string) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const map = (this._compilation! as any)[ExportWeiXinAssetsPluginSymbol]
-    .htmlContextMap as Map<string, string[]>;
+    .htmlContextMap as Map<string, string>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const platformInfo = (this._compilation! as any)[
     ExportWeiXinAssetsPluginSymbol
   ].platformInfo as PlatformInfo;
-  const viewContextName = platformInfo.templateTransform.viewContextName;
 
-  const context = map.get(path.normalize(this.resourcePath))!;
+  const logic = map.get(path.normalize(this.resourcePath))!;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const obj: Record<string, any> = {};
-  const list = context
-    .map((item) => item)
-    .filter((item) => {
-      if (item in obj) {
-        return false;
-      }
-      obj[item] = true;
-      return true;
-    })
-    .map((item) => `{value:ctx.${item},name:"${item}"}`)
-    .join(',');
+
   const content = `{
-    if(rf&2){wx.__window.__propertyChange(ctx,[${list}],'${viewContextName}')}
+    if(rf&2){${logic};wx.__window.__propertyChange(wxContainerMain({originVar:ctx}))}
   }`;
   const change = new TsChange(sf);
   const replaceChange = change.replaceNode(

@@ -10,10 +10,12 @@ import {
   Render3ParseResult,
   htmlAstToRender3Ast,
 } from '@angular/compiler/src/render3/r3_template_transform';
-import { Inject, Injectable, Injector } from 'static-injector';
-import { TemplateTransformBase } from '../template-transform-strategy/transform.base';
+import { Inject, Injectable, Optional } from 'static-injector';
+import { BuildPlatform } from '../platform/platform';
+import { PlatformInfo } from '../platform/platform-info';
 import {
   COMPONENT_FILE_NAME_TOKEN,
+  COMPONENT_TEMPLATE_CONTENT_TOKEN,
   TEMPLATE_COMPILER_OPTIONS_TOKEN,
 } from '../token/component.token';
 import { ParsedNgBoundText } from './node-handle/bound-text';
@@ -42,13 +44,18 @@ export class TemplateCompiler {
   private render3ParseResult!: Render3ParseResult;
   private nodeMetaList: NgNodeMeta[] = [];
   globalContext = new TemplateGlobalContext();
+  private templateTransform: PlatformInfo['templateTransform'];
   constructor(
     @Inject(COMPONENT_FILE_NAME_TOKEN) private url: string,
-    @Inject(COMPONENT_FILE_NAME_TOKEN) private content: string,
-    private templateTransform: TemplateTransformBase,
+    @Inject(COMPONENT_TEMPLATE_CONTENT_TOKEN) private content: string,
+    @Optional()
     @Inject(TEMPLATE_COMPILER_OPTIONS_TOKEN)
-    private options: { interpolation?: string[] } = {}
+    private options: { interpolation?: string[] },
+    private templateInterpolationService: TemplateInterpolationService,
+    buildPlatform: BuildPlatform
   ) {
+    this.options = this.options || {};
+    this.templateTransform = buildPlatform.templateTransform;
     this.templateTransform.setGlobalContext(this.globalContext);
   }
   private parseHtmlToAst() {
@@ -78,7 +85,7 @@ export class TemplateCompiler {
   }
   private parseNode() {
     const nodes = this.render3ParseResult.nodes;
-    const service = new TemplateInterpolationService();
+    const service = this.templateInterpolationService;
 
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
@@ -111,6 +118,9 @@ export class TemplateCompiler {
       template: template,
       context: Array.from(new Set(context)),
       logic: this.templateTransform.getLogic(),
+      htmlTemplate: Array.from(this.templateInterpolationService.pipes)
+        .map((pipe) => `{{''|${pipe}}}`)
+        .join(''),
     };
   }
 
@@ -136,10 +146,9 @@ export class TemplateCompiler {
       },
       Template: (node) => {
         const instance = new NgTemplate(node, parent, service);
-        const childService = new TemplateInterpolationService();
         const childrenInstance = instance
           .getOriginChildren()
-          .map((node) => this.generateParsedNode(node, instance, childService));
+          .map((node) => this.generateParsedNode(node, instance, service));
         instance.setNgNodeChildren(childrenInstance);
         return instance;
       },

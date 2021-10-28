@@ -9,6 +9,8 @@ export class PlainValue {
   toString() {
     if (/^\s+$/.test(this.value)) {
       return `' '`;
+    } else if (/^\s+|\s+$/.test(this.value)) {
+      return `'${(this.value as string).replace(/^\s+|\s+$/g, ' ')}'`;
     }
     return typeof this.value === 'string' ? `'${this.value}'` : this.value;
   }

@@ -7,5 +7,6 @@ export enum PlatformType {
 @Injectable()
 export class BuildPlatform {
   globalObject!: string;
-  templateTransform!: WxTransformLike;
+  globalVariablePrefix!: string;
+  constructor(public templateTransform: WxTransformLike) {}
 }

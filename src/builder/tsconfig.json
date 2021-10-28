@@ -1,18 +1,16 @@
 {
   "extends": "../../tsconfig.base.json",
-  "files": ["./browser/index.ts"],
   "compilerOptions": {
     "noImplicitThis": true,
     "outDir": "../../dist/builder",
     "declaration": true,
     "strict": true
   },
-
+  "include": ["./"],
   "exclude": [
-    "./src/**/fixture",
-    "./src/**/*.template.ts",
-    "./src/**/*.d.ts",
-    "**/*.spec.ts",
-    "test"
+    "./**/fixture",
+    "./**/*.template.ts",
+    "./**/*.d.ts",
+    "**/*.spec.ts"
   ]
 }

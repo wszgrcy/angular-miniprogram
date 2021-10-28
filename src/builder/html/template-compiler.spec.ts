@@ -1,19 +1,44 @@
+import { Injector } from 'static-injector';
 import * as vm from 'vm';
+import { BuildPlatform } from '../platform/platform';
+import { WxPlatformInfo } from '../platform/wx-platform-info';
 import { WxTransform } from '../template-transform-strategy/wx.transform';
+import {
+  COMPONENT_FILE_NAME_TOKEN,
+  COMPONENT_TEMPLATE_CONTENT_TOKEN,
+} from '../token/component.token';
 import { TemplateCompiler } from './template-compiler';
+import { TemplateInterpolationService } from './template-interpolation.service';
 
 const computeExpressionMock = `function computeExpression(a){
   return a
 }`;
 const getPipeMock = `function getPipe(a,b){return b}`;
 function runLogic(str: string, context: Record<string, any>) {
-  return vm.runInNewContext(`${computeExpressionMock}${getPipeMock}${str}`, {
-    ctx: context,
-  });
+  return vm.runInNewContext(
+    `${computeExpressionMock}${getPipeMock}${str};let wx={__window:{__computeExpression:computeExpression,__getPipe:getPipe}};;ctx=wxContainerMain(ctx);`,
+    {
+      ctx: context,
+    }
+  );
 }
 describe('template-compiler', () => {
   function defaultTransform(content: string) {
-    const instance = new TemplateCompiler('', content, new WxTransform());
+    const injector = Injector.create({
+      providers: [
+        { provide: WxTransform },
+        { provide: TemplateCompiler },
+        { provide: WxPlatformInfo },
+        {
+          provide: BuildPlatform,
+          useClass: WxPlatformInfo,
+        },
+        { provide: COMPONENT_FILE_NAME_TOKEN, useValue: '' },
+        { provide: COMPONENT_TEMPLATE_CONTENT_TOKEN, useValue: content },
+        { provide: TemplateInterpolationService },
+      ],
+    });
+    const instance = injector.get(TemplateCompiler);
     return instance.transform();
   }
   // todo 标签
@@ -164,7 +189,9 @@ describe('template-compiler', () => {
     let result = defaultTransform(`{{123456|json:1:2:title}}`);
     expect(result.content).toContain('');
     result = defaultTransform(`{{(123456|json:1:2:title)|pipe2}}`);
-    expect(result.logic).toContain(`getPipe('pipe2',getPipe('json',`);
+    expect(result.logic).toContain(
+      `getPipe('pipe2',wx.__window.__getPipe('json',`
+    );
   });
   it('索引变量', () => {
     const result = defaultTransform(`<div>
@@ -200,5 +227,26 @@ describe('template-compiler', () => {
   it('变量插值', () => {
     const result = defaultTransform(`{{a[b]}}`);
     expect(result.content).toContain(`{{varList[0]}}`);
+  });
+  it('复合上下文', () => {
+    const result =
+      defaultTransform(`<div *ngFor="let item of list1; let i = index">
+     <div *ngFor="let item of list2; let j = index">{{item}}{{i}}{{j}}</div>
+    </div>
+  `);
+    const execResult = runLogic(result.logic, {
+      originVar: { list1: [1, 2, 3], list2: [3, 2, 1] },
+    });
+
+    expect(execResult.directive[0][0].directive[0][0].varList).toEqual({
+      0: 3,
+      1: 0,
+      2: 0,
+    });
+    expect(execResult.directive[0][2].directive[0][2].varList).toEqual({
+      0: 1,
+      1: 2,
+      2: 2,
+    });
   });
 });

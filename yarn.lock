@@ -9214,10 +9214,10 @@ static-extend@^0.1.1:
     define-property "^0.2.5"
     object-copy "^0.1.0"
 
-static-injector@^1.0.8:
-  version "1.0.8"
-  resolved "https://registry.yarnpkg.com/static-injector/-/static-injector-1.0.8.tgz#523dd0ee69651c6a0ad9c644c8d12b763c3bcf3f"
-  integrity sha512-yWv9HxkqfSBVI730PC8K7F2bnOeT4Ys23BBEGWBbIxNsraXu0G0BIFvYUb8gTwoG72HxI4AdNz1BT+MKs+0ujA==
+static-injector@^1.0.9:
+  version "1.0.9"
+  resolved "https://registry.yarnpkg.com/static-injector/-/static-injector-1.0.9.tgz#4ac8de0a56a82827528b9c5c9894362107fa3032"
+  integrity sha512-3JI1ycLriKnsm2gMVGYNwSW6e/mmAbHlMzzLIA+/FcSUamWCcairM8F6uPhwcLcgi00MSt6YbYommxEW8NqRdQ==
 
 "statuses@>= 1.4.0 < 2", "statuses@>= 1.5.0 < 2", statuses@~1.5.0:
   version "1.5.0"
