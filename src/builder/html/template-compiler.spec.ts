@@ -14,6 +14,7 @@ const computeExpressionMock = `function computeExpression(a){
   return a
 }`;
 const getPipeMock = `function getPipe(a,b){return b}`;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function runLogic(str: string, context: Record<string, any>) {
   return vm.runInNewContext(
     `${computeExpressionMock}${getPipeMock}${str};let wx={__window:{__computeExpression:computeExpression,__getPipe:getPipe}};;ctx=wxContainerMain(ctx);`,

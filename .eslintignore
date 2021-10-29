@@ -10,3 +10,4 @@ schema-merge.ts
 test/util
 commitlint.config.js
 script
+**/fixture

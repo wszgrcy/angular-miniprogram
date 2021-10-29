@@ -1,13 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   ɵangular_packages_core_core_bh,
   ɵɵdirectiveInject,
 } from '@angular/core';
 import { COMPONENT_TOKEN } from './module/token/component.token';
 
-function propertyChange(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ctx: any
-) {
+function propertyChange(ctx: any) {
   // const lview = ɵangular_packages_core_core_bh();
   // const bindStart = 20;
   // const changeVarObject = list
@@ -46,16 +44,17 @@ function computeExpression(value: any) {
 function getPipe(pipeName: string, index: number, ...args: any[]) {
   const lview = ɵangular_packages_core_core_bh();
   const pipeStart = 1;
-  let pipeInstance = lview[20 + pipeStart + index];
+  const pipeIndex = 20 + pipeStart + index;
+  let pipeInstance = lview[pipeIndex];
 
-  if (pipeInstance) {
-  } else {
+  if (!pipeInstance) {
     const tview = lview[1];
     const list = tview.pipeRegistry;
-    const pipeDef = list?.find((item) => item.name === pipeName);
+    const pipeDef = list!.find((item) => item.name === pipeName);
     const pipeFactory =
-      (pipeDef?.type as any).factory || (pipeDef as any).type['ɵfac'];
+      (pipeDef!.type as any).factory || (pipeDef!.type as any)['ɵfac'];
     pipeInstance = pipeFactory();
+    lview[pipeIndex] = pipeInstance;
   }
   return pipeInstance.transform(...args);
 }

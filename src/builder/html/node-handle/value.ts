@@ -5,6 +5,7 @@ export class BindValue {
   }
 }
 export class PlainValue {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(public value: any) {}
   toString() {
     if (/^\s+$/.test(this.value)) {
