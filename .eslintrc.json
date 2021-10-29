@@ -122,7 +122,7 @@
         "test"
       ],
       "parserOptions": {
-        "project": "tsconfig.builder.json"
+        "project": "./src/builder/tsconfig.json"
       }
     },
     {

@@ -1,9 +1,10 @@
 import { ASTWithSource } from '@angular/compiler';
 import { BoundAttribute, Element } from '@angular/compiler/src/render3/r3_ast';
-import { ExpressionConvert } from '../expression-to-string';
+import { TemplateInterpolationService } from '../template-interpolation.service';
 import { TagEventMeta } from './event';
-import { GlobalContext } from './global-context';
+import { TemplateGlobalContext } from './global-context';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
+import { BindValue, PlainValue } from './value';
 
 export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   classList: string[] = [];
@@ -12,15 +13,17 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   private children: ParsedNode<NgNodeMeta>[] = [];
   attributeObject: Record<string, string> = {};
   kind = NgNodeKind.Element;
-  inputs: Record<string, string> = {};
+  inputs: Record<string, PlainValue | BindValue> = {};
   outputSet: TagEventMeta[] = [];
-  bindValueList: string[] = [];
   ngSwitch: BoundAttribute | undefined;
   ngSwitchFirst = true;
+  ngSwitchIndex = 0;
   singleClosedTag = false;
+
   constructor(
     private node: Element,
-    public parent: ParsedNode<NgNodeMeta> | undefined
+    public parent: ParsedNode<NgNodeMeta> | undefined,
+    public templateInterpolationService: TemplateInterpolationService
   ) {}
   private analysis() {
     this.getTagName();
@@ -34,12 +37,11 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       this.attributeObject['class'] = this.classList.join(' ');
     }
     this.node.inputs.forEach((input) => {
-      const expressionConvert = new ExpressionConvert();
-      const result = expressionConvert.toString(
-        (input.value as ASTWithSource).ast
-      );
+      const result =
+        this.templateInterpolationService.expressionConvertToString(
+          (input.value as ASTWithSource).ast
+        );
       this.inputs[input.name] = result;
-      this.bindValueList.push(...expressionConvert.propertyReadList);
     });
     this.node.outputs.forEach((output) => {
       this.outputSet.push(
@@ -84,7 +86,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   setNgNodeChildren(children: ParsedNode<NgNodeMeta>[]) {
     this.children = children;
   }
-  getNodeMeta(globalContext: GlobalContext): NgElementMeta {
+  getNodeMeta(globalContext: TemplateGlobalContext): NgElementMeta {
     this.analysis();
 
     return {
@@ -95,38 +97,19 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       outputs: this.outputSet,
       attributes: this.attributeObject,
       singleClosedTag: this.singleClosedTag,
-      data: this.getBindValueList().map((item) => item.split('.')[0]),
     };
   }
   getNgSwitch() {
     if (this.ngSwitch) {
       const first = this.ngSwitchFirst;
       this.ngSwitchFirst = false;
-      return { first: first, ngSwitch: this.ngSwitch };
+
+      return {
+        first: first,
+        ngSwitch: this.ngSwitch,
+        index: this.ngSwitchIndex++,
+      };
     }
     return undefined;
-  }
-  getBindValueList() {
-    const list = [
-      ...this.bindValueList,
-      ...this.children
-        .map((item) => item.getBindValueList())
-        .reduce((pre, cur) => {
-          pre.push(...cur);
-          return pre;
-        }, []),
-    ];
-    const parentList = this.getParentBindValueList();
-    return list.filter((item) => !parentList.includes(item));
-  }
-  getParentBindValueList() {
-    if (this.parent) {
-      return [
-        ...this.parent.bindValueList,
-        ...(this.parent.autoGenerateValueList || []),
-        ...this.parent.getParentBindValueList(),
-      ];
-    }
-    return [];
   }
 }

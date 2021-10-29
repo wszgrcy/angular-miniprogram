@@ -13,6 +13,7 @@ import {
   InsertChange,
 } from 'cyia-code-util/dist/change/content-change';
 import * as path from 'path';
+import { Inject, Injectable, Injector } from 'static-injector';
 import ts, {
   CallExpression,
   CompilerOptions,
@@ -24,8 +25,18 @@ import * as webpack from 'webpack';
 
 import { RawSource } from 'webpack-sources';
 import { ExportWeiXinAssetsPluginSymbol } from '../const';
+import { TemplateGlobalContext } from '../html/node-handle/global-context';
 import { TemplateCompiler } from '../html/template-compiler';
+import { TemplateInterpolationService } from '../html/template-interpolation.service';
+import { ComponentTemplateLoaderContext } from '../loader/type';
+import { BuildPlatform } from '../platform/platform';
 import { PlatformInfo } from '../platform/platform-info';
+import {
+  COMPONENT_FILE_NAME_TOKEN,
+  COMPONENT_TEMPLATE_CONTENT_TOKEN,
+  TEMPLATE_COMPILER_OPTIONS_TOKEN,
+} from '../token/component.token';
+import { TS_CONFIG_TOKEN } from '../token/project.token';
 import { DecoratorMetaDataResolver } from '../ts/decorator-metadata-resolver';
 import { PagePattern } from '../type';
 import { RawUpdater } from '../util/raw-updater';
@@ -34,9 +45,10 @@ import { NgComponentCssExtractPlugin } from './ng-component-css-extract.plugin';
 export interface ExportWeiXinAssetsPluginOptions {
   /** tsConfig配置路径 */
   tsConfig: string;
-  platformInfo: PlatformInfo;
+  buildPlatform: PlatformInfo;
 }
 /** 导出微信的wxml与wxss */
+@Injectable()
 export class ExportWeiXinAssetsPlugin {
   private pageList!: PagePattern[];
   private componentList!: PagePattern[];
@@ -53,14 +65,24 @@ export class ExportWeiXinAssetsPlugin {
     string,
     { sizeOffset: number; content: string }
   >();
-  private htmlContext = new Map<string, string[]>();
+  private updateLogicMap = new Map<string, string>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private originInputFileSystemSync: { readFileSync: any; statSync: any } = {
     readFileSync: undefined,
     statSync: undefined,
   };
   private cleanDependencyFileCacheSet = new Set<string>();
-  constructor(private options: ExportWeiXinAssetsPluginOptions) {}
+  private options: ExportWeiXinAssetsPluginOptions;
+  constructor(
+    @Inject(TS_CONFIG_TOKEN) tsConfig: string,
+    buildPlatform: BuildPlatform,
+    private injector: Injector
+  ) {
+    this.options = {
+      tsConfig: tsConfig,
+      buildPlatform: buildPlatform,
+    };
+  }
   apply(compiler: webpack.Compiler) {
     this.compiler = compiler;
     const resourceLoader = new WebpackResourceLoader(compiler.watchMode);
@@ -123,11 +145,12 @@ export class ExportWeiXinAssetsPlugin {
           this.removeTemplateAndStyleInTs(
             (key.decorators![0].expression as CallExpression)
               .arguments[0] as ObjectLiteralExpression,
-            key.getSourceFile()
+            key.getSourceFile(),
+            WXMLTemplate.htmlTemplate
           );
-          this.htmlContext.set(
+          this.updateLogicMap.set(
             path.normalize(key.getSourceFile().fileName),
-            WXMLTemplate.context
+            WXMLTemplate.logic
           );
         });
         this.hookFileSystemFile();
@@ -139,9 +162,9 @@ export class ExportWeiXinAssetsPlugin {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (compilation as any)[ExportWeiXinAssetsPluginSymbol] = {
-          htmlContextMap: this.htmlContext,
-          platformInfo: this.options.platformInfo,
-        };
+          updateLogicMap: this.updateLogicMap,
+          platformInfo: this.options.buildPlatform,
+        } as ComponentTemplateLoaderContext;
         compilation.hooks.processAssets.tapAsync(
           'ExportWeiXinAssetsPlugin',
           async (assets, cb) => {
@@ -270,7 +293,8 @@ export class ExportWeiXinAssetsPlugin {
   }
   private removeTemplateAndStyleInTs(
     objectNode: ObjectLiteralExpression,
-    sf: SourceFile
+    sf: SourceFile,
+    htmlString: string
   ) {
     const change = new TsChange(sf);
     const list: (InsertChange | DeleteChange)[] = change.deleteChildNode(
@@ -293,12 +317,17 @@ export class ExportWeiXinAssetsPlugin {
         } else {
           return false;
         }
+
         return /^(templateUrl|template|styleUrls|styles)$/.test(
           value as string
         );
       }
     );
-    list.push(change.insertChildNode(objectNode, `template:''`));
+    if (typeof htmlString === 'string' && htmlString) {
+      list.push(change.insertChildNode(objectNode, `template:"${htmlString}"`));
+    } else {
+      list.push(change.insertChildNode(objectNode, `template:''`));
+    }
     list.sort((a, b) => {
       return b.start - a.start;
     });
@@ -324,12 +353,27 @@ export class ExportWeiXinAssetsPlugin {
       throw new Error('解析错误');
     }
     const interpolation = meta['interpolation'] as string[];
-    const instance = new TemplateCompiler(
-      classDeclaration.getSourceFile().fileName,
-      templateContent,
-      this.options.platformInfo.templateTransform,
-      { interpolation }
-    );
+    const injector = Injector.create({
+      parent: this.injector,
+      providers: [
+        { provide: TemplateCompiler },
+        {
+          provide: COMPONENT_FILE_NAME_TOKEN,
+          useValue: classDeclaration.getSourceFile().fileName,
+        },
+        {
+          provide: COMPONENT_TEMPLATE_CONTENT_TOKEN,
+          useValue: templateContent,
+        },
+        {
+          provide: TEMPLATE_COMPILER_OPTIONS_TOKEN,
+          useValue: { interpolation },
+        },
+        { provide: TemplateInterpolationService },
+        { provide: TemplateGlobalContext },
+      ],
+    });
+    const instance = injector.get(TemplateCompiler);
     return instance.transform();
   }
   private restore() {
@@ -337,7 +381,7 @@ export class ExportWeiXinAssetsPlugin {
     ifs.readFileSync = this.originInputFileSystemSync.readFileSync;
     ifs.statSync = this.originInputFileSystemSync.statSync;
     this.changeFileMap = new Map();
-    this.htmlContext = new Map();
+    this.updateLogicMap = new Map();
     this.cleanDependencyFileCacheSet = new Set();
     this.dependencyUseModule = new Map();
     this.componentToModule = new Map();

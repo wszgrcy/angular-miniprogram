@@ -1,8 +1,7 @@
 import { Inject, Injector, NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Cp1Component } from './cp1.component';
-import { ComponentModuleBase } from '../../../../../src/platform';
-import { PAGE_TOKEN } from '../../../../../src/platform/module/token/page.token';
+import { ComponentModuleBase, PAGE_TOKEN } from '../../../../../src/platform';
 
 @NgModule({
   imports: [CommonModule],

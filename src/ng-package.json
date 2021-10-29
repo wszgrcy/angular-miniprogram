@@ -4,7 +4,8 @@
   "deleteDestPath": true,
   "allowedNonPeerDependencies": [
     "cyia-code-util",
-    "webpack-bootstrap-assets-plugin"
+    "webpack-bootstrap-assets-plugin",
+    "static-injector"
   ],
   "lib": {
     "entryFile": "./platform/index.ts"

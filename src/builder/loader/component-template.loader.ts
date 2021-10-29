@@ -3,8 +3,8 @@ import * as path from 'path';
 import * as ts from 'typescript';
 import * as webpack from 'webpack';
 import { ExportWeiXinAssetsPluginSymbol } from '../const';
-import { PlatformInfo } from '../platform/platform-info';
 import { RawUpdater } from '../util/raw-updater';
+import { ComponentTemplateLoaderContext } from './type';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function (this: webpack.LoaderContext<any>, data: string) {
@@ -21,32 +21,16 @@ export default function (this: webpack.LoaderContext<any>, data: string) {
   if (!node) {
     return data;
   }
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const map = (this._compilation! as any)[ExportWeiXinAssetsPluginSymbol]
-    .htmlContextMap as Map<string, string[]>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const platformInfo = (this._compilation! as any)[
+  const context: ComponentTemplateLoaderContext = (this._compilation! as any)[
     ExportWeiXinAssetsPluginSymbol
-  ].platformInfo as PlatformInfo;
-  const viewContextName = platformInfo.templateTransform.viewContextName;
+  ];
 
-  const context = map.get(path.normalize(this.resourcePath))!;
+  const logic = context.updateLogicMap.get(path.normalize(this.resourcePath))!;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const obj: Record<string, any> = {};
-  const list = context
-    .map((item) => item)
-    .filter((item) => {
-      if (item in obj) {
-        return false;
-      }
-      obj[item] = true;
-      return true;
-    })
-    .map((item) => `{value:ctx.${item},name:"${item}"}`)
-    .join(',');
+
   const content = `{
-    if(rf&2){wx.__window.__propertyChange(ctx,[${list}],'${viewContextName}')}
+    if(rf&2){${logic};wx.__window.__propertyChange(wxContainerMain({originVar:ctx}))}
   }`;
   const change = new TsChange(sf);
   const replaceChange = change.replaceNode(

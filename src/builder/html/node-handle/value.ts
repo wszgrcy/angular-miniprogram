@@ -1,13 +1,19 @@
 export class BindValue {
-  constructor(public value: string) {}
-  toString() {
-    return this.value;
+  constructor(public value: (str?: string) => string) {}
+  toString(contextPrefix: string) {
+    return this.value(contextPrefix);
   }
 }
 export class PlainValue {
-  constructor(public value: string) {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(public value: any) {}
   toString() {
-    return this.value;
+    if (/^\s+$/.test(this.value)) {
+      return `' '`;
+    } else if (/^\s+|\s+$/.test(this.value)) {
+      return `'${(this.value as string).replace(/^\s+|\s+$/g, ' ')}'`;
+    }
+    return typeof this.value === 'string' ? `'${this.value}'` : this.value;
   }
 }
 export function isBindValue(value: BindValue | PlainValue): value is BindValue {

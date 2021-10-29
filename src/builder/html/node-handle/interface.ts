@@ -1,21 +1,14 @@
-import {
-  BoundAttribute,
-  BoundEvent,
-  Node,
-} from '@angular/compiler/src/render3/r3_ast';
+import { TemplateInterpolationService } from '../template-interpolation.service';
 import { TagEventMeta } from './event';
-import { GlobalContext } from './global-context';
+import { TemplateGlobalContext } from './global-context';
 import { BindValue, PlainValue } from './value';
 
 export interface ParsedNode<T> {
   kind: NgNodeKind;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parent: ParsedNode<any> | undefined;
-  bindValueList: string[];
-  autoGenerateValueList?: string[];
-  getNodeMeta(globalContext: GlobalContext): T;
-  getBindValueList(): string[];
-  getParentBindValueList(): string[];
+  templateInterpolationService: TemplateInterpolationService;
+  getNodeMeta(globalContext: TemplateGlobalContext): T;
 }
 export enum NgNodeKind {
   Element,
@@ -32,15 +25,13 @@ export interface NgElementMeta extends NgNodeMeta {
   tagName: string;
   children: NgNodeMeta[];
   attributes: Record<string, string>;
-  inputs: Record<string, string>;
+  inputs: Record<string, PlainValue | BindValue>;
   outputs: TagEventMeta[];
   singleClosedTag: boolean;
-  data: string[];
 }
 export interface NgBoundTextMeta extends NgNodeMeta {
   kind: NgNodeKind.BoundText;
   values: (BindValue | PlainValue)[];
-  data: string[];
 }
 export interface NgTextMeta extends NgNodeMeta {
   kind: NgNodeKind.Text;
@@ -63,13 +54,16 @@ export interface NgForDirective {
   for: BindValue | PlainValue;
   item: string;
   index: string;
+  templateName: string;
 }
 export interface NgSwitchDirective {
   type: 'switch';
-  switchValue: string;
+  switchValue: BindValue | PlainValue;
   case: BindValue | PlainValue | undefined;
   default: boolean;
   first: boolean;
+  templateName: string;
+  index: number;
 }
 export interface NgDefaultDirective {
   type: 'none';
@@ -78,8 +72,7 @@ export interface NgDefaultDirective {
 export interface NgTemplateMeta<T = NgDirective> extends NgNodeMeta {
   kind: NgNodeKind.Template;
   children: NgNodeMeta[];
-  directive: T;
-  data: string[];
+  directive: T[];
 }
 export interface NgContentMeta extends NgNodeMeta {
   kind: NgNodeKind.Content;

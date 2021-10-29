@@ -7,3 +7,7 @@ test/hello-world-app
 jest.builder.config.ts
 build-ng-package.ts
 schema-merge.ts
+test/util
+commitlint.config.js
+script
+**/fixture

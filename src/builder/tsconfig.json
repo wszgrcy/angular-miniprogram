@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noImplicitThis": true,
+    "outDir": "../../dist/builder",
+    "declaration": true,
+    "strict": true
+  },
+  "include": ["./"],
+  "exclude": [
+    "./**/fixture",
+    "./**/*.template.ts",
+    "./**/*.d.ts",
+    "**/*.spec.ts"
+  ]
+}

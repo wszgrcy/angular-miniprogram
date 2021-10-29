@@ -1,9 +1,12 @@
-import { AST } from '@angular/compiler/src/expression_parser/ast';
+import { AST } from '@angular/compiler';
 import { expressionIteration } from './expression-iteration';
 
 export class ExpressionConvert {
-  propertyReadList: string[] = [];
-
+  private propertyReadList: string[] = [];
+  private pipeList: string[] = [];
+  contextPrefix: string | undefined;
+  globalVariablePrefix!: string;
+  pipeIndex!: number;
   toString(expression: AST): string {
     return expressionIteration(expression, {
       empty: () => '',
@@ -13,6 +16,7 @@ export class ExpressionConvert {
         const receiver = this.toString(ast.receiver);
         if (!receiver) {
           this.propertyReadList.push(ast.name);
+          return this.contextPrefix + ast.name;
         }
         return (receiver ? receiver + '.' : '') + ast.name;
       },
@@ -51,9 +55,19 @@ export class ExpressionConvert {
       KeyedRead: (ast) => {
         return `${this.toString(ast.obj)}[${this.toString(ast.key)}]`;
       },
+      BindingPipe: (ast) => {
+        this.pipeList.push(ast.name);
+        return `${this.globalVariablePrefix}.__getPipe('${ast.name}',${this
+          .pipeIndex++},${this.toString(ast.exp)},${ast.args
+          .map((arg: AST) => this.toString(arg))
+          .join(',')})`;
+      },
       default: (ast) => {
         return '';
       },
     });
+  }
+  getPipeList() {
+    return this.pipeList;
   }
 }
