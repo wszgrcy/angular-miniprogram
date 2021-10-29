@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - pipe
 env:
   REPOSITORY_PATH: https://${{secrets.ACCESS_TOKEN}}@github.com/
 jobs:
