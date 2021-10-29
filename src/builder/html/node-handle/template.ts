@@ -20,9 +20,9 @@ import { BindValue, PlainValue } from './value';
 export class NgTemplate implements ParsedNode<NgTemplateMeta> {
   kind = NgNodeKind.Template;
   attrs!: (BoundAttribute | TextAttribute)[];
-  bindValueList: string[] = [];
+
   declareContext: Record<string, string> = {};
-  autoGenerateValueList: string[] = [];
+  globalContext!: TemplateGlobalContext;
   private children: ParsedNode<NgNodeMeta>[] = [];
 
   constructor(
@@ -76,7 +76,7 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
     const ngIf = this.attrs.find((item) => item.name === 'ngIf')!;
     const ngIfElse = this.attrs.find((item) => item.name === 'ngIfElse')!;
     const ngIfThen = this.attrs.find((item) => item.name === 'ngIfThen')!;
-    const ngIfTemplateName = `ngIf${Math.random().toString(36).slice(2)}`;
+    const ngIfTemplateName = `ngIf_then_${this.globalContext.getBindIndex()}`;
 
     return [
       {
@@ -99,14 +99,11 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
     const ngForItem = this.node.variables.find(
       (item) => item.value === '$implicit'
     )!;
-    this.autoGenerateValueList.push(ngForItem.name);
     const ngForIndex = this.node.variables.find(
       (item) => item.value === 'index'
     );
-    if (ngForIndex) {
-      this.autoGenerateValueList.push(ngForIndex.name);
-    }
-    const ngForTemplateName = `ngFor${Math.random().toString(36).slice(2)}`;
+
+    const ngForTemplateName = `ngFor_item_${this.globalContext.getBindIndex()}`;
 
     return [
       {
@@ -146,9 +143,9 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
       this.templateInterpolationService.expressionConvertToString(
         (result!.ngSwitch.value as ASTWithSource).ast
       );
-    const ngSwitchTemplateName = `ngSwitch${Math.random()
-      .toString(36)
-      .slice(2)}`;
+    const ngSwitchTemplateName = `ngSwitch_${
+      result?.index
+    }_${this.globalContext.getBindIndex()}`;
     return [
       {
         type: 'switch',
@@ -185,13 +182,13 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
     }
   }
   getNodeMeta(globalContext: TemplateGlobalContext): NgTemplateMeta {
+    this.globalContext = globalContext;
     const directive = this.transform()!;
 
     const meta: NgTemplateMeta = {
       kind: NgNodeKind.Template,
       children: this.children.map((child) => child.getNodeMeta(globalContext)),
       directive: directive,
-      data: this.getBindValueList().map((item) => item.split('.')[0]),
     };
     for (let i = 0; i < directive.length; i++) {
       const element = directive[i];
@@ -202,28 +199,5 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
     }
 
     return meta;
-  }
-  getBindValueList() {
-    const list = [
-      // ...this.bindValueList,
-      ...this.children
-        .map((item) => item.getBindValueList())
-        .reduce((pre, cur) => {
-          pre.push(...cur);
-          return pre;
-        }, []),
-    ];
-    const parentList = this.getParentBindValueList();
-    return list.filter((item) => !parentList.includes(item));
-  }
-  getParentBindValueList() {
-    if (this.parent) {
-      return [
-        // ...this.parent.bindValueList,
-        ...(this.parent.autoGenerateValueList || []),
-        ...this.parent.getParentBindValueList(),
-      ];
-    }
-    return [];
   }
 }

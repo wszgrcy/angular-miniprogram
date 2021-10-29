@@ -1,4 +1,4 @@
-import { AST } from '@angular/compiler/src/expression_parser/ast';
+import { AST } from '@angular/compiler';
 import { expressionIteration } from './expression-iteration';
 
 export class ExpressionConvert {
@@ -6,6 +6,7 @@ export class ExpressionConvert {
   private pipeList: string[] = [];
   contextPrefix: string | undefined;
   globalVariablePrefix!: string;
+  pipeIndex!: number;
   toString(expression: AST): string {
     return expressionIteration(expression, {
       empty: () => '',
@@ -56,9 +57,8 @@ export class ExpressionConvert {
       },
       BindingPipe: (ast) => {
         this.pipeList.push(ast.name);
-        return `${this.globalVariablePrefix}.__getPipe('${
-          ast.name
-        }',${this.toString(ast.exp)},${ast.args
+        return `${this.globalVariablePrefix}.__getPipe('${ast.name}',${this
+          .pipeIndex++},${this.toString(ast.exp)},${ast.args
           .map((arg: AST) => this.toString(arg))
           .join(',')})`;
       },

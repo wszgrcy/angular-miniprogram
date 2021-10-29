@@ -13,7 +13,7 @@ import { BindValue, PlainValue } from './value';
 export class ParsedNgBoundText implements ParsedNode<NgBoundTextMeta> {
   valueList: NgBoundTextMeta['values'] = [];
   kind = NgNodeKind.BoundText;
-  bindValueList: string[] = [];
+
   constructor(
     private node: BoundText,
     public parent: ParsedNode<NgNodeMeta> | undefined,
@@ -39,21 +39,6 @@ export class ParsedNgBoundText implements ParsedNode<NgBoundTextMeta> {
     return {
       kind: NgNodeKind.BoundText,
       values: this.valueList,
-      data: this.getBindValueList(),
     };
-  }
-  getBindValueList() {
-    const parentList = this.getParentBindValueList();
-    return this.bindValueList.filter((item) => !parentList.includes(item));
-  }
-  getParentBindValueList() {
-    if (this.parent) {
-      return [
-        // ...this.parent.bindValueList,
-        ...(this.parent.autoGenerateValueList || []),
-        ...this.parent.getParentBindValueList(),
-      ];
-    }
-    return [];
   }
 }

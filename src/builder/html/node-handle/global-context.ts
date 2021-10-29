@@ -1,6 +1,7 @@
 import { NgDefaultDirective, NgTemplateMeta } from './interface';
 
 export class TemplateGlobalContext {
+  bindIndex = 0;
   private templateList: NgTemplateMeta<NgDefaultDirective>[] = [];
   addTemplate(template: NgTemplateMeta<NgDefaultDirective>) {
     this.templateList.push(template);
@@ -11,5 +12,8 @@ export class TemplateGlobalContext {
         .filter((item) => item.type === 'none')
         .find((directive) => directive.name.some((item) => item.name === name))
     );
+  }
+  getBindIndex() {
+    return this.bindIndex++;
   }
 }

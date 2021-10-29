@@ -28,9 +28,9 @@ import { ExportWeiXinAssetsPluginSymbol } from '../const';
 import { TemplateGlobalContext } from '../html/node-handle/global-context';
 import { TemplateCompiler } from '../html/template-compiler';
 import { TemplateInterpolationService } from '../html/template-interpolation.service';
+import { ComponentTemplateLoaderContext } from '../loader/type';
 import { BuildPlatform } from '../platform/platform';
 import { PlatformInfo } from '../platform/platform-info';
-import { TemplateTransformBase } from '../template-transform-strategy/transform.base';
 import {
   COMPONENT_FILE_NAME_TOKEN,
   COMPONENT_TEMPLATE_CONTENT_TOKEN,
@@ -162,9 +162,9 @@ export class ExportWeiXinAssetsPlugin {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (compilation as any)[ExportWeiXinAssetsPluginSymbol] = {
-          htmlContextMap: this.updateLogicMap,
+          updateLogicMap: this.updateLogicMap,
           platformInfo: this.options.buildPlatform,
-        };
+        } as ComponentTemplateLoaderContext;
         compilation.hooks.processAssets.tapAsync(
           'ExportWeiXinAssetsPlugin',
           async (assets, cb) => {
@@ -368,10 +368,6 @@ export class ExportWeiXinAssetsPlugin {
         {
           provide: TEMPLATE_COMPILER_OPTIONS_TOKEN,
           useValue: { interpolation },
-        },
-        {
-          provide: TemplateTransformBase,
-          useValue: this.options.buildPlatform.templateTransform,
         },
         { provide: TemplateInterpolationService },
         { provide: TemplateGlobalContext },

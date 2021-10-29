@@ -8,5 +8,6 @@ export enum PlatformType {
 export class BuildPlatform {
   globalObject!: string;
   globalVariablePrefix!: string;
+  contextPrefix!: string;
   constructor(public templateTransform: WxTransformLike) {}
 }

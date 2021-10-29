@@ -6,6 +6,7 @@ import { BuildPlatform } from './platform';
 export class WxPlatformInfo extends BuildPlatform {
   globalObject = 'wx';
   globalVariablePrefix = 'wx.__window';
+  contextPrefix = 'ctx.originVar';
   constructor(public templateTransform: WxTransform) {
     super(templateTransform);
   }

@@ -13,7 +13,11 @@ import {
   isNgTemplateMeta,
   isNgTextMeta,
 } from '../../html/node-handle/node-meta/type-predicate';
-import { BindValue, PlainValue } from '../../html/node-handle/value';
+import {
+  BindValue,
+  PlainValue,
+  isPlainValue,
+} from '../../html/node-handle/value';
 
 export class WxContainer {
   directivePrefix!: string;
@@ -180,7 +184,7 @@ export class WxContainer {
               directive.templateName
             }" ${this.getTemplateDataStr(
               directiveIndex,
-              `${directive.index}`
+              `0`
             )}></template></block>`;
           } else {
             content += `<block ${this.directivePrefix}:elif="{{${
@@ -189,7 +193,7 @@ export class WxContainer {
               directive.templateName
             }" ${this.getTemplateDataStr(
               directiveIndex,
-              `${directive.index}`
+              `0`
             )}></template></block>`;
           }
         } else if (directive.default) {
@@ -197,15 +201,13 @@ export class WxContainer {
             directive.templateName
           }" ${this.getTemplateDataStr(
             directiveIndex,
-            `${directive.index}`
+            `0`
           )}></template></block>`;
         } else {
           throw new Error('未知的解析指令');
         }
         this.logic.push(() => {
-          return `ctx.directive[${directiveIndex}][${
-            directive.index
-          }]=wxContainer${
+          return `ctx.directive[${directiveIndex}][0]=wxContainer${
             directive.templateName
           }({originVar:{...ctx,${this.getCurrentContext()
             .map((item) => item + ':' + item)
@@ -239,7 +241,7 @@ export class WxContainer {
     return {
       template: `varList[${index}]`,
       logic: `wx.__window.__computeExpression(${
-        expression instanceof PlainValue
+        isPlainValue(expression)
           ? expression.toString()
           : expression.toString('ctx.originVar.')
       })`,

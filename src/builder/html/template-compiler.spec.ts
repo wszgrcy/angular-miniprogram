@@ -186,11 +186,20 @@ describe('template-compiler', () => {
     expect(result.content).toContain('测试');
   });
   it('pipe', () => {
-    let result = defaultTransform(`{{123456|json:1:2:title}}`);
-    expect(result.content).toContain('');
-    result = defaultTransform(`{{(123456|json:1:2:title)|pipe2}}`);
+    let result = defaultTransform(`{{123456|pipe1:1:2:title}}`);
+    expect(result.logic).toContain(`__getPipe('pipe1',0`);
+    result = defaultTransform(`{{(123456|pipe1:1:2:title)|pipe2}}`);
     expect(result.logic).toContain(
-      `getPipe('pipe2',wx.__window.__getPipe('json',`
+      `getPipe('pipe2',0,wx.__window.__getPipe('pipe1',1`
+    );
+    result = defaultTransform(
+      `{{(123456|pipe1:1:2:title)|pipe2}}<div>{{(123456|pipe1:1:2:title)|pipe2}}</div>`
+    );
+    expect(result.logic).toContain(
+      `getPipe('pipe2',0,wx.__window.__getPipe('pipe1',1`
+    );
+    expect(result.logic).toContain(
+      `getPipe('pipe2',2,wx.__window.__getPipe('pipe1',3`
     );
   });
   it('索引变量', () => {

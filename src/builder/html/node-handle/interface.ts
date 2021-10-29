@@ -7,12 +7,8 @@ export interface ParsedNode<T> {
   kind: NgNodeKind;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parent: ParsedNode<any> | undefined;
-  bindValueList: string[];
-  autoGenerateValueList?: string[];
   templateInterpolationService: TemplateInterpolationService;
   getNodeMeta(globalContext: TemplateGlobalContext): T;
-  getBindValueList(): string[];
-  getParentBindValueList(): string[];
 }
 export enum NgNodeKind {
   Element,
@@ -32,12 +28,10 @@ export interface NgElementMeta extends NgNodeMeta {
   inputs: Record<string, PlainValue | BindValue>;
   outputs: TagEventMeta[];
   singleClosedTag: boolean;
-  data: string[];
 }
 export interface NgBoundTextMeta extends NgNodeMeta {
   kind: NgNodeKind.BoundText;
   values: (BindValue | PlainValue)[];
-  data: string[];
 }
 export interface NgTextMeta extends NgNodeMeta {
   kind: NgNodeKind.Text;
@@ -79,7 +73,6 @@ export interface NgTemplateMeta<T = NgDirective> extends NgNodeMeta {
   kind: NgNodeKind.Template;
   children: NgNodeMeta[];
   directive: T[];
-  data: string[];
 }
 export interface NgContentMeta extends NgNodeMeta {
   kind: NgNodeKind.Content;

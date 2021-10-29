@@ -15,7 +15,6 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   kind = NgNodeKind.Element;
   inputs: Record<string, PlainValue | BindValue> = {};
   outputSet: TagEventMeta[] = [];
-  bindValueList: string[] = [];
   ngSwitch: BoundAttribute | undefined;
   ngSwitchFirst = true;
   ngSwitchIndex = 0;
@@ -98,7 +97,6 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       outputs: this.outputSet,
       attributes: this.attributeObject,
       singleClosedTag: this.singleClosedTag,
-      data: this.getBindValueList().map((item) => item.split('.')[0]),
     };
   }
   getNgSwitch() {
@@ -113,28 +111,5 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       };
     }
     return undefined;
-  }
-  getBindValueList() {
-    const list = [
-      // ...this.bindValueList,
-      ...this.children
-        .map((item) => item.getBindValueList())
-        .reduce((pre, cur) => {
-          pre.push(...cur);
-          return pre;
-        }, []),
-    ];
-    const parentList = this.getParentBindValueList();
-    return list.filter((item) => !parentList.includes(item));
-  }
-  getParentBindValueList() {
-    if (this.parent) {
-      return [
-        ...this.parent.bindValueList,
-        ...(this.parent.autoGenerateValueList || []),
-        ...this.parent.getParentBindValueList(),
-      ];
-    }
-    return [];
   }
 }

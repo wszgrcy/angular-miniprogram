@@ -57,7 +57,7 @@ function getPipe(pipeName: string, index: number, ...args: any[]) {
       (pipeDef?.type as any).factory || (pipeDef as any).type['ɵfac'];
     pipeInstance = pipeFactory();
   }
-  return pipeInstance.transform(index, ...args);
+  return pipeInstance.transform(...args);
 }
 export function componentTemplateHookFactory() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -5,7 +5,7 @@ import { NgNodeKind, NgNodeMeta, NgTextMeta, ParsedNode } from './interface';
 export class ParsedNgText implements ParsedNode<NgTextMeta> {
   value!: string;
   kind = NgNodeKind.Text;
-  bindValueList = [];
+
   constructor(
     private node: Text,
     public parent: ParsedNode<NgNodeMeta> | undefined,
@@ -20,11 +20,5 @@ export class ParsedNgText implements ParsedNode<NgTextMeta> {
       kind: NgNodeKind.Text,
       value: this.value,
     };
-  }
-  getBindValueList() {
-    return [];
-  }
-  getParentBindValueList() {
-    return [];
   }
 }

@@ -8,7 +8,7 @@ import { isLiteralPrimitive } from './type-protection';
 @Injectable()
 export class TemplateInterpolationService {
   pipes = new Set<string>();
-
+  pipeIndex = 0;
   constructor(private buildPlatform: BuildPlatform) {}
   expressionConvertToString(ast: AST) {
     if (isLiteralPrimitive(ast)) {
@@ -19,9 +19,10 @@ export class TemplateInterpolationService {
     return new BindValue((contextPrefix) => {
       instance.contextPrefix = contextPrefix;
       instance.globalVariablePrefix = this.buildPlatform.globalVariablePrefix;
+      instance.pipeIndex = this.pipeIndex;
       const result = instance.toString(ast);
-
       instance.getPipeList().forEach((item) => {
+        this.pipeIndex++;
         this.pipes.add(item);
       });
       return result;
