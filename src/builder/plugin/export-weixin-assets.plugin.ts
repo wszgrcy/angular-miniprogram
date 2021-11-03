@@ -1,4 +1,5 @@
 import { dirname, join, normalize, strings } from '@angular-devkit/core';
+import { NgtscProgram } from '@angular/compiler-cli';
 import { ResolvedValue } from '@angular/compiler-cli/src/ngtsc/partial_evaluator';
 import { readConfiguration } from '@angular/compiler-cli/src/perform_compile';
 import { externalizePath, normalizePath } from '@ngtools/webpack/src/ivy/paths';
@@ -107,6 +108,13 @@ export class ExportWeiXinAssetsPlugin {
         this.addCleanDependency(host);
         this.program = ts.createProgram(config.rootNames, config.options, host);
         this.typeChecker = this.program.getTypeChecker();
+        const program = new NgtscProgram(
+          config.rootNames,
+          config.options,
+          host
+        );
+        const typeScriptProgram = program.getTsProgram();
+
         this.resolver = new DecoratorMetaDataResolver(
           this.program,
           this.typeChecker
