@@ -29,6 +29,7 @@ import { ExportWeiXinAssetsPluginSymbol } from '../const';
 import { TemplateGlobalContext } from '../html/node-handle/global-context';
 import { TemplateCompiler } from '../html/template-compiler';
 import { TemplateInterpolationService } from '../html/template-interpolation.service';
+import { TemplateService } from '../html/template.service';
 import { ComponentTemplateLoaderContext } from '../loader/type';
 import { BuildPlatform } from '../platform/platform';
 import { PlatformInfo } from '../platform/platform-info';
@@ -38,6 +39,13 @@ import {
   TEMPLATE_COMPILER_OPTIONS_TOKEN,
 } from '../token/component.token';
 import { TS_CONFIG_TOKEN } from '../token/project.token';
+import {
+  NGTSC_PROGRAM,
+  NG_COMPILER,
+  TS_SYSTEM,
+  TS_TPROGRAM,
+} from '../token/ts-program.token';
+import { WEBPACK_COMPILATION } from '../token/webpack.token';
 import { DecoratorMetaDataResolver } from '../ts/decorator-metadata-resolver';
 import { PagePattern } from '../type';
 import { RawUpdater } from '../util/raw-updater';
@@ -56,7 +64,7 @@ export class ExportWeiXinAssetsPlugin {
   private system!: ts.System;
   private WXMLMap = new Map<string, string>();
   private dependencyUseModule = new Map<string, string[]>();
-  private program!: ts.Program;
+  // private program!: ts.Program;
   private compiler!: webpack.Compiler;
   private compilation!: webpack.Compilation;
   private typeChecker!: TypeChecker;
@@ -90,6 +98,9 @@ export class ExportWeiXinAssetsPlugin {
     const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
     this.originInputFileSystemSync.readFileSync = ifs.readFileSync;
     this.originInputFileSystemSync.statSync = ifs.statSync;
+    let oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined =
+      undefined;
+
     compiler.hooks.thisCompilation.tap(
       'ExportWeiXinAssetsPlugin',
       (compilation) => {
@@ -106,67 +117,53 @@ export class ExportWeiXinAssetsPlugin {
         );
         this.augmentResolveModuleNames(host, config.options);
         this.addCleanDependency(host);
-        this.program = ts.createProgram(config.rootNames, config.options, host);
-        this.typeChecker = this.program.getTypeChecker();
+        // this.program = ts.createProgram(config.rootNames, config.options, host);
+        // this.typeChecker = this.program.getTypeChecker();
         const program = new NgtscProgram(
           config.rootNames,
           config.options,
           host
         );
-        const typeScriptProgram = program.getTsProgram();
+        const ngCompiler = program.compiler;
 
-        this.resolver = new DecoratorMetaDataResolver(
-          this.program,
-          this.typeChecker
-        );
-        this.program
-          .getSourceFiles()
-          .filter((sf) => !sf.isDeclarationFile)
-          .filter((sf) => !sf.fileName.includes('node_modules'))
-          .forEach((item) => {
-            this.resolver.resolverSourceFile(item);
-          });
-        this.resolver.getModuleMetaMap().forEach((value, key) => {
-          if (value['declarations'] && value['declarations'].length) {
-            if (value['declarations'].length > 1) {
-              throw new Error('类声明组件超过一个');
-            }
-            const ref = value['declarations'][0];
-            const sf = ref.node.getSourceFile();
-            this.componentToModule.set(sf, key.getSourceFile());
-          }
-        });
-        this.resolver.getComponentMetaMap().forEach((value, key) => {
-          const WXMLTemplate = this.buildWxmlTemplate(key, value);
-          const module = this.componentToModule.get(key.getSourceFile());
-          const entry = this.getModuleEntry(module!);
-          if (!entry) {
-            throw new Error('没有找到对应的出口信息');
-          }
-          this.WXMLMap.set(entry.outputWXML, WXMLTemplate.content);
-          if (WXMLTemplate.template) {
-            this.WXMLMap.set(
-              join(dirname(normalize(entry.outputWXML)), 'template.wxml'),
-              WXMLTemplate.template
+        const typeScriptProgram = program.getTsProgram();
+        let builder:
+          | ts.BuilderProgram
+          | ts.EmitAndSemanticDiagnosticsBuilderProgram;
+        if (compiler.watchMode) {
+          builder = oldBuilder =
+            ts.createEmitAndSemanticDiagnosticsBuilderProgram(
+              typeScriptProgram,
+              host,
+              oldBuilder
             );
-          }
-          this.removeTemplateAndStyleInTs(
-            (key.decorators![0].expression as CallExpression)
-              .arguments[0] as ObjectLiteralExpression,
-            key.getSourceFile(),
-            WXMLTemplate.htmlTemplate
-          );
-          this.updateLogicMap.set(
-            path.normalize(key.getSourceFile().fileName),
-            WXMLTemplate.logic
-          );
+        } else {
+          builder = ts.createAbstractBuilder(typeScriptProgram, host);
+        }
+        const waitAnalyzeAsync = ngCompiler.analyzeAsync();
+        const injector = Injector.create({
+          providers: [
+            { provide: TemplateService },
+            { provide: NG_COMPILER, useValue: ngCompiler },
+            { provide: TS_TPROGRAM, useValue: typeScriptProgram },
+            { provide: NGTSC_PROGRAM, useValue: program },
+            { provide: WEBPACK_COMPILATION, useValue: compilation },
+            {
+              provide: TS_SYSTEM,
+              useValue: this.system,
+            },
+          ],
+          parent: this.injector,
         });
+        const templateService = injector.get(TemplateService);
+        this.changeFileMap = templateService.removeStyle();
+
         this.hookFileSystemFile();
-        const ngComponentCssExtractPlugin = new NgComponentCssExtractPlugin(
-          this.resolver.getComponentMetaMap(),
-          resourceLoader
-        );
-        ngComponentCssExtractPlugin.run(compilation);
+        // const ngComponentCssExtractPlugin = new NgComponentCssExtractPlugin(
+        //   this.resolver.getComponentMetaMap(),
+        //   resourceLoader
+        // );
+        // ngComponentCssExtractPlugin.run(compilation);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (compilation as any)[ExportWeiXinAssetsPluginSymbol] = {
@@ -176,16 +173,25 @@ export class ExportWeiXinAssetsPlugin {
         compilation.hooks.processAssets.tapAsync(
           'ExportWeiXinAssetsPlugin',
           async (assets, cb) => {
-            const cssMap = ngComponentCssExtractPlugin.getAllCss();
-            for (const [key, value] of cssMap.entries()) {
-              const entry = this.getModuleEntry(
-                this.componentToModule.get(key.getSourceFile())!
-              );
-              compilation.assets[entry!.outputWXSS] = new RawSource(
-                await value
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ) as any;
-            }
+            await waitAnalyzeAsync;
+            templateService.buildTemplate();
+            /**
+             * 等待分析结束
+             * 读组件组件节点的数据TraitCompiler compile
+             * 通过组件节点数据生成SelectorMatcher
+             * 比较标签类型,指令类型得到实际的指令索引
+             * 对索引固化
+             */
+            // const cssMap = ngComponentCssExtractPlugin.getAllCss();
+            // for (const [key, value] of cssMap.entries()) {
+            //   const entry = this.getModuleEntry(
+            //     this.componentToModule.get(key.getSourceFile())!
+            //   );
+            //   compilation.assets[entry!.outputWXSS] = new RawSource(
+            //     await value
+            //     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            //   ) as any;
+            // }
 
             this.WXMLMap.forEach((value, key) => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -299,91 +305,91 @@ export class ExportWeiXinAssetsPlugin {
     }
     return maybeEntryPath;
   }
-  private removeTemplateAndStyleInTs(
-    objectNode: ObjectLiteralExpression,
-    sf: SourceFile,
-    htmlString: string
-  ) {
-    const change = new TsChange(sf);
-    const list: (InsertChange | DeleteChange)[] = change.deleteChildNode(
-      objectNode,
-      (node) => {
-        let value: string;
-        if (ts.isPropertyAssignment(node)) {
-          const propertyName = node.name;
-          if (
-            ts.isIdentifier(propertyName) ||
-            ts.isStringLiteral(propertyName) ||
-            ts.isNumericLiteral(propertyName)
-          ) {
-            value = propertyName.text;
-          } else {
-            return false;
-          }
-        } else if (ts.isShorthandPropertyAssignment(node)) {
-          value = node.name.text;
-        } else {
-          return false;
-        }
+  // private removeTemplateAndStyleInTs(
+  //   objectNode: ObjectLiteralExpression,
+  //   sf: SourceFile,
+  //   htmlString: string
+  // ) {
+  //   const change = new TsChange(sf);
+  //   const list: (InsertChange | DeleteChange)[] = change.deleteChildNode(
+  //     objectNode,
+  //     (node) => {
+  //       let value: string;
+  //       if (ts.isPropertyAssignment(node)) {
+  //         const propertyName = node.name;
+  //         if (
+  //           ts.isIdentifier(propertyName) ||
+  //           ts.isStringLiteral(propertyName) ||
+  //           ts.isNumericLiteral(propertyName)
+  //         ) {
+  //           value = propertyName.text;
+  //         } else {
+  //           return false;
+  //         }
+  //       } else if (ts.isShorthandPropertyAssignment(node)) {
+  //         value = node.name.text;
+  //       } else {
+  //         return false;
+  //       }
 
-        return /^(templateUrl|template|styleUrls|styles)$/.test(
-          value as string
-        );
-      }
-    );
-    if (typeof htmlString === 'string' && htmlString) {
-      list.push(change.insertChildNode(objectNode, `template:"${htmlString}"`));
-    } else {
-      list.push(change.insertChildNode(objectNode, `template:''`));
-    }
-    list.sort((a, b) => {
-      return b.start - a.start;
-    });
-    const content = RawUpdater.update(sf.text, list);
-    this.changeFileMap.set(path.normalize(sf.fileName), {
-      sizeOffset: sf.text.length - content.length,
-      content: content,
-    });
-  }
-  private buildWxmlTemplate(
-    classDeclaration: ts.ClassDeclaration,
-    meta: Record<string, ResolvedValue>
-  ) {
-    let templateContent = '';
-    const templateUrl = meta['templateUrl'] as string;
-    if (templateUrl) {
-      templateContent = this.system.readFile(templateUrl)!;
-      this.compilation.fileDependencies.add(templateUrl);
-    } else {
-      templateContent = meta['template'] as string;
-    }
-    if (typeof templateContent !== 'string') {
-      throw new Error('解析错误');
-    }
-    const interpolation = meta['interpolation'] as string[];
-    const injector = Injector.create({
-      parent: this.injector,
-      providers: [
-        { provide: TemplateCompiler },
-        {
-          provide: COMPONENT_FILE_NAME_TOKEN,
-          useValue: classDeclaration.getSourceFile().fileName,
-        },
-        {
-          provide: COMPONENT_TEMPLATE_CONTENT_TOKEN,
-          useValue: templateContent,
-        },
-        {
-          provide: TEMPLATE_COMPILER_OPTIONS_TOKEN,
-          useValue: { interpolation },
-        },
-        { provide: TemplateInterpolationService },
-        { provide: TemplateGlobalContext },
-      ],
-    });
-    const instance = injector.get(TemplateCompiler);
-    return instance.transform();
-  }
+  //       return /^(templateUrl|template|styleUrls|styles)$/.test(
+  //         value as string
+  //       );
+  //     }
+  //   );
+  //   if (typeof htmlString === 'string' && htmlString) {
+  //     list.push(change.insertChildNode(objectNode, `template:"${htmlString}"`));
+  //   } else {
+  //     list.push(change.insertChildNode(objectNode, `template:''`));
+  //   }
+  //   list.sort((a, b) => {
+  //     return b.start - a.start;
+  //   });
+  //   const content = RawUpdater.update(sf.text, list);
+  //   this.changeFileMap.set(path.normalize(sf.fileName), {
+  //     sizeOffset: sf.text.length - content.length,
+  //     content: content,
+  //   });
+  // }
+  // private buildWxmlTemplate(
+  //   classDeclaration: ts.ClassDeclaration,
+  //   meta: Record<string, ResolvedValue>
+  // ) {
+  //   let templateContent = '';
+  //   const templateUrl = meta['templateUrl'] as string;
+  //   if (templateUrl) {
+  //     templateContent = this.system.readFile(templateUrl)!;
+  //     this.compilation.fileDependencies.add(templateUrl);
+  //   } else {
+  //     templateContent = meta['template'] as string;
+  //   }
+  //   if (typeof templateContent !== 'string') {
+  //     throw new Error('解析错误');
+  //   }
+  //   const interpolation = meta['interpolation'] as string[];
+  //   const injector = Injector.create({
+  //     parent: this.injector,
+  //     providers: [
+  //       { provide: TemplateCompiler },
+  //       {
+  //         provide: COMPONENT_FILE_NAME_TOKEN,
+  //         useValue: classDeclaration.getSourceFile().fileName,
+  //       },
+  //       {
+  //         provide: COMPONENT_TEMPLATE_CONTENT_TOKEN,
+  //         useValue: templateContent,
+  //       },
+  //       {
+  //         provide: TEMPLATE_COMPILER_OPTIONS_TOKEN,
+  //         useValue: { interpolation },
+  //       },
+  //       { provide: TemplateInterpolationService },
+  //       { provide: TemplateGlobalContext },
+  //     ],
+  //   });
+  //   const instance = injector.get(TemplateCompiler);
+  //   return instance.transform();
+  // }
   private restore() {
     const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
     ifs.readFileSync = this.originInputFileSystemSync.readFileSync;
