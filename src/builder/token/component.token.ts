@@ -9,3 +9,5 @@ export const COMPONENT_TEMPLATE_CONTENT_TOKEN = new InjectionToken<string>(
 export const TEMPLATE_COMPILER_OPTIONS_TOKEN = new InjectionToken(
   'TEMPLATE_COMPILER_TOKEN'
 );
+
+export const DIRECTIVE_MATCHER = new InjectionToken('DIRECTIVE_MATCHER');

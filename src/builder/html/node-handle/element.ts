@@ -87,6 +87,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     this.children = children;
   }
   getNodeMeta(globalContext: TemplateGlobalContext): NgElementMeta {
+    const staticType = globalContext.matchDirective(this.node);
     this.analysis();
 
     return {
@@ -97,6 +98,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       outputs: this.outputSet,
       attributes: this.attributeObject,
       singleClosedTag: this.singleClosedTag,
+      staticType,
     };
   }
   getNgSwitch() {

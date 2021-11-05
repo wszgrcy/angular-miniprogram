@@ -28,6 +28,7 @@ export interface NgElementMeta extends NgNodeMeta {
   inputs: Record<string, PlainValue | BindValue>;
   outputs: TagEventMeta[];
   singleClosedTag: boolean;
+  staticType: any;
 }
 export interface NgBoundTextMeta extends NgNodeMeta {
   kind: NgNodeKind.BoundText;
@@ -73,6 +74,7 @@ export interface NgTemplateMeta<T = NgDirective> extends NgNodeMeta {
   kind: NgNodeKind.Template;
   children: NgNodeMeta[];
   directive: T[];
+  staticType: any;
 }
 export interface NgContentMeta extends NgNodeMeta {
   kind: NgNodeKind.Content;

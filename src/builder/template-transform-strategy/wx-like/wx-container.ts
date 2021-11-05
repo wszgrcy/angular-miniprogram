@@ -29,6 +29,7 @@ export class WxContainer {
   private containerName!: string;
   private childContainer: WxContainer[] = [];
   private directiveIndex = 0;
+  private componentIndex = 0;
   constructor(private parent?: WxContainer) {}
 
   private _compileTemplate(node: NgNodeMeta): string {
@@ -51,6 +52,10 @@ export class WxContainer {
   }
 
   private ngElementTransform(node: NgElementMeta): string {
+    let componentIndex: number | undefined = undefined;
+    if (node.staticType && node.staticType.some((item: any) => item.element)) {
+      componentIndex = this.componentIndex++;
+    }
     const attributeStr = Object.entries(node.attributes)
       .map(([key, value]) => `${key}="${value}"`)
       .join(' ');
@@ -74,9 +79,9 @@ export class WxContainer {
     }
     return `<${
       node.tagName
-    } ${attributeStr} ${inputStr} ${outputStr}>${children.join('')}</${
-      node.tagName
-    }>`;
+    } ${attributeStr} ${inputStr} ${outputStr} ${this.setComponentIndex(
+      this.componentIndex
+    )}>${children.join('')}</${node.tagName}>`;
   }
   private ngBoundTextTransform(node: NgBoundTextMeta): string {
     return node.values
@@ -268,5 +273,11 @@ export class WxContainer {
   }
   getDeclarationContainerFunction() {
     return this.childContainer.map((child) => child.export().logic);
+  }
+  private setComponentIndex(index: number | undefined) {
+    if (typeof index === 'number') {
+      return `componentindex="${index}"`;
+    }
+    return ``;
   }
 }

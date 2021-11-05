@@ -183,12 +183,15 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
   }
   getNodeMeta(globalContext: TemplateGlobalContext): NgTemplateMeta {
     this.globalContext = globalContext;
+    const staticType = globalContext.matchDirective(this.node);
+
     const directive = this.transform()!;
 
     const meta: NgTemplateMeta = {
       kind: NgNodeKind.Template,
       children: this.children.map((child) => child.getNodeMeta(globalContext)),
       directive: directive,
+      staticType: staticType,
     };
     for (let i = 0; i < directive.length; i++) {
       const element = directive[i];

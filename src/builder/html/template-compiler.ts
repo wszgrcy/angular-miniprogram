@@ -2,6 +2,7 @@ import {
   DEFAULT_INTERPOLATION_CONFIG,
   HtmlParser,
   InterpolationConfig,
+  SelectorMatcher,
   makeBindingParser,
 } from '@angular/compiler';
 
@@ -16,6 +17,7 @@ import { PlatformInfo } from '../platform/platform-info';
 import {
   COMPONENT_FILE_NAME_TOKEN,
   COMPONENT_TEMPLATE_CONTENT_TOKEN,
+  DIRECTIVE_MATCHER,
   TEMPLATE_COMPILER_OPTIONS_TOKEN,
 } from '../token/component.token';
 import { ParsedNgBoundText } from './node-handle/bound-text';
@@ -43,8 +45,8 @@ import { TemplateInterpolationService } from './template-interpolation.service';
 export class TemplateCompiler {
   private render3ParseResult!: Render3ParseResult;
   private nodeMetaList: NgNodeMeta[] = [];
-  globalContext = new TemplateGlobalContext();
   private templateTransform: PlatformInfo['templateTransform'];
+  private globalContext: TemplateGlobalContext;
   constructor(
     @Inject(COMPONENT_FILE_NAME_TOKEN) private url: string,
     @Inject(COMPONENT_TEMPLATE_CONTENT_TOKEN) private content: string,
@@ -52,8 +54,10 @@ export class TemplateCompiler {
     @Inject(TEMPLATE_COMPILER_OPTIONS_TOKEN)
     private options: { interpolation?: string[] },
     private templateInterpolationService: TemplateInterpolationService,
-    buildPlatform: BuildPlatform
+    buildPlatform: BuildPlatform,
+    @Inject(DIRECTIVE_MATCHER) directiveMatcher: SelectorMatcher
   ) {
+    this.globalContext = new TemplateGlobalContext(directiveMatcher);
     this.options = this.options || {};
     this.templateTransform = buildPlatform.templateTransform;
     this.templateTransform.setGlobalContext(this.globalContext);

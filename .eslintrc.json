@@ -58,6 +58,7 @@
     "no-eval": "error",
     "no-multiple-empty-lines": ["warn"],
     "no-throw-literal": "warn",
+    "no-var": "warn",
     "sort-imports": ["warn", { "ignoreDeclarationSort": true }],
     "spaced-comment": [
       "warn",
