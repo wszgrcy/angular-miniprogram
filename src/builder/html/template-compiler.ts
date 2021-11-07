@@ -6,7 +6,6 @@ import {
   makeBindingParser,
 } from '@angular/compiler';
 
-import { Node } from '@angular/compiler/src/render3/r3_ast';
 import {
   Render3ParseResult,
   htmlAstToRender3Ast,
@@ -20,25 +19,11 @@ import {
   DIRECTIVE_MATCHER,
   TEMPLATE_COMPILER_OPTIONS_TOKEN,
 } from '../token/component.token';
-import { ParsedNgBoundText } from './node-handle/bound-text';
-import { ParsedNgContent } from './node-handle/content';
-import { ParsedNgElement } from './node-handle/element';
+
 import { TemplateGlobalContext } from './node-handle/global-context';
-import {
-  NgBoundTextMeta,
-  NgElementMeta,
-  NgNodeMeta,
-  NgTemplateMeta,
-  ParsedNode,
-} from './node-handle/interface';
-import {
-  isNgBoundTextMeta,
-  isNgElementMeta,
-  isNgTemplateMeta,
-} from './node-handle/node-meta/type-predicate';
-import { NgTemplate } from './node-handle/template';
-import { ParsedNgText } from './node-handle/text';
-import { nodeIteration } from './node-iteration';
+import { NgNodeMeta } from './node-handle/interface';
+
+import { TemplateDefinition } from './template-definition';
 import { TemplateInterpolationService } from './template-interpolation.service';
 
 @Injectable()
@@ -90,12 +75,15 @@ export class TemplateCompiler {
   private parseNode() {
     const nodes = this.render3ParseResult.nodes;
     const service = this.templateInterpolationService;
-
-    for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i];
-      const parsedNode = this.generateParsedNode(node, undefined, service);
-      this.nodeMetaList.push(parsedNode.getNodeMeta(this.globalContext));
-    }
+    const templateDefinition = new TemplateDefinition(
+      nodes,
+      this.globalContext,
+      this.templateInterpolationService
+    );
+    const list = templateDefinition.run();
+    list.forEach((item) => {
+      this.nodeMetaList.push(item.getNodeMeta(this.globalContext));
+    });
   }
 
   transform() {
@@ -111,42 +99,5 @@ export class TemplateCompiler {
         .map((pipe) => `{{''|${pipe}}}`)
         .join(''),
     };
-  }
-
-  generateParsedNode(
-    node: Node,
-    parent: ParsedNode<NgNodeMeta> | undefined,
-    service: TemplateInterpolationService
-  ): ParsedNode<NgNodeMeta> {
-    return nodeIteration(node, {
-      Element: (node) => {
-        const instance = new ParsedNgElement(node, parent, service);
-        const childrenInstance = instance
-          .getOriginChildren()
-          .map((node) => this.generateParsedNode(node, instance, service));
-        instance.setNgNodeChildren(childrenInstance);
-        return instance;
-      },
-      BoundText: (node) => {
-        return new ParsedNgBoundText(node, parent, service);
-      },
-      Text: (node) => {
-        return new ParsedNgText(node, parent, service);
-      },
-      Template: (node) => {
-        const instance = new NgTemplate(node, parent, service);
-        const childrenInstance = instance
-          .getOriginChildren()
-          .map((node) => this.generateParsedNode(node, instance, service));
-        instance.setNgNodeChildren(childrenInstance);
-        return instance;
-      },
-      Content: (node) => {
-        return new ParsedNgContent(node, parent, service);
-      },
-      default: (node) => {
-        throw new Error('未实现');
-      },
-    });
   }
 }

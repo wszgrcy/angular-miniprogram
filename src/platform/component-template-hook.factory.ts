@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
+  InjectFlags,
   ɵangular_packages_core_core_bh,
+  ɵangular_packages_core_core_ca,
   ɵɵdirectiveInject,
 } from '@angular/core';
+import { PAGE_TOKEN } from 'index';
 import { COMPONENT_TOKEN } from './module/token/component.token';
 
 function propertyChange(ctx: any) {
@@ -58,9 +61,34 @@ function getPipe(pipeName: string, index: number, ...args: any[]) {
   }
   return pipeInstance.transform(...args);
 }
+const pageMap = new Map<string, ɵangular_packages_core_core_ca>();
+function pageBind() {
+  const lview = ɵangular_packages_core_core_bh();
+  const wxComponentInstance = ɵɵdirectiveInject(PAGE_TOKEN);
+  if (!wxComponentInstance) {
+    return;
+  }
+  const pageId = wxComponentInstance.getPageId();
+  pageMap.set(pageId, lview);
+}
+const wxPageStructMap = new Map();
+// todo 定义改为由wx部分定义,因为有不同位置索引
+function defineComponent(key: string, value: any) {
+  wxPageStructMap.set(key, value);
+}
+function queryComponent(key: string) {
+  return wxPageStructMap.get(key);
+}
+
 export function componentTemplateHookFactory() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (wx as any).__window.__propertyChange = propertyChange;
   (wx as any).__window.__computeExpression = computeExpression;
   (wx as any).__window.__getPipe = getPipe;
+  (wx as any).__window.__pageBind = pageBind;
+  (wx as any).__window.__defineComponent = defineComponent;
+  (wx as any).__window.__queryComponent = queryComponent;
 }
+/**
+ * todo 改为wxml保存引用索引,通过引用索引找到对应的lview进行绑定并更新
+ */

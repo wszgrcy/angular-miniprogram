@@ -175,16 +175,9 @@ export class TemplateService {
           return false;
         }
 
-        return /^(templateUrl|template|styleUrls|styles)$/.test(
-          value as string
-        );
+        return /^(styleUrls|styles)$/.test(value as string);
       }
     );
-    if (typeof htmlString === 'string' && htmlString) {
-      list.push(change.insertChildNode(objectNode, `template:"${htmlString}"`));
-    } else {
-      list.push(change.insertChildNode(objectNode, `template:''`));
-    }
     list.sort((a, b) => {
       return b.start - a.start;
     });

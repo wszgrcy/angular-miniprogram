@@ -6,6 +6,7 @@ import { WxTransform } from '../template-transform-strategy/wx.transform';
 import {
   COMPONENT_FILE_NAME_TOKEN,
   COMPONENT_TEMPLATE_CONTENT_TOKEN,
+  DIRECTIVE_MATCHER,
 } from '../token/component.token';
 import { TemplateCompiler } from './template-compiler';
 import { TemplateInterpolationService } from './template-interpolation.service';
@@ -37,6 +38,7 @@ describe('template-compiler', () => {
         { provide: COMPONENT_FILE_NAME_TOKEN, useValue: '' },
         { provide: COMPONENT_TEMPLATE_CONTENT_TOKEN, useValue: content },
         { provide: TemplateInterpolationService },
+        { provide: DIRECTIVE_MATCHER, useValue: undefined },
       ],
     });
     const instance = injector.get(TemplateCompiler);

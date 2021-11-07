@@ -201,6 +201,7 @@ export class WebpackConfigurationChange {
     const defineObject: Record<string, string> = {
       global: `${this.platformInfo.globalObject}.__global`,
       window: `${this.platformInfo.globalVariablePrefix}`,
+      globalThis: `${this.platformInfo.globalVariablePrefix}`,
       Zone: `${this.platformInfo.globalVariablePrefix}.Zone`,
       setTimeout: `${this.platformInfo.globalVariablePrefix}.setTimeout`,
       clearTimeout: `${this.platformInfo.globalVariablePrefix}.clearTimeout`,
@@ -216,7 +217,9 @@ export class WebpackConfigurationChange {
       navigator: `${this.platformInfo.globalVariablePrefix}.navigator`,
     };
     if (this.config.mode === 'development') {
-      defineObject['ngDevMode'] = `${this.platformInfo.globalObject}.ngDevMode`;
+      defineObject[
+        'ngDevMode'
+      ] = `${this.platformInfo.globalObject}.__global.ngDevMode`;
     }
     this.config.plugins!.push(new DefinePlugin(defineObject));
   }

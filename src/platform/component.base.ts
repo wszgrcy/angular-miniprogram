@@ -21,7 +21,8 @@ export function generateWxComponent<C>(
   component: Type<C> & NgCompileComponent,
   componentOptions: Partial<
     WechatMiniprogram.Component.Options<{}, {}, {}>
-  > = {}
+  > = {},
+  isComponent: boolean
 ) {
   const inputs = component.ɵcmp.inputs;
   const outputs = component.ɵcmp.outputs;
@@ -94,60 +95,69 @@ export function generateWxComponent<C>(
         return componentRef.instance;
       }));
     };
-    type LifetimeKey = keyof WechatMiniprogram.Component.Lifetimes['lifetimes'];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lifetimes = (
-      ['attached', 'detached', 'error', 'moved', 'ready'] as LifetimeKey[]
-    ).reduce((pre, lifetime) => {
+    let lifetimes;
+    let pageLifetimes;
+    if (!isComponent) {
+      type LifetimeKey =
+        keyof WechatMiniprogram.Component.Lifetimes['lifetimes'];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pre[lifetime] = function (this: WxComponentInstance, ...args: any[]) {
-        this.__waitNgComponentInit.then(
-          (instance: WxLifetimes) => {
-            if (instance.wxLifetimes && instance.wxLifetimes[lifetime]) {
-              (instance.wxLifetimes[lifetime] as Function)(...args);
+      lifetimes = (
+        ['attached', 'detached', 'error', 'moved', 'ready'] as LifetimeKey[]
+      ).reduce((pre, lifetime) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        pre[lifetime] = function (this: WxComponentInstance, ...args: any[]) {
+          this.__waitNgComponentInit.then(
+            (instance: WxLifetimes) => {
+              if (instance.wxLifetimes && instance.wxLifetimes[lifetime]) {
+                (instance.wxLifetimes[lifetime] as Function)(...args);
+              }
+            },
+            (rej) => {
+              throw rej;
             }
-          },
-          (rej) => {
-            throw rej;
-          }
-        );
-      };
-      return pre;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }, {} as { [p in LifetimeKey]: (...args: any[]) => void });
-    type PageLifetimeKey = keyof WechatMiniprogram.Component.PageLifetimes;
-    const pageLifetimes = (
-      ['hide', 'resize', 'show'] as PageLifetimeKey[]
-    ).reduce((pre, cur) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pre[cur] = function (this: WxComponentInstance, ...args: any[]) {
-        this.__waitNgComponentInit.then(
-          (instance: WxLifetimes) => {
-            if (instance.wxPageLifetimes && instance.wxPageLifetimes[cur]) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (instance.wxPageLifetimes[cur] as any)(...args);
-            }
-          },
-          (rej) => {
-            throw rej;
-          }
-        );
-      };
-      return pre;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }, {} as { [p in PageLifetimeKey]: (...args: any[]) => void });
+          );
+        };
+        return pre;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, {} as { [p in LifetimeKey]: (...args: any[]) => void });
+      type PageLifetimeKey = keyof WechatMiniprogram.Component.PageLifetimes;
+      pageLifetimes = (['hide', 'resize', 'show'] as PageLifetimeKey[]).reduce(
+        (pre, cur) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          pre[cur] = function (this: WxComponentInstance, ...args: any[]) {
+            this.__waitNgComponentInit.then(
+              (instance: WxLifetimes) => {
+                if (instance.wxPageLifetimes && instance.wxPageLifetimes[cur]) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (instance.wxPageLifetimes[cur] as any)(...args);
+                }
+              },
+              (rej) => {
+                throw rej;
+              }
+            );
+          };
+          return pre;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        },
+        {} as { [p in PageLifetimeKey]: (...args: any[]) => void }
+      );
+    }
     Component({
       options: componentOptions.options,
       externalClasses: componentOptions.externalClasses,
       observers: observers,
-      properties: Object.keys(inputs).reduce(
-        (pre, cur) => {
-          pre[cur] = { value: null, type: null };
-          return pre;
-        },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        {} as Record<string, any>
-      ),
+      properties: {
+        ...Object.keys(inputs).reduce(
+          (pre, cur) => {
+            pre[cur] = { value: null, type: null };
+            return pre;
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          {} as Record<string, any>
+        ),
+        componentindex: { value: NaN, type: Number },
+      },
       methods: fnList.reduce((pre: Record<string, Function>, cur) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         pre[cur] = function (this: WxComponentInstance, ...args: any[]) {
@@ -164,6 +174,22 @@ export function generateWxComponent<C>(
       lifetimes: {
         ...lifetimes,
         created(this: WxComponentInstance) {
+          if (isComponent) {
+            const componentStruct = (wx as any).__window.__queryComponent(
+              this.properties.componentStruct
+            );
+            // todo 将组件的结构预定义出来
+            // todo 找父级,投影可能被影响,也可能不影响
+            const parentThis = this.selectOwnerComponent();
+            // 查找出自身的位置,并且在lview上确定,
+            // 也就是根据查找自身位置的路径,查lview
+            parentThis.componentStruct;
+            const parentComponentStruct = (wx as any).__window.__queryComponent(
+              parentThis.properties.componentStruct
+            );
+
+            return;
+          }
           const ref = bootStrapFn(this);
           ref.then(
             (ngComponentInstance) => {
@@ -178,6 +204,9 @@ export function generateWxComponent<C>(
           );
         },
         detached(this: WxComponentInstance) {
+          if (isComponent) {
+            return;
+          }
           this.__waitNgComponentInit.then(
             (ref) => {
               this.__ngComponentDestroy();

@@ -53,7 +53,10 @@ export class WxContainer {
 
   private ngElementTransform(node: NgElementMeta): string {
     let componentIndex: number | undefined = undefined;
-    if (node.staticType && node.staticType.some((item: any) => item.element)) {
+    if (
+      node.staticType &&
+      node.staticType.some((item: any) => item.selector.element)
+    ) {
       componentIndex = this.componentIndex++;
     }
     const attributeStr = Object.entries(node.attributes)
@@ -80,7 +83,7 @@ export class WxContainer {
     return `<${
       node.tagName
     } ${attributeStr} ${inputStr} ${outputStr} ${this.setComponentIndex(
-      this.componentIndex
+      componentIndex
     )}>${children.join('')}</${node.tagName}>`;
   }
   private ngBoundTextTransform(node: NgBoundTextMeta): string {

@@ -37,6 +37,9 @@ export class NgTemplate implements ParsedNode<NgTemplateMeta> {
   setNgNodeChildren(children: ParsedNode<NgNodeMeta>[]) {
     this.children = children;
   }
+  appendNgNodeChild(child: ParsedNode<NgNodeMeta>) {
+    this.children.push(child);
+  }
   private transform(): NgDirective[] {
     /**
      * 根据指令判断如何处理

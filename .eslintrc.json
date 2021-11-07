@@ -51,7 +51,7 @@
         "ignoreRegExpLiterals": true
       }
     ],
-    "max-lines-per-function": ["warn", { "max": 200 }],
+    "max-lines-per-function": ["warn", { "max": 400 }],
     "no-caller": "error",
     "no-console": "warn",
     "no-empty": ["warn", { "allowEmptyCatch": true }],

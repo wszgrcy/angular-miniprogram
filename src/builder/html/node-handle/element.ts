@@ -86,6 +86,9 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   setNgNodeChildren(children: ParsedNode<NgNodeMeta>[]) {
     this.children = children;
   }
+  appendNgNodeChild(child: ParsedNode<NgNodeMeta>) {
+    this.children.push(child);
+  }
   getNodeMeta(globalContext: TemplateGlobalContext): NgElementMeta {
     const staticType = globalContext.matchDirective(this.node);
     this.analysis();

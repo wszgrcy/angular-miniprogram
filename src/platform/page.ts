@@ -10,7 +10,8 @@ export function pageStartup<M, C>(
   const wxComponentFactory = generateWxComponent(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     component as any,
-    componentOptions
+    componentOptions,
+    false
   );
   const app = getApp<AppOptions>();
   app.__pageModuleLoadedMap = new Map();
