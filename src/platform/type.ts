@@ -44,14 +44,10 @@ export type WxComponentInstance = WechatMiniprogram.Component.Instance<
     __ngZone: NgZone;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     __ngComponentRef: ComponentRef<any>;
-    /** 未变更的所有属性 */
-    __unchangedInputs: Set<string>;
-    /** wx初始化ng未初始化时保存 */
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    __initialInputValues: Map<string, any> | undefined;
-    /** 是否为第一次变更检测 */
-    __firstChange: boolean;
-    __firstChangeFunction: Function;
+    /** 小程序组件是否与lview链接成功 */
+    __isLink: boolean;
   }
 >;
 

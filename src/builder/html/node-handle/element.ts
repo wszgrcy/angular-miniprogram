@@ -4,6 +4,7 @@ import { TemplateInterpolationService } from '../template-interpolation.service'
 import { TagEventMeta } from './event';
 import { TemplateGlobalContext } from './global-context';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
+import { MatchedDirective } from './type';
 import { BindValue, PlainValue } from './value';
 
 export class ParsedNgElement implements ParsedNode<NgElementMeta> {
@@ -19,12 +20,12 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   ngSwitchFirst = true;
   ngSwitchIndex = 0;
   singleClosedTag = false;
-
+  ngInternalOutputs: string[] = [];
   constructor(
     private node: Element,
     public parent: ParsedNode<NgNodeMeta> | undefined,
     public templateInterpolationService: TemplateInterpolationService,
-    private index: number | undefined
+    private componentMeta: { index: number; type: MatchedDirective } | undefined
   ) {}
   private analysis() {
     this.getTagName();
@@ -47,13 +48,17 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     this.node.outputs.forEach((output) => {
       this.outputSet.push(
         new TagEventMeta(
-          (output.target || 'bind') + ':' + output.name,
+          output.target || 'bind',
+          output.name,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           output.handler as any
         )
       );
     });
-
+    if (this.componentMeta) {
+      this.ngInternalOutputs =
+        this.componentMeta.type.directiveMetadata.outputs;
+    }
     this.ngSwitch = this.node.inputs.find((item) => item.name === 'ngSwitch');
     if (this.ngSwitch) {
       delete this.inputs['ngSwitch'];
@@ -101,7 +106,10 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       outputs: this.outputSet,
       attributes: this.attributeObject,
       singleClosedTag: this.singleClosedTag,
-      index: this.index,
+      componentMeta: {
+        index: this.componentMeta?.index,
+        outputs: this.ngInternalOutputs,
+      },
     };
   }
   getNgSwitch() {

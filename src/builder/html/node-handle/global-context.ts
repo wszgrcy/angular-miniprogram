@@ -1,9 +1,11 @@
 import { SelectorMatcher } from '@angular/compiler';
+import { R3UsedDirectiveMetadata } from '@angular/compiler/src/compiler_facade_interface';
 import { Element, Template } from '@angular/compiler/src/render3/r3_ast';
 import { createCssSelector } from '@angular/compiler/src/render3/view/template';
 import { getAttrsForDirectiveMatching } from '@angular/compiler/src/render3/view/util';
 import { isTemplate } from '../type-protection';
 import { NgDefaultDirective, NgTemplateMeta } from './interface';
+import { MatchedDirective } from './type';
 
 export class TemplateGlobalContext {
   bindIndex = 0;
@@ -24,9 +26,9 @@ export class TemplateGlobalContext {
   getBindIndex() {
     return this.bindIndex++;
   }
-  matchDirective(node: Element | Template): any[] | undefined {
+  matchDirective(node: Element | Template): MatchedDirective[] {
     if (!this.directiveMatcher) {
-      return undefined;
+      return [];
     }
     let name: string;
     if (isTemplate(node)) {
@@ -38,16 +40,13 @@ export class TemplateGlobalContext {
       name,
       getAttrsForDirectiveMatching(node)
     );
-    const result: any[] = [];
-    const hasMatch = this.directiveMatcher.match(
+    const result: MatchedDirective[] = [];
+    this.directiveMatcher.match(
       selector,
-      (selector, staticType) => {
-        result.push({ selector, staticType });
+      (selector, directiveMetadata: R3UsedDirectiveMetadata) => {
+        result.push({ selector, directiveMetadata });
       }
     );
-    if (hasMatch) {
-      return result;
-    }
-    return undefined;
+    return result;
   }
 }

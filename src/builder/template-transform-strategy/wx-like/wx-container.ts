@@ -29,7 +29,6 @@ export class WxContainer {
   private containerName!: string;
   private childContainer: WxContainer[] = [];
   private directiveIndex = 0;
-  private componentIndex = 0;
   constructor(private parent?: WxContainer) {}
 
   private _compileTemplate(node: NgNodeMeta): string {
@@ -56,27 +55,31 @@ export class WxContainer {
       .map(([key, value]) => `${key}="${value}"`)
       .join(' ');
 
-    const inputStr = Object.entries(node.inputs)
-      .map(([key, value]) => {
-        const result = this.computeExpression(value);
-        this.logic.push(`varList[${result.index}]=${result.logic}`);
-        return `${key}="{{${result.template}}}"`;
-      })
-      .join(' ');
-
     const outputStr = node.outputs
+      .filter(
+        (item) =>
+          !node.componentMeta ||
+          (node.componentMeta &&
+            !(node.componentMeta.outputs || []).some(
+              (output) => output === item.name
+            ))
+      )
       .map(
-        (item) => `${item.name}="${item.handler.source!.replace(/\(.*$/, '')}"`
+        (item) =>
+          `${item.prefix}:${item.name}="${item.handler.source!.replace(
+            /\(.*$/,
+            ''
+          )}"`
       )
       .join(' ');
     const children = node.children.map((child) => this._compileTemplate(child));
     if (node.singleClosedTag) {
-      return `<${node.tagName} ${attributeStr} ${inputStr} ${outputStr}>`;
+      return `<${node.tagName} ${attributeStr} ${outputStr}>`;
     }
     return `<${
       node.tagName
-    } ${attributeStr} ${inputStr} ${outputStr} ${this.setComponentIndex(
-      node.index
+    } ${attributeStr} ${outputStr} ${this.setComponentIndex(
+      node?.componentMeta?.index
     )}>${children.join('')}</${node.tagName}>`;
   }
   private ngBoundTextTransform(node: NgBoundTextMeta): string {
@@ -95,7 +98,9 @@ export class WxContainer {
     let content = '';
     const directiveList = node.directive;
     const directiveIndex = this.directiveIndex++;
-    this.logic.push(`directive[${directiveIndex}]={}`);
+    if (directiveList.some((item) => item.type !== 'none')) {
+      this.logic.push(`directive[${directiveIndex}]={}`);
+    }
     for (let i = 0; i < directiveList.length; i++) {
       const directive = directiveList[i];
       if (directive.type === 'none') {
@@ -125,11 +130,7 @@ export class WxContainer {
           this.logic.push(() => {
             return `directive[${directiveIndex}]['then']=wxContainer${directive.thenTemplateRef!.value(
               ''
-            )}({originVar:{...ctx,${this.getCurrentContext()
-              .map((item) => item + ':' + item)
-              .join(
-                ','
-              )}},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},'then']})`;
+            )}({originVar:{...ctx},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},0]})`;
           });
         }
         if (directive.falseTemplateRef) {
@@ -144,11 +145,7 @@ export class WxContainer {
           this.logic.push(() => {
             return `directive[${directiveIndex}]['else']=wxContainer${directive.falseTemplateRef.value(
               ''
-            )}({originVar:{...ctx,${this.getCurrentContext()
-              .map((item) => item + ':' + item)
-              .join(
-                ','
-              )}},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},'else']})`;
+            )}({originVar:{...ctx},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},0]})`;
           });
         }
       } else if (directive.type === 'for') {
@@ -166,19 +163,9 @@ export class WxContainer {
         )}></template>
           </block>`;
         this.logic.push(() => {
-          return `for (let ${directive.index} = 0; ${directive.index} < ${
-            forResult.logic
-          }.length; ${directive.index}++) {
+          return `for (let ${directive.index} = 0; ${directive.index} < ${forResult.logic}.length; ${directive.index}++) {
               const ${directive.item} = ${forResult.logic}[${directive.index}];
-             directive[${directiveIndex}][${directive.index}]=wxContainer${
-            directive.templateName
-          }({originVar:{...ctx.originVar,${this.getCurrentContext()
-            .map((item) => item + ':' + item)
-            .join(
-              ','
-            )}},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},${
-            directive.index
-          }]})
+             directive[${directiveIndex}][${directive.index}]=wxContainer${directive.templateName}({originVar:{...ctx.originVar,${directive.item}:${directive.item},${directive.index}:${directive.index}},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},${directive.index}]})
             }`;
         });
       } else if (directive.type === 'switch') {
@@ -216,13 +203,7 @@ export class WxContainer {
           throw new Error('未知的解析指令');
         }
         this.logic.push(() => {
-          return `ctx.directive[${directiveIndex}][0]=wxContainer${
-            directive.templateName
-          }({originVar:{...ctx,${this.getCurrentContext()
-            .map((item) => item + ':' + item)
-            .join(
-              ','
-            )}},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},0]})`;
+          return `ctx.directive[${directiveIndex}][0]=wxContainer${directive.templateName}({originVar:{...ctx},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},0]})`;
         });
       } else {
         throw new Error('未知的解析节点');
@@ -259,9 +240,7 @@ export class WxContainer {
       index: index,
     };
   }
-  private getCurrentContext(otherList: string[] = []): string[] {
-    return Array.from(new Set([...this.currentContext, ...otherList]));
-  }
+
   export(): { logic: string; wxmlTemplate: string } {
     return {
       logic: `${this.childContainer

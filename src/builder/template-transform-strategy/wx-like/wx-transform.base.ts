@@ -24,7 +24,7 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     const templateImport = this.exportTemplateList.length
       ? `<import src="./template.wxml"/>`
       : '';
-    return `${templateImport}<template name="main-template">${result.wxmlTemplate}</template><template is="main-template" data="{{...${this.viewContextName}}}"></template>`;
+    return `${templateImport}<template name="main-template">${result.wxmlTemplate}</template><block wx:if="{{${this.viewContextName}}}"><template is="main-template" data="{{...${this.viewContextName}}}"></template></block> `;
   }
 
   getExportTemplate() {

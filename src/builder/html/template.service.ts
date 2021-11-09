@@ -5,6 +5,7 @@ import {
   ParsedConfiguration,
   readConfiguration,
 } from '@angular/compiler-cli';
+import { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
 import { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
 import { ResolvedValue } from '@angular/compiler-cli/src/ngtsc/partial_evaluator';
 import {
@@ -118,14 +119,15 @@ export class TemplateService {
       list.forEach((trait) => {
         let directiveMatcher: SelectorMatcher | null = null;
 
-        const meta = {
+        const meta: ComponentResolutionData = {
           ...(trait as any).analysis.meta,
-          ...(trait as any).resolution,
+          ...((trait as any).resolution as ComponentResolutionData),
         };
         if (meta.directives.length > 0) {
           const matcher = new SelectorMatcher();
-          for (const { selector, type } of meta.directives) {
-            matcher.addSelectables(CssSelector.parse(selector), type);
+          for (const directive of meta.directives) {
+            const selector = directive.selector;
+            matcher.addSelectables(CssSelector.parse(selector), directive);
           }
           directiveMatcher = matcher;
         }

@@ -28,7 +28,10 @@ export interface NgElementMeta extends NgNodeMeta {
   inputs: Record<string, PlainValue | BindValue>;
   outputs: TagEventMeta[];
   singleClosedTag: boolean;
-  index: number | undefined;
+  componentMeta: {
+    index: number | undefined;
+    outputs: string[];
+  };
 }
 export interface NgBoundTextMeta extends NgNodeMeta {
   kind: NgNodeKind.BoundText;

@@ -1,7 +1,6 @@
-import { Inject, Injector, NgModule } from '@angular/core';
+import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Cp1Component } from './cp1.component';
-import { ComponentModuleBase, PAGE_TOKEN } from '../../../../../src/platform';
 
 @NgModule({
   imports: [CommonModule],
@@ -9,10 +8,6 @@ import { ComponentModuleBase, PAGE_TOKEN } from '../../../../../src/platform';
   exports: [Cp1Component],
   providers: [],
 })
-export class Cp1Module extends ComponentModuleBase {
+export class Cp1Module {
   rand = Math.random();
-  constructor(@Inject(PAGE_TOKEN) private page: any, injector: Injector) {
-    super(injector);
-    console.log('Cp1Module构造', page);
-  }
 }

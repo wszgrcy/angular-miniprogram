@@ -21,6 +21,7 @@ import { TemplateGlobalContext } from './node-handle/global-context';
 import { NgNodeMeta, ParsedNode } from './node-handle/interface';
 import { ParsedNgTemplate } from './node-handle/template';
 import { ParsedNgText } from './node-handle/text';
+import { MatchedDirective } from './node-handle/type';
 import { TemplateInterpolationService } from './template-interpolation.service';
 
 export class TemplateDefinition implements Visitor {
@@ -37,16 +38,19 @@ export class TemplateDefinition implements Visitor {
 
   visit?(node: Node) {}
   visitElement(element: Element) {
+    let componentMeta: { index: number; type: MatchedDirective } | undefined;
     const result = this.templateGlobalContext.matchDirective(element);
     let index: number | undefined;
-    if (result && result.some((item: any) => item.selector.element)) {
+    if (result && result.some((item) => item.directiveMetadata.isComponent)) {
       index = this.currentComponentIndex++;
+      const type = result.find((item) => item.directiveMetadata.isComponent)!;
+      componentMeta = { index, type: type };
     }
     const instance = new ParsedNgElement(
       element,
       this.parentNode,
       this.service,
-      index
+      componentMeta
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);

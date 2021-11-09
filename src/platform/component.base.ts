@@ -1,12 +1,8 @@
 import {
   ChangeDetectorRef,
-  ComponentRef,
   NgZone,
-  OnChanges,
-  OnInit,
-  SimpleChange,
-  SimpleChanges,
   Type,
+  ɵangular_packages_core_core_ca,
 } from '@angular/core';
 import { Observable, Subscription } from 'rxjs';
 import {
@@ -15,7 +11,6 @@ import {
   WxComponentInstance,
   WxLifetimes,
 } from './type';
-import { strictEquals } from './utils';
 
 export function generateWxComponent<C>(
   component: Type<C> & NgCompileComponent,
@@ -24,7 +19,6 @@ export function generateWxComponent<C>(
   > = {},
   isComponent: boolean
 ) {
-  const inputs = component.ɵcmp.inputs;
   const outputs = component.ɵcmp.outputs;
   const fnList: string[] = [];
   let tmpComponent = component.prototype;
@@ -39,20 +33,33 @@ export function generateWxComponent<C>(
     tmpComponent = tmpComponent.__proto__;
   }
   return (componentInitFactory: ComponentInitFactory, isPage?: boolean) => {
-    const inputNameList = Object.keys(inputs);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let observers: Record<string, (...args: any[]) => void> | undefined =
-      undefined;
-    if (inputNameList.length) {
-      observers = {
-        [inputNameList.join(',')]: function (
-          this: WxComponentInstance,
-          ...list
-        ) {
-          valueChange(this, list, inputNameList);
-        },
-      };
-    }
+    const observers: Record<string, (...args: any[]) => void> | undefined = {
+      ['componentIndexList,cpIndex']: function (
+        this: WxComponentInstance,
+        list = [],
+        index: number
+      ) {
+        if (this.__isLink) {
+          return;
+        }
+        if (!(index > -1)) {
+          throw new Error('组件索引异常');
+        }
+        const lview: ɵangular_packages_core_core_ca = (
+          wx as any
+        ).__window.__getPageLView(this.getPageId());
+        const currentLView = (wx as any).__window.__findCurrentLView(
+          lview,
+          list,
+          index
+        );
+        const initValue = (wx as any).__window.__updateInitValue(currentLView);
+        this.setData({ __wxView: initValue });
+        (wx as any).__window.__lviewLinkToMPComponentRef(this, currentLView);
+        this.__isLink = true;
+      },
+    };
 
     const bootStrapFn = (wxComponentInstance: WxComponentInstance) => {
       return (wxComponentInstance.__waitNgComponentInit = componentInitFactory(
@@ -88,10 +95,6 @@ export function generateWxComponent<C>(
             })
           );
         });
-        wxComponentInstance.__unchangedInputs = new Set<string>(
-          Object.keys(inputs)
-        );
-        wxComponentInstance.__firstChange = true;
         return componentRef.instance;
       }));
     };
@@ -148,14 +151,6 @@ export function generateWxComponent<C>(
       externalClasses: componentOptions.externalClasses,
       observers: observers,
       properties: {
-        ...Object.keys(inputs).reduce(
-          (pre, cur) => {
-            pre[cur] = { value: null, type: null };
-            return pre;
-          },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          {} as Record<string, any>
-        ),
         componentIndexList: { value: [], type: Array },
         cpIndex: { value: NaN, type: Number },
       },
@@ -175,25 +170,19 @@ export function generateWxComponent<C>(
       lifetimes: {
         ...lifetimes,
         created(this: WxComponentInstance) {
-          console.log('组件索引列表', this.properties.componentIndexList);
-          console.log('当前上下文的组件', this.properties.cpIndex);
-
           if (isComponent) {
-            // todo 将组件的结构预定义出来
-            // todo 找父级,投影可能被影响,也可能不影响
-            const parentThis = this.selectOwnerComponent();
-            // 查找出自身的位置,并且在lview上确定,
-            // 也就是根据查找自身位置的路径,查lview
-
             return;
           }
           const ref = bootStrapFn(this);
           ref.then(
             (ngComponentInstance) => {
-              if (this.__firstChangeFunction) {
-                this.__firstChangeFunction(ngComponentInstance);
-              }
               this.__ngComponentInjector.get(ChangeDetectorRef).detectChanges();
+              const lview: ɵangular_packages_core_core_ca = (
+                wx as any
+              ).__window.__getPageLView(this.getPageId());
+              const initValue = (wx as any).__window.__updateInitValue(lview);
+              this.setData({ __wxView: initValue });
+              (wx as any).__window.__lviewLinkToMPComponentRef(this, lview);
             },
             (rej) => {
               throw rej;
@@ -220,79 +209,4 @@ export function generateWxComponent<C>(
       relations: componentOptions.relations,
     });
   };
-}
-
-function valueChange(
-  wxComponentInstance: WxComponentInstance,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  changeList: any[] = [],
-  inputNameList: string[] = []
-) {
-  const changeObject = changeList.reduce((pre, cur, index) => {
-    pre[inputNameList[index]] = cur;
-    return pre;
-  }, Object.create(null));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ngComponentInstance: OnChanges & Record<string, any> =
-    wxComponentInstance.__ngComponentInstance;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const componentRef: ComponentRef<any> = wxComponentInstance.__ngComponentRef;
-  if (typeof ngComponentInstance == 'undefined') {
-    wxComponentInstance.__firstChangeFunction =
-      wxComponentInstance.__firstChangeFunction ||
-      (() => valueChange(wxComponentInstance));
-    wxComponentInstance.__initialInputValues =
-      wxComponentInstance.__initialInputValues || new Map();
-
-    for (const propertyName in changeObject) {
-      if (Object.prototype.hasOwnProperty.call(changeObject, propertyName)) {
-        const value = changeObject[propertyName];
-        wxComponentInstance.__initialInputValues.set(propertyName, value);
-      }
-    }
-    return;
-  }
-  if (wxComponentInstance.__firstChange) {
-    wxComponentInstance.__firstChange = false;
-    wxComponentInstance.__initialInputValues!.forEach((value, key) => {
-      if (!(key in changeObject)) {
-        changeObject[key] = value;
-      }
-    });
-    wxComponentInstance.__initialInputValues = undefined;
-  } else {
-    for (const key in changeObject) {
-      if (Object.prototype.hasOwnProperty.call(changeObject, key)) {
-        const value = changeObject[key];
-        if (strictEquals(value, ngComponentInstance[key])) {
-          delete changeObject[key];
-        }
-      }
-    }
-  }
-  const simpleChanges: SimpleChanges = {};
-  for (const propertyName in changeObject) {
-    if (Object.prototype.hasOwnProperty.call(changeObject, propertyName)) {
-      const currentValue = changeObject[propertyName];
-      const firstChange =
-        wxComponentInstance.__unchangedInputs.has(propertyName);
-      if (firstChange) {
-        wxComponentInstance.__unchangedInputs.delete(propertyName);
-      }
-      const previousValue = firstChange
-        ? undefined
-        : ngComponentInstance[propertyName];
-      simpleChanges[propertyName] = new SimpleChange(
-        previousValue,
-        currentValue,
-        firstChange
-      );
-      ngComponentInstance[propertyName] = currentValue;
-    }
-  }
-
-  if (ngComponentInstance.ngOnChanges && Object.keys(simpleChanges).length) {
-    ngComponentInstance.ngOnChanges(simpleChanges);
-    componentRef.changeDetectorRef.detectChanges();
-  }
 }
