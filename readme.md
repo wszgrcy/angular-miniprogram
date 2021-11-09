@@ -1,3 +1,5 @@
+[![Gitter](https://badges.gitter.im/angular-miniprogram/community.svg)](https://gitter.im/angular-miniprogram/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+
 # `Angular`开发小程序
 
 - 通过修改`Angular`实现使用`Angular`开发小程序
