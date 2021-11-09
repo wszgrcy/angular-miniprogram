@@ -23,7 +23,8 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   constructor(
     private node: Element,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    public templateInterpolationService: TemplateInterpolationService
+    public templateInterpolationService: TemplateInterpolationService,
+    private index: number | undefined
   ) {}
   private analysis() {
     this.getTagName();
@@ -90,7 +91,6 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     this.children.push(child);
   }
   getNodeMeta(globalContext: TemplateGlobalContext): NgElementMeta {
-    const staticType = globalContext.matchDirective(this.node);
     this.analysis();
 
     return {
@@ -101,7 +101,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       outputs: this.outputSet,
       attributes: this.attributeObject,
       singleClosedTag: this.singleClosedTag,
-      staticType,
+      index: this.index,
     };
   }
   getNgSwitch() {

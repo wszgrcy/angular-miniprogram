@@ -19,15 +19,16 @@ import { ParsedNgContent } from './node-handle/content';
 import { ParsedNgElement } from './node-handle/element';
 import { TemplateGlobalContext } from './node-handle/global-context';
 import { NgNodeMeta, ParsedNode } from './node-handle/interface';
-import { NgTemplate } from './node-handle/template';
+import { ParsedNgTemplate } from './node-handle/template';
 import { ParsedNgText } from './node-handle/text';
 import { TemplateInterpolationService } from './template-interpolation.service';
 
 export class TemplateDefinition implements Visitor {
   /** 变量对应的值索引 */
   private templateDefinitionMap = new Map<Template, TemplateDefinition>();
-  private parentNode: ParsedNgElement | NgTemplate | undefined;
+  private parentNode: ParsedNgElement | ParsedNgTemplate | undefined;
   list: ParsedNode<NgNodeMeta>[] = [];
+  private currentComponentIndex = 0;
   constructor(
     private nodes: Node[],
     private templateGlobalContext: TemplateGlobalContext,
@@ -36,10 +37,16 @@ export class TemplateDefinition implements Visitor {
 
   visit?(node: Node) {}
   visitElement(element: Element) {
+    const result = this.templateGlobalContext.matchDirective(element);
+    let index: number | undefined;
+    if (result && result.some((item: any) => item.selector.element)) {
+      index = this.currentComponentIndex++;
+    }
     const instance = new ParsedNgElement(
       element,
       this.parentNode,
-      this.service
+      this.service,
+      index
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
@@ -59,7 +66,7 @@ export class TemplateDefinition implements Visitor {
    * todo 对于自定义结构型指令的处理
    */
   visitTemplate(template: Template) {
-    const templateInstance = new NgTemplate(
+    const templateInstance = new ParsedNgTemplate(
       template,
       this.parentNode,
       this.service

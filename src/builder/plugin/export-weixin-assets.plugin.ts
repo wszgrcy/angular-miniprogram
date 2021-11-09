@@ -135,16 +135,24 @@ export class ExportWeiXinAssetsPlugin {
           resourceLoader
         );
         ngComponentCssExtractPlugin.run(compilation);
+        const buildTemplatePromise = this.buildTemplate(
+          waitAnalyzeAsync,
+          templateService
+        );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (compilation as any)[ExportWeiXinAssetsPluginSymbol] = {
-          updateLogicMap: this.updateLogicMap,
+          updateLogicMapPromise: buildTemplatePromise.then((result) => {
+            return result.updateLogicMap;
+          }),
           platformInfo: this.options.buildPlatform,
         } as ComponentTemplateLoaderContext;
+
         compilation.hooks.processAssets.tapAsync(
           'ExportWeiXinAssetsPlugin',
           async (assets, cb) => {
-            await waitAnalyzeAsync;
-            this.WXMLMap = templateService.buildTemplate();
+            this.WXMLMap = await buildTemplatePromise.then(
+              (result) => result.WXMLMap
+            );
             const cssMap = ngComponentCssExtractPlugin.getAllCss();
             for (const [key, value] of cssMap.entries()) {
               const entry = templateService.getModuleEntryFromCss(key);
@@ -205,5 +213,13 @@ export class ExportWeiXinAssetsPlugin {
   public setEntry(pageList: PagePattern[], componentList: PagePattern[]) {
     this.pageList = pageList;
     this.componentList = componentList;
+  }
+  async buildTemplate(
+    waitAnalyzeAsync: Promise<void>,
+    service: TemplateService
+  ) {
+    await waitAnalyzeAsync;
+    const result = service.buildTemplate();
+    return result;
   }
 }

@@ -57,9 +57,9 @@ export class TemplateService {
   builder!: ts.BuilderProgram | ts.EmitAndSemanticDiagnosticsBuilderProgram;
   private ngTscProgram!: NgtscProgram;
   private tsProgram!: ts.Program;
-  private WXMLMap = new Map<string, string>();
 
   private ngCompiler!: NgCompiler;
+
   constructor(
     private injector: Injector,
     @Inject(WEBPACK_COMPILATION) private compilation: Compilation,
@@ -105,6 +105,8 @@ export class TemplateService {
   buildTemplate() {
     const traitCompiler: TraitCompiler = (this.ngCompiler as any).compilation
       .traitCompiler;
+    const WXMLMap = new Map<string, string>();
+    const updateLogicMap = new Map<string, string>();
     this.resolver.getComponentMetaMap().forEach((value, key) => {
       const original = ts.getOriginalNode(key) as ClassDeclaration;
       const record = (
@@ -137,16 +139,20 @@ export class TemplateService {
         if (!entry) {
           throw new Error('没有找到对应的出口信息');
         }
-        this.WXMLMap.set(entry.outputWXML, WXMLTemplate.content);
+        WXMLMap.set(entry.outputWXML, WXMLTemplate.content);
         if (WXMLTemplate.template) {
-          this.WXMLMap.set(
+          WXMLMap.set(
             join(dirname(normalize(entry.outputWXML)), 'template.wxml'),
             WXMLTemplate.template
           );
         }
+        updateLogicMap.set(
+          path.normalize(key.getSourceFile().fileName),
+          WXMLTemplate.logic
+        );
       });
     });
-    return this.WXMLMap;
+    return { WXMLMap: WXMLMap, updateLogicMap: updateLogicMap };
   }
   private removeTemplateAndStyleInTs(
     objectNode: ObjectLiteralExpression,

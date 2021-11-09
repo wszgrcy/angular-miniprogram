@@ -1,6 +1,6 @@
 import { PlatformInfo } from '../platform/platform-info';
 
 export interface ComponentTemplateLoaderContext {
-  updateLogicMap: Map<string, string>;
+  updateLogicMapPromise: Promise<Map<string, string>>;
   platformInfo: PlatformInfo;
 }

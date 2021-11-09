@@ -156,7 +156,8 @@ export function generateWxComponent<C>(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           {} as Record<string, any>
         ),
-        componentindex: { value: NaN, type: Number },
+        componentIndexList: { value: [], type: Array },
+        cpIndex: { value: NaN, type: Number },
       },
       methods: fnList.reduce((pre: Record<string, Function>, cur) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -174,19 +175,15 @@ export function generateWxComponent<C>(
       lifetimes: {
         ...lifetimes,
         created(this: WxComponentInstance) {
+          console.log('组件索引列表', this.properties.componentIndexList);
+          console.log('当前上下文的组件', this.properties.cpIndex);
+
           if (isComponent) {
-            const componentStruct = (wx as any).__window.__queryComponent(
-              this.properties.componentStruct
-            );
             // todo 将组件的结构预定义出来
             // todo 找父级,投影可能被影响,也可能不影响
             const parentThis = this.selectOwnerComponent();
             // 查找出自身的位置,并且在lview上确定,
             // 也就是根据查找自身位置的路径,查lview
-            parentThis.componentStruct;
-            const parentComponentStruct = (wx as any).__window.__queryComponent(
-              parentThis.properties.componentStruct
-            );
 
             return;
           }

@@ -17,7 +17,7 @@ import {
 import { isElement } from './type-predicate';
 import { BindValue, PlainValue } from './value';
 
-export class NgTemplate implements ParsedNode<NgTemplateMeta> {
+export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
   kind = NgNodeKind.Template;
   attrs!: (BoundAttribute | TextAttribute)[];
 

@@ -52,13 +52,6 @@ export class WxContainer {
   }
 
   private ngElementTransform(node: NgElementMeta): string {
-    let componentIndex: number | undefined = undefined;
-    if (
-      node.staticType &&
-      node.staticType.some((item: any) => item.selector.element)
-    ) {
-      componentIndex = this.componentIndex++;
-    }
     const attributeStr = Object.entries(node.attributes)
       .map(([key, value]) => `${key}="${value}"`)
       .join(' ');
@@ -83,7 +76,7 @@ export class WxContainer {
     return `<${
       node.tagName
     } ${attributeStr} ${inputStr} ${outputStr} ${this.setComponentIndex(
-      componentIndex
+      node.index
     )}>${children.join('')}</${node.tagName}>`;
   }
   private ngBoundTextTransform(node: NgBoundTextMeta): string {
@@ -134,7 +127,9 @@ export class WxContainer {
               ''
             )}({originVar:{...ctx,${this.getCurrentContext()
               .map((item) => item + ':' + item)
-              .join(',')}}})`;
+              .join(
+                ','
+              )}},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},'then']})`;
           });
         }
         if (directive.falseTemplateRef) {
@@ -151,7 +146,9 @@ export class WxContainer {
               ''
             )}({originVar:{...ctx,${this.getCurrentContext()
               .map((item) => item + ':' + item)
-              .join(',')}}})`;
+              .join(
+                ','
+              )}},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},'else']})`;
           });
         }
       } else if (directive.type === 'for') {
@@ -177,7 +174,11 @@ export class WxContainer {
             directive.templateName
           }({originVar:{...ctx.originVar,${this.getCurrentContext()
             .map((item) => item + ':' + item)
-            .join(',')}}})
+            .join(
+              ','
+            )}},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},${
+            directive.index
+          }]})
             }`;
         });
       } else if (directive.type === 'switch') {
@@ -219,7 +220,9 @@ export class WxContainer {
             directive.templateName
           }({originVar:{...ctx,${this.getCurrentContext()
             .map((item) => item + ':' + item)
-            .join(',')}})`;
+            .join(
+              ','
+            )}},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},0]})`;
         });
       } else {
         throw new Error('未知的解析节点');
@@ -267,7 +270,9 @@ export class WxContainer {
         this.containerName
       }(ctx){let varList={};let directive={};${this.logic
         .map((item) => (typeof item === 'string' ? item : item()))
-        .join(';\n')};return {varList:varList,directive:directive}}`,
+        .join(
+          ';\n'
+        )};return {varList:varList,directive:directive,componentIndexList:ctx.componentIndexList}}`,
       wxmlTemplate: this.wxmlTemplate,
     };
   }
@@ -277,9 +282,9 @@ export class WxContainer {
   getDeclarationContainerFunction() {
     return this.childContainer.map((child) => child.export().logic);
   }
-  private setComponentIndex(index: number | undefined) {
-    if (typeof index === 'number') {
-      return `componentindex="${index}"`;
+  private setComponentIndex(cpIndex: number | undefined) {
+    if (typeof cpIndex === 'number') {
+      return `componentIndexList="{{componentIndexList}}" cpIndex="${cpIndex}"`;
     }
     return ``;
   }

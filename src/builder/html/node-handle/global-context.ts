@@ -24,7 +24,7 @@ export class TemplateGlobalContext {
   getBindIndex() {
     return this.bindIndex++;
   }
-  matchDirective(node: Element | Template): any | undefined {
+  matchDirective(node: Element | Template): any[] | undefined {
     if (!this.directiveMatcher) {
       return undefined;
     }

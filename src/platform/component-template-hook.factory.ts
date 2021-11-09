@@ -5,11 +5,12 @@ import {
   ɵangular_packages_core_core_ca,
   ɵɵdirectiveInject,
 } from '@angular/core';
-import { PAGE_TOKEN } from 'index';
 import { COMPONENT_TOKEN } from './module/token/component.token';
+import { PAGE_TOKEN } from './module/token/page.token';
 
+const initValue = new Map<ɵangular_packages_core_core_ca, any>();
 function propertyChange(ctx: any) {
-  // const lview = ɵangular_packages_core_core_bh();
+  const lview = ɵangular_packages_core_core_bh();
   // const bindStart = 20;
   // const changeVarObject = list
   //   .filter((item, index) =>
@@ -23,12 +24,18 @@ function propertyChange(ctx: any) {
   //     },
   //     { [viewContextName]: {} }
   //   );
-  const instance = ɵɵdirectiveInject(COMPONENT_TOKEN);
+  const instance = ɵɵdirectiveInject(COMPONENT_TOKEN, InjectFlags.Optional);
   // changeVarObject[viewContextName] = {
   //   ...instance.data[viewContextName],
   //   ...changeVarObject[viewContextName],
   // };
-  instance.setData({ __wxView: ctx });
+  console.log('变更', ctx);
+
+  if (instance) {
+    instance.setData({ __wxView: ctx });
+  } else {
+    initValue.set(lview, ctx);
+  }
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 // function bindingUpdated(lView: any[], bindingIndex: number, value: any) {
@@ -44,22 +51,24 @@ function propertyChange(ctx: any) {
 function computeExpression(value: any) {
   return value;
 }
+// todo未来会淘汰
 function getPipe(pipeName: string, index: number, ...args: any[]) {
-  const lview = ɵangular_packages_core_core_bh();
-  const pipeStart = 1;
-  const pipeIndex = 20 + pipeStart + index;
-  let pipeInstance = lview[pipeIndex];
+  // const lview = ɵangular_packages_core_core_bh();
+  // const pipeStart = 1;
+  // const pipeIndex = 20 + pipeStart + index;
+  // let pipeInstance = lview[pipeIndex];
 
-  if (!pipeInstance) {
-    const tview = lview[1];
-    const list = tview.pipeRegistry;
-    const pipeDef = list!.find((item) => item.name === pipeName);
-    const pipeFactory =
-      (pipeDef!.type as any).factory || (pipeDef!.type as any)['ɵfac'];
-    pipeInstance = pipeFactory();
-    lview[pipeIndex] = pipeInstance;
-  }
-  return pipeInstance.transform(...args);
+  // if (!pipeInstance) {
+  //   const tview = lview[1];
+  //   const list = tview.pipeRegistry;
+  //   const pipeDef = list!.find((item) => item.name === pipeName);
+  //   const pipeFactory =
+  //     (pipeDef!.type as any).factory || (pipeDef!.type as any)['ɵfac'];
+  //   pipeInstance = pipeFactory();
+  //   lview[pipeIndex] = pipeInstance;
+  // }
+  // return pipeInstance.transform(...args);
+  return args[0];
 }
 const pageMap = new Map<string, ɵangular_packages_core_core_ca>();
 function pageBind() {
@@ -71,14 +80,14 @@ function pageBind() {
   const pageId = wxComponentInstance.getPageId();
   pageMap.set(pageId, lview);
 }
-const wxPageStructMap = new Map();
-// todo 定义改为由wx部分定义,因为有不同位置索引
-function defineComponent(key: string, value: any) {
-  wxPageStructMap.set(key, value);
-}
-function queryComponent(key: string) {
-  return wxPageStructMap.get(key);
-}
+// const wxPageStructMap = new Map();
+// // todo 定义改为由wx部分定义,因为有不同位置索引
+// function defineComponent(key: string, value: any) {
+//   wxPageStructMap.set(key, value);
+// }
+// function queryComponent(key: string) {
+//   return wxPageStructMap.get(key);
+// }
 
 export function componentTemplateHookFactory() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,8 +95,8 @@ export function componentTemplateHookFactory() {
   (wx as any).__window.__computeExpression = computeExpression;
   (wx as any).__window.__getPipe = getPipe;
   (wx as any).__window.__pageBind = pageBind;
-  (wx as any).__window.__defineComponent = defineComponent;
-  (wx as any).__window.__queryComponent = queryComponent;
+  // (wx as any).__window.__defineComponent = defineComponent;
+  // (wx as any).__window.__queryComponent = queryComponent;
 }
 /**
  * todo 改为wxml保存引用索引,通过引用索引找到对应的lview进行绑定并更新
