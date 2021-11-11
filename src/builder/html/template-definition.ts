@@ -1,3 +1,4 @@
+import { ConstantPool } from '@angular/compiler';
 import {
   BoundAttribute,
   BoundEvent,
@@ -14,6 +15,7 @@ import {
   Visitor,
   visitAll,
 } from '@angular/compiler/src/render3/r3_ast';
+import { ValueConverter } from '@angular/compiler/src/render3/view/template';
 import { ParsedNgBoundText } from './node-handle/bound-text';
 import { ParsedNgContent } from './node-handle/content';
 import { ParsedNgElement } from './node-handle/element';
@@ -25,11 +27,22 @@ import { MatchedDirective } from './node-handle/type';
 import { TemplateInterpolationService } from './template-interpolation.service';
 
 export class TemplateDefinition implements Visitor {
+  test = Math.random();
   /** 变量对应的值索引 */
   private templateDefinitionMap = new Map<Template, TemplateDefinition>();
   private parentNode: ParsedNgElement | ParsedNgTemplate | undefined;
   list: ParsedNode<NgNodeMeta>[] = [];
   private currentComponentIndex = 0;
+  private declIndex = 0;
+  private valueConverter = new ValueConverter(
+    new ConstantPool(),
+    () => {
+      this.declIndex++;
+      return 0;
+    },
+    () => 0,
+    () => {}
+  );
   constructor(
     private nodes: Node[],
     private templateGlobalContext: TemplateGlobalContext,
@@ -38,11 +51,11 @@ export class TemplateDefinition implements Visitor {
 
   visit?(node: Node) {}
   visitElement(element: Element) {
+    const nodeIndex = this.declIndex++;
     let componentMeta: { index: number; type: MatchedDirective } | undefined;
     const result = this.templateGlobalContext.matchDirective(element);
-    let index: number | undefined;
     if (result && result.some((item) => item.directiveMetadata.isComponent)) {
-      index = this.currentComponentIndex++;
+      const index = this.currentComponentIndex++;
       const type = result.find((item) => item.directiveMetadata.isComponent)!;
       componentMeta = { index, type: type };
     }
@@ -50,13 +63,19 @@ export class TemplateDefinition implements Visitor {
       element,
       this.parentNode,
       this.service,
-      componentMeta
+      componentMeta,
+      nodeIndex
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
     }
+    element.inputs.forEach((item) => {
+      item.value.visit(this.valueConverter);
+    });
     const oldParent = this.parentNode;
     this.parentNode = instance;
+    this.prepareRefsArray(element.references);
+
     visitAll(this, element.children);
     this.parentNode = oldParent;
     if (!this.parentNode) {
@@ -70,14 +89,25 @@ export class TemplateDefinition implements Visitor {
    * todo 对于自定义结构型指令的处理
    */
   visitTemplate(template: Template) {
+    const nodeIndex = this.declIndex++;
     const templateInstance = new ParsedNgTemplate(
       template,
       this.parentNode,
-      this.service
+      this.service,
+      nodeIndex
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(templateInstance);
     }
+    this.prepareRefsArray(template.references);
+    template.templateAttrs.forEach((item) => {
+      if (typeof item.value !== 'string') {
+        item.value.visit(this.valueConverter);
+      }
+    });
+    template.inputs.forEach((item) => {
+      item.value.visit(this.valueConverter);
+    });
     const instance = new TemplateDefinition(
       template.children,
       this.templateGlobalContext,
@@ -92,10 +122,12 @@ export class TemplateDefinition implements Visitor {
     }
   }
   visitContent(content: Content) {
+    const nodeIndex = this.declIndex++;
     const instance = new ParsedNgContent(
       content,
       this.parentNode,
-      this.service
+      this.service,
+      nodeIndex
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
@@ -110,7 +142,13 @@ export class TemplateDefinition implements Visitor {
   visitBoundAttribute(attribute: BoundAttribute) {}
   visitBoundEvent(attribute: BoundEvent) {}
   visitText(text: Text) {
-    const instance = new ParsedNgText(text, this.parentNode, this.service);
+    const nodeIndex = this.declIndex++;
+    const instance = new ParsedNgText(
+      text,
+      this.parentNode,
+      this.service,
+      nodeIndex
+    );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
     }
@@ -119,17 +157,33 @@ export class TemplateDefinition implements Visitor {
     }
   }
   visitBoundText(text: BoundText) {
-    const instance = new ParsedNgBoundText(text, this.parentNode, this.service);
+    const nodeIndex = this.declIndex++;
+    text.value.visit(this.valueConverter);
+    const instance = new ParsedNgBoundText(
+      text,
+      this.parentNode,
+      this.service,
+      nodeIndex
+    );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
     }
     if (!this.parentNode) {
       this.list.push(instance);
     }
+    const value = text.value.visit(this.valueConverter);
   }
   visitIcu(icu: Icu) {}
   run() {
     visitAll(this, this.nodes);
     return this.list;
+  }
+  prepareRefsArray(refs: Reference[]) {
+    if (!refs || !refs.length) {
+      return;
+    }
+    refs.forEach((item) => {
+      this.declIndex++;
+    });
   }
 }

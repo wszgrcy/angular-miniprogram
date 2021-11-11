@@ -9,6 +9,7 @@ export interface ParsedNode<T> {
   parent: ParsedNode<any> | undefined;
   templateInterpolationService: TemplateInterpolationService;
   getNodeMeta(globalContext: TemplateGlobalContext): T;
+  nodeIndex: number;
 }
 export enum NgNodeKind {
   Element,
@@ -19,6 +20,7 @@ export enum NgNodeKind {
 }
 export interface NgNodeMeta {
   kind: NgNodeKind;
+  nodeIndex: number;
 }
 export interface NgElementMeta extends NgNodeMeta {
   kind: NgNodeKind.Element;

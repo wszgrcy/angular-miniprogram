@@ -17,7 +17,8 @@ export class ParsedNgBoundText implements ParsedNode<NgBoundTextMeta> {
   constructor(
     private node: BoundText,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    public templateInterpolationService: TemplateInterpolationService
+    public templateInterpolationService: TemplateInterpolationService,
+    public nodeIndex: number
   ) {}
   analysis() {
     const ast = (this.node.value as ASTWithSource).ast as Interpolation;
@@ -39,6 +40,7 @@ export class ParsedNgBoundText implements ParsedNode<NgBoundTextMeta> {
     return {
       kind: NgNodeKind.BoundText,
       values: this.valueList,
+      nodeIndex: this.nodeIndex,
     };
   }
 }

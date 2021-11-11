@@ -9,7 +9,8 @@ export class ParsedNgText implements ParsedNode<NgTextMeta> {
   constructor(
     private node: Text,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    public templateInterpolationService: TemplateInterpolationService
+    public templateInterpolationService: TemplateInterpolationService,
+    public nodeIndex: number
   ) {}
   analysis() {
     this.value = this.node.value;
@@ -19,6 +20,7 @@ export class ParsedNgText implements ParsedNode<NgTextMeta> {
     return {
       kind: NgNodeKind.Text,
       value: this.value,
+      nodeIndex: this.nodeIndex,
     };
   }
 }

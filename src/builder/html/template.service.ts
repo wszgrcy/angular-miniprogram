@@ -28,6 +28,7 @@ import ts, {
 import { Compilation, Compiler } from 'webpack';
 import {
   COMPONENT_FILE_NAME_TOKEN,
+  COMPONENT_META,
   COMPONENT_TEMPLATE_CONTENT_TOKEN,
   DIRECTIVE_MATCHER,
   TEMPLATE_COMPILER_OPTIONS_TOKEN,
@@ -134,7 +135,8 @@ export class TemplateService {
         const WXMLTemplate = this.buildWxmlTemplate(
           key,
           value,
-          directiveMatcher
+          directiveMatcher,
+          meta
         );
         const module = this.componentToModule.get(key.getSourceFile());
         const entry = this.getModuleEntry(module!);
@@ -199,7 +201,8 @@ export class TemplateService {
   private buildWxmlTemplate(
     classDeclaration: ts.ClassDeclaration,
     meta: Record<string, ResolvedValue>,
-    directiveMatcher: SelectorMatcher | null
+    directiveMatcher: SelectorMatcher | null,
+    componentMeta: ComponentResolutionData
   ) {
     let templateContent = '';
     const templateUrl = meta['templateUrl'] as string;
@@ -217,18 +220,8 @@ export class TemplateService {
       parent: this.injector,
       providers: [
         { provide: TemplateCompiler },
-        {
-          provide: COMPONENT_FILE_NAME_TOKEN,
-          useValue: classDeclaration.getSourceFile().fileName,
-        },
-        {
-          provide: COMPONENT_TEMPLATE_CONTENT_TOKEN,
-          useValue: templateContent,
-        },
-        {
-          provide: TEMPLATE_COMPILER_OPTIONS_TOKEN,
-          useValue: { interpolation },
-        },
+        { provide: COMPONENT_META, useValue: componentMeta },
+
         { provide: TemplateInterpolationService },
         { provide: DIRECTIVE_MATCHER, useValue: directiveMatcher },
       ],

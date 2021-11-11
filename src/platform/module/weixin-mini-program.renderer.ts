@@ -6,7 +6,7 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
   inputRoot = this.element;
   constructor(
     private element: NoopNode | undefined,
-    private lview: any,
+    private def: any,
     private index: number
   ) {
     // console.log('---初始化---', element, lview);
@@ -46,16 +46,17 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
     isMove?: boolean
   ) {
     // console.log('插入之前', parent, newChild, refChild, isMove);
-
-    let index: number;
-    index = parent.children.findIndex((item) => (item = refChild));
-    parent.children.splice(index, 0, newChild);
+    if (isMove) {
+      console.log('移动?');
+    }
+    parent.insertBefore(newChild, refChild);
   }
   removeChild(parent: NoopNode, oldChild: NoopNode, isHostElement?: boolean) {
     // console.log('移除子', parent, oldChild, isHostElement);
-
-    const index = parent.children.findIndex((item) => item === oldChild);
-    parent.children.splice(index, 1);
+    if (isHostElement) {
+      console.log('是Host', oldChild);
+    }
+    parent.removeChild(oldChild);
   }
   selectRootElement(
     selectorOrNode: string | unknown,

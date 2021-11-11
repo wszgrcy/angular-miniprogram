@@ -83,13 +83,7 @@ export class WxContainer {
     )}>${children.join('')}</${node.tagName}>`;
   }
   private ngBoundTextTransform(node: NgBoundTextMeta): string {
-    return node.values
-      .map((item) => {
-        const result = this.computeExpression(item);
-        this.logic.push(`varList[${result.index}]=${result.logic}`);
-        return `{{${result.template}}}`;
-      })
-      .join('');
+    return `{{nodeList[${node.nodeIndex}]}}`;
   }
   private ngContentTransform(node: NgContentMeta): string {
     return node.name ? `<slot name="${node.name}"></slot>` : `<slot></slot>`;
@@ -212,7 +206,7 @@ export class WxContainer {
     return content;
   }
   private ngTextTransform(node: NgTextMeta): string {
-    return node.value;
+    return `{{nodeList[${node.nodeIndex}]}}`;
   }
 
   private getTemplateDataStr(directiveIndex: number, indexName: string) {

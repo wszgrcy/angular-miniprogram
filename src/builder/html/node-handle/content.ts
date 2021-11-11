@@ -8,7 +8,8 @@ export class ParsedNgContent implements ParsedNode<NgContentMeta> {
   constructor(
     private node: Content,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    public templateInterpolationService: TemplateInterpolationService
+    public templateInterpolationService: TemplateInterpolationService,
+    public nodeIndex: number
   ) {}
   getNodeMeta(): NgContentMeta {
     const nameAttr = this.node.attributes.find((item) => item.name === 'name');
@@ -16,6 +17,7 @@ export class ParsedNgContent implements ParsedNode<NgContentMeta> {
     return {
       kind: NgNodeKind.Content,
       name: nameAttr ? nameAttr.value : undefined,
+      nodeIndex: this.nodeIndex,
     };
   }
 }

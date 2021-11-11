@@ -28,7 +28,8 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
   constructor(
     private node: Template,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    public templateInterpolationService: TemplateInterpolationService
+    public templateInterpolationService: TemplateInterpolationService,
+    public nodeIndex: number
   ) {}
 
   getOriginChildren() {
@@ -195,6 +196,7 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
       children: this.children.map((child) => child.getNodeMeta(globalContext)),
       directive: directive,
       staticType: staticType,
+      nodeIndex: this.nodeIndex,
     };
     for (let i = 0; i < directive.length; i++) {
       const element = directive[i];

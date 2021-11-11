@@ -5,6 +5,7 @@ import {
   ɵangular_packages_core_core_ca,
   ɵɵdirectiveInject,
 } from '@angular/core';
+import { NoopNode } from './module/renderer-node';
 import { COMPONENT_TOKEN } from './module/token/component.token';
 import { PAGE_TOKEN } from './module/token/page.token';
 
@@ -12,7 +13,15 @@ type LView = ɵangular_packages_core_core_ca;
 const initValue = new Map<LView, any>();
 function propertyChange(ctx: any) {
   const lview = ɵangular_packages_core_core_bh();
+  const tview = lview[1];
   const instance = ɵɵdirectiveInject(COMPONENT_TOKEN, InjectFlags.Optional);
+  for (let i = 20; i < tview.bindingStartIndex; i++) {
+    const element = lview[i];
+    if (element instanceof NoopNode) {
+      console.log(element.type, i - 20);
+    }
+  }
+
   if (linkMap.has(lview)) {
     linkMap.get(lview).setData({ __wxView: ctx });
   } else {
