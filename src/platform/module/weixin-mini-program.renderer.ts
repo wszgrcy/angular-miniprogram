@@ -9,7 +9,7 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
     private def: any,
     private index: number
   ) {
-    // console.log('---初始化---', element, lview);
+    // console.log('---初始化---', element, def);
   }
   data = Object.create(null);
   destroy() {}
@@ -17,6 +17,7 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
     // console.log(this.index, '创建元素', name, namespace);
     const element = new NoopNode('element');
     element.name = name;
+    element.classList.add(`tag-name-${name}`);
     return element;
   }
   createComment(value: string) {

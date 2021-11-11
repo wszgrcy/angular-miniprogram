@@ -25,9 +25,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     private node: Element,
     public parent: ParsedNode<NgNodeMeta> | undefined,
     public templateInterpolationService: TemplateInterpolationService,
-    private componentMeta:
-      | { index: number; type: MatchedDirective }
-      | undefined,
+    private componentMeta: { type: MatchedDirective } | undefined,
     public nodeIndex: number
   ) {}
   private analysis() {
@@ -110,7 +108,6 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       attributes: this.attributeObject,
       singleClosedTag: this.singleClosedTag,
       componentMeta: {
-        index: this.componentMeta?.index,
         outputs: this.ngInternalOutputs,
       },
       nodeIndex: this.nodeIndex,

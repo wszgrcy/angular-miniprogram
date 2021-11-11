@@ -56,4 +56,17 @@ export class NoopNode {
     }
     this.children.splice(index, 1);
   }
+  toView() {
+    if (this.type === 'text') {
+      return { value: this.value };
+    } else {
+      return {
+        class:
+          Array.from(this.classList).join(' ') + ' ' + this.attribute.class,
+        style: Object.entries(this.style)
+          .map(([style, value]) => `${style}:${value}`)
+          .join(';'),
+      };
+    }
+  }
 }

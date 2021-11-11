@@ -1,3 +1,6 @@
+<div [class]="'sdfsdf'" [class.abc]="false" [style.color]="'red'">
+  615156156516
+</div>
 <p class="myclass">hello test</p>
 这是我的一小步,是ng社区的一大步
 <app-cp1 [testInputValue]="title" (custom)="testApp($event)"></app-cp1>
@@ -18,14 +21,12 @@
 <div *ngIf="true">
   指令层测试---
   <app-cp1></app-cp1>
-  ---指令层测试
 </div>
 <div *ngIf="true">
   多指令层测试---
   <div *ngIf="true">
     <app-cp1></app-cp1>
   </div>
-  ---多指令层测试
 </div>
 <div *ngFor="let item of [1, 2]">
   <app-cp1></app-cp1>

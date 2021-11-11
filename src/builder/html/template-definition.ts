@@ -52,12 +52,12 @@ export class TemplateDefinition implements Visitor {
   visit?(node: Node) {}
   visitElement(element: Element) {
     const nodeIndex = this.declIndex++;
-    let componentMeta: { index: number; type: MatchedDirective } | undefined;
+    let componentMeta: { type: MatchedDirective } | undefined;
     const result = this.templateGlobalContext.matchDirective(element);
     if (result && result.some((item) => item.directiveMetadata.isComponent)) {
       const index = this.currentComponentIndex++;
       const type = result.find((item) => item.directiveMetadata.isComponent)!;
-      componentMeta = { index, type: type };
+      componentMeta = { type: type };
     }
     const instance = new ParsedNgElement(
       element,
@@ -171,7 +171,6 @@ export class TemplateDefinition implements Visitor {
     if (!this.parentNode) {
       this.list.push(instance);
     }
-    const value = text.value.visit(this.valueConverter);
   }
   visitIcu(icu: Icu) {}
   run() {

@@ -1,10 +1,10 @@
+import { ChangeDetectorRef, NgZone, Type } from '@angular/core';
 import {
-  ChangeDetectorRef,
-  NgZone,
-  Type,
-  ɵangular_packages_core_core_ca,
-} from '@angular/core';
-import { Observable, Subscription } from 'rxjs';
+  findCurrentLView,
+  getPageLView,
+  lViewLinkToMPComponentRef,
+  updateInitValue,
+} from './component-template-hook.factory';
 import {
   ComponentInitFactory,
   NgCompileComponent,
@@ -19,7 +19,7 @@ export function generateWxComponent<C>(
   > = {},
   isComponent: boolean
 ) {
-  const outputs = component.ɵcmp.outputs;
+  // todo 改为静态确定类型
   const fnList: string[] = [];
   let tmpComponent = component.prototype;
   while (tmpComponent) {
@@ -34,7 +34,7 @@ export function generateWxComponent<C>(
   }
   return (componentInitFactory: ComponentInitFactory, isPage?: boolean) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const observers: Record<string, (...args: any[]) => void> | undefined = {
+    const observers = {
       ['componentIndexList,cpIndex']: function (
         this: WxComponentInstance,
         list = [],
@@ -46,17 +46,13 @@ export function generateWxComponent<C>(
         if (!(index > -1)) {
           throw new Error('组件索引异常');
         }
-        const lview: ɵangular_packages_core_core_ca = (
-          wx as any
-        ).__window.__getPageLView(this.getPageId());
-        const currentLView = (wx as any).__window.__findCurrentLView(
-          lview,
-          list,
-          index
-        );
-        const initValue = (wx as any).__window.__updateInitValue(currentLView);
+        const rootLView = getPageLView(this.getPageId());
+        const lView = findCurrentLView(rootLView, list, index);
+        const initValue = updateInitValue(lView);
         this.setData({ __wxView: initValue });
-        (wx as any).__window.__lviewLinkToMPComponentRef(this, currentLView);
+        lViewLinkToMPComponentRef(this, lView);
+        this.__lView = lView;
+        this.__ngComponentInstance = lView[8];
         this.__isLink = true;
       },
     };
@@ -69,32 +65,9 @@ export function generateWxComponent<C>(
         wxComponentInstance.__ngComponentInstance = componentRef.instance;
         wxComponentInstance.__ngComponentInjector = componentRef.injector;
         wxComponentInstance.__ngZone = componentRef.injector.get(NgZone);
-        wxComponentInstance.__ngComponentRef = componentRef;
-
-        const subscriptionList: Subscription[] = [];
         wxComponentInstance.__ngComponentDestroy = () => {
           componentRef.destroy();
-          subscriptionList.forEach((item) => {
-            item.unsubscribe();
-          });
         };
-
-        Object.keys(outputs).forEach((output) => {
-          const ob: Observable<{
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            detail?: any;
-            options?: WechatMiniprogram.Component.TriggerEventOption;
-          }> = componentRef.instance[output];
-          subscriptionList.push(
-            ob.subscribe((result) => {
-              wxComponentInstance.triggerEvent(
-                output,
-                result.detail,
-                result.options
-              );
-            })
-          );
-        });
         return componentRef.instance;
       }));
     };
@@ -157,7 +130,12 @@ export function generateWxComponent<C>(
       methods: fnList.reduce((pre: Record<string, Function>, cur) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         pre[cur] = function (this: WxComponentInstance, ...args: any[]) {
-          const ngZone = this.__ngComponentInjector.get(NgZone);
+          let ngZone: NgZone;
+          if (this.__lView) {
+            ngZone = this.__lView[9]!.get(NgZone);
+          } else {
+            ngZone = this.__ngComponentInjector.get(NgZone);
+          }
           return ngZone.run(() => {
             (this.__ngComponentInstance[cur] as Function).bind(
               this.__ngComponentInstance
@@ -166,7 +144,7 @@ export function generateWxComponent<C>(
         };
         return pre;
       }, {}),
-      data: {},
+      data: { __wxView: false },
       lifetimes: {
         ...lifetimes,
         created(this: WxComponentInstance) {
@@ -177,12 +155,10 @@ export function generateWxComponent<C>(
           ref.then(
             (ngComponentInstance) => {
               this.__ngComponentInjector.get(ChangeDetectorRef).detectChanges();
-              const lview: ɵangular_packages_core_core_ca = (
-                wx as any
-              ).__window.__getPageLView(this.getPageId());
-              const initValue = (wx as any).__window.__updateInitValue(lview);
+              const lView = getPageLView(this.getPageId());
+              const initValue = updateInitValue(lView);
               this.setData({ __wxView: initValue });
-              (wx as any).__window.__lviewLinkToMPComponentRef(this, lview);
+              lViewLinkToMPComponentRef(this, lView);
             },
             (rej) => {
               throw rej;

@@ -1,11 +1,9 @@
 import {
   ApplicationRef,
   Compiler,
-  ComponentFactoryResolver,
   Inject,
   Injectable,
   Injector,
-  NgModuleRef,
   NgZone,
   Type,
 } from '@angular/core';
@@ -48,31 +46,6 @@ export class PageService {
         this.applicationRef.attachView(componentRef.hostView);
         return { componentRef, ngModuleRef };
       });
-    };
-
-    this.app.__ngStartComponent = <C>(
-      injector: Injector,
-      component: Type<C>,
-      wxComponentInstance: WxComponentInstance
-    ) => {
-      const factory = injector.get(ComponentFactoryResolver);
-      const ngModuleRef = injector.get(NgModuleRef);
-      injector = Injector.create({
-        providers: [
-          { provide: COMPONENT_TOKEN, useValue: wxComponentInstance },
-        ],
-        parent: injector,
-      });
-      const componentFactory = factory.resolveComponentFactory(component);
-      const componentRef = componentFactory.create(
-        injector,
-        undefined,
-        undefined,
-        ngModuleRef
-      );
-      this.applicationRef.attachView(componentRef.hostView);
-
-      return componentRef;
     };
   }
 }

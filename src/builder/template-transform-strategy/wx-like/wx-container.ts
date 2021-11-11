@@ -25,10 +25,8 @@ export class WxContainer {
   private exportTemplateList: { name: string; content: string }[] = [];
   private wxmlTemplate: string = '';
   private logic: (string | (() => string))[] = [];
-  private currentContext: string[] = [];
   private containerName!: string;
   private childContainer: WxContainer[] = [];
-  private directiveIndex = 0;
   constructor(private parent?: WxContainer) {}
 
   private _compileTemplate(node: NgNodeMeta): string {
@@ -52,6 +50,7 @@ export class WxContainer {
 
   private ngElementTransform(node: NgElementMeta): string {
     const attributeStr = Object.entries(node.attributes)
+      .filter(([key]) => key !== 'class' && key !== 'style')
       .map(([key, value]) => `${key}="${value}"`)
       .join(' ');
 
@@ -79,11 +78,13 @@ export class WxContainer {
     return `<${
       node.tagName
     } ${attributeStr} ${outputStr} ${this.setComponentIndex(
-      node?.componentMeta?.index
-    )}>${children.join('')}</${node.tagName}>`;
+      node?.nodeIndex
+    )} ${this.generateClassAndStyle(node.nodeIndex)}>${children.join('')}</${
+      node.tagName
+    }>`;
   }
   private ngBoundTextTransform(node: NgBoundTextMeta): string {
-    return `{{nodeList[${node.nodeIndex}]}}`;
+    return `{{nodeList[${node.nodeIndex}].value}}`;
   }
   private ngContentTransform(node: NgContentMeta): string {
     return node.name ? `<slot name="${node.name}"></slot>` : `<slot></slot>`;
@@ -91,9 +92,8 @@ export class WxContainer {
   private ngTemplateTransform(node: NgTemplateMeta): string {
     let content = '';
     const directiveList = node.directive;
-    const directiveIndex = this.directiveIndex++;
     if (directiveList.some((item) => item.type !== 'none')) {
-      this.logic.push(`directive[${directiveIndex}]={}`);
+      this.logic.push(`directive[${node.nodeIndex}]={}`);
     }
     for (let i = 0; i < directiveList.length; i++) {
       const directive = directiveList[i];
@@ -118,13 +118,17 @@ export class WxContainer {
           }}}"><template is="${directive.thenTemplateRef.value(
             ''
           )}" ${this.getTemplateDataStr(
-            directiveIndex,
-            `'then'`
+            node.nodeIndex,
+            `0`
           )}></template></block>`;
           this.logic.push(() => {
-            return `directive[${directiveIndex}]['then']=wxContainer${directive.thenTemplateRef!.value(
+            return `directive[${
+              node.nodeIndex
+            }][0]=wxContainer${directive.thenTemplateRef!.value(
               ''
-            )}({originVar:{...ctx},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},0]})`;
+            )}({originVar:{...ctx},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${
+              node.nodeIndex
+            },0]})`;
           });
         }
         if (directive.falseTemplateRef) {
@@ -133,33 +137,36 @@ export class WxContainer {
           }:else><template is="${directive.falseTemplateRef.value(
             ''
           )}" ${this.getTemplateDataStr(
-            directiveIndex,
-            `'else'`
+            node.nodeIndex,
+            `0`
           )}></template></block>`;
           this.logic.push(() => {
-            return `directive[${directiveIndex}]['else']=wxContainer${directive.falseTemplateRef.value(
+            return `directive[${
+              node.nodeIndex
+            }][0]=wxContainer${directive.falseTemplateRef.value(
               ''
-            )}({originVar:{...ctx},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},0]})`;
+            )}({originVar:{...ctx},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${
+              node.nodeIndex
+            },0]})`;
           });
         }
       } else if (directive.type === 'for') {
         const forResult = this.computeExpression(directive.for);
         this.logic.push(`varList[${forResult.index}]=${forResult.logic}`);
-        this.currentContext.push(directive.item, directive.index);
         content += `<block ${this.directivePrefix}:for="{{${
           forResult.template
         }}}" ${this.directivePrefix}:for-item="${directive.item}" ${
           this.directivePrefix
         }:for-index="${directive.index}">
           <template is="${directive.templateName}" ${this.getTemplateDataStr(
-          directiveIndex,
-          'index'
+          node.nodeIndex,
+          `${directive.index}`
         )}></template>
           </block>`;
         this.logic.push(() => {
           return `for (let ${directive.index} = 0; ${directive.index} < ${forResult.logic}.length; ${directive.index}++) {
               const ${directive.item} = ${forResult.logic}[${directive.index}];
-             directive[${directiveIndex}][${directive.index}]=wxContainer${directive.templateName}({originVar:{...ctx.originVar,${directive.item}:${directive.item},${directive.index}:${directive.index}},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},${directive.index}]})
+             directive[${node.nodeIndex}][${directive.index}]=wxContainer${directive.templateName}({originVar:{...ctx.originVar,${directive.item}:${directive.item},${directive.index}:${directive.index}},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${node.nodeIndex},${directive.index}]})
             }`;
         });
       } else if (directive.type === 'switch') {
@@ -173,7 +180,7 @@ export class WxContainer {
             }===${caseResult!.template}}}"> <template is="${
               directive.templateName
             }" ${this.getTemplateDataStr(
-              directiveIndex,
+              node.nodeIndex,
               `0`
             )}></template></block>`;
           } else {
@@ -182,7 +189,7 @@ export class WxContainer {
             }===${caseResult!.template}}}"> <template is="${
               directive.templateName
             }" ${this.getTemplateDataStr(
-              directiveIndex,
+              node.nodeIndex,
               `0`
             )}></template></block>`;
           }
@@ -190,14 +197,14 @@ export class WxContainer {
           content += `<block ${this.directivePrefix}:else> <template is="${
             directive.templateName
           }" ${this.getTemplateDataStr(
-            directiveIndex,
+            node.nodeIndex,
             `0`
           )}></template></block>`;
         } else {
           throw new Error('未知的解析指令');
         }
         this.logic.push(() => {
-          return `ctx.directive[${directiveIndex}][0]=wxContainer${directive.templateName}({originVar:{...ctx},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${directiveIndex},0]})`;
+          return `ctx.directive[${node.nodeIndex}][0]=wxContainer${directive.templateName}({originVar:{...ctx},componentIndexList:[...(ctx.componentIndexList||[]),'directive',${node.nodeIndex},0]})`;
         });
       } else {
         throw new Error('未知的解析节点');
@@ -206,11 +213,11 @@ export class WxContainer {
     return content;
   }
   private ngTextTransform(node: NgTextMeta): string {
-    return `{{nodeList[${node.nodeIndex}]}}`;
+    return `{{nodeList[${node.nodeIndex}].value}}`;
   }
 
   private getTemplateDataStr(directiveIndex: number, indexName: string) {
-    return `data="{{...directive[${directiveIndex}][${indexName}] }}"`;
+    return `data="{{...nodeList[${directiveIndex}][${indexName}] }}"`;
   }
   getExportTemplate(): {
     name: string;
@@ -260,5 +267,8 @@ export class WxContainer {
       return `componentIndexList="{{componentIndexList}}" cpIndex="${cpIndex}"`;
     }
     return ``;
+  }
+  generateClassAndStyle(index: number) {
+    return `class="{{nodeList[${index}].class}}" style="{{nodeList[${index}].style}}"`;
   }
 }

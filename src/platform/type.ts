@@ -6,6 +6,7 @@ import {
   Type,
 } from '@angular/core';
 import 'miniprogram-api-typings';
+import { LView } from './internal-type';
 
 export interface AppOptions {
   __ngStartPage<M, C>(
@@ -16,11 +17,6 @@ export interface AppOptions {
     componentRef: ComponentRef<C>;
     ngModuleRef: NgModuleRef<M>;
   };
-  __ngStartComponent<C>(
-    injector: Injector,
-    component: Type<C>,
-    wxComponentInstance: WxComponentInstance
-  ): ComponentRef<C>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   __pageModuleLoadedMap: Map<Type<any>, Promise<ModuleInitResult>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,11 +39,9 @@ export type WxComponentInstance = WechatMiniprogram.Component.Instance<
     __ngComponentInjector: Injector;
     __ngZone: NgZone;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    __ngComponentRef: ComponentRef<any>;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     /** 小程序组件是否与lview链接成功 */
     __isLink: boolean;
+    __lView: LView;
   }
 >;
 
