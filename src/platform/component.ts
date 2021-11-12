@@ -1,7 +1,7 @@
 import { Injector, Type } from '@angular/core';
 import { generateWxComponent } from './component.base';
 import { AppOptions, ModuleInitResult, WxComponentInstance } from './type';
-
+// todo 去掉这里的话需要找入口
 export function componentRegistry<M, C>(
   module: Type<M>,
   component: Type<C>,

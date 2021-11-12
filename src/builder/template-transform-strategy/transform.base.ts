@@ -7,7 +7,6 @@ export abstract class TemplateTransformBase {
   protected globalContext!: TemplateGlobalContext;
   abstract compile(nodes: NgNodeMeta[]): string;
   abstract getExportTemplate(): string;
-  abstract getLogic(): string;
   setGlobalContext(globalContext: TemplateGlobalContext) {
     this.globalContext = globalContext;
   }

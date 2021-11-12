@@ -20,6 +20,10 @@ export default async function (
     true
   );
   const selector = createCssSelectorForTs(sf);
+  const componentMetaObjectNode = selector.queryOne(
+    `BinaryExpression[left$=ɵcmp]`
+  ) as ts.BinaryExpression;
+
   const templateNode = selector.queryOne(
     `BinaryExpression[left$=ɵcmp] CallExpression ObjectLiteralExpression PropertyAssignment[name=template]`
   );
@@ -43,19 +47,23 @@ export default async function (
   const context: ComponentTemplateLoaderContext = (this._compilation! as any)[
     ExportWeiXinAssetsPluginSymbol
   ];
-
-  const logic = (await context.updateLogicMapPromise).get(
+  const meta = (await context.metaMapPromise).get(
     path.normalize(this.resourcePath)
   )!;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
   const content = `wx.__window.__pageBind()`;
   const change = new TsChange(sf);
-  let inserChange;
+  const metaChange = change.insertNode(
+    componentMetaObjectNode,
+    `;${componentMetaObjectNode.left.getText()}Meta=${meta}`,
+    'end'
+  );
+  let insertChange;
   if (!initBlock.statements.length) {
-    inserChange = change.replaceNode(initBlock, `{${content}}`);
+    insertChange = change.replaceNode(initBlock, `{${content}}`);
   } else {
-    inserChange = change.insertNode(
+    insertChange = change.insertNode(
       initBlock.statements[initBlock.statements.length - 1],
       content,
       'end'
@@ -65,15 +73,15 @@ export default async function (
   if (!updateBlock.statements.length) {
     updateChange = change.replaceNode(
       updateBlock,
-      `{${logic};wx.__window.__propertyChange(wxContainerMain({originVar:ctx}))}`
+      `{;wx.__window.__propertyChange()}`
     );
   } else {
     updateChange = change.insertNode(
       updateBlock.statements[updateBlock.statements.length - 1],
-      `${logic};wx.__window.__propertyChange(wxContainerMain({originVar:ctx}))`,
+      `;wx.__window.__propertyChange()`,
       'end'
     );
   }
-  data = RawUpdater.update(data, [updateChange, inserChange]);
+  data = RawUpdater.update(data, [updateChange, insertChange, metaChange]);
   callback(undefined, data);
 }

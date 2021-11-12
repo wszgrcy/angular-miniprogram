@@ -62,10 +62,13 @@ export class NoopNode {
     } else {
       return {
         class:
-          Array.from(this.classList).join(' ') + ' ' + this.attribute.class,
+          Array.from(this.classList).join(' ') +
+          ' ' +
+          (this.attribute.class || ''),
         style: Object.entries(this.style)
           .map(([style, value]) => `${style}:${value}`)
           .join(';'),
+        property: this.property,
       };
     }
   }

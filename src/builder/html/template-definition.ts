@@ -24,7 +24,6 @@ import { NgNodeMeta, ParsedNode } from './node-handle/interface';
 import { ParsedNgTemplate } from './node-handle/template';
 import { ParsedNgText } from './node-handle/text';
 import { MatchedDirective } from './node-handle/type';
-import { TemplateInterpolationService } from './template-interpolation.service';
 
 export class TemplateDefinition implements Visitor {
   test = Math.random();
@@ -45,24 +44,23 @@ export class TemplateDefinition implements Visitor {
   );
   constructor(
     private nodes: Node[],
-    private templateGlobalContext: TemplateGlobalContext,
-    private service: TemplateInterpolationService
+    private templateGlobalContext: TemplateGlobalContext
   ) {}
 
   visit?(node: Node) {}
   visitElement(element: Element) {
     const nodeIndex = this.declIndex++;
-    let componentMeta: { type: MatchedDirective } | undefined;
+    let componentMeta:
+      | { type: MatchedDirective; isComponent: boolean }
+      | undefined;
     const result = this.templateGlobalContext.matchDirective(element);
     if (result && result.some((item) => item.directiveMetadata.isComponent)) {
-      const index = this.currentComponentIndex++;
       const type = result.find((item) => item.directiveMetadata.isComponent)!;
-      componentMeta = { type: type };
+      componentMeta = { type: type, isComponent: true };
     }
     const instance = new ParsedNgElement(
       element,
       this.parentNode,
-      this.service,
       componentMeta,
       nodeIndex
     );
@@ -93,7 +91,6 @@ export class TemplateDefinition implements Visitor {
     const templateInstance = new ParsedNgTemplate(
       template,
       this.parentNode,
-      this.service,
       nodeIndex
     );
     if (this.parentNode) {
@@ -110,8 +107,7 @@ export class TemplateDefinition implements Visitor {
     });
     const instance = new TemplateDefinition(
       template.children,
-      this.templateGlobalContext,
-      this.service
+      this.templateGlobalContext
     );
     instance.parentNode = templateInstance;
     this.templateDefinitionMap.set(template, instance);
@@ -123,12 +119,7 @@ export class TemplateDefinition implements Visitor {
   }
   visitContent(content: Content) {
     const nodeIndex = this.declIndex++;
-    const instance = new ParsedNgContent(
-      content,
-      this.parentNode,
-      this.service,
-      nodeIndex
-    );
+    const instance = new ParsedNgContent(content, this.parentNode, nodeIndex);
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
     }
@@ -143,12 +134,7 @@ export class TemplateDefinition implements Visitor {
   visitBoundEvent(attribute: BoundEvent) {}
   visitText(text: Text) {
     const nodeIndex = this.declIndex++;
-    const instance = new ParsedNgText(
-      text,
-      this.parentNode,
-      this.service,
-      nodeIndex
-    );
+    const instance = new ParsedNgText(text, this.parentNode, nodeIndex);
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
     }
@@ -159,12 +145,7 @@ export class TemplateDefinition implements Visitor {
   visitBoundText(text: BoundText) {
     const nodeIndex = this.declIndex++;
     text.value.visit(this.valueConverter);
-    const instance = new ParsedNgBoundText(
-      text,
-      this.parentNode,
-      this.service,
-      nodeIndex
-    );
+    const instance = new ParsedNgBoundText(text, this.parentNode, nodeIndex);
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
     }

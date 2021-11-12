@@ -1,11 +1,9 @@
-import { ASTWithSource } from '@angular/compiler';
+import { BindingType } from '@angular/compiler';
 import { BoundAttribute, Element } from '@angular/compiler/src/render3/r3_ast';
-import { TemplateInterpolationService } from '../template-interpolation.service';
 import { TagEventMeta } from './event';
 import { TemplateGlobalContext } from './global-context';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
 import { MatchedDirective } from './type';
-import { BindValue, PlainValue } from './value';
 
 export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   classList: string[] = [];
@@ -14,7 +12,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   private children: ParsedNode<NgNodeMeta>[] = [];
   attributeObject: Record<string, string> = {};
   kind = NgNodeKind.Element;
-  inputs: Record<string, PlainValue | BindValue> = {};
+  property: string[] = [];
   outputSet: TagEventMeta[] = [];
   ngSwitch: BoundAttribute | undefined;
   ngSwitchFirst = true;
@@ -24,8 +22,9 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   constructor(
     private node: Element,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    public templateInterpolationService: TemplateInterpolationService,
-    private componentMeta: { type: MatchedDirective } | undefined,
+    private componentMeta:
+      | { type: MatchedDirective; isComponent: boolean }
+      | undefined,
     public nodeIndex: number
   ) {}
   private analysis() {
@@ -40,11 +39,9 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       this.attributeObject['class'] = this.classList.join(' ');
     }
     this.node.inputs.forEach((input) => {
-      const result =
-        this.templateInterpolationService.expressionConvertToString(
-          (input.value as ASTWithSource).ast
-        );
-      this.inputs[input.name] = result;
+      if (input.type === BindingType.Property) {
+        this.property.push(input.name);
+      }
     });
     this.node.outputs.forEach((output) => {
       this.outputSet.push(
@@ -61,9 +58,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
         this.componentMeta.type.directiveMetadata.outputs;
     }
     this.ngSwitch = this.node.inputs.find((item) => item.name === 'ngSwitch');
-    if (this.ngSwitch) {
-      delete this.inputs['ngSwitch'];
-    }
+
     if (!this.node.endSourceSpan) {
       this.singleClosedTag = true;
     }
@@ -103,12 +98,13 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       kind: NgNodeKind.Element,
       tagName: this.tagName,
       children: this.children.map((child) => child.getNodeMeta(globalContext)),
-      inputs: this.inputs,
+      property: this.property,
       outputs: this.outputSet,
       attributes: this.attributeObject,
       singleClosedTag: this.singleClosedTag,
       componentMeta: {
         outputs: this.ngInternalOutputs,
+        isComponent: this.componentMeta?.isComponent || false,
       },
       nodeIndex: this.nodeIndex,
     };

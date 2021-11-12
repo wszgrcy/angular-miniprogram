@@ -19,19 +19,8 @@ export function generateWxComponent<C>(
   > = {},
   isComponent: boolean
 ) {
-  // todo 改为静态确定类型
-  const fnList: string[] = [];
-  let tmpComponent = component.prototype;
-  while (tmpComponent) {
-    if (tmpComponent.constructor && tmpComponent.constructor === Object) {
-      break;
-    }
-    const list = Object.getOwnPropertyNames(tmpComponent).filter(
-      (item) => !/(constructor)/.test(item)
-    );
-    fnList.push(...list);
-    tmpComponent = tmpComponent.__proto__;
-  }
+  const meta = component.ɵcmpMeta;
+
   return (componentInitFactory: ComponentInitFactory, isPage?: boolean) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const observers = {
@@ -127,7 +116,7 @@ export function generateWxComponent<C>(
         componentIndexList: { value: [], type: Array },
         cpIndex: { value: NaN, type: Number },
       },
-      methods: fnList.reduce((pre: Record<string, Function>, cur) => {
+      methods: meta.method.reduce((pre: Record<string, Function>, cur) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         pre[cur] = function (this: WxComponentInstance, ...args: any[]) {
           let ngZone: NgZone;

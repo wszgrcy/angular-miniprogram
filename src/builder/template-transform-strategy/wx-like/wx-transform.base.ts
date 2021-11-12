@@ -7,20 +7,20 @@ export abstract class WxTransformLike extends TemplateTransformBase {
   abstract directivePrefix: string;
   abstract viewContextName: string;
   private exportTemplateList: { name: string; content: string }[] = [];
+  private metaCollection = {
+    method: new Set<string>(),
+  };
   constructor() {
     super();
   }
-  private logic!: string;
   compile(nodes: NgNodeMeta[]) {
-    const container = new WxContainer();
-    container.setContainerContext('Main');
+    const container = new WxContainer(this.metaCollection);
     container.directivePrefix = this.directivePrefix;
     nodes.forEach((node) => {
       container.compileNode(node);
     });
     this.exportTemplateList = container.getExportTemplate();
     const result = container.export();
-    this.logic = `${result.logic};`;
     const templateImport = this.exportTemplateList.length
       ? `<import src="./template.wxml"/>`
       : '';
@@ -30,7 +30,8 @@ export abstract class WxTransformLike extends TemplateTransformBase {
   getExportTemplate() {
     return this.exportTemplateList.map((item) => `${item.content}`).join('');
   }
-  getLogic() {
-    return this.logic;
+
+  getExportMeta() {
+    return `{method:${JSON.stringify([...this.metaCollection.method])}}`;
   }
 }

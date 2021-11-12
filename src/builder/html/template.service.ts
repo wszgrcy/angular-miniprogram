@@ -41,7 +41,6 @@ import { PagePattern } from '../type';
 import { RawUpdater } from '../util/raw-updater';
 import { TemplateGlobalContext } from './node-handle/global-context';
 import { TemplateCompiler } from './template-compiler';
-import { TemplateInterpolationService } from './template-interpolation.service';
 
 @Injectable()
 export class TemplateService {
@@ -108,7 +107,7 @@ export class TemplateService {
     const traitCompiler: TraitCompiler = (this.ngCompiler as any).compilation
       .traitCompiler;
     const WXMLMap = new Map<string, string>();
-    const updateLogicMap = new Map<string, string>();
+    const metaMap = new Map();
     this.resolver.getComponentMetaMap().forEach((value, key) => {
       const original = ts.getOriginalNode(key) as ClassDeclaration;
       const record = (
@@ -150,13 +149,13 @@ export class TemplateService {
             WXMLTemplate.template
           );
         }
-        updateLogicMap.set(
+        metaMap.set(
           path.normalize(key.getSourceFile().fileName),
-          WXMLTemplate.logic
+          WXMLTemplate.meta
         );
       });
     });
-    return { WXMLMap: WXMLMap, updateLogicMap: updateLogicMap };
+    return { WXMLMap: WXMLMap, metaMap };
   }
   private removeTemplateAndStyleInTs(
     objectNode: ObjectLiteralExpression,
@@ -222,7 +221,6 @@ export class TemplateService {
         { provide: TemplateCompiler },
         { provide: COMPONENT_META, useValue: componentMeta },
 
-        { provide: TemplateInterpolationService },
         { provide: DIRECTIVE_MATCHER, useValue: directiveMatcher },
       ],
     });

@@ -12,18 +12,18 @@ const start = 20;
 
 type LView = ɵangular_packages_core_core_ca;
 const initValue = new Map<LView, any>();
-function propertyChange(ctx: any) {
+function propertyChange() {
   const lView = ɵangular_packages_core_core_bh();
   // const instance = ɵɵdirectiveInject(COMPONENT_TOKEN, InjectFlags.Optional);
-  const nodeList = lViewToWXView(lView, ctx.directive);
-  ctx = { ...ctx, nodeList: nodeList };
+  const nodeList = lViewToWXView(lView);
+  const ctx = { nodeList: nodeList };
   if (linkMap.has(lView)) {
     linkMap.get(lView).setData({ __wxView: ctx });
   } else {
     initValue.set(lView, ctx);
   }
 }
-function lViewToWXView(lView: LView, data: any) {
+function lViewToWXView(lView: LView, parentComponentIndexList: any[] = []) {
   const tView = lView[1];
   const end = tView.bindingStartIndex;
   const nodeList = [];
@@ -35,12 +35,16 @@ function lViewToWXView(lView: LView, data: any) {
       const lContainerList: any[] = [];
       const viewRefList: any[] = item[8] || [];
       viewRefList.forEach((item, itemIndex) => {
+        const componentIndexList = [
+          ...parentComponentIndexList,
+          'directive',
+          index - start,
+          itemIndex,
+        ];
         lContainerList.push({
-          nodeList: lViewToWXView(
-            item._lView,
-            data[index - start][itemIndex].directive
-          ),
-          componentIndexList: data[index - start][itemIndex].componentIndexList,
+          context: item._lView[8],
+          nodeList: lViewToWXView(item._lView, componentIndexList),
+          componentIndexList: componentIndexList,
         });
       });
       nodeList[index - start] = lContainerList;

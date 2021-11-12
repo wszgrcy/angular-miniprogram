@@ -4,7 +4,6 @@ import {
   Template,
   TextAttribute,
 } from '@angular/compiler/src/render3/r3_ast';
-import { TemplateInterpolationService } from '../template-interpolation.service';
 import { TemplateGlobalContext } from './global-context';
 import {
   NgDefaultDirective,
@@ -15,7 +14,6 @@ import {
   ParsedNode,
 } from './interface';
 import { isElement } from './type-predicate';
-import { BindValue, PlainValue } from './value';
 
 export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
   kind = NgNodeKind.Template;
@@ -28,7 +26,6 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
   constructor(
     private node: Template,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    public templateInterpolationService: TemplateInterpolationService,
     public nodeIndex: number
   ) {}
 
@@ -85,11 +82,10 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
     return [
       {
         type: 'if',
-        assert: this.getAttrValue(ngIf),
         thenTemplateRef:
-          (ngIf && ngIfThen && this.getAttrValue(ngIfThen, false)) ||
-          new BindValue(() => ngIfTemplateName),
-        falseTemplateRef: ngIfElse && this.getAttrValue(ngIfElse, false),
+          (ngIf && ngIfThen && (ngIfThen.value as any).source) ||
+          ngIfTemplateName,
+        falseTemplateRef: (ngIfElse?.value as any)?.source,
       },
       {
         type: 'none',
@@ -98,8 +94,6 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
     ];
   }
   private ngForTransform(): NgDirective[] {
-    const ngFor = this.attrs.find((item) => item.name === 'ngForOf')!;
-    const ngForValue = this.getAttrValue(ngFor);
     const ngForItem = this.node.variables.find(
       (item) => item.value === '$implicit'
     )!;
@@ -112,9 +106,6 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
     return [
       {
         type: 'for',
-        for: ngForValue,
-        item: ngForItem.name,
-        index: ngForIndex ? ngForIndex.name : 'index',
         templateName: ngForTemplateName,
       },
       {
@@ -143,10 +134,6 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
       }
       parent = parent.parent;
     }
-    const switchValue =
-      this.templateInterpolationService.expressionConvertToString(
-        (result!.ngSwitch.value as ASTWithSource).ast
-      );
     const ngSwitchTemplateName = `ngSwitch_${
       result?.index
     }_${this.globalContext.getBindIndex()}`;
@@ -154,11 +141,9 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
       {
         type: 'switch',
         default: !!ngSwitchDefault,
-        case: ngSwitchCase && this.getAttrValue(ngSwitchCase),
-        switchValue: switchValue,
+        case: !!ngSwitchCase,
         first: result!.first,
         templateName: ngSwitchTemplateName,
-        index: result!.index,
       },
       {
         type: 'none',
@@ -166,25 +151,7 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
       },
     ];
   }
-  private getAttrValue(
-    value: BoundAttribute | TextAttribute,
-    record: boolean = true
-  ) {
-    if (typeof value.value === 'string') {
-      return new PlainValue(value.value);
-    } else {
-      // const instance = new ExpressionConvert();
-      const result =
-        this.templateInterpolationService.expressionConvertToString(
-          (value.value as ASTWithSource).ast
-        );
-      // const result =result
-      if (record) {
-        // this.bindValueList.push(...instance.propertyReadList);
-      }
-      return result;
-    }
-  }
+
   getNodeMeta(globalContext: TemplateGlobalContext): NgTemplateMeta {
     this.globalContext = globalContext;
     const staticType = globalContext.matchDirective(this.node);

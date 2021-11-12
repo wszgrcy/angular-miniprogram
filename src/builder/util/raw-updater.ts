@@ -7,6 +7,7 @@ import {
 
 export class RawUpdater {
   static update(content: string, change: Change[]) {
+    change = change.sort((a, b) => b.start - a.start);
     return new RawUpdater(content, change).update();
   }
   originContent!: string;

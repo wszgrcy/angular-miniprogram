@@ -26,7 +26,6 @@ import { TemplateGlobalContext } from './node-handle/global-context';
 import { NgNodeMeta } from './node-handle/interface';
 
 import { TemplateDefinition } from './template-definition';
-import { TemplateInterpolationService } from './template-interpolation.service';
 
 @Injectable()
 export class TemplateCompiler {
@@ -35,7 +34,6 @@ export class TemplateCompiler {
   private templateTransform: PlatformInfo['templateTransform'];
   private globalContext: TemplateGlobalContext;
   constructor(
-    private templateInterpolationService: TemplateInterpolationService,
     buildPlatform: BuildPlatform,
     @Inject(DIRECTIVE_MATCHER) directiveMatcher: SelectorMatcher,
     @Inject(COMPONENT_META) private componentMeta: ComponentResolutionData
@@ -52,11 +50,9 @@ export class TemplateCompiler {
   private parseNode() {
     const nodes = (this.componentMeta as any).template.nodes;
 
-    const service = this.templateInterpolationService;
     const templateDefinition = new TemplateDefinition(
       nodes,
-      this.globalContext,
-      this.templateInterpolationService
+      this.globalContext
     );
     const list = templateDefinition.run();
     list.forEach((item) => {
@@ -71,10 +67,7 @@ export class TemplateCompiler {
     return {
       content: content,
       template: template,
-      logic: this.templateTransform.getLogic(),
-      htmlTemplate: Array.from(this.templateInterpolationService.pipes)
-        .map((pipe) => `{{''|${pipe}}}`)
-        .join(''),
+      meta: this.templateTransform.getExportMeta(),
     };
   }
 }
