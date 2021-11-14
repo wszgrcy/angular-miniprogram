@@ -53,16 +53,34 @@ export class TemplateDefinition implements Visitor {
     let componentMeta:
       | { type: MatchedDirective; isComponent: boolean }
       | undefined;
+    let directiveMeta: { listeners: string[] } | undefined;
     const result = this.templateGlobalContext.matchDirective(element);
-    if (result && result.some((item) => item.directiveMetadata.isComponent)) {
-      const type = result.find((item) => item.directiveMetadata.isComponent)!;
-      componentMeta = { type: type, isComponent: true };
+    if (result) {
+      if (result.some((item) => item.directiveMetadata.isComponent)) {
+        const type = result.find((item) => item.directiveMetadata.isComponent)!;
+        componentMeta = { type: type, isComponent: true };
+      } else {
+        const list = result.filter(
+          (item) => !item.directiveMetadata.isComponent
+        );
+        const listeners: string[] = [];
+        list.forEach((item) => {
+          Object.keys(
+            (item.directiveMetadata as any).meta.host.listeners
+          ).forEach((listener) => {
+            listeners.push(listener);
+          });
+        });
+        directiveMeta = { listeners };
+      }
     }
+
     const instance = new ParsedNgElement(
       element,
       this.parentNode,
       componentMeta,
-      nodeIndex
+      nodeIndex,
+      directiveMeta
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);

@@ -26,20 +26,13 @@ import ts, {
   SourceFile,
 } from 'typescript';
 import { Compilation, Compiler } from 'webpack';
-import {
-  COMPONENT_FILE_NAME_TOKEN,
-  COMPONENT_META,
-  COMPONENT_TEMPLATE_CONTENT_TOKEN,
-  DIRECTIVE_MATCHER,
-  TEMPLATE_COMPILER_OPTIONS_TOKEN,
-} from '../token/component.token';
+import { COMPONENT_META, DIRECTIVE_MATCHER } from '../token/component.token';
 import { TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
 import { DecoratorMetaDataResolver } from '../ts/decorator-metadata-resolver';
 import { PagePattern } from '../type';
 import { RawUpdater } from '../util/raw-updater';
-import { TemplateGlobalContext } from './node-handle/global-context';
 import { TemplateCompiler } from './template-compiler';
 
 @Injectable()
@@ -83,9 +76,10 @@ export class TemplateService {
       });
     this.resolver.getModuleMetaMap().forEach((value, key) => {
       if (value['declarations'] && value['declarations'].length) {
-        if (value['declarations'].length > 1) {
-          throw new Error('类声明组件超过一个');
-        }
+        // todo
+        // if (value['declarations'].length > 1) {
+        //   throw new Error('类声明组件超过一个');
+        // }
         const ref = value['declarations'][0];
         const sf = ref.node.getSourceFile();
         this.componentToModule.set(sf, key.getSourceFile());
@@ -127,6 +121,24 @@ export class TemplateService {
           const matcher = new SelectorMatcher();
           for (const directive of meta.directives) {
             const selector = directive.selector;
+            const node = (directive as any).ref.node as ts.Node;
+            const record = (
+              (traitCompiler as any).classes as Map<
+                ts.ClassDeclaration,
+                ClassRecord
+              >
+            ).get(ts.getOriginalNode(node) as ClassDeclaration)!;
+            let meta = {};
+            if (!record) {
+              // todo 需要判断
+            } else {
+              meta = {
+                ...(record.traits[0] as any).analysis.meta,
+                ...((record.traits[0] as any)
+                  .resolution as ComponentResolutionData),
+              };
+            }
+            (directive as any).meta = meta;
             matcher.addSelectables(CssSelector.parse(selector), directive);
           }
           directiveMatcher = matcher;

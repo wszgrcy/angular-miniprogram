@@ -25,7 +25,8 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     private componentMeta:
       | { type: MatchedDirective; isComponent: boolean }
       | undefined,
-    public nodeIndex: number
+    public nodeIndex: number,
+    private directiveMeta: { listeners: string[] } | undefined
   ) {}
   private analysis() {
     this.getTagName();
@@ -107,6 +108,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
         isComponent: this.componentMeta?.isComponent || false,
       },
       nodeIndex: this.nodeIndex,
+      directiveMeta: this.directiveMeta,
     };
   }
   getNgSwitch() {

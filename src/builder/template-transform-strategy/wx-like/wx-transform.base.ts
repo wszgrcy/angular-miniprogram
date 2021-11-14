@@ -9,6 +9,7 @@ export abstract class WxTransformLike extends TemplateTransformBase {
   private exportTemplateList: { name: string; content: string }[] = [];
   private metaCollection = {
     method: new Set<string>(),
+    listeners: [],
   };
   constructor() {
     super();
@@ -32,6 +33,8 @@ export abstract class WxTransformLike extends TemplateTransformBase {
   }
 
   getExportMeta() {
-    return `{method:${JSON.stringify([...this.metaCollection.method])}}`;
+    return `{method:${JSON.stringify([
+      ...this.metaCollection.method,
+    ])},listeners:${JSON.stringify(this.metaCollection.listeners)}}`;
   }
 }

@@ -1,4 +1,4 @@
-import { TsChange, createCssSelectorForTs } from 'cyia-code-util';
+import { InsertChange, TsChange, createCssSelectorForTs } from 'cyia-code-util';
 import * as path from 'path';
 import * as ts from 'typescript';
 import * as webpack from 'webpack';
@@ -20,29 +20,30 @@ export default async function (
     true
   );
   const selector = createCssSelectorForTs(sf);
-  const componentMetaObjectNode = selector.queryOne(
+  const componentɵcmpNode = selector.queryOne(
     `BinaryExpression[left$=ɵcmp]`
   ) as ts.BinaryExpression;
-
+  if (!componentɵcmpNode) {
+    callback(undefined, data, map);
+    return;
+  }
   const templateNode = selector.queryOne(
-    `BinaryExpression[left$=ɵcmp] CallExpression ObjectLiteralExpression PropertyAssignment[name=template]`
-  );
+    componentɵcmpNode,
+    `CallExpression ObjectLiteralExpression PropertyAssignment[name=template]`
+  ) as ts.PropertyAssignment;
   const initIfNode = selector.queryOne(
     templateNode,
     `IfStatement[expression="rf & 1"]`
   ) as ts.IfStatement;
+  if (!initIfNode) {
+    callback(undefined, data, map);
+    return;
+  }
   const updateIfNode = selector.queryOne(
     templateNode,
     `IfStatement[expression="rf & 2"]`
   ) as ts.IfStatement;
-  const node = initIfNode as ts.IfStatement;
-  if (!node) {
-    callback(undefined, data, map);
-    return;
-  }
-  const initBlock = node.thenStatement as ts.Block;
-  const updateBlock = updateIfNode.thenStatement as ts.Block;
-  // todo 修改更新逻辑
+  const initBlock = initIfNode.thenStatement as ts.Block;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const context: ComponentTemplateLoaderContext = (this._compilation! as any)[
     ExportWeiXinAssetsPluginSymbol
@@ -50,38 +51,36 @@ export default async function (
   const meta = (await context.metaMapPromise).get(
     path.normalize(this.resourcePath)
   )!;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-
-  const content = `wx.__window.__pageBind()`;
+  const initContent = `wx.__window.__pageBind()`;
   const change = new TsChange(sf);
-  const metaChange = change.insertNode(
-    componentMetaObjectNode,
-    `;${componentMetaObjectNode.left.getText()}Meta=${meta}`,
+  const extraMetaChange = change.insertNode(
+    componentɵcmpNode,
+    `;${componentɵcmpNode.left.getText()}ExtraMeta=${meta}`,
     'end'
   );
-  let insertChange;
-  if (!initBlock.statements.length) {
-    insertChange = change.replaceNode(initBlock, `{${content}}`);
-  } else {
-    insertChange = change.insertNode(
-      initBlock.statements[initBlock.statements.length - 1],
-      content,
-      'end'
-    );
-  }
-  let updateChange;
-  if (!updateBlock.statements.length) {
-    updateChange = change.replaceNode(
-      updateBlock,
-      `{;wx.__window.__propertyChange()}`
-    );
-  } else {
-    updateChange = change.insertNode(
+  const initInsertChange = change.insertNode(
+    initBlock.statements[initBlock.statements.length - 1],
+    initContent,
+    'end'
+  );
+  let updateInsertChange: InsertChange;
+  const changeList = [initInsertChange, extraMetaChange];
+  const updateContent = `wx.__window.__propertyChange();`;
+  if (updateIfNode) {
+    const updateBlock = updateIfNode.thenStatement as ts.Block;
+    updateInsertChange = change.insertNode(
       updateBlock.statements[updateBlock.statements.length - 1],
-      `;wx.__window.__propertyChange()`,
+      `;${updateContent}`,
+      'end'
+    );
+  } else {
+    updateInsertChange = change.insertNode(
+      initIfNode,
+      `if(rf & 2){${updateContent}}`,
       'end'
     );
   }
-  data = RawUpdater.update(data, [updateChange, insertChange, metaChange]);
+  changeList.push(updateInsertChange);
+  data = RawUpdater.update(data, changeList);
   callback(undefined, data);
 }

@@ -124,11 +124,15 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
     node.value = value;
   }
   listen(
-    target: 'window' | 'document' | 'body' | any,
+    target: NoopNode,
     eventName: string,
-    callback: (event: any) => boolean | void
+    callback: (event: WechatMiniprogram.BaseEvent) => boolean | void
   ) {
-    // console.log('监听', target, eventName, callback);
+    if (!(target instanceof NoopNode)) {
+      throw new Error('不支持其他类型监听');
+    }
+    target.linstener[eventName] = callback;
+    // console.log('---监听', target, eventName, callback);
     return () => {};
   }
 }

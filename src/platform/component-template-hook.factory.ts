@@ -97,6 +97,26 @@ export function findCurrentLView(lview: LView, list: any[], index: number) {
 
   return lview[index + start];
 }
+export function findCurrentElement(
+  lview: LView,
+  list: (string | number)[] = [],
+  index: number
+) {
+  list = [...list];
+  while (list.length) {
+    const item = list.shift();
+    if (item === 'directive') {
+      const index = list.shift() as number;
+      const lContainer = lview[index + start];
+      const child = list.shift() as number;
+      const viewRef = lContainer[8][child];
+      lview = viewRef['_lView'];
+    }
+  }
+
+  return lview[index + start];
+}
+
 const linkMap = new Map<LView, any>();
 export function lViewLinkToMPComponentRef(ref: any, lview: LView) {
   linkMap.set(lview, ref);

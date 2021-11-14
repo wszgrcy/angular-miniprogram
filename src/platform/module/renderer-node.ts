@@ -9,6 +9,7 @@ export class NoopNode {
   classList = new Set<string>();
   value!: string;
   children: NoopNode[] = [];
+  linstener: Record<string, Function> = {};
   constructor(public type: 'element' | 'comment' | 'text') {}
   addChild(child: NoopNode) {
     const preChildIndex = this.children.length - 1;

@@ -31,6 +31,7 @@ export interface NgElementMeta extends NgNodeMeta {
     outputs: string[];
     isComponent: boolean;
   };
+  directiveMeta: { listeners: string[] } | undefined;
 }
 export interface NgBoundTextMeta extends NgNodeMeta {
   kind: NgNodeKind.BoundText;

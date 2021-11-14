@@ -21,7 +21,10 @@ export class WxContainer {
   private childContainer: WxContainer[] = [];
 
   constructor(
-    private metaCollection: { method: Set<string> },
+    private metaCollection: {
+      method: Set<string>;
+      listeners: { methodName: string; index: number; eventName: string }[];
+    },
     private parent?: WxContainer
   ) {}
 
@@ -78,7 +81,7 @@ export class WxContainer {
       node.componentMeta.isComponent,
       node.nodeIndex,
       node.property
-    )}`;
+    )} ${this.setDirectiveData(node.directiveMeta, node.nodeIndex)}`;
     if (node.singleClosedTag) {
       return `<${node.tagName} ${commonTagProperty}>`;
     }
@@ -215,5 +218,31 @@ export class WxContainer {
         .join(' ');
     }
     return ``;
+  }
+  private setDirectiveData(
+    directiveMeta: { listeners: string[] } | undefined,
+    nodeIndex: number
+  ) {
+    if (
+      typeof directiveMeta === 'undefined' ||
+      !directiveMeta.listeners.length
+    ) {
+      return '';
+    }
+
+    return (
+      `data-element-path="{{componentIndexList}}" data-element-index="{{${nodeIndex}}}" ` +
+      directiveMeta.listeners
+        .map((item) => {
+          const methodName = `directive_${nodeIndex}_${item}`;
+          this.metaCollection.listeners.push({
+            methodName: methodName,
+            index: nodeIndex,
+            eventName: item,
+          });
+          return `bind:${item}="${methodName}"`;
+        })
+        .join(' ')
+    );
   }
 }

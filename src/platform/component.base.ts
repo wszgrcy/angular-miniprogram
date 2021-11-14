@@ -1,10 +1,12 @@
 import { ChangeDetectorRef, NgZone, Type } from '@angular/core';
 import {
+  findCurrentElement,
   findCurrentLView,
   getPageLView,
   lViewLinkToMPComponentRef,
   updateInitValue,
 } from './component-template-hook.factory';
+import { NoopNode } from './module/renderer-node';
 import {
   ComponentInitFactory,
   NgCompileComponent,
@@ -19,7 +21,7 @@ export function generateWxComponent<C>(
   > = {},
   isComponent: boolean
 ) {
-  const meta = component.ɵcmpMeta;
+  const meta = component.ɵcmpExtraMeta;
 
   return (componentInitFactory: ComponentInitFactory, isPage?: boolean) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -116,23 +118,43 @@ export function generateWxComponent<C>(
         componentIndexList: { value: [], type: Array },
         cpIndex: { value: NaN, type: Number },
       },
-      methods: meta.method.reduce((pre: Record<string, Function>, cur) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        pre[cur] = function (this: WxComponentInstance, ...args: any[]) {
-          let ngZone: NgZone;
-          if (this.__lView) {
-            ngZone = this.__lView[9]!.get(NgZone);
-          } else {
-            ngZone = this.__ngComponentInjector.get(NgZone);
-          }
-          return ngZone.run(() => {
-            (this.__ngComponentInstance[cur] as Function).bind(
-              this.__ngComponentInstance
-            )(...args);
-          });
-        };
-        return pre;
-      }, {}),
+      methods: {
+        ...meta.method.reduce((pre: Record<string, Function>, cur) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          pre[cur] = function (this: WxComponentInstance, ...args: any[]) {
+            let ngZone: NgZone;
+            if (this.__lView) {
+              ngZone = this.__lView[9]!.get(NgZone);
+            } else {
+              ngZone = this.__ngComponentInjector.get(NgZone);
+            }
+            return ngZone.run(() => {
+              (this.__ngComponentInstance[cur] as Function).bind(
+                this.__ngComponentInstance
+              )(...args);
+            });
+          };
+          return pre;
+        }, {}),
+        ...meta.listeners.reduce((pre: Record<string, Function>, cur) => {
+          pre[cur.methodName] = function (
+            this: WxComponentInstance,
+            event: WechatMiniprogram.BaseEvent
+          ) {
+            if (this.__lView) {
+              const el = findCurrentElement(
+                this.__lView,
+                event.target.dataset.elementPath,
+                event.target.dataset.elementIndex
+              ) as NoopNode;
+              el.linstener[cur.eventName](event);
+            } else {
+              throw new Error('未绑定事件');
+            }
+          };
+          return pre;
+        }, {}),
+      },
       data: { __wxView: false },
       lifetimes: {
         ...lifetimes,
@@ -148,6 +170,9 @@ export function generateWxComponent<C>(
               const initValue = updateInitValue(lView);
               this.setData({ __wxView: initValue });
               lViewLinkToMPComponentRef(this, lView);
+              this.__lView = lView;
+              this.__ngComponentInstance = lView[8];
+              this.__isLink = true;
             },
             (rej) => {
               throw rej;
