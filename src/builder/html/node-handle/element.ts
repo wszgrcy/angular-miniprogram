@@ -55,8 +55,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       );
     });
     if (this.componentMeta) {
-      this.ngInternalOutputs =
-        this.componentMeta.type.directiveMetadata.outputs;
+      this.ngInternalOutputs = this.componentMeta.type.meta.directive.outputs;
     }
     this.ngSwitch = this.node.inputs.find((item) => item.name === 'ngSwitch');
 

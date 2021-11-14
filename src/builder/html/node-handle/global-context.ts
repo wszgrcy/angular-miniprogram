@@ -43,8 +43,11 @@ export class TemplateGlobalContext {
     const result: MatchedDirective[] = [];
     this.directiveMatcher.match(
       selector,
-      (selector, directiveMetadata: R3UsedDirectiveMetadata) => {
-        result.push({ selector, directiveMetadata });
+      (
+        selector,
+        meta: { directive: R3UsedDirectiveMetadata; directiveMeta: any }
+      ) => {
+        result.push({ selector, meta });
       }
     );
     return result;

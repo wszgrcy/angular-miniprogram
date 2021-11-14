@@ -11,6 +11,8 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
   src: string;
   /** 导出wxml(html)文件 */
   outputWXML: string;
+  /** 导出wxml(html)文件 */
+  outputWXMLTemplate: string;
   /** 导出wxss(css)文件 */
   outputWXSS: string;
   /** 导出wxs(js)文件 */

@@ -13,11 +13,12 @@ import * as webpack from 'webpack';
 import { RawSource } from 'webpack-sources';
 import { ExportWeiXinAssetsPluginSymbol } from '../const';
 import { TemplateService } from '../html/template.service';
+import { StyleHookData } from '../html/type';
 import { ComponentTemplateLoaderContext } from '../loader/type';
 import { BuildPlatform } from '../platform/platform';
 import { PlatformInfo } from '../platform/platform-info';
 
-import { TS_CONFIG_TOKEN } from '../token/project.token';
+import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
 import { PagePattern } from '../type';
@@ -34,14 +35,9 @@ export class ExportWeiXinAssetsPlugin {
   private pageList!: PagePattern[];
   private componentList!: PagePattern[];
   private system!: ts.System;
-  private WXMLMap = new Map<string, string>();
   // private program!: ts.Program;
   private compiler!: webpack.Compiler;
   private compilation!: webpack.Compilation;
-  private changeFileMap = new Map<
-    string,
-    { sizeOffset: number; content: string }
-  >();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private originInputFileSystemSync: { readFileSync: any; statSync: any } = {
     readFileSync: undefined,
@@ -88,20 +84,22 @@ export class ExportWeiXinAssetsPlugin {
               provide: TS_SYSTEM,
               useValue: this.system,
             },
+            {
+              provide: PAGE_PATTERN_TOKEN,
+              useValue: [...this.pageList, ...this.componentList],
+            },
           ],
           parent: this.injector,
         });
         const templateService = injector.get(TemplateService);
-        templateService.setEntry(this.pageList, this.componentList);
         oldBuilder =
           templateService.getBuilder() as ts.EmitAndSemanticDiagnosticsBuilderProgram;
         const waitAnalyzeAsync = templateService.analyzeAsync();
-        this.changeFileMap = templateService.removeStyle();
-        const componentMetaMap = templateService.getComponentMetaMap();
-        this.hookFileSystemFile();
+        const styleChangeMap = templateService.removeStyle();
+        this.hookFileSystemFile(styleChangeMap);
 
         const ngComponentCssExtractPlugin = new NgComponentCssExtractPlugin(
-          componentMetaMap,
+          styleChangeMap,
           resourceLoader
         );
         ngComponentCssExtractPlugin.run(compilation);
@@ -111,26 +109,26 @@ export class ExportWeiXinAssetsPlugin {
         );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (compilation as any)[ExportWeiXinAssetsPluginSymbol] = {
-          metaMapPromise: buildTemplatePromise.then((item) => item.metaMap),
+          metaMapPromise: buildTemplatePromise.then((item) => item.meta),
           platformInfo: this.options.buildPlatform,
         } as ComponentTemplateLoaderContext;
 
         compilation.hooks.processAssets.tapAsync(
           'ExportWeiXinAssetsPlugin',
           async (assets, cb) => {
-            this.WXMLMap = await buildTemplatePromise.then(
-              (result) => result.WXMLMap
-            );
+            const componentBuildMetaMap = await (
+              await buildTemplatePromise
+            ).outputContent;
+
             const cssMap = ngComponentCssExtractPlugin.getAllCss();
             for (const [key, value] of cssMap.entries()) {
-              const entry = templateService.getModuleEntryFromCss(key);
-              compilation.assets[entry!.outputWXSS] = new RawSource(
+              compilation.assets[key] = new RawSource(
                 await value
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ) as any;
             }
 
-            this.WXMLMap.forEach((value, key) => {
+            componentBuildMetaMap.forEach((value, key) => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               compilation.assets[key] = new RawSource(value) as any;
             });
@@ -151,15 +149,14 @@ export class ExportWeiXinAssetsPlugin {
     const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
     ifs.readFileSync = this.originInputFileSystemSync.readFileSync;
     ifs.statSync = this.originInputFileSystemSync.statSync;
-    this.changeFileMap = new Map();
     this.cleanDependencyFileCacheSet = new Set();
   }
-  private hookFileSystemFile() {
+  private hookFileSystemFile(map: Map<string, StyleHookData>) {
     const _this = this;
     const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
     const oldReadFileSync = ifs.readFileSync;
     ifs.readFileSync = function (filePath: string) {
-      const changeFile = _this.changeFileMap.get(path.normalize(filePath));
+      const changeFile = map.get(path.normalize(filePath));
       if (changeFile) {
         return Buffer.from(changeFile.content);
       }
@@ -170,7 +167,7 @@ export class ExportWeiXinAssetsPlugin {
     ifs.statSync = function (filePath: string, ...args: any[]) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const stat = (oldStatSync as any).apply(this, [filePath, ...args]);
-      const changeFile = _this.changeFileMap.get(path.normalize(filePath));
+      const changeFile = map.get(path.normalize(filePath));
       if (changeFile) {
         stat.size = stat.size - changeFile.sizeOffset;
       }
@@ -186,7 +183,7 @@ export class ExportWeiXinAssetsPlugin {
     service: TemplateService
   ) {
     await waitAnalyzeAsync;
-    const result = service.buildTemplate();
+    const result = service.exportComponentBuildMetaMap();
     return result;
   }
 }

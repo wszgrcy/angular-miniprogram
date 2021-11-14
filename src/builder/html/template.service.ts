@@ -1,5 +1,8 @@
-import { dirname, join, normalize } from '@angular-devkit/core';
-import { CssSelector, SelectorMatcher } from '@angular/compiler';
+import {
+  CssSelector,
+  R3ComponentMetadata,
+  SelectorMatcher,
+} from '@angular/compiler';
 import {
   NgtscProgram,
   ParsedConfiguration,
@@ -7,13 +10,11 @@ import {
 } from '@angular/compiler-cli';
 import { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
 import { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
-import { ResolvedValue } from '@angular/compiler-cli/src/ngtsc/partial_evaluator';
 import {
   ClassRecord,
   TraitCompiler,
 } from '@angular/compiler-cli/src/ngtsc/transform';
 import { externalizePath } from '@ngtools/webpack/src/ivy/paths';
-import { InputFileSystemSync } from '@ngtools/webpack/src/ivy/system';
 import { DeleteChange, InsertChange, TsChange } from 'cyia-code-util';
 import * as path from 'path';
 import { Inject, Injectable, Injector } from 'static-injector';
@@ -27,40 +28,38 @@ import ts, {
 } from 'typescript';
 import { Compilation, Compiler } from 'webpack';
 import { COMPONENT_META, DIRECTIVE_MATCHER } from '../token/component.token';
-import { TS_CONFIG_TOKEN } from '../token/project.token';
+import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
 import { DecoratorMetaDataResolver } from '../ts/decorator-metadata-resolver';
 import { PagePattern } from '../type';
 import { RawUpdater } from '../util/raw-updater';
 import { TemplateCompiler } from './template-compiler';
+import { StyleHookData } from './type';
 
 @Injectable()
 export class TemplateService {
-  private pageList!: PagePattern[];
-  private componentList!: PagePattern[];
   private dependencyUseModule = new Map<string, string[]>();
   private cleanDependencyFileCacheSet = new Set<string>();
 
   private resolver!: DecoratorMetaDataResolver;
-  private componentToModule = new Map<SourceFile, SourceFile>();
-  private changeFileMap = new Map<
-    string,
-    { sizeOffset: number; content: string }
-  >();
   builder!: ts.BuilderProgram | ts.EmitAndSemanticDiagnosticsBuilderProgram;
   private ngTscProgram!: NgtscProgram;
   private tsProgram!: ts.Program;
 
   private ngCompiler!: NgCompiler;
-
+  private componentMap = new Map<ClassDeclaration, R3ComponentMetadata>();
+  private directiveMap = new Map<ClassDeclaration, any>();
+  private ngModuleMap = new Map<ClassDeclaration, any>();
+  private componentToEntryMap = new Map<string, PagePattern>();
   constructor(
     private injector: Injector,
     @Inject(WEBPACK_COMPILATION) private compilation: Compilation,
     @Inject(TS_SYSTEM) private system: ts.System,
     @Inject(WEBPACK_COMPILER) private compiler: Compiler,
     @Inject(TS_CONFIG_TOKEN) private tsConfig: string,
-    @Inject(OLD_BUILDER) private oldBuilder: any
+    @Inject(OLD_BUILDER) private oldBuilder: any,
+    @Inject(PAGE_PATTERN_TOKEN) private pagePatternList: PagePattern[]
   ) {
     this.initTscProgram();
     this.resolver = new DecoratorMetaDataResolver(
@@ -74,105 +73,132 @@ export class TemplateService {
       .forEach((item) => {
         this.resolver.resolverSourceFile(item);
       });
-    this.resolver.getModuleMetaMap().forEach((value, key) => {
-      if (value['declarations'] && value['declarations'].length) {
-        // todo
-        // if (value['declarations'].length > 1) {
-        //   throw new Error('类声明组件超过一个');
-        // }
-        const ref = value['declarations'][0];
-        const sf = ref.node.getSourceFile();
-        this.componentToModule.set(sf, key.getSourceFile());
-      }
+    this.resolver.getComponentMetaMap().forEach((value, key) => {
+      const fileName = key.getSourceFile().fileName;
+      this.componentToEntryMap.set(
+        fileName,
+        this.getComponentPagePattern(fileName)
+      );
     });
   }
   removeStyle() {
+    const componentChangeMap = new Map<string, StyleHookData>();
     this.resolver.getComponentMetaMap().forEach((value, key) => {
-      this.removeTemplateAndStyleInTs(
-        (key.decorators![0].expression as CallExpression)
-          .arguments[0] as ObjectLiteralExpression,
-        key.getSourceFile(),
-        ''
-      );
-    });
-    return this.changeFileMap;
-  }
-  buildTemplate() {
-    const traitCompiler: TraitCompiler = (this.ngCompiler as any).compilation
-      .traitCompiler;
-    const WXMLMap = new Map<string, string>();
-    const metaMap = new Map();
-    this.resolver.getComponentMetaMap().forEach((value, key) => {
-      const original = ts.getOriginalNode(key) as ClassDeclaration;
-      const record = (
-        (traitCompiler as any).classes as Map<ts.ClassDeclaration, ClassRecord>
-      ).get(original)!;
-      const list = record.traits.filter(
-        (trait) => trait.handler.name === 'ComponentDecoratorHandler'
-      );
-      list.forEach((trait) => {
-        let directiveMatcher: SelectorMatcher | null = null;
-
-        const meta: ComponentResolutionData = {
-          ...(trait as any).analysis.meta,
-          ...((trait as any).resolution as ComponentResolutionData),
-        };
-        if (meta.directives.length > 0) {
-          const matcher = new SelectorMatcher();
-          for (const directive of meta.directives) {
-            const selector = directive.selector;
-            const node = (directive as any).ref.node as ts.Node;
-            const record = (
-              (traitCompiler as any).classes as Map<
-                ts.ClassDeclaration,
-                ClassRecord
-              >
-            ).get(ts.getOriginalNode(node) as ClassDeclaration)!;
-            let meta = {};
-            if (!record) {
-              // todo 需要判断
-            } else {
-              meta = {
-                ...(record.traits[0] as any).analysis.meta,
-                ...((record.traits[0] as any)
-                  .resolution as ComponentResolutionData),
-              };
-            }
-            (directive as any).meta = meta;
-            matcher.addSelectables(CssSelector.parse(selector), directive);
-          }
-          directiveMatcher = matcher;
-        }
-        const WXMLTemplate = this.buildWxmlTemplate(
-          key,
-          value,
-          directiveMatcher,
-          meta
-        );
-        const module = this.componentToModule.get(key.getSourceFile());
-        const entry = this.getModuleEntry(module!);
-        if (!entry) {
-          throw new Error('没有找到对应的出口信息');
-        }
-        WXMLMap.set(entry.outputWXML, WXMLTemplate.content);
-        if (WXMLTemplate.template) {
-          WXMLMap.set(
-            join(dirname(normalize(entry.outputWXML)), 'template.wxml'),
-            WXMLTemplate.template
-          );
-        }
-        metaMap.set(
-          path.normalize(key.getSourceFile().fileName),
-          WXMLTemplate.meta
-        );
+      const sf = key.getSourceFile();
+      const fileName = sf.fileName;
+      const pagePattern = this.componentToEntryMap.get(fileName)!;
+      componentChangeMap.set(pagePattern.outputWXSS, {
+        ...this.removeTemplateAndStyleInTs(
+          (key.decorators![0].expression as CallExpression)
+            .arguments[0] as ObjectLiteralExpression,
+          sf
+        ),
+        styles: value['styles'] as string[],
+        styleUrls: value['styleUrls'] as string[],
       });
     });
-    return { WXMLMap: WXMLMap, metaMap };
+
+    return componentChangeMap;
   }
+  private collectionInfo() {
+    const traitCompiler: TraitCompiler = (this.ngCompiler as any).compilation
+      .traitCompiler;
+    const classes = (traitCompiler as any).classes as Map<
+      ts.ClassDeclaration,
+      ClassRecord
+    >;
+    for (const [classDeclaration, classRecord] of classes) {
+      const componentTraits = classRecord.traits.filter(
+        (trait) => trait.handler.name === 'ComponentDecoratorHandler'
+      );
+      if (componentTraits.length > 1) {
+        throw new Error('组件装饰器异常');
+      }
+      componentTraits.forEach((trait) => {
+        const meta: R3ComponentMetadata = {
+          ...(trait as any).analysis.meta,
+          ...(trait as any).resolution,
+        };
+        this.componentMap.set(
+          ts.getOriginalNode(classDeclaration) as ts.ClassDeclaration,
+          meta
+        );
+      });
+      const directiveTraits = classRecord.traits.filter(
+        (trait) => trait.handler.name === 'DirectiveDecoratorHandler'
+      );
+      if (directiveTraits.length > 1) {
+        throw new Error('指令装饰器异常');
+      }
+      directiveTraits.forEach((trait) => {
+        this.directiveMap.set(
+          ts.getOriginalNode(classDeclaration) as ts.ClassDeclaration,
+          (trait as any).analysis
+        );
+      });
+      const ngModuleTraits = classRecord.traits.filter(
+        (trait) => trait.handler.name === 'NgModuleDecoratorHandler'
+      );
+
+      ngModuleTraits.forEach((trait) => {
+        const meta: R3ComponentMetadata = {
+          ...(trait as any).analysis.meta,
+          ...(trait as any).resolution,
+        };
+        this.ngModuleMap.set(classDeclaration, meta);
+      });
+    }
+  }
+  exportComponentBuildMetaMap() {
+    this.collectionInfo();
+
+    const componentBuildMetaRecord = {
+      outputContent: new Map<string, string>(),
+      meta: new Map<string, string>(),
+    };
+    this.componentMap.forEach((meta, key) => {
+      const fileName = key.getSourceFile().fileName;
+      let directiveMatcher: SelectorMatcher | undefined;
+      if (meta.directives.length > 0) {
+        const matcher = new SelectorMatcher();
+        for (const directive of meta.directives) {
+          const selector = directive.selector;
+          const directiveClassDeclaration = ts.getOriginalNode(
+            (directive as any).ref.node
+          ) as ts.ClassDeclaration;
+          const directiveMeta = this.directiveMap.get(
+            directiveClassDeclaration
+          );
+          matcher.addSelectables(CssSelector.parse(selector), {
+            directive,
+            directiveMeta,
+          });
+        }
+        directiveMatcher = matcher;
+      }
+      const componentBuildMeta = this.buildWxmlTemplate(directiveMatcher, meta);
+      const pagePattern = this.componentToEntryMap.get(fileName)!;
+      componentBuildMetaRecord.outputContent.set(
+        pagePattern.outputWXML,
+        componentBuildMeta.content
+      );
+      if (componentBuildMeta.template) {
+        componentBuildMetaRecord.outputContent.set(
+          pagePattern.outputWXMLTemplate,
+          componentBuildMeta.template
+        );
+      }
+      componentBuildMetaRecord.meta.set(
+        path.normalize(fileName),
+        componentBuildMeta.meta
+      );
+    });
+    return componentBuildMetaRecord;
+  }
+
   private removeTemplateAndStyleInTs(
     objectNode: ObjectLiteralExpression,
-    sf: SourceFile,
-    htmlString: string
+    sf: SourceFile
   ) {
     const change = new TsChange(sf);
     const list: (InsertChange | DeleteChange)[] = change.deleteChildNode(
@@ -199,34 +225,17 @@ export class TemplateService {
         return /^(styleUrls|styles)$/.test(value as string);
       }
     );
-    list.sort((a, b) => {
-      return b.start - a.start;
-    });
     const content = RawUpdater.update(sf.text, list);
-    this.changeFileMap.set(path.normalize(sf.fileName), {
+    return {
       sizeOffset: sf.text.length - content.length,
       content: content,
-    });
+    };
   }
 
   private buildWxmlTemplate(
-    classDeclaration: ts.ClassDeclaration,
-    meta: Record<string, ResolvedValue>,
-    directiveMatcher: SelectorMatcher | null,
+    directiveMatcher: SelectorMatcher | undefined,
     componentMeta: ComponentResolutionData
   ) {
-    let templateContent = '';
-    const templateUrl = meta['templateUrl'] as string;
-    if (templateUrl) {
-      templateContent = this.system.readFile(templateUrl)!;
-      this.compilation.fileDependencies.add(templateUrl);
-    } else {
-      templateContent = meta['template'] as string;
-    }
-    if (typeof templateContent !== 'string') {
-      throw new Error('解析错误');
-    }
-    const interpolation = meta['interpolation'] as string[];
     const injector = Injector.create({
       parent: this.injector,
       providers: [
@@ -247,7 +256,6 @@ export class TemplateService {
   }
   private initTscProgram() {
     const config = readConfiguration(this.tsConfig, undefined);
-    const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
     const host = this.initHost(config);
     this.ngTscProgram = new NgtscProgram(
       config.rootNames,
@@ -267,8 +275,8 @@ export class TemplateService {
     }
     this.ngCompiler = this.ngTscProgram.compiler;
   }
-  private getModuleEntry(sf: SourceFile) {
-    const findList = [sf.fileName];
+  private getComponentPagePattern(fileName: string) {
+    const findList = [fileName];
     let maybeEntryPath: PagePattern | undefined;
 
     while (findList.length) {
@@ -277,7 +285,7 @@ export class TemplateService {
       if (moduleList && moduleList.length) {
         findList.push(...moduleList);
       } else {
-        maybeEntryPath = [...this.pageList, ...this.componentList].find(
+        maybeEntryPath = this.pagePatternList.find(
           (item) => path.normalize(item.src) === path.normalize(module!)
         );
         if (maybeEntryPath) {
@@ -285,8 +293,12 @@ export class TemplateService {
         }
       }
     }
+    if (!maybeEntryPath) {
+      throw new Error(`没有找到组件[${fileName}]对应的入口点`);
+    }
     return maybeEntryPath;
   }
+
   private addCleanDependency(host: ts.CompilerHost) {
     const oldReadFile = host.readFile;
     const _this = this;
@@ -361,22 +373,11 @@ export class TemplateService {
       };
     }
   }
-  public setEntry(pageList: PagePattern[], componentList: PagePattern[]) {
-    this.pageList = pageList;
-    this.componentList = componentList;
-  }
-  public getComponentMetaMap() {
-    return this.resolver.getComponentMetaMap();
-  }
+
   analyzeAsync() {
     return this.ngCompiler.analyzeAsync();
   }
   getBuilder() {
     return this.builder;
-  }
-  getModuleEntryFromCss(sf: Node) {
-    return this.getModuleEntry(
-      this.componentToModule.get(sf.getSourceFile()!)!
-    );
   }
 }

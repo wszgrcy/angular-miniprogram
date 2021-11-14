@@ -121,6 +121,9 @@ export class DynamicWatchEntryPlugin {
             .replace(/\.ts$/g, '.js');
           object.outputWXSS = object.outputWXS.replace(/\.js$/g, '.wxss');
           object.outputWXML = object.outputWXS.replace(/\.js$/g, '.wxml');
+          object.outputWXMLTemplate = path
+            .join(pattern.output, 'template')
+            .replace(/\.ts$/g, '.wxml');
           return object as PagePattern;
         })
       );

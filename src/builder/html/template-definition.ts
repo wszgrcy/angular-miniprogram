@@ -56,20 +56,21 @@ export class TemplateDefinition implements Visitor {
     let directiveMeta: { listeners: string[] } | undefined;
     const result = this.templateGlobalContext.matchDirective(element);
     if (result) {
-      if (result.some((item) => item.directiveMetadata.isComponent)) {
-        const type = result.find((item) => item.directiveMetadata.isComponent)!;
+      if (result.some((item) => item.meta.directive.isComponent)) {
+        const type = result.find((item) => item.meta.directive.isComponent)!;
         componentMeta = { type: type, isComponent: true };
       } else {
-        const list = result.filter(
-          (item) => !item.directiveMetadata.isComponent
-        );
+        const list = result.filter((item) => !item.meta.directive.isComponent);
         const listeners: string[] = [];
         list.forEach((item) => {
-          Object.keys(
-            (item.directiveMetadata as any).meta.host.listeners
-          ).forEach((listener) => {
-            listeners.push(listener);
-          });
+          if (!item.meta.directiveMeta) {
+            return;
+          }
+          Object.keys(item.meta.directiveMeta.meta.host.listeners).forEach(
+            (listener) => {
+              listeners.push(listener);
+            }
+          );
         });
         directiveMeta = { listeners };
       }

@@ -4,37 +4,32 @@ import ts from 'typescript';
 import * as webpack from 'webpack';
 
 export class NgComponentCssExtractPlugin {
-  cssMap = new Map<ts.ClassDeclaration, Promise<string>>();
+  cssMap = new Map<string, Promise<string>>();
 
   constructor(
-    private map: Map<ts.ClassDeclaration, Record<string, ResolvedValue>>,
+    private map: Map<string, { styles: string[]; styleUrls: string[] }>,
     private resourceLoader: WebpackResourceLoader
   ) {}
   run(compilation: webpack.Compilation) {
     this.resourceLoader.update(compilation);
-    this.map.forEach((value, key) => {
-      const styles = value['styles'] as string[];
+    this.map.forEach((value, outputPath) => {
+      const styles = value.styles;
       const styleList: Promise<string>[] = [];
       if (styles && styles.length) {
         styles.forEach((value) => {
           styleList.push(
-            this.resourceLoader.process(
-              value,
-              'text/css',
-              'style',
-              key.getSourceFile().fileName
-            )
+            this.resourceLoader.process(value, 'text/css', 'style', outputPath)
           );
         });
       }
-      const styleUrls = value['styleUrls'] as string[];
+      const styleUrls = value.styleUrls;
       if (styleUrls && styleUrls.length) {
         styleUrls.forEach((value) => {
           styleList.push(this.resourceLoader.get(value));
         });
       }
       this.cssMap.set(
-        key,
+        outputPath,
         Promise.all(styleList).then((list) => list.join('\n'))
       );
     });
