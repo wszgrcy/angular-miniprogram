@@ -19,7 +19,7 @@ import { ValueConverter } from '@angular/compiler/src/render3/view/template';
 import { ParsedNgBoundText } from './node-handle/bound-text';
 import { ParsedNgContent } from './node-handle/content';
 import { ParsedNgElement } from './node-handle/element';
-import { TemplateGlobalContext } from './node-handle/global-context';
+import { ComponentContext } from './node-handle/global-context';
 import { NgNodeMeta, ParsedNode } from './node-handle/interface';
 import { ParsedNgTemplate } from './node-handle/template';
 import { ParsedNgText } from './node-handle/text';
@@ -42,35 +42,24 @@ export class TemplateDefinition implements Visitor {
   );
   constructor(
     private nodes: Node[],
-    private templateGlobalContext: TemplateGlobalContext
+    private templateGlobalContext: ComponentContext
   ) {}
 
   visit?(node: Node) {}
   visitElement(element: Element) {
     const nodeIndex = this.declIndex++;
-    let componentMeta:
-      | { type: MatchedDirective; isComponent: boolean }
-      | undefined;
+    let componentMeta: { outputs: string[]; isComponent: boolean } | undefined;
     let directiveMeta: { listeners: string[] } | undefined;
     const result = this.templateGlobalContext.matchDirective(element);
     if (result) {
-      if (result.some((item) => item.meta.directive.isComponent)) {
-        const type = result.find((item) => item.meta.directive.isComponent)!;
-        componentMeta = { type: type, isComponent: true };
+      if (result.some((item) => item.isComponent)) {
+        const type = result.find((item) => item.isComponent)!;
+        componentMeta = { outputs: type.outputs!, isComponent: true };
       } else {
-        const list = result.filter((item) => !item.meta.directive.isComponent);
-        const listeners: string[] = [];
-        list.forEach((item) => {
-          if (!item.meta.directiveMeta) {
-            return;
-          }
-          Object.keys(item.meta.directiveMeta.meta.host.listeners).forEach(
-            (listener) => {
-              listeners.push(listener);
-            }
-          );
-        });
-        directiveMeta = { listeners };
+        const list = result.filter((item) => !item.isComponent);
+        directiveMeta = {
+          listeners: list.map((item) => item.listeners!).flat(),
+        };
       }
     }
 

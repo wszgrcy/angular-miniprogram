@@ -1,12 +1,10 @@
 import { ASTWithSource, BindingType, MethodCall } from '@angular/compiler';
 import { BoundAttribute, Element } from '@angular/compiler/src/render3/r3_ast';
 import { TagEventMeta } from './event';
-import { TemplateGlobalContext } from './global-context';
+import { ComponentContext } from './global-context';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
-import { MatchedDirective } from './type';
 
 export class ParsedNgElement implements ParsedNode<NgElementMeta> {
-  private tagChange = false;
   private tagName!: string;
   private children: ParsedNode<NgNodeMeta>[] = [];
   attributeObject: Record<string, string> = {};
@@ -17,12 +15,11 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   ngSwitchFirst = true;
   ngSwitchIndex = 0;
   singleClosedTag = false;
-  ngInternalOutputs: string[] = [];
   constructor(
     private node: Element,
     public parent: ParsedNode<NgNodeMeta> | undefined,
     private componentMeta:
-      | { type: MatchedDirective; isComponent: boolean }
+      | { outputs: string[]; isComponent: boolean }
       | undefined,
     public index: number,
     private directiveMeta: { listeners: string[] } | undefined
@@ -50,9 +47,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
         )
       );
     });
-    if (this.componentMeta) {
-      this.ngInternalOutputs = this.componentMeta.type.meta.directive.outputs;
-    }
+
     this.ngSwitch = this.node.inputs.find((item) => item.name === 'ngSwitch');
 
     if (!this.node.endSourceSpan) {
@@ -64,14 +59,13 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     this.tagName = originTagName;
     if (/^(div|p|h1|h2|h3|h4|h5|h6|span)$/.test(originTagName)) {
       this.tagName = 'view';
-      this.tagChange = true;
     }
   }
 
   appendNgNodeChild(child: ParsedNode<NgNodeMeta>) {
     this.children.push(child);
   }
-  getNodeMeta(globalContext: TemplateGlobalContext): NgElementMeta {
+  getNodeMeta(globalContext: ComponentContext): NgElementMeta {
     this.analysis();
 
     return {
@@ -82,10 +76,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       outputs: this.outputSet,
       attributes: this.attributeObject,
       singleClosedTag: this.singleClosedTag,
-      componentMeta: {
-        outputs: this.ngInternalOutputs,
-        isComponent: this.componentMeta?.isComponent || false,
-      },
+      componentMeta: this.componentMeta,
       index: this.index,
       directiveMeta: this.directiveMeta,
     };

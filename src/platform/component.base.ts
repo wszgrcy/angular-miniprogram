@@ -26,7 +26,7 @@ export function generateWxComponent<C>(
   return (componentInitFactory: ComponentInitFactory, isPage?: boolean) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const observers = {
-      ['componentIndexList,cpIndex']: function (
+      ['componentPath,nodeIndex']: function (
         this: WxComponentInstance,
         list = [],
         index: number
@@ -115,8 +115,8 @@ export function generateWxComponent<C>(
       externalClasses: componentOptions.externalClasses,
       observers: observers,
       properties: {
-        componentIndexList: { value: [], type: Array },
-        cpIndex: { value: NaN, type: Number },
+        componentPath: { value: [], type: Array },
+        nodeIndex: { value: NaN, type: Number },
       },
       methods: {
         ...meta.method.reduce((pre: Record<string, Function>, cur) => {
@@ -144,8 +144,8 @@ export function generateWxComponent<C>(
             if (this.__lView) {
               const el = findCurrentElement(
                 this.__lView,
-                event.target.dataset.elementPath,
-                event.target.dataset.elementIndex
+                event.target.dataset.nodePath,
+                event.target.dataset.nodeIndex
               ) as NoopNode;
               el.linstener[cur.eventName](event);
             } else {

@@ -69,14 +69,14 @@ export class WxContainer {
       })
       .join(' ');
     const children = node.children.map((child) => this._compileTemplate(child));
-    const commonTagProperty = `${attributeStr} ${outputStr} ${this.setComponentIndex(
-      node.componentMeta.isComponent ? node?.index : undefined
-    )} ${
-      !node.componentMeta.isComponent
-        ? this.generateClassAndStyle(node.index)
-        : ''
-    } ${this.setProperty(
-      node.componentMeta.isComponent,
+    const commonTagProperty = `${attributeStr} ${outputStr} ${this.setComponentIdentification(
+      node.componentMeta?.isComponent,
+      node.index
+    )} ${this.generateClassAndStyle(
+      node.componentMeta?.isComponent,
+      node.index
+    )} ${this.setProperty(
+      !!node.componentMeta?.isComponent,
       node.index,
       node.property
     )} ${this.setDirectiveData(node.directiveMeta, node.index)}`;
@@ -189,13 +189,19 @@ export class WxContainer {
     };
   }
 
-  private setComponentIndex(cpIndex: number | undefined) {
-    if (typeof cpIndex === 'number') {
-      return `componentIndexList="{{componentIndexList}}" cpIndex="${cpIndex}"`;
+  private setComponentIdentification(
+    isComponent: boolean | undefined,
+    nodeIndex: number | undefined
+  ) {
+    if (isComponent) {
+      return `componentPath="{{componentPath}}" nodeIndex="${nodeIndex}"`;
     }
     return ``;
   }
-  generateClassAndStyle(index: number) {
+  generateClassAndStyle(isComponent: boolean | undefined, index: number) {
+    if (isComponent) {
+      return ``;
+    }
     return `class="{{nodeList[${index}].class}}" style="{{nodeList[${index}].style}}"`;
   }
   private setProperty(isComponent: boolean, index: number, property: string[]) {
@@ -218,7 +224,7 @@ export class WxContainer {
     }
 
     return (
-      `data-element-path="{{componentIndexList}}" data-element-index="{{${nodeIndex}}}" ` +
+      `data-node-path="{{componentPath}}" data-node-index="{{${nodeIndex}}}" ` +
       directiveMeta.listeners
         .map((item) => {
           const methodName = `${this.containerName}_directive_${nodeIndex}_${item}`;

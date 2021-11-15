@@ -3,16 +3,17 @@ import { R3UsedDirectiveMetadata } from '@angular/compiler/src/compiler_facade_i
 import { Element, Template } from '@angular/compiler/src/render3/r3_ast';
 import { createCssSelector } from '@angular/compiler/src/render3/view/template';
 import { getAttrsForDirectiveMatching } from '@angular/compiler/src/render3/view/util';
+import { Injectable } from 'static-injector';
 import { isTemplate } from '../type-protection';
 import { NgDefaultDirective, NgTemplateMeta } from './interface';
 import { MatchedDirective } from './type';
 
-export class TemplateGlobalContext {
-  bindIndex = 0;
-  directiveIndex = 0;
+@Injectable()
+export class ComponentContext {
+  private templateIndex = 0;
   private templateList: NgTemplateMeta<NgDefaultDirective>[] = [];
 
-  constructor(private directiveMatcher: SelectorMatcher | null) {}
+  constructor(private directiveMatcher: SelectorMatcher | undefined) {}
   addTemplate(template: NgTemplateMeta<NgDefaultDirective>) {
     this.templateList.push(template);
   }
@@ -24,7 +25,7 @@ export class TemplateGlobalContext {
     );
   }
   getBindIndex() {
-    return this.bindIndex++;
+    return this.templateIndex++;
   }
   matchDirective(node: Element | Template): MatchedDirective[] {
     if (!this.directiveMatcher) {
@@ -47,7 +48,20 @@ export class TemplateGlobalContext {
         selector,
         meta: { directive: R3UsedDirectiveMetadata; directiveMeta: any }
       ) => {
-        result.push({ selector, meta });
+        const isComponent: boolean = (meta.directive as any).isComponent;
+        if (isComponent) {
+          result.push({
+            isComponent,
+            outputs: (meta.directive as any).outputs,
+          });
+        } else {
+          result.push({
+            isComponent,
+            listeners: Object.keys(
+              meta.directiveMeta?.meta?.host?.listeners || []
+            ),
+          });
+        }
       }
     );
     return result;

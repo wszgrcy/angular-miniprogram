@@ -23,7 +23,7 @@ function propertyChange() {
     initValue.set(lView, ctx);
   }
 }
-function lViewToWXView(lView: LView, parentComponentIndexList: any[] = []) {
+function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
   const tView = lView[1];
   const end = tView.bindingStartIndex;
   const nodeList = [];
@@ -35,16 +35,16 @@ function lViewToWXView(lView: LView, parentComponentIndexList: any[] = []) {
       const lContainerList: any[] = [];
       const viewRefList: any[] = item[8] || [];
       viewRefList.forEach((item, itemIndex) => {
-        const componentIndexList = [
-          ...parentComponentIndexList,
+        const componentPath = [
+          ...parentComponentPath,
           'directive',
           index - start,
           itemIndex,
         ];
         lContainerList.push({
           context: item._lView[8],
-          nodeList: lViewToWXView(item._lView, componentIndexList),
-          componentIndexList: componentIndexList,
+          nodeList: lViewToWXView(item._lView, componentPath),
+          componentPath: componentPath,
         });
       });
       nodeList[index - start] = lContainerList;

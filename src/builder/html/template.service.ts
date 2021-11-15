@@ -35,6 +35,7 @@ import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
 import { DecoratorMetaDataResolver } from '../ts/decorator-metadata-resolver';
 import { PagePattern } from '../type';
 import { RawUpdater } from '../util/raw-updater';
+import { ComponentContext } from './node-handle/global-context';
 import { TemplateCompiler } from './template-compiler';
 import { StyleHookData } from './type';
 
@@ -246,6 +247,12 @@ export class TemplateService {
         { provide: TemplateCompiler },
         { provide: COMPONENT_META, useValue: componentMeta },
         { provide: DIRECTIVE_MATCHER, useValue: directiveMatcher },
+        {
+          provide: ComponentContext,
+          useFactory: () => {
+            return new ComponentContext(directiveMatcher);
+          },
+        },
       ],
     });
     const instance = injector.get(TemplateCompiler);

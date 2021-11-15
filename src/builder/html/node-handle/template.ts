@@ -1,10 +1,9 @@
-import { ASTWithSource } from '@angular/compiler';
 import {
   BoundAttribute,
   Template,
   TextAttribute,
 } from '@angular/compiler/src/render3/r3_ast';
-import { TemplateGlobalContext } from './global-context';
+import { ComponentContext } from './global-context';
 import {
   NgDefaultDirective,
   NgDirective,
@@ -20,7 +19,7 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
   attrs!: (BoundAttribute | TextAttribute)[];
 
   declareContext: Record<string, string> = {};
-  globalContext!: TemplateGlobalContext;
+  globalContext!: ComponentContext;
   private children: ParsedNode<NgNodeMeta>[] = [];
 
   constructor(
@@ -145,7 +144,7 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
     ];
   }
 
-  getNodeMeta(globalContext: TemplateGlobalContext): NgTemplateMeta {
+  getNodeMeta(globalContext: ComponentContext): NgTemplateMeta {
     this.globalContext = globalContext;
     const staticType = globalContext.matchDirective(this.node);
 

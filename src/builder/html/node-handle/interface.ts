@@ -1,11 +1,11 @@
 import { TagEventMeta } from './event';
-import { TemplateGlobalContext } from './global-context';
+import { ComponentContext } from './global-context';
 
 export interface ParsedNode<T> {
   kind: NgNodeKind;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parent: ParsedNode<any> | undefined;
-  getNodeMeta(globalContext: TemplateGlobalContext): T;
+  getNodeMeta(globalContext: ComponentContext): T;
   index: number;
 }
 export enum NgNodeKind {
@@ -27,10 +27,12 @@ export interface NgElementMeta extends NgNodeMeta {
   property: string[];
   outputs: TagEventMeta[];
   singleClosedTag: boolean;
-  componentMeta: {
-    outputs: string[];
-    isComponent: boolean;
-  };
+  componentMeta:
+    | {
+        outputs: string[];
+        isComponent: boolean;
+      }
+    | undefined;
   directiveMeta: { listeners: string[] } | undefined;
 }
 export interface NgBoundTextMeta extends NgNodeMeta {
