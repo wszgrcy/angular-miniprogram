@@ -39,10 +39,6 @@ export class TemplateCompiler {
   }
 
   transform() {
-    return {
-      content: this.buildPlatformTemplate(),
-      template: this.templateTransform.getExportTemplate(),
-      meta: this.templateTransform.getExportMeta(),
-    };
+    return this.buildPlatformTemplate();
   }
 }

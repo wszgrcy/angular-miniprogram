@@ -25,14 +25,18 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     const templateImport = this.exportTemplateList.length
       ? `<import src="./template.wxml"/>`
       : '';
-    return `${templateImport}<template name="main-template">${result.wxmlTemplate}</template><block wx:if="{{${this.viewContextName}}}"><template is="main-template" data="{{...${this.viewContextName}}}"></template></block> `;
+    return {
+      content: `${templateImport}<template name="main-template">${result.wxmlTemplate}</template><block wx:if="{{${this.viewContextName}}}"><template is="main-template" data="{{...${this.viewContextName}}}"></template></block> `,
+      template: this.getExportTemplate(),
+      meta: this.getExportMeta(),
+    };
   }
 
-  getExportTemplate() {
+  private getExportTemplate() {
     return this.exportTemplateList.map((item) => item.content).join('');
   }
 
-  getExportMeta() {
+  private getExportMeta() {
     return `{method:${JSON.stringify([
       ...this.metaCollection.method,
     ])},listeners:${JSON.stringify(this.metaCollection.listeners)}}`;
