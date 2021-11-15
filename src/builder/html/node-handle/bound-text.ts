@@ -1,8 +1,6 @@
-import { ASTWithSource, Interpolation } from '@angular/compiler';
 import { BoundText } from '@angular/compiler/src/render3/r3_ast';
 import {
   NgBoundTextMeta,
-  NgElementMeta,
   NgNodeKind,
   NgNodeMeta,
   ParsedNode,

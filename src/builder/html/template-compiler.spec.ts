@@ -1,5 +1,4 @@
 import { Injector } from 'static-injector';
-import * as vm from 'vm';
 import { BuildPlatform } from '../platform/platform';
 import { WxPlatformInfo } from '../platform/wx-platform-info';
 import { WxTransform } from '../template-transform-strategy/wx.transform';
@@ -10,7 +9,7 @@ import {
 } from '../token/component.token';
 import { TemplateCompiler } from './template-compiler';
 
-describe('template-compiler', () => {
+xdescribe('template-compiler', () => {
   function defaultTransform(content: string) {
     const injector = Injector.create({
       providers: [
