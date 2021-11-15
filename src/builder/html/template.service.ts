@@ -15,6 +15,7 @@ import {
   TraitCompiler,
 } from '@angular/compiler-cli/src/ngtsc/transform';
 import { externalizePath } from '@ngtools/webpack/src/ivy/paths';
+import { createHash } from 'crypto';
 import { DeleteChange, InsertChange, TsChange } from 'cyia-code-util';
 import * as path from 'path';
 import { Inject, Injectable, Injector } from 'static-injector';
@@ -176,7 +177,10 @@ export class TemplateService {
         }
         directiveMatcher = matcher;
       }
-      const componentBuildMeta = this.buildWxmlTemplate(directiveMatcher, meta);
+      const componentBuildMeta = this.buildComponentMeta(
+        directiveMatcher,
+        meta
+      );
       const pagePattern = this.componentToEntryMap.get(fileName)!;
       componentBuildMetaRecord.outputContent.set(
         pagePattern.outputWXML,
@@ -232,7 +236,7 @@ export class TemplateService {
     };
   }
 
-  private buildWxmlTemplate(
+  private buildComponentMeta(
     directiveMatcher: SelectorMatcher | undefined,
     componentMeta: ComponentResolutionData
   ) {
@@ -241,7 +245,6 @@ export class TemplateService {
       providers: [
         { provide: TemplateCompiler },
         { provide: COMPONENT_META, useValue: componentMeta },
-
         { provide: DIRECTIVE_MATCHER, useValue: directiveMatcher },
       ],
     });
@@ -263,6 +266,7 @@ export class TemplateService {
       host
     );
     this.tsProgram = this.ngTscProgram.getTsProgram();
+    this.augmentProgramWithVersioning(this.tsProgram);
     if (this.compiler.watchMode) {
       this.builder = this.oldBuilder =
         ts.createEmitAndSemanticDiagnosticsBuilderProgram(
@@ -379,5 +383,27 @@ export class TemplateService {
   }
   getBuilder() {
     return this.builder;
+  }
+  cleanDependencyFileCache() {
+    this.cleanDependencyFileCacheSet.forEach((filePath) => {
+      try {
+        this.compiler.inputFileSystem.purge!(filePath);
+      } catch (error) {}
+    });
+  }
+  augmentProgramWithVersioning(program: ts.Program): void {
+    const baseGetSourceFiles = program.getSourceFiles;
+    program.getSourceFiles = function (...parameters) {
+      const files: readonly (ts.SourceFile & { version?: string })[] =
+        baseGetSourceFiles(...parameters);
+
+      for (const file of files) {
+        if (file.version === undefined) {
+          file.version = createHash('sha256').update(file.text).digest('hex');
+        }
+      }
+
+      return files;
+    };
   }
 }

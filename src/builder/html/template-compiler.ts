@@ -29,7 +29,6 @@ import { TemplateDefinition } from './template-definition';
 
 @Injectable()
 export class TemplateCompiler {
-  private render3ParseResult!: Render3ParseResult;
   private nodeMetaList: NgNodeMeta[] = [];
   private templateTransform: PlatformInfo['templateTransform'];
   private globalContext: TemplateGlobalContext;
@@ -40,33 +39,28 @@ export class TemplateCompiler {
   ) {
     this.globalContext = new TemplateGlobalContext(directiveMatcher);
     this.templateTransform = buildPlatform.templateTransform;
-    this.templateTransform.setGlobalContext(this.globalContext);
   }
 
   private buildPlatformTemplate() {
-    this.parseNode();
+    this.collectionNode();
     return this.templateTransform.compile(this.nodeMetaList);
   }
-  private parseNode() {
+  private collectionNode() {
     const nodes = (this.componentMeta as any).template.nodes;
-
     const templateDefinition = new TemplateDefinition(
       nodes,
       this.globalContext
     );
     const list = templateDefinition.run();
-    list.forEach((item) => {
-      this.nodeMetaList.push(item.getNodeMeta(this.globalContext));
-    });
+    this.nodeMetaList = list.map((item) =>
+      item.getNodeMeta(this.globalContext)
+    );
   }
 
   transform() {
-    const content = this.buildPlatformTemplate();
-    const template = this.templateTransform.getExportTemplate();
-
     return {
-      content: content,
-      template: template,
+      content: this.buildPlatformTemplate(),
+      template: this.templateTransform.getExportTemplate(),
       meta: this.templateTransform.getExportMeta(),
     };
   }

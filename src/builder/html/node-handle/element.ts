@@ -1,4 +1,4 @@
-import { BindingType } from '@angular/compiler';
+import { ASTWithSource, BindingType, MethodCall } from '@angular/compiler';
 import { BoundAttribute, Element } from '@angular/compiler/src/render3/r3_ast';
 import { TagEventMeta } from './event';
 import { TemplateGlobalContext } from './global-context';
@@ -6,7 +6,6 @@ import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
 import { MatchedDirective } from './type';
 
 export class ParsedNgElement implements ParsedNode<NgElementMeta> {
-  classList: string[] = [];
   private tagChange = false;
   private tagName!: string;
   private children: ParsedNode<NgNodeMeta>[] = [];
@@ -25,20 +24,17 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     private componentMeta:
       | { type: MatchedDirective; isComponent: boolean }
       | undefined,
-    public nodeIndex: number,
+    public index: number,
     private directiveMeta: { listeners: string[] } | undefined
   ) {}
   private analysis() {
     this.getTagName();
-    this.getClass();
     this.node.attributes
       .filter((item) => item.name !== 'class')
       .forEach((item) => {
         this.attributeObject[item.name] = item.value;
       });
-    if (this.classList.length) {
-      this.attributeObject['class'] = this.classList.join(' ');
-    }
+
     this.node.inputs.forEach((input) => {
       if (input.type === BindingType.Property) {
         this.property.push(input.name);
@@ -50,7 +46,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
           output.target || 'bind',
           output.name,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          output.handler as any
+          ((output.handler as ASTWithSource).ast as MethodCall).name
         )
       );
     });
@@ -71,23 +67,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       this.tagChange = true;
     }
   }
-  private getClass() {
-    const classAttribute = this.node.attributes.find(
-      (item) => item.name === 'class'
-    );
-    if (classAttribute) {
-      this.classList = classAttribute.value.split(' ');
-    }
-    if (this.tagChange) {
-      this.classList.push(`origin-tag-${this.node.name}`);
-    }
-  }
-  getOriginChildren() {
-    return this.node.children;
-  }
-  setNgNodeChildren(children: ParsedNode<NgNodeMeta>[]) {
-    this.children = children;
-  }
+
   appendNgNodeChild(child: ParsedNode<NgNodeMeta>) {
     this.children.push(child);
   }
@@ -106,7 +86,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
         outputs: this.ngInternalOutputs,
         isComponent: this.componentMeta?.isComponent || false,
       },
-      nodeIndex: this.nodeIndex,
+      index: this.index,
       directiveMeta: this.directiveMeta,
     };
   }

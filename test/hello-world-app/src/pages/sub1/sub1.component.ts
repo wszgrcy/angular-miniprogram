@@ -1,5 +1,5 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { COMPONENT_TOKEN } from '../../../../../src/platform';
+import { COMPONENT_TOKEN } from 'angular-miniprogram';
 
 @Component({
   selector: 'app-sub1',

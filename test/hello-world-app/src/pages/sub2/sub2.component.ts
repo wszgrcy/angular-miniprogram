@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { WxLifetimes } from '../../../../../src/platform';
+import { WxLifetimes } from 'angular-miniprogram';
 
 @Component({
   selector: 'app-sub2',

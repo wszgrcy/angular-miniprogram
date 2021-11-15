@@ -26,12 +26,10 @@ import { ParsedNgText } from './node-handle/text';
 import { MatchedDirective } from './node-handle/type';
 
 export class TemplateDefinition implements Visitor {
-  test = Math.random();
   /** 变量对应的值索引 */
   private templateDefinitionMap = new Map<Template, TemplateDefinition>();
   private parentNode: ParsedNgElement | ParsedNgTemplate | undefined;
   list: ParsedNode<NgNodeMeta>[] = [];
-  private currentComponentIndex = 0;
   private declIndex = 0;
   private valueConverter = new ValueConverter(
     new ConstantPool(),

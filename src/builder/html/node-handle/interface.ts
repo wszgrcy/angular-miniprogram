@@ -6,7 +6,7 @@ export interface ParsedNode<T> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parent: ParsedNode<any> | undefined;
   getNodeMeta(globalContext: TemplateGlobalContext): T;
-  nodeIndex: number;
+  index: number;
 }
 export enum NgNodeKind {
   Element,
@@ -17,7 +17,7 @@ export enum NgNodeKind {
 }
 export interface NgNodeMeta {
   kind: NgNodeKind;
-  nodeIndex: number;
+  index: number;
 }
 export interface NgElementMeta extends NgNodeMeta {
   kind: NgNodeKind.Element;

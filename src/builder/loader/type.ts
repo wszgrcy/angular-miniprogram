@@ -1,4 +1,3 @@
-import { ComponentBuildMeta } from '../html/type';
 import { PlatformInfo } from '../platform/platform-info';
 
 export interface ComponentTemplateLoaderContext {

@@ -43,7 +43,6 @@ export class ExportWeiXinAssetsPlugin {
     readFileSync: undefined,
     statSync: undefined,
   };
-  private cleanDependencyFileCacheSet = new Set<string>();
   private options: ExportWeiXinAssetsPluginOptions;
   constructor(
     @Inject(TS_CONFIG_TOKEN) tsConfig: string,
@@ -102,7 +101,7 @@ export class ExportWeiXinAssetsPlugin {
           styleChangeMap,
           resourceLoader
         );
-        ngComponentCssExtractPlugin.run(compilation);
+        ngComponentCssExtractPlugin.apply(compilation);
         const buildTemplatePromise = this.buildTemplate(
           waitAnalyzeAsync,
           templateService
@@ -120,14 +119,6 @@ export class ExportWeiXinAssetsPlugin {
               await buildTemplatePromise
             ).outputContent;
 
-            const cssMap = ngComponentCssExtractPlugin.getAllCss();
-            for (const [key, value] of cssMap.entries()) {
-              compilation.assets[key] = new RawSource(
-                await value
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ) as any;
-            }
-
             componentBuildMetaMap.forEach((value, key) => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               compilation.assets[key] = new RawSource(value) as any;
@@ -136,11 +127,7 @@ export class ExportWeiXinAssetsPlugin {
             cb();
           }
         );
-        this.cleanDependencyFileCacheSet.forEach((filePath) => {
-          try {
-            compiler.inputFileSystem.purge!(filePath);
-          } catch (error) {}
-        });
+        templateService.cleanDependencyFileCache();
       }
     );
   }
@@ -149,10 +136,8 @@ export class ExportWeiXinAssetsPlugin {
     const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
     ifs.readFileSync = this.originInputFileSystemSync.readFileSync;
     ifs.statSync = this.originInputFileSystemSync.statSync;
-    this.cleanDependencyFileCacheSet = new Set();
   }
   private hookFileSystemFile(map: Map<string, StyleHookData>) {
-    const _this = this;
     const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
     const oldReadFileSync = ifs.readFileSync;
     ifs.readFileSync = function (filePath: string) {

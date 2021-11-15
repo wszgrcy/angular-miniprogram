@@ -19,12 +19,13 @@ export class WxContainer {
   private exportTemplateList: { name: string; content: string }[] = [];
   private wxmlTemplate: string = '';
   private childContainer: WxContainer[] = [];
-
+  private level: number = 0;
   constructor(
     private metaCollection: {
       method: Set<string>;
       listeners: { methodName: string; index: number; eventName: string }[];
     },
+    private containerName = 'container',
     private parent?: WxContainer
   ) {}
 
@@ -63,25 +64,22 @@ export class WxContainer {
             ))
       )
       .map((item) => {
-        this.metaCollection.method.add((item.handler.ast as any).name);
-        return `${item.prefix}:${item.name}="${item.handler.source!.replace(
-          /\(.*$/,
-          ''
-        )}"`;
+        this.metaCollection.method.add(item.methodName);
+        return `${item.prefix}:${item.name}="${item.methodName}"`;
       })
       .join(' ');
     const children = node.children.map((child) => this._compileTemplate(child));
     const commonTagProperty = `${attributeStr} ${outputStr} ${this.setComponentIndex(
-      node.componentMeta.isComponent ? node?.nodeIndex : undefined
+      node.componentMeta.isComponent ? node?.index : undefined
     )} ${
       !node.componentMeta.isComponent
-        ? this.generateClassAndStyle(node.nodeIndex)
+        ? this.generateClassAndStyle(node.index)
         : ''
     } ${this.setProperty(
       node.componentMeta.isComponent,
-      node.nodeIndex,
+      node.index,
       node.property
-    )} ${this.setDirectiveData(node.directiveMeta, node.nodeIndex)}`;
+    )} ${this.setDirectiveData(node.directiveMeta, node.index)}`;
     if (node.singleClosedTag) {
       return `<${node.tagName} ${commonTagProperty}>`;
     }
@@ -90,7 +88,7 @@ export class WxContainer {
     }>`;
   }
   private ngBoundTextTransform(node: NgBoundTextMeta): string {
-    return `{{nodeList[${node.nodeIndex}].value}}`;
+    return `{{nodeList[${node.index}].value}}`;
   }
   private ngContentTransform(node: NgContentMeta): string {
     return node.name ? `<slot name="${node.name}"></slot>` : `<slot></slot>`;
@@ -102,7 +100,11 @@ export class WxContainer {
     for (let i = 0; i < directiveList.length; i++) {
       const directive = directiveList[i];
       if (directive.type === 'none') {
-        const container = new WxContainer(this.metaCollection, this);
+        const container = new WxContainer(
+          this.metaCollection,
+          `${this.containerName}_${this.level++}`,
+          this
+        );
         this.childContainer.push(container);
         container.directivePrefix = this.directivePrefix;
         node.children.forEach((childNode) => {
@@ -115,30 +117,24 @@ export class WxContainer {
       } else if (directive.type === 'if') {
         if (directive.thenTemplateRef) {
           content += `<block ${this.directivePrefix}:if="{{nodeList[${
-            node.nodeIndex
+            node.index
           }][0].context.$implicit}}"><template is="${
             directive.thenTemplateRef
-          }" ${this.getTemplateDataStr(
-            node.nodeIndex,
-            `0`
-          )}></template></block>`;
+          }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
         }
         if (directive.falseTemplateRef) {
           content += `<block ${this.directivePrefix}:if="{{!nodeList[${
-            node.nodeIndex
+            node.index
           }][0].context.$implicit}}"><template is="${
             directive.falseTemplateRef
-          }" ${this.getTemplateDataStr(
-            node.nodeIndex,
-            `0`
-          )}></template></block>`;
+          }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
         }
       } else if (directive.type === 'for') {
         content += `<block ${this.directivePrefix}:for="{{nodeList[${
-          node.nodeIndex
+          node.index
         }]}}" >
           <template is="${directive.templateName}" ${this.getTemplateDataStr(
-          node.nodeIndex,
+          node.index,
           `index`
         )}></template>
           </block>`;
@@ -146,30 +142,21 @@ export class WxContainer {
         if (directive.case) {
           if (directive.first) {
             content += `<block ${this.directivePrefix}:if="{{nodeList[${
-              node.nodeIndex
+              node.index
             }]}}"> <template is="${
               directive.templateName
-            }" ${this.getTemplateDataStr(
-              node.nodeIndex,
-              `0`
-            )}></template></block>`;
+            }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
           } else {
             content += `<block ${this.directivePrefix}:elif="{{nodeList[${
-              node.nodeIndex
+              node.index
             }]}}"> <template is="${
               directive.templateName
-            }" ${this.getTemplateDataStr(
-              node.nodeIndex,
-              `0`
-            )}></template></block>`;
+            }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
           }
         } else if (directive.default) {
           content += `<block ${this.directivePrefix}:else> <template is="${
             directive.templateName
-          }" ${this.getTemplateDataStr(
-            node.nodeIndex,
-            `0`
-          )}></template></block>`;
+          }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
         } else {
           throw new Error('未知的解析指令');
         }
@@ -180,7 +167,7 @@ export class WxContainer {
     return content;
   }
   private ngTextTransform(node: NgTextMeta): string {
-    return `{{nodeList[${node.nodeIndex}].value}}`;
+    return `{{nodeList[${node.index}].value}}`;
   }
 
   private getTemplateDataStr(directiveIndex: number, indexName: string) {
@@ -234,7 +221,7 @@ export class WxContainer {
       `data-element-path="{{componentIndexList}}" data-element-index="{{${nodeIndex}}}" ` +
       directiveMeta.listeners
         .map((item) => {
-          const methodName = `directive_${nodeIndex}_${item}`;
+          const methodName = `${this.containerName}_directive_${nodeIndex}_${item}`;
           this.metaCollection.listeners.push({
             methodName: methodName,
             index: nodeIndex,

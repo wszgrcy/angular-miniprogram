@@ -29,7 +29,7 @@ export abstract class WxTransformLike extends TemplateTransformBase {
   }
 
   getExportTemplate() {
-    return this.exportTemplateList.map((item) => `${item.content}`).join('');
+    return this.exportTemplateList.map((item) => item.content).join('');
   }
 
   getExportMeta() {

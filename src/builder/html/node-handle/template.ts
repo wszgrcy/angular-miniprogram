@@ -26,7 +26,7 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
   constructor(
     private node: Template,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    public nodeIndex: number
+    public index: number
   ) {}
 
   getOriginChildren() {
@@ -94,13 +94,6 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
     ];
   }
   private ngForTransform(): NgDirective[] {
-    const ngForItem = this.node.variables.find(
-      (item) => item.value === '$implicit'
-    )!;
-    const ngForIndex = this.node.variables.find(
-      (item) => item.value === 'index'
-    );
-
     const ngForTemplateName = `ngFor_item_${this.globalContext.getBindIndex()}`;
 
     return [
@@ -163,7 +156,7 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
       children: this.children.map((child) => child.getNodeMeta(globalContext)),
       directive: directive,
       staticType: staticType,
-      nodeIndex: this.nodeIndex,
+      index: this.index,
     };
     for (let i = 0; i < directive.length; i++) {
       const element = directive[i];
