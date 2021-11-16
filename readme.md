@@ -36,7 +36,7 @@
   > 小程序自带的一些生命周期
 - 小程序相关 token.
   > `APP_TOKEN`可以获得 App 实例
-  > `COMPONENT_TOKEN`,`PAGE_TOKEN`可以获得组件对应的小程序组件实例
+  > `PAGE_TOKEN`可以获得组件对应的小程序页面实例
 
 ## 已实现内容
 

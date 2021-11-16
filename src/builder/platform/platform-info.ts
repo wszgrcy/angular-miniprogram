@@ -1,12 +1,10 @@
 import { PlatformType } from './platform';
-import { WxPlatformInfo } from './wx-platform-info';
+import { WxBuildPlatform } from './wx/wx-platform';
 
-export type PlatformInfo = WxPlatformInfo;
-
-export function getPlatformInfo(platform: PlatformType) {
+export function getBuildPlatform(platform: PlatformType) {
   switch (platform) {
     case PlatformType.wx:
-      return WxPlatformInfo;
+      return WxBuildPlatform;
     default:
       throw new Error('未能匹配到相关平台');
   }

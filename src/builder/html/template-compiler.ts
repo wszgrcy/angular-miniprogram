@@ -2,7 +2,6 @@ import { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotat
 
 import { Inject, Injectable, Optional } from 'static-injector';
 import { BuildPlatform } from '../platform/platform';
-import { PlatformInfo } from '../platform/platform-info';
 import { COMPONENT_META } from '../token/component.token';
 
 import { ComponentContext } from './node-handle/global-context';
@@ -13,7 +12,7 @@ import { TemplateDefinition } from './template-definition';
 @Injectable()
 export class TemplateCompiler {
   private nodeMetaList: NgNodeMeta[] = [];
-  private templateTransform: PlatformInfo['templateTransform'];
+  private templateTransform: BuildPlatform['templateTransform'];
   constructor(
     buildPlatform: BuildPlatform,
     @Inject(COMPONENT_META) private componentMeta: ComponentResolutionData,

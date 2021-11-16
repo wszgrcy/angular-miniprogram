@@ -2,7 +2,7 @@ import { InsertChange, TsChange, createCssSelectorForTs } from 'cyia-code-util';
 import * as path from 'path';
 import * as ts from 'typescript';
 import * as webpack from 'webpack';
-import { ExportWeiXinAssetsPluginSymbol } from '../const';
+import { ExportMiniProgramAssetsPluginSymbol } from '../const';
 import { RawUpdater } from '../util/raw-updater';
 import { ComponentTemplateLoaderContext } from './type';
 
@@ -46,12 +46,12 @@ export default async function (
   const initBlock = initIfNode.thenStatement as ts.Block;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const context: ComponentTemplateLoaderContext = (this._compilation! as any)[
-    ExportWeiXinAssetsPluginSymbol
+    ExportMiniProgramAssetsPluginSymbol
   ];
   const meta = (await context.metaMapPromise).get(
     path.normalize(this.resourcePath)
   )!;
-  const initContent = `wx.__window.__pageBind()`;
+  const initContent = `amp.pageBind();`;
   const change = new TsChange(sf);
   const extraMetaChange = change.insertNode(
     componentɵcmpNode,
@@ -64,8 +64,12 @@ export default async function (
     'end'
   );
   let updateInsertChange: InsertChange;
-  const changeList = [initInsertChange, extraMetaChange];
-  const updateContent = `wx.__window.__propertyChange();`;
+  const changeList = [
+    initInsertChange,
+    new InsertChange(0, `import * as amp from 'angular-miniprogram';\n`),
+    extraMetaChange,
+  ];
+  const updateContent = `amp.propertyChange();`;
   if (updateIfNode) {
     const updateBlock = updateIfNode.thenStatement as ts.Block;
     updateInsertChange = change.insertNode(

@@ -1,6 +1,7 @@
 import { Type } from '@angular/core';
+import { AppOptions } from '../type';
 import { generateWxComponent } from './component.base';
-import { AppOptions, WxComponentInstance } from './type';
+import { WxComponentInstance } from './type';
 
 export function pageStartup<M, C>(
   module: Type<M>,

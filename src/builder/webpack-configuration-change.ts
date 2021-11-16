@@ -7,16 +7,13 @@ import { Path, getSystemPath, normalize, resolve } from '@angular-devkit/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { filter } from 'rxjs/operators';
-import { Injector } from 'static-injector';
+import { Injectable, Injector } from 'static-injector';
 import * as webpack from 'webpack';
 import { DefinePlugin } from 'webpack';
 import { BootstrapAssetsPlugin } from 'webpack-bootstrap-assets-plugin';
 import { BuildPlatform, PlatformType } from './platform/platform';
-import { PlatformInfo, getPlatformInfo } from './platform/platform-info';
-import { WxPlatformInfo } from './platform/wx-platform-info';
 import { DynamicWatchEntryPlugin } from './plugin/dynamic-watch-entry.plugin';
-import { ExportWeiXinAssetsPlugin } from './plugin/export-weixin-assets.plugin';
-import { WxTransform } from './template-transform-strategy/wx.transform';
+import { ExportMiniProgramAssetsPlugin } from './plugin/export-mini-program-assets.plugin';
 import { TS_CONFIG_TOKEN } from './token/project.token';
 import { PagePattern } from './type';
 
@@ -29,15 +26,14 @@ type OptimizationSplitChunksCacheGroup = Exclude<
   NonNullable<OptimizationSplitChunksOptions['cacheGroups']>[''],
   false | string | Function | RegExp
 >;
-
+@Injectable()
 export class WebpackConfigurationChange {
   workspaceRoot!: Path;
   absoluteProjectRoot!: Path;
   absoluteProjectSourceRoot!: Path;
-  exportWeiXinAssetsPluginInstance!: ExportWeiXinAssetsPlugin;
-  private platformInfo: PlatformInfo;
+  exportMiniProgramAssetsPluginInstance!: ExportMiniProgramAssetsPlugin;
+  private buildPlatform: BuildPlatform;
   private entryList!: PagePattern[];
-  injector: Injector;
   constructor(
     private options: BrowserBuilderOptions & {
       pages: AssetPattern[];
@@ -45,17 +41,13 @@ export class WebpackConfigurationChange {
       platform: PlatformType;
     },
     private context: BuilderContext,
-    private config: webpack.Configuration
+    private config: webpack.Configuration,
+    private injector: Injector
   ) {
     this.injector = Injector.create({
+      parent: this.injector,
       providers: [
-        { provide: WxTransform },
-        { provide: WxPlatformInfo },
-        {
-          provide: BuildPlatform,
-          useClass: getPlatformInfo(options.platform),
-        },
-        { provide: ExportWeiXinAssetsPlugin },
+        { provide: ExportMiniProgramAssetsPlugin },
         {
           provide: TS_CONFIG_TOKEN,
           useValue: path.resolve(
@@ -63,15 +55,33 @@ export class WebpackConfigurationChange {
             this.options.tsConfig
           ),
         },
+        {
+          provide: DynamicWatchEntryPlugin,
+          deps: [BuildPlatform],
+          useFactory: (buildPlatform: BuildPlatform) => {
+            return new DynamicWatchEntryPlugin(
+              {
+                pages: this.options.pages,
+                components: this.options.components,
+                workspaceRoot: this.workspaceRoot,
+                absoluteProjectRoot: this.absoluteProjectRoot,
+                context: this.context,
+                absoluteProjectSourceRoot: this.absoluteProjectSourceRoot,
+                config: this.config,
+              },
+              buildPlatform
+            );
+          },
+        },
       ],
     });
-    this.platformInfo = this.injector.get(BuildPlatform);
-    config.output!.globalObject = this.platformInfo.globalObject;
+    this.buildPlatform = this.injector.get(BuildPlatform);
+    config.output!.globalObject = this.buildPlatform.globalObject;
   }
 
   async change() {
     await this.pageHandle();
-    this.exportWeiXinAssetsPlugin();
+    this.exportMiniProgramAssetsPlugin();
     this.componentTemplateLoader();
     this.definePlugin();
     this.changeStylesExportSuffix();
@@ -101,20 +111,14 @@ export class WebpackConfigurationChange {
         getSystemPath(absoluteSourceRootPath!)
       )!;
     }
-    const dynamicWatchEntryInstance = new DynamicWatchEntryPlugin({
-      pages: this.options.pages,
-      components: this.options.components,
-      workspaceRoot: this.workspaceRoot,
-      absoluteProjectRoot: this.absoluteProjectRoot,
-      context: this.context,
-      absoluteProjectSourceRoot: this.absoluteProjectSourceRoot,
-      config: this.config,
-    });
+    const dynamicWatchEntryInstance = this.injector.get(
+      DynamicWatchEntryPlugin
+    );
     dynamicWatchEntryInstance.entryPattern$
       .pipe(filter((item) => !!item))
       .subscribe((result) => {
         this.entryList = [...result!.pageList, ...result!.componentList];
-        this.exportWeiXinAssetsPluginInstance.setEntry(
+        this.exportMiniProgramAssetsPluginInstance.setEntry(
           result!.pageList,
           result!.componentList
         );
@@ -127,7 +131,7 @@ export class WebpackConfigurationChange {
         (item) => item.entryName === chunkData.chunk!.name
       );
       if (page) {
-        return page.outputWXS;
+        return page.outputFiles.logic;
       }
       return oldFileName(chunkData);
     };
@@ -173,19 +177,17 @@ export class WebpackConfigurationChange {
     assetsPlugin.hooks.emitAssets.tap('pageHandle', (object, json) => {
       return {
         'app.js':
-          fs
-            .readFileSync(path.resolve(__dirname, './template/app-template.js'))
-            .toString() +
+          fs.readFileSync(this.buildPlatform.importTemplate).toString() +
           json.scripts.map((item) => `require('./${item.src}')`).join(';'),
       };
     });
     this.config.plugins!.push(assetsPlugin);
   }
-  exportWeiXinAssetsPlugin() {
-    this.exportWeiXinAssetsPluginInstance = this.injector.get(
-      ExportWeiXinAssetsPlugin
+  exportMiniProgramAssetsPlugin() {
+    this.exportMiniProgramAssetsPluginInstance = this.injector.get(
+      ExportMiniProgramAssetsPlugin
     );
-    this.config.plugins!.unshift(this.exportWeiXinAssetsPluginInstance);
+    this.config.plugins!.unshift(this.exportMiniProgramAssetsPluginInstance);
   }
 
   private componentTemplateLoader() {
@@ -199,27 +201,27 @@ export class WebpackConfigurationChange {
   }
   private definePlugin() {
     const defineObject: Record<string, string> = {
-      global: `${this.platformInfo.globalObject}.__global`,
-      window: `${this.platformInfo.globalVariablePrefix}`,
-      globalThis: `${this.platformInfo.globalVariablePrefix}`,
-      Zone: `${this.platformInfo.globalVariablePrefix}.Zone`,
-      setTimeout: `${this.platformInfo.globalVariablePrefix}.setTimeout`,
-      clearTimeout: `${this.platformInfo.globalVariablePrefix}.clearTimeout`,
-      setInterval: `${this.platformInfo.globalVariablePrefix}.setInterval`,
-      clearInterval: `${this.platformInfo.globalVariablePrefix}.clearInterval`,
-      setImmediate: `${this.platformInfo.globalVariablePrefix}.setImmediate`,
-      clearImmediate: `${this.platformInfo.globalVariablePrefix}.clearImmediate`,
-      Promise: `${this.platformInfo.globalVariablePrefix}.Promise`,
-      Reflect: `${this.platformInfo.globalVariablePrefix}.Reflect`,
-      requestAnimationFrame: `${this.platformInfo.globalVariablePrefix}.requestAnimationFrame`,
-      cancelAnimationFrame: `${this.platformInfo.globalVariablePrefix}.cancelAnimationFrame`,
-      performance: `${this.platformInfo.globalVariablePrefix}.performance`,
-      navigator: `${this.platformInfo.globalVariablePrefix}.navigator`,
+      global: `${this.buildPlatform.globalObject}.__global`,
+      window: `${this.buildPlatform.globalVariablePrefix}`,
+      globalThis: `${this.buildPlatform.globalVariablePrefix}`,
+      Zone: `${this.buildPlatform.globalVariablePrefix}.Zone`,
+      setTimeout: `${this.buildPlatform.globalVariablePrefix}.setTimeout`,
+      clearTimeout: `${this.buildPlatform.globalVariablePrefix}.clearTimeout`,
+      setInterval: `${this.buildPlatform.globalVariablePrefix}.setInterval`,
+      clearInterval: `${this.buildPlatform.globalVariablePrefix}.clearInterval`,
+      setImmediate: `${this.buildPlatform.globalVariablePrefix}.setImmediate`,
+      clearImmediate: `${this.buildPlatform.globalVariablePrefix}.clearImmediate`,
+      Promise: `${this.buildPlatform.globalVariablePrefix}.Promise`,
+      Reflect: `${this.buildPlatform.globalVariablePrefix}.Reflect`,
+      requestAnimationFrame: `${this.buildPlatform.globalVariablePrefix}.requestAnimationFrame`,
+      cancelAnimationFrame: `${this.buildPlatform.globalVariablePrefix}.cancelAnimationFrame`,
+      performance: `${this.buildPlatform.globalVariablePrefix}.performance`,
+      navigator: `${this.buildPlatform.globalVariablePrefix}.navigator`,
     };
     if (this.config.mode === 'development') {
       defineObject[
         'ngDevMode'
-      ] = `${this.platformInfo.globalObject}.__global.ngDevMode`;
+      ] = `${this.buildPlatform.globalObject}.__global.ngDevMode`;
     }
     this.config.plugins!.push(new DefinePlugin(defineObject));
   }

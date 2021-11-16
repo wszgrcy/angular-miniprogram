@@ -5,14 +5,14 @@ import {
   NgNodeMeta,
   NgTemplateMeta,
   NgTextMeta,
-} from '../../html/node-handle/interface';
+} from '../../../html/node-handle/interface';
 import {
   isNgBoundTextMeta,
   isNgContentMeta,
   isNgElementMeta,
   isNgTemplateMeta,
   isNgTextMeta,
-} from '../../html/node-handle/node-meta/type-predicate';
+} from '../../../html/node-handle/node-meta/type-predicate';
 
 export class WxContainer {
   directivePrefix!: string;

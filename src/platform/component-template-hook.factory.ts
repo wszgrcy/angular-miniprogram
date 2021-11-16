@@ -5,16 +5,15 @@ import {
   ɵangular_packages_core_core_ca,
   ɵɵdirectiveInject,
 } from '@angular/core';
-import { NoopNode } from './module/renderer-node';
+import { AgentNode } from './module/renderer-node';
 import { PAGE_TOKEN } from './module/token/page.token';
 
 const start = 20;
 
 type LView = ɵangular_packages_core_core_ca;
 const initValue = new Map<LView, any>();
-function propertyChange() {
+export function propertyChange() {
   const lView = ɵangular_packages_core_core_bh();
-  // const instance = ɵɵdirectiveInject(COMPONENT_TOKEN, InjectFlags.Optional);
   const nodeList = lViewToWXView(lView);
   const ctx = { nodeList: nodeList };
   if (linkMap.has(lView)) {
@@ -29,7 +28,7 @@ function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
   const nodeList = [];
   for (let index = start; index < end; index++) {
     const item = lView[index];
-    if (item instanceof NoopNode) {
+    if (item instanceof AgentNode) {
       nodeList[index - start] = item.toView();
     } else if (item && item[1] === true) {
       const lContainerList: any[] = [];
@@ -56,12 +55,8 @@ export function updateInitValue(lview: LView) {
   return initValue.get(lview);
 }
 
-function computeExpression(value: any) {
-  return value;
-}
-
 const pageMap = new Map<string, LView>();
-function pageBind() {
+export function pageBind() {
   const lview = ɵangular_packages_core_core_bh();
   const wxComponentInstance = ɵɵdirectiveInject(
     PAGE_TOKEN,
@@ -121,9 +116,4 @@ const linkMap = new Map<LView, any>();
 export function lViewLinkToMPComponentRef(ref: any, lview: LView) {
   linkMap.set(lview, ref);
 }
-export function componentTemplateHookFactory() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (wx as any).__window.__propertyChange = propertyChange;
-  (wx as any).__window.__computeExpression = computeExpression;
-  (wx as any).__window.__pageBind = pageBind;
-}
+export function componentTemplateHookFactory() {}

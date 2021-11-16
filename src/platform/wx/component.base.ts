@@ -5,14 +5,10 @@ import {
   getPageLView,
   lViewLinkToMPComponentRef,
   updateInitValue,
-} from './component-template-hook.factory';
-import { NoopNode } from './module/renderer-node';
-import {
-  ComponentInitFactory,
-  NgCompileComponent,
-  WxComponentInstance,
-  WxLifetimes,
-} from './type';
+} from '../component-template-hook.factory';
+import type { AgentNode } from '../module/renderer-node';
+import { ComponentInitFactory, NgCompileComponent } from '../type';
+import { WxComponentInstance, WxLifetimes } from './type';
 
 export function generateWxComponent<C>(
   component: Type<C> & NgCompileComponent,
@@ -146,8 +142,8 @@ export function generateWxComponent<C>(
                 this.__lView,
                 event.target.dataset.nodePath,
                 event.target.dataset.nodeIndex
-              ) as NoopNode;
-              el.linstener[cur.eventName](event);
+              ) as AgentNode;
+              el.listener[cur.eventName](event);
             } else {
               throw new Error('未绑定事件');
             }
@@ -185,7 +181,7 @@ export function generateWxComponent<C>(
           }
           this.__waitNgComponentInit.then(
             (ref) => {
-              this.__ngComponentDestroy();
+              this.__ngComponentDestroy!();
             },
             (rej) => {
               throw rej;

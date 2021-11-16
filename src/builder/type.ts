@@ -9,12 +9,10 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
   output: string;
   /** 绝对路径,path.join */
   src: string;
-  /** 导出wxml(html)文件 */
-  outputWXML: string;
-  /** 导出wxml(html)文件 */
-  outputWXMLTemplate: string;
-  /** 导出wxss(css)文件 */
-  outputWXSS: string;
-  /** 导出wxs(js)文件 */
-  outputWXS: string;
+  outputFiles: {
+    content: string;
+    contentTemplate: string;
+    style: string;
+    logic: string;
+  };
 }

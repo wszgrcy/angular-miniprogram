@@ -4,34 +4,29 @@ import {
   createWebpackSystem,
 } from '@ngtools/webpack/src/ivy/system';
 import { WebpackResourceLoader } from '@ngtools/webpack/src/resource_loader';
-
 import * as path from 'path';
 import { Inject, Injectable, Injector } from 'static-injector';
 import ts from 'typescript';
 import * as webpack from 'webpack';
-
 import { RawSource } from 'webpack-sources';
-import { ExportWeiXinAssetsPluginSymbol } from '../const';
+import { ExportMiniProgramAssetsPluginSymbol } from '../const';
 import { TemplateService } from '../html/template.service';
 import { StyleHookData } from '../html/type';
 import { ComponentTemplateLoaderContext } from '../loader/type';
 import { BuildPlatform } from '../platform/platform';
-import { PlatformInfo } from '../platform/platform-info';
-
 import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
 import { PagePattern } from '../type';
 import { NgComponentCssExtractPlugin } from './ng-component-css-extract.plugin';
 
-export interface ExportWeiXinAssetsPluginOptions {
+export interface ExportMiniProgramAssetsPluginOptions {
   /** tsConfig配置路径 */
   tsConfig: string;
-  buildPlatform: PlatformInfo;
+  buildPlatform: BuildPlatform;
 }
-/** 导出微信的wxml与wxss */
 @Injectable()
-export class ExportWeiXinAssetsPlugin {
+export class ExportMiniProgramAssetsPlugin {
   private pageList!: PagePattern[];
   private componentList!: PagePattern[];
   private system!: ts.System;
@@ -43,7 +38,7 @@ export class ExportWeiXinAssetsPlugin {
     readFileSync: undefined,
     statSync: undefined,
   };
-  private options: ExportWeiXinAssetsPluginOptions;
+  private options: ExportMiniProgramAssetsPluginOptions;
   constructor(
     @Inject(TS_CONFIG_TOKEN) tsConfig: string,
     buildPlatform: BuildPlatform,
@@ -64,7 +59,7 @@ export class ExportWeiXinAssetsPlugin {
       undefined;
 
     compiler.hooks.thisCompilation.tap(
-      'ExportWeiXinAssetsPlugin',
+      'ExportMiniProgramAssetsPlugin',
       (compilation) => {
         this.system = createWebpackSystem(
           compiler.inputFileSystem as InputFileSystemSync,
@@ -107,13 +102,13 @@ export class ExportWeiXinAssetsPlugin {
           templateService
         );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (compilation as any)[ExportWeiXinAssetsPluginSymbol] = {
+        (compilation as any)[ExportMiniProgramAssetsPluginSymbol] = {
           metaMapPromise: buildTemplatePromise.then((item) => item.meta),
-          platformInfo: this.options.buildPlatform,
+          buildPlatform: this.options.buildPlatform,
         } as ComponentTemplateLoaderContext;
 
         compilation.hooks.processAssets.tapAsync(
-          'ExportWeiXinAssetsPlugin',
+          'ExportMiniProgramAssetsPlugin',
           async (assets, cb) => {
             const componentBuildMetaMap = await (
               await buildTemplatePromise

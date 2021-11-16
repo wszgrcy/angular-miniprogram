@@ -1,5 +1,5 @@
 import { Injectable } from 'static-injector';
-import { WxTransformLike } from '../template-transform-strategy/wx-like/wx-transform.base';
+import { TemplateTransformBase } from './template-transform-strategy/transform.base';
 
 export enum PlatformType {
   wx = 'wx',
@@ -9,5 +9,12 @@ export class BuildPlatform {
   globalObject!: string;
   globalVariablePrefix!: string;
   contextPrefix!: string;
-  constructor(public templateTransform: WxTransformLike) {}
+  fileExtname!: {
+    style: string;
+    logic: string;
+    content: string;
+    contentTemplate: string;
+  };
+  importTemplate!: string;
+  constructor(public templateTransform: TemplateTransformBase) {}
 }

@@ -1,7 +1,7 @@
 import { Injector } from 'static-injector';
 import { BuildPlatform } from '../platform/platform';
-import { WxPlatformInfo } from '../platform/wx-platform-info';
-import { WxTransform } from '../template-transform-strategy/wx.transform';
+import { WxTransform } from '../platform/template-transform-strategy/wx.transform';
+import { WxBuildPlatform } from '../platform/wx/wx-platform';
 import {
   COMPONENT_FILE_NAME_TOKEN,
   COMPONENT_TEMPLATE_CONTENT_TOKEN,
@@ -15,10 +15,10 @@ xdescribe('template-compiler', () => {
       providers: [
         { provide: WxTransform },
         { provide: TemplateCompiler },
-        { provide: WxPlatformInfo },
+        { provide: WxBuildPlatform },
         {
           provide: BuildPlatform,
-          useClass: WxPlatformInfo,
+          useClass: WxBuildPlatform,
         },
         { provide: COMPONENT_FILE_NAME_TOKEN, useValue: '' },
         { provide: COMPONENT_TEMPLATE_CONTENT_TOKEN, useValue: content },

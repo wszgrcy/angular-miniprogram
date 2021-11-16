@@ -1,17 +1,17 @@
-export class NoopNode {
-  selector!: any;
+export class AgentNode {
+  selector!: string | unknown;
   name!: string;
-  parent!: NoopNode;
-  nextSibling!: NoopNode | undefined;
+  parent!: AgentNode;
+  nextSibling!: AgentNode | undefined;
   attribute: Record<string, string> = {};
   style: Record<string, string> = {};
   property: Record<string, string> = {};
   classList = new Set<string>();
   value!: string;
-  children: NoopNode[] = [];
-  linstener: Record<string, Function> = {};
+  children: AgentNode[] = [];
+  listener: Record<string, Function> = {};
   constructor(public type: 'element' | 'comment' | 'text') {}
-  addChild(child: NoopNode) {
+  addChild(child: AgentNode) {
     const preChildIndex = this.children.length - 1;
     const pos = this.children.push(child);
     child.parent = this;
@@ -19,7 +19,7 @@ export class NoopNode {
       this.children[pos].nextSibling = child;
     }
   }
-  setParent(parent: NoopNode) {
+  setParent(parent: AgentNode) {
     const oldParent = this.parent;
     if (oldParent) {
       const index = oldParent.children.findIndex((item) => item === this);
@@ -30,7 +30,7 @@ export class NoopNode {
     }
     parent.addChild(this);
   }
-  insertBefore(newChild: NoopNode, refChild: NoopNode) {
+  insertBefore(newChild: AgentNode, refChild: AgentNode) {
     const refIndex = this.children.findIndex((item) => item === refChild);
     if (refIndex === -1) {
       throw new Error('未找到引用子节点' + refChild);
@@ -44,7 +44,7 @@ export class NoopNode {
     }
     this.children.splice(refIndex, 0, newChild);
   }
-  removeChild(child: NoopNode) {
+  removeChild(child: AgentNode) {
     const index = this.children.findIndex((item) => item === child);
     if (index === 0) {
       child.nextSibling = undefined;

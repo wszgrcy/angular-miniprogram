@@ -5,7 +5,9 @@ import { Path } from '@angular-devkit/core';
 import * as glob from 'glob';
 import * as path from 'path';
 import { BehaviorSubject } from 'rxjs';
+import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
+import { BuildPlatform } from '../platform/platform';
 import { PagePattern } from '../type';
 
 function globAsync(pattern: string, options: glob.IOptions) {
@@ -13,6 +15,7 @@ function globAsync(pattern: string, options: glob.IOptions) {
     glob.default(pattern, options, (e, m) => (e ? reject(e) : resolve(m)))
   );
 }
+@Injectable()
 export class DynamicWatchEntryPlugin {
   pageList!: PagePattern[];
   componentList!: PagePattern[];
@@ -33,7 +36,8 @@ export class DynamicWatchEntryPlugin {
       absoluteProjectSourceRoot: Path;
       context: BuilderContext;
       config: webpack.Configuration;
-    }
+    },
+    private buildPlatform: BuildPlatform
   ) {
     this.init();
   }
@@ -115,17 +119,23 @@ export class DynamicWatchEntryPlugin {
             fileName: file,
             src: path.join(cwd, file),
             ...pattern,
+            outputFiles: {} as any,
           };
-          object.outputWXS = path
+          object.outputFiles!.logic = path
             .join(pattern.output, object.fileName!)
             .replace(/\.ts$/g, '.js');
-          object.outputWXSS = object.outputWXS.replace(/\.js$/g, '.wxss');
-          object.outputWXML = object.outputWXS.replace(/\.js$/g, '.wxml');
-          object.outputWXMLTemplate = path.join(
-            path.dirname(object.outputWXS),
-            'template.wxml'
+          object.outputFiles!.style = object.outputFiles!.logic.replace(
+            /\.js$/g,
+            this.buildPlatform.fileExtname.style
           );
-
+          object.outputFiles!.content = object.outputFiles!.logic.replace(
+            /\.js$/g,
+            this.buildPlatform.fileExtname.content
+          );
+          object.outputFiles!.contentTemplate = path.join(
+            path.dirname(object.outputFiles!.logic),
+            `template${this.buildPlatform.fileExtname.contentTemplate}`
+          );
           return object as PagePattern;
         })
       );

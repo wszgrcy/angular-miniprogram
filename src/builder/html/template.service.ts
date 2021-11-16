@@ -89,7 +89,7 @@ export class TemplateService {
       const sf = key.getSourceFile();
       const fileName = sf.fileName;
       const pagePattern = this.componentToEntryMap.get(fileName)!;
-      componentChangeMap.set(pagePattern.outputWXSS, {
+      componentChangeMap.set(pagePattern.outputFiles.style, {
         ...this.removeTemplateAndStyleInTs(
           (key.decorators![0].expression as CallExpression)
             .arguments[0] as ObjectLiteralExpression,
@@ -184,12 +184,12 @@ export class TemplateService {
       );
       const pagePattern = this.componentToEntryMap.get(fileName)!;
       componentBuildMetaRecord.outputContent.set(
-        pagePattern.outputWXML,
+        pagePattern.outputFiles.content,
         componentBuildMeta.content
       );
       if (componentBuildMeta.template) {
         componentBuildMetaRecord.outputContent.set(
-          pagePattern.outputWXMLTemplate,
+          pagePattern.outputFiles.contentTemplate,
           componentBuildMeta.template
         );
       }

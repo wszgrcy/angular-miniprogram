@@ -1,11 +1,11 @@
 import { Renderer2, RendererStyleFlags2 } from '@angular/core';
-import { NoopNode } from './renderer-node';
+import { AgentNode } from './renderer-node';
 
-export class WeixinMiniProgramRenderer implements Renderer2 {
-  root!: NoopNode;
+export class MiniProgramRenderer implements Renderer2 {
+  root!: AgentNode;
   inputRoot = this.element;
   constructor(
-    private element: NoopNode | undefined,
+    private element: AgentNode | undefined,
     private def: any,
     private index: number
   ) {
@@ -15,35 +15,35 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
   destroy() {}
   createElement(name: string, namespace?: string | null) {
     // console.log(this.index, '创建元素', name, namespace);
-    const element = new NoopNode('element');
+    const element = new AgentNode('element');
     element.name = name;
     element.classList.add(`tag-name-${name}`);
     return element;
   }
   createComment(value: string) {
     // console.log('创建评论', value);
-    const comment = new NoopNode('comment');
+    const comment = new AgentNode('comment');
     comment.value = value;
     return comment;
   }
   createText(value: string) {
     // console.log('创建文本');
-    const text = new NoopNode('text');
+    const text = new AgentNode('text');
     text.value = value;
     return text;
   }
   destroyNode() {
     // console.log('销毁节点');
   }
-  appendChild(parent: NoopNode, newChild: NoopNode) {
+  appendChild(parent: AgentNode, newChild: AgentNode) {
     // console.log('添加子', parent, newChild);
     parent.children.push(newChild);
     newChild.parent = parent;
   }
   insertBefore(
-    parent: NoopNode,
-    newChild: NoopNode,
-    refChild: NoopNode,
+    parent: AgentNode,
+    newChild: AgentNode,
+    refChild: AgentNode,
     isMove?: boolean
   ) {
     // console.log('插入之前', parent, newChild, refChild, isMove);
@@ -52,7 +52,7 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
     }
     parent.insertBefore(newChild, refChild);
   }
-  removeChild(parent: NoopNode, oldChild: NoopNode, isHostElement?: boolean) {
+  removeChild(parent: AgentNode, oldChild: AgentNode, isHostElement?: boolean) {
     // console.log('移除子', parent, oldChild, isHostElement);
     if (isHostElement) {
       console.log('是Host', oldChild);
@@ -65,23 +65,23 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
   ) {
     // console.log(this.index, '选择根元素', selectorOrNode, preserveContent);
 
-    const root = new NoopNode('element');
+    const root = new AgentNode('element');
     root.selector = selectorOrNode;
     this.root = root;
     return root;
   }
-  parentNode(node: NoopNode) {
+  parentNode(node: AgentNode) {
     // console.log('父节点', node);
 
     return node.parent;
   }
-  nextSibling(node: NoopNode) {
+  nextSibling(node: AgentNode) {
     // console.log('下一个兄弟节点', node);
 
     return node.nextSibling;
   }
   setAttribute(
-    el: NoopNode,
+    el: AgentNode,
     name: string,
     value: string,
     namespace?: string | null
@@ -90,20 +90,20 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
 
     el.attribute[name] = value;
   }
-  removeAttribute(el: NoopNode, name: string, namespace?: string | null) {
+  removeAttribute(el: AgentNode, name: string, namespace?: string | null) {
     // console.log('移除属性', el);
     delete el.attribute[name];
   }
-  addClass(el: NoopNode, name: string) {
+  addClass(el: AgentNode, name: string) {
     // console.log('添加类', el, name);
     el.classList.add(name);
   }
-  removeClass(el: NoopNode, name: string) {
+  removeClass(el: AgentNode, name: string) {
     // console.log('移除类', el, name);
     el.classList.delete(name);
   }
   setStyle(
-    el: NoopNode,
+    el: AgentNode,
     style: string,
     value: any,
     flags?: RendererStyleFlags2
@@ -111,27 +111,27 @@ export class WeixinMiniProgramRenderer implements Renderer2 {
     // console.log('设置样式', el, style, value, flags);
     el.style[style] = value;
   }
-  removeStyle(el: NoopNode, style: string, flags?: RendererStyleFlags2) {
+  removeStyle(el: AgentNode, style: string, flags?: RendererStyleFlags2) {
     // console.log('移除样式', el, style, flags);
     delete el.style[style];
   }
-  setProperty(el: NoopNode, name: string, value: any) {
+  setProperty(el: AgentNode, name: string, value: any) {
     // console.log('设置属性', name, value);
     el.property[name] = value;
   }
-  setValue(node: NoopNode, value: string) {
+  setValue(node: AgentNode, value: string) {
     // console.log('设置值', node, value);
     node.value = value;
   }
   listen(
-    target: NoopNode,
+    target: AgentNode,
     eventName: string,
     callback: (event: WechatMiniprogram.BaseEvent) => boolean | void
   ) {
-    if (!(target instanceof NoopNode)) {
+    if (!(target instanceof AgentNode)) {
       throw new Error('不支持其他类型监听');
     }
-    target.linstener[eventName] = callback;
+    target.listener[eventName] = callback;
     // console.log('---监听', target, eventName, callback);
     return () => {};
   }

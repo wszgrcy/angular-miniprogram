@@ -1,3 +1,3 @@
-export const ExportWeiXinAssetsPluginSymbol = Symbol.for(
-  'ExportWeiXinAssetsPluginSymbol'
+export const ExportMiniProgramAssetsPluginSymbol = Symbol.for(
+  'ExportMiniProgramAssetsPluginSymbol'
 );
