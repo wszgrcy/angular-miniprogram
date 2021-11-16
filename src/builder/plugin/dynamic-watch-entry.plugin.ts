@@ -119,6 +119,7 @@ export class DynamicWatchEntryPlugin {
             fileName: file,
             src: path.join(cwd, file),
             ...pattern,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             outputFiles: {} as any,
           };
           object.outputFiles!.logic = path

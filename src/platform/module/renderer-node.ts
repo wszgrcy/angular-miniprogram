@@ -5,7 +5,7 @@ export class AgentNode {
   nextSibling!: AgentNode | undefined;
   attribute: Record<string, string> = {};
   style: Record<string, string> = {};
-  property: Record<string, string> = {};
+  property: Record<string, unknown> = {};
   classList = new Set<string>();
   value!: string;
   children: AgentNode[] = [];

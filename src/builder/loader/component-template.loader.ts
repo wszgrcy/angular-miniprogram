@@ -6,8 +6,8 @@ import { ExportMiniProgramAssetsPluginSymbol } from '../const';
 import { RawUpdater } from '../util/raw-updater';
 import { ComponentTemplateLoaderContext } from './type';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default async function (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   this: webpack.LoaderContext<any>,
   data: string,
   map: string

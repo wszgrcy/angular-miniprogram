@@ -13,5 +13,6 @@ export function componentRegistry<M, C>(
     componentOptions,
     true
   );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   wxComponentFactory(undefined as any);
 }

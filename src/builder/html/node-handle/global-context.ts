@@ -46,12 +46,15 @@ export class ComponentContext {
       selector,
       (
         selector,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         meta: { directive: R3UsedDirectiveMetadata; directiveMeta: any }
       ) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const isComponent: boolean = (meta.directive as any).isComponent;
         if (isComponent) {
           result.push({
             isComponent,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             outputs: (meta.directive as any).outputs,
           });
         } else {

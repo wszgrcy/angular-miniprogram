@@ -1,4 +1,4 @@
-import { Renderer2, RendererStyleFlags2 } from '@angular/core';
+import { Renderer2, RendererStyleFlags2, Type } from '@angular/core';
 import { AgentNode } from './renderer-node';
 
 export class MiniProgramRenderer implements Renderer2 {
@@ -6,6 +6,7 @@ export class MiniProgramRenderer implements Renderer2 {
   inputRoot = this.element;
   constructor(
     private element: AgentNode | undefined,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private def: any,
     private index: number
   ) {
@@ -48,14 +49,14 @@ export class MiniProgramRenderer implements Renderer2 {
   ) {
     // console.log('插入之前', parent, newChild, refChild, isMove);
     if (isMove) {
-      console.log('移动?');
+      // todo 应该没用
     }
     parent.insertBefore(newChild, refChild);
   }
   removeChild(parent: AgentNode, oldChild: AgentNode, isHostElement?: boolean) {
     // console.log('移除子', parent, oldChild, isHostElement);
     if (isHostElement) {
-      console.log('是Host', oldChild);
+      // todo 应该没用
     }
     parent.removeChild(oldChild);
   }
@@ -105,7 +106,7 @@ export class MiniProgramRenderer implements Renderer2 {
   setStyle(
     el: AgentNode,
     style: string,
-    value: any,
+    value: string,
     flags?: RendererStyleFlags2
   ) {
     // console.log('设置样式', el, style, value, flags);
@@ -115,7 +116,7 @@ export class MiniProgramRenderer implements Renderer2 {
     // console.log('移除样式', el, style, flags);
     delete el.style[style];
   }
-  setProperty(el: AgentNode, name: string, value: any) {
+  setProperty(el: AgentNode, name: string, value: unknown) {
     // console.log('设置属性', name, value);
     el.property[name] = value;
   }

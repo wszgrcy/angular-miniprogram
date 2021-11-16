@@ -1,3 +1,4 @@
+import { ASTWithSource } from '@angular/compiler';
 import {
   BoundAttribute,
   Template,
@@ -82,9 +83,9 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
       {
         type: 'if',
         thenTemplateRef:
-          (ngIf && ngIfThen && (ngIfThen.value as any).source) ||
+          (ngIf && ngIfThen && (ngIfThen.value as ASTWithSource).source!) ||
           ngIfTemplateName,
-        falseTemplateRef: (ngIfElse?.value as any)?.source,
+        falseTemplateRef: (ngIfElse?.value as ASTWithSource)?.source,
       },
       {
         type: 'none',

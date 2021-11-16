@@ -43,15 +43,15 @@ import { StyleHookData } from './type';
 export class TemplateService {
   private dependencyUseModule = new Map<string, string[]>();
   private cleanDependencyFileCacheSet = new Set<string>();
-
   private resolver!: DecoratorMetaDataResolver;
   builder!: ts.BuilderProgram | ts.EmitAndSemanticDiagnosticsBuilderProgram;
   private ngTscProgram!: NgtscProgram;
   private tsProgram!: ts.Program;
-
   private ngCompiler!: NgCompiler;
   private componentMap = new Map<ClassDeclaration, R3ComponentMetadata>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private directiveMap = new Map<ClassDeclaration, any>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private ngModuleMap = new Map<ClassDeclaration, any>();
   private componentToEntryMap = new Map<string, PagePattern>();
   constructor(
@@ -60,7 +60,8 @@ export class TemplateService {
     @Inject(TS_SYSTEM) private system: ts.System,
     @Inject(WEBPACK_COMPILER) private compiler: Compiler,
     @Inject(TS_CONFIG_TOKEN) private tsConfig: string,
-    @Inject(OLD_BUILDER) private oldBuilder: any,
+    @Inject(OLD_BUILDER)
+    private oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined,
     @Inject(PAGE_PATTERN_TOKEN) private pagePatternList: PagePattern[]
   ) {
     this.initTscProgram();
@@ -103,8 +104,10 @@ export class TemplateService {
     return componentChangeMap;
   }
   private collectionInfo() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const traitCompiler: TraitCompiler = (this.ngCompiler as any).compilation
       .traitCompiler;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const classes = (traitCompiler as any).classes as Map<
       ts.ClassDeclaration,
       ClassRecord
@@ -118,7 +121,9 @@ export class TemplateService {
       }
       componentTraits.forEach((trait) => {
         const meta: R3ComponentMetadata = {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).analysis.meta,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).resolution,
         };
         this.componentMap.set(
@@ -135,6 +140,7 @@ export class TemplateService {
       directiveTraits.forEach((trait) => {
         this.directiveMap.set(
           ts.getOriginalNode(classDeclaration) as ts.ClassDeclaration,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (trait as any).analysis
         );
       });
@@ -144,7 +150,9 @@ export class TemplateService {
 
       ngModuleTraits.forEach((trait) => {
         const meta: R3ComponentMetadata = {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).analysis.meta,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).resolution,
         };
         this.ngModuleMap.set(classDeclaration, meta);
@@ -166,6 +174,7 @@ export class TemplateService {
         for (const directive of meta.directives) {
           const selector = directive.selector;
           const directiveClassDeclaration = ts.getOriginalNode(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (directive as any).ref.node
           ) as ts.ClassDeclaration;
           const directiveMeta = this.directiveMap.get(

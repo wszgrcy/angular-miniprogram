@@ -1,12 +1,9 @@
 import { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
-
 import { Inject, Injectable, Optional } from 'static-injector';
 import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
-
 import { ComponentContext } from './node-handle/global-context';
 import { NgNodeMeta } from './node-handle/interface';
-
 import { TemplateDefinition } from './template-definition';
 
 @Injectable()
@@ -26,6 +23,7 @@ export class TemplateCompiler {
     return this.templateTransform.compile(this.nodeMetaList);
   }
   private collectionNode() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const nodes = (this.componentMeta as any).template.nodes;
     const templateDefinition = new TemplateDefinition(
       nodes,

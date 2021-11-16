@@ -11,7 +11,8 @@ export interface AppOptions {
   __ngStartPage<M, C>(
     module: Type<M>,
     component: Type<C>,
-    wxComponentInstance: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    miniProgramComponentInstance: any
   ): {
     componentRef: ComponentRef<C>;
     ngModuleRef: NgModuleRef<M>;
@@ -38,6 +39,7 @@ export interface MiniProgramComponentMethod {
   __ngComponentDestroy: () => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ComponentInitFactory = (instance: any) => Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ngModuleInstance: any;

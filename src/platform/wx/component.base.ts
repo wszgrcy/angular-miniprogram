@@ -101,8 +101,8 @@ export function generateWxComponent<C>(
             );
           };
           return pre;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         {} as { [p in PageLifetimeKey]: (...args: any[]) => void }
       );
     }

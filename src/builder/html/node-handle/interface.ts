@@ -51,7 +51,7 @@ export type NgDirective =
 export interface NgIfDirective {
   type: 'if';
   thenTemplateRef: string;
-  falseTemplateRef: string;
+  falseTemplateRef: string | null;
 }
 export interface NgForDirective {
   type: 'for';
@@ -73,6 +73,8 @@ export interface NgTemplateMeta<T = NgDirective> extends NgNodeMeta {
   kind: NgNodeKind.Template;
   children: NgNodeMeta[];
   directive: T[];
+  // todo 暂时未使用
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   staticType: any;
 }
 export interface NgContentMeta extends NgNodeMeta {
