@@ -1,6 +1,7 @@
 import { Type } from '@angular/core';
+import { AppOptions } from '../type';
 import { generateWxComponent } from './component.base';
-import { AppOptions, WxComponentInstance } from './type';
+import { WxComponentInstance } from './type';
 
 export function pageStartup<M, C>(
   module: Type<M>,
@@ -10,7 +11,8 @@ export function pageStartup<M, C>(
   const wxComponentFactory = generateWxComponent(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     component as any,
-    componentOptions
+    componentOptions,
+    false
   );
   const app = getApp<AppOptions>();
   app.__pageModuleLoadedMap = new Map();

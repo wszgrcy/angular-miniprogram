@@ -1,14 +1,12 @@
-import { TemplateInterpolationService } from '../template-interpolation.service';
 import { TagEventMeta } from './event';
-import { TemplateGlobalContext } from './global-context';
-import { BindValue, PlainValue } from './value';
+import { ComponentContext } from './global-context';
 
 export interface ParsedNode<T> {
   kind: NgNodeKind;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parent: ParsedNode<any> | undefined;
-  templateInterpolationService: TemplateInterpolationService;
-  getNodeMeta(globalContext: TemplateGlobalContext): T;
+  getNodeMeta(globalContext: ComponentContext): T;
+  index: number;
 }
 export enum NgNodeKind {
   Element,
@@ -19,19 +17,26 @@ export enum NgNodeKind {
 }
 export interface NgNodeMeta {
   kind: NgNodeKind;
+  index: number;
 }
 export interface NgElementMeta extends NgNodeMeta {
   kind: NgNodeKind.Element;
   tagName: string;
   children: NgNodeMeta[];
   attributes: Record<string, string>;
-  inputs: Record<string, PlainValue | BindValue>;
+  property: string[];
   outputs: TagEventMeta[];
   singleClosedTag: boolean;
+  componentMeta:
+    | {
+        outputs: string[];
+        isComponent: boolean;
+      }
+    | undefined;
+  directiveMeta: { listeners: string[] } | undefined;
 }
 export interface NgBoundTextMeta extends NgNodeMeta {
   kind: NgNodeKind.BoundText;
-  values: (BindValue | PlainValue)[];
 }
 export interface NgTextMeta extends NgNodeMeta {
   kind: NgNodeKind.Text;
@@ -45,25 +50,20 @@ export type NgDirective =
   | NgDefaultDirective;
 export interface NgIfDirective {
   type: 'if';
-  assert: BindValue | PlainValue;
-  thenTemplateRef: BindValue | undefined;
-  falseTemplateRef: BindValue;
+  thenTemplateRef: string;
+  falseTemplateRef: string | null;
 }
 export interface NgForDirective {
   type: 'for';
-  for: BindValue | PlainValue;
-  item: string;
-  index: string;
+
   templateName: string;
 }
 export interface NgSwitchDirective {
   type: 'switch';
-  switchValue: BindValue | PlainValue;
-  case: BindValue | PlainValue | undefined;
+  case: boolean;
   default: boolean;
   first: boolean;
   templateName: string;
-  index: number;
 }
 export interface NgDefaultDirective {
   type: 'none';
@@ -73,6 +73,9 @@ export interface NgTemplateMeta<T = NgDirective> extends NgNodeMeta {
   kind: NgNodeKind.Template;
   children: NgNodeMeta[];
   directive: T[];
+  // todo 暂时未使用
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  staticType: any;
 }
 export interface NgContentMeta extends NgNodeMeta {
   kind: NgNodeKind.Content;

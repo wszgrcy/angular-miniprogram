@@ -6,8 +6,8 @@ import {
   RendererFactory2,
   ɵINJECTOR_SCOPE,
 } from '@angular/core';
+import { MiniProgramRendererFactory } from './mini-program.renderer.factory';
 import { PageService } from './service/page.service';
-import { WeixinMiniProgramRendererFactory } from './weixin-mini-program.renderer.factory';
 
 export function errorHandler(): ErrorHandler {
   return new ErrorHandler();
@@ -21,18 +21,18 @@ export function errorHandler(): ErrorHandler {
 
     { provide: ErrorHandler, useFactory: errorHandler, deps: [] },
     {
-      provide: WeixinMiniProgramRendererFactory,
-      useClass: WeixinMiniProgramRendererFactory,
+      provide: MiniProgramRendererFactory,
+      useClass: MiniProgramRendererFactory,
     },
     {
       provide: RendererFactory2,
-      useExisting: WeixinMiniProgramRendererFactory,
+      useExisting: MiniProgramRendererFactory,
     },
     PageService,
   ],
   exports: [CommonModule, ApplicationModule],
 })
-export class WeixinMiniProgramModule {
+export class MiniProgramModule {
   constructor(pageService: PageService) {
     pageService.register();
   }

@@ -4,9 +4,9 @@ import {
   createPlatformFactory,
   platformCore,
 } from '@angular/core';
-import { componentTemplateHookFactory } from './component-template-hook.factory';
-import { APP_TOKEN } from './module/token/app.token';
-import { AppOptions } from './type';
+import { componentTemplateHookFactory } from '../component-template-hook.factory';
+import { APP_TOKEN } from '../module/token/app.token';
+import { AppOptions } from '../type';
 
 export function platformWeixinMiniProgram(
   extraProviders: StaticProvider[] = [],

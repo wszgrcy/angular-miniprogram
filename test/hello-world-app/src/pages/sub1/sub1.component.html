@@ -1,3 +1,6 @@
+<div [class]="'sdfsdf'" [class.abc]="false" [style.color]="'red'">
+  615156156516
+</div>
 <p class="myclass">hello test</p>
 这是我的一小步,是ng社区的一大步
 <app-cp1 [testInputValue]="title" (custom)="testApp($event)"></app-cp1>
@@ -6,6 +9,7 @@
 <div *ngIf="num; else test">显示的内容</div>
 <div *ngIf="display; else test" class="test">显示的内容</div>
 <ng-template #test> 不显示的模板 </ng-template>
+<ng-template #test2> 测试是不是多一个LContainer </ng-template>
 <button (tap)="changeTest($event)"></button>
 <p>待变化</p>
 <p>{{ randomValue }}</p>
@@ -13,3 +17,20 @@
 <p>{{ randomValue }}</p>
 {{ jsonObj | json }}
 {{ today | date: 'yyyy-MM-dd' }}
+<div *ngIf="true">{{ '测试' }}</div>
+<div *ngIf="true">
+  指令层测试---
+  <app-cp1></app-cp1>
+</div>
+<div *ngIf="true">
+  多指令层测试---
+  <div *ngIf="true">
+    <app-cp1></app-cp1>
+  </div>
+</div>
+<div *ngFor="let item of [1, 2]">
+  <app-cp1></app-cp1>
+</div>
+<div *ngIf="true">
+  <div appF1>sdfsdfsfdfgsgsgf</div>
+</div>

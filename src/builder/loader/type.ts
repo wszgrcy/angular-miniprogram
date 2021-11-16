@@ -1,6 +1,6 @@
-import { PlatformInfo } from '../platform/platform-info';
+import { BuildPlatform } from '../platform/platform';
 
 export interface ComponentTemplateLoaderContext {
-  updateLogicMap: Map<string, string>;
-  platformInfo: PlatformInfo;
+  metaMapPromise: Promise<Map<string, string>>;
+  buildPlatform: BuildPlatform;
 }
