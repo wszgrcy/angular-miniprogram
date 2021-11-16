@@ -122,7 +122,7 @@ export class TemplateService {
       componentTraits.forEach((trait) => {
         const meta: R3ComponentMetadata = {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(trait as any).analysis.meta,
+          ...(trait as any).analysis?.meta,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).resolution,
         };
@@ -151,7 +151,7 @@ export class TemplateService {
       ngModuleTraits.forEach((trait) => {
         const meta: R3ComponentMetadata = {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(trait as any).analysis.meta,
+          ...(trait as any).analysis?.meta,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).resolution,
         };
