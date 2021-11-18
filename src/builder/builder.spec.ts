@@ -19,13 +19,13 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect(result).toBeTruthy();
       expect(result.error).toBeFalsy();
       expect(result.logs[0].level !== 'error').toBeTruthy();
-      expect(result.result.success).toBeTruthy();
+      expect(result.result?.success).toBeTruthy();
       harness
         .expectFile(
           join(normalize(DEFAULT_ANGULAR_CONFIG.outputPath), 'styles.wxss')
         )
         .toExist();
-      const realTestPath: string = result.result.outputPath as string;
+      const realTestPath: string = result.result?.outputPath as string;
       const appTestPath = path.resolve(process.cwd(), '__test-app');
       fs.copySync(realTestPath, path.resolve(process.cwd(), '__test-app'));
       // ('等待断点放开');

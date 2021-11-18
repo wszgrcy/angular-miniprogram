@@ -1,4 +1,4 @@
-import { Content } from '@angular/compiler/src/render3/r3_ast';
+import type { Content } from '@angular/compiler/src/render3/r3_ast';
 import { NgContentMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
 
 export class ParsedNgContent implements ParsedNode<NgContentMeta> {

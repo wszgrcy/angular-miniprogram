@@ -1,4 +1,4 @@
-import { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
+import type { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
 import { Inject, Injectable, Optional } from 'static-injector';
 import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';

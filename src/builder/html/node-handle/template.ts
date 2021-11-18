@@ -1,5 +1,5 @@
-import { ASTWithSource } from '@angular/compiler';
-import {
+import type { ASTWithSource } from '@angular/compiler';
+import type {
   BoundAttribute,
   Template,
   TextAttribute,

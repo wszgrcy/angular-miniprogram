@@ -74,7 +74,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           expect(result.logs[0].level !== 'error').toBeTruthy();
           expect(result).toBeTruthy();
           expect(result.error).toBeFalsy();
-          expect(result.result.success).toBeTruthy();
+          expect(result.result?.success).toBeTruthy();
           expect(result.logs[0].message).toContain('sub3.entry.js');
           harness
             .expectFile(

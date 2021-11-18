@@ -1,5 +1,5 @@
-import { ConstantPool } from '@angular/compiler';
-import {
+// import { ConstantPool } from '@angular/compiler';
+import type {
   BoundAttribute,
   BoundEvent,
   BoundText,
@@ -13,9 +13,8 @@ import {
   TextAttribute,
   Variable,
   Visitor,
-  visitAll,
 } from '@angular/compiler/src/render3/r3_ast';
-import { ValueConverter } from '@angular/compiler/src/render3/view/template';
+// import { ValueConverter } from '@angular/compiler/src/render3/view/template';
 import { ParsedNgBoundText } from './node-handle/bound-text';
 import { ParsedNgContent } from './node-handle/content';
 import { ParsedNgElement } from './node-handle/element';
@@ -31,20 +30,21 @@ export class TemplateDefinition implements Visitor {
   private parentNode: ParsedNgElement | ParsedNgTemplate | undefined;
   list: ParsedNode<NgNodeMeta>[] = [];
   private declIndex = 0;
-  private valueConverter = new ValueConverter(
-    new ConstantPool(),
-    () => {
-      this.declIndex++;
-      return 0;
-    },
-    () => 0,
-    () => {}
-  );
+  // private valueConverter = new ValueConverter(
+  //   new ConstantPool(),
+  //   () => {
+  //     this.declIndex++;
+  //     return 0;
+  //   },
+  //   () => 0,
+  //   () => {}
+  // );
+  // todo 重写管道逻辑进行添加索引
   constructor(
     private nodes: Node[],
     private templateGlobalContext: ComponentContext
   ) {}
-
+  init() {}
   visit?(node: Node) {}
   visitElement(element: Element) {
     const nodeIndex = this.declIndex++;
@@ -74,7 +74,8 @@ export class TemplateDefinition implements Visitor {
       this.parentNode.appendNgNodeChild(instance);
     }
     element.inputs.forEach((item) => {
-      item.value.visit(this.valueConverter);
+      // todo
+      // item.value.visit(this.valueConverter);
     });
     const oldParent = this.parentNode;
     this.parentNode = instance;
@@ -105,11 +106,13 @@ export class TemplateDefinition implements Visitor {
     this.prepareRefsArray(template.references);
     template.templateAttrs.forEach((item) => {
       if (typeof item.value !== 'string') {
-        item.value.visit(this.valueConverter);
+        // todo
+        // item.value.visit(this.valueConverter);
       }
     });
     template.inputs.forEach((item) => {
-      item.value.visit(this.valueConverter);
+      // todo
+      // item.value.visit(this.valueConverter);
     });
     const instance = new TemplateDefinition(
       template.children,
@@ -150,7 +153,8 @@ export class TemplateDefinition implements Visitor {
   }
   visitBoundText(text: BoundText) {
     const nodeIndex = this.declIndex++;
-    text.value.visit(this.valueConverter);
+    // todo
+    // text.value.visit(this.valueConverter);
     const instance = new ParsedNgBoundText(text, this.parentNode, nodeIndex);
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
@@ -172,4 +176,23 @@ export class TemplateDefinition implements Visitor {
       this.declIndex++;
     });
   }
+}
+export function visitAll<Result>(
+  visitor: Visitor<Result>,
+  nodes: Node[]
+): Result[] {
+  const result: Result[] = [];
+  if (visitor.visit) {
+    for (const node of nodes) {
+      const newNode = visitor.visit(node) || node.visit(visitor);
+    }
+  } else {
+    for (const node of nodes) {
+      const newNode = node.visit(visitor);
+      if (newNode) {
+        result.push(newNode);
+      }
+    }
+  }
+  return result;
 }

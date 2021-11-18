@@ -163,7 +163,7 @@ export class ExportMiniProgramAssetsPlugin {
     service: TemplateService
   ) {
     await waitAnalyzeAsync;
-    const result = service.exportComponentBuildMetaMap();
+    const result = await service.exportComponentBuildMetaMap();
     return result;
   }
 }

@@ -1,16 +1,12 @@
-import {
-  CssSelector,
-  R3ComponentMetadata,
-  SelectorMatcher,
-} from '@angular/compiler';
-import {
+import type { R3ComponentMetadata, SelectorMatcher } from '@angular/compiler';
+import type {
   NgtscProgram,
   ParsedConfiguration,
-  readConfiguration,
+  // readConfiguration,
 } from '@angular/compiler-cli';
-import { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
-import { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
-import {
+import type { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
+import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
+import type {
   ClassRecord,
   TraitCompiler,
 } from '@angular/compiler-cli/src/ngtsc/transform';
@@ -19,11 +15,10 @@ import { createHash } from 'crypto';
 import { DeleteChange, InsertChange, TsChange } from 'cyia-code-util';
 import * as path from 'path';
 import { Inject, Injectable, Injector } from 'static-injector';
-import ts, {
-  CallExpression,
+import ts from 'typescript';
+import type {
   ClassDeclaration,
   CompilerOptions,
-  Node,
   ObjectLiteralExpression,
   SourceFile,
 } from 'typescript';
@@ -32,18 +27,23 @@ import { COMPONENT_META, DIRECTIVE_MATCHER } from '../token/component.token';
 import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
-import { DecoratorMetaDataResolver } from '../ts/decorator-metadata-resolver';
+// import { DecoratorMetaDataResolver } from '../ts/decorator-metadata-resolver';
 import { PagePattern } from '../type';
+import {
+  angularCompilerCliPromise,
+  angularCompilerPromise,
+} from '../util/load_esm';
 import { RawUpdater } from '../util/raw-updater';
 import { ComponentContext } from './node-handle/global-context';
 import { TemplateCompiler } from './template-compiler';
 import { StyleHookData } from './type';
-
+// import { getAngularCompiler } from '../util/load_esm';
+// const angularCompilerPromise = getAngularCompiler();
 @Injectable()
 export class TemplateService {
   private dependencyUseModule = new Map<string, string[]>();
   private cleanDependencyFileCacheSet = new Set<string>();
-  private resolver!: DecoratorMetaDataResolver;
+  // private resolver!: DecoratorMetaDataResolver;
   builder!: ts.BuilderProgram | ts.EmitAndSemanticDiagnosticsBuilderProgram;
   private ngTscProgram!: NgtscProgram;
   private tsProgram!: ts.Program;
@@ -64,42 +64,41 @@ export class TemplateService {
     private oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined,
     @Inject(PAGE_PATTERN_TOKEN) private pagePatternList: PagePattern[]
   ) {
-    this.initTscProgram();
-    this.resolver = new DecoratorMetaDataResolver(
-      this.tsProgram,
-      this.tsProgram.getTypeChecker()
-    );
-    this.tsProgram
-      .getSourceFiles()
-      .filter((sf) => !sf.isDeclarationFile)
-      .filter((sf) => !sf.fileName.includes('node_modules'))
-      .forEach((item) => {
-        this.resolver.resolverSourceFile(item);
-      });
-    this.resolver.getComponentMetaMap().forEach((value, key) => {
-      const fileName = key.getSourceFile().fileName;
-      this.componentToEntryMap.set(
-        fileName,
-        this.getComponentPagePattern(fileName)
-      );
-    });
+    // this.resolver = new DecoratorMetaDataResolver(
+    //   this.tsProgram,
+    //   this.tsProgram.getTypeChecker()
+    // );
+    // this.tsProgram
+    //   .getSourceFiles()
+    //   .filter((sf) => !sf.isDeclarationFile)
+    //   .filter((sf) => !sf.fileName.includes('node_modules'))
+    //   .forEach((item) => {
+    //     this.resolver.resolverSourceFile(item);
+    //   });
+    // this.resolver.getComponentMetaMap().forEach((value, key) => {
+    //   const fileName = key.getSourceFile().fileName;
+    //   this.componentToEntryMap.set(
+    //     fileName,
+    //     this.getComponentPagePattern(fileName)
+    //   );
+    // });
   }
   removeStyle() {
     const componentChangeMap = new Map<string, StyleHookData>();
-    this.resolver.getComponentMetaMap().forEach((value, key) => {
-      const sf = key.getSourceFile();
-      const fileName = sf.fileName;
-      const pagePattern = this.componentToEntryMap.get(fileName)!;
-      componentChangeMap.set(pagePattern.outputFiles.style, {
-        ...this.removeTemplateAndStyleInTs(
-          (key.decorators![0].expression as CallExpression)
-            .arguments[0] as ObjectLiteralExpression,
-          sf
-        ),
-        styles: value['styles'] as string[],
-        styleUrls: value['styleUrls'] as string[],
-      });
-    });
+    // this.resolver.getComponentMetaMap().forEach((value, key) => {
+    //   const sf = key.getSourceFile();
+    //   const fileName = sf.fileName;
+    //   const pagePattern = this.componentToEntryMap.get(fileName)!;
+    //   componentChangeMap.set(pagePattern.outputFiles.style, {
+    //     ...this.removeTemplateAndStyleInTs(
+    //       (key.decorators![0].expression as CallExpression)
+    //         .arguments[0] as ObjectLiteralExpression,
+    //       sf
+    //     ),
+    //     styles: value['styles'] as string[],
+    //     styleUrls: value['styleUrls'] as string[],
+    //   });
+    // });
 
     return componentChangeMap;
   }
@@ -159,18 +158,19 @@ export class TemplateService {
       });
     }
   }
-  exportComponentBuildMetaMap() {
+  async exportComponentBuildMetaMap() {
+    await this.initTscProgram();
     this.collectionInfo();
 
     const componentBuildMetaRecord = {
       outputContent: new Map<string, string>(),
       meta: new Map<string, string>(),
     };
-    this.componentMap.forEach((meta, key) => {
+    for (const [key, meta] of this.componentMap) {
       const fileName = key.getSourceFile().fileName;
       let directiveMatcher: SelectorMatcher | undefined;
       if (meta.directives.length > 0) {
-        const matcher = new SelectorMatcher();
+        const matcher = new (await angularCompilerPromise).SelectorMatcher();
         for (const directive of meta.directives) {
           const selector = directive.selector;
           const directiveClassDeclaration = ts.getOriginalNode(
@@ -180,10 +180,13 @@ export class TemplateService {
           const directiveMeta = this.directiveMap.get(
             directiveClassDeclaration
           );
-          matcher.addSelectables(CssSelector.parse(selector), {
-            directive,
-            directiveMeta,
-          });
+          matcher.addSelectables(
+            (await angularCompilerPromise).CssSelector.parse(selector),
+            {
+              directive,
+              directiveMeta,
+            }
+          );
         }
         directiveMatcher = matcher;
       }
@@ -206,7 +209,8 @@ export class TemplateService {
         path.normalize(fileName),
         componentBuildMeta.meta
       );
-    });
+    }
+
     return componentBuildMetaRecord;
   }
 
@@ -273,10 +277,13 @@ export class TemplateService {
     this.addCleanDependency(host);
     return host;
   }
-  private initTscProgram() {
-    const config = readConfiguration(this.tsConfig, undefined);
+  private async initTscProgram() {
+    const config = (await angularCompilerCliPromise).readConfiguration(
+      this.tsConfig,
+      undefined
+    );
     const host = this.initHost(config);
-    this.ngTscProgram = new NgtscProgram(
+    this.ngTscProgram = new (await angularCompilerCliPromise).NgtscProgram(
       config.rootNames,
       config.options,
       host
