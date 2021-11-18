@@ -1,0 +1,6 @@
+{
+  "spec_dir": "src/builder",
+  "spec_files": ["**/*.spec.ts"],
+  "stopSpecOnExpectationFailure": false,
+  "random": false
+}

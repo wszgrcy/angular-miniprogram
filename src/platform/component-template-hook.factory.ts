@@ -1,19 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  InjectFlags,
-  ɵangular_packages_core_core_bh,
-  ɵangular_packages_core_core_ca,
-  ɵɵdirectiveInject,
-} from '@angular/core';
+import { InjectFlags, ɵɵdirectiveInject } from '@angular/core';
 import { AgentNode } from './module/renderer-node';
 import { PAGE_TOKEN } from './module/token/page.token';
 
 const start = 20;
 
-type LView = ɵangular_packages_core_core_ca;
+type LView = any;
 const initValue = new Map<LView, any>();
-export function propertyChange() {
-  const lView = ɵangular_packages_core_core_bh();
+export function propertyChange(context: any) {
+  const lView = findCurrenComponentLView(context);
   const nodeList = lViewToWXView(lView);
   const ctx = { nodeList: nodeList };
   if (linkMap.has(lView)) {
@@ -21,6 +16,23 @@ export function propertyChange() {
   } else {
     initValue.set(lView, ctx);
   }
+}
+function findCurrenComponentLView(context: any) {
+  let lView = context['__ngContext__'];
+  if (lView[8] === context) {
+    return lView;
+  }
+  lView = lView[13];
+  while (lView[8] !== context) {
+    lView = lView[4];
+    if (lView[1] === true) {
+      throw new Error('这是LContainer?');
+    }
+  }
+  if (!lView) {
+    throw new Error('没有找到LView');
+  }
+  return lView;
 }
 function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
   const tView = lView[1];
@@ -56,8 +68,8 @@ export function updateInitValue(lview: LView) {
 }
 
 const pageMap = new Map<string, LView>();
-export function pageBind() {
-  const lview = ɵangular_packages_core_core_bh();
+export function pageBind(context: any) {
+  const lview = findCurrenComponentLView(context);
   const wxComponentInstance = ɵɵdirectiveInject(
     PAGE_TOKEN,
     InjectFlags.Optional

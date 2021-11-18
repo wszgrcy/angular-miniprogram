@@ -1,6 +1,14 @@
 {
   "extends": "./tsconfig.base.json",
-  "compilerOptions": {},
+  "compilerOptions": {
+    "target": "ESNext",
+    "moduleResolution": "node",
+    "module": "commonjs",
+    "experimentalDecorators": true,
+    "lib": ["ES2019"],
+    "esModuleInterop": true,
+    "sourceMap": true
+  },
   "exclude": ["**/fixture/**"],
   "files": [],
   "include": ["src/builder"]

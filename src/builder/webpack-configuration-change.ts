@@ -125,7 +125,8 @@ export class WebpackConfigurationChange {
       });
     this.config.plugins?.push(dynamicWatchEntryInstance);
     // 出口
-    const oldFileName = this.config.output!.filename as Function;
+    // todo改为string不知道是否完全都改了
+    const oldFileName = this.config.output!.filename as string;
     this.config.output!.filename = (chunkData) => {
       const page = this.entryList.find(
         (item) => item.entryName === chunkData.chunk!.name
@@ -133,7 +134,7 @@ export class WebpackConfigurationChange {
       if (page) {
         return page.outputFiles.logic;
       }
-      return oldFileName(chunkData);
+      return oldFileName;
     };
     // 共享依赖
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

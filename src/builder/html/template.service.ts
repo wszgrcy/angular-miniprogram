@@ -159,9 +159,6 @@ export class TemplateService {
     }
   }
   async exportComponentBuildMetaMap() {
-    await this.initTscProgram();
-    this.collectionInfo();
-
     const componentBuildMetaRecord = {
       outputContent: new Map<string, string>(),
       meta: new Map<string, string>(),
@@ -401,8 +398,18 @@ export class TemplateService {
     }
   }
 
-  analyzeAsync() {
-    return this.ngCompiler.analyzeAsync();
+  async analyzeAsync() {
+    await this.initTscProgram();
+    await this.ngCompiler.analyzeAsync();
+    this.collectionInfo();
+
+    this.componentMap.forEach((value, key) => {
+      const fileName = key.getSourceFile().fileName;
+      this.componentToEntryMap.set(
+        fileName,
+        this.getComponentPagePattern(fileName)
+      );
+    });
   }
   getBuilder() {
     return this.builder;

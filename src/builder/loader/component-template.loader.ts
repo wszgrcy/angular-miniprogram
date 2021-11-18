@@ -51,7 +51,7 @@ export default async function (
   const meta = (await context.metaMapPromise).get(
     path.normalize(this.resourcePath)
   )!;
-  const initContent = `amp.pageBind();`;
+  const initContent = `amp.pageBind(ctx);`;
   const change = new TsChange(sf);
   const extraMetaChange = change.insertNode(
     componentɵcmpNode,
@@ -69,7 +69,7 @@ export default async function (
     new InsertChange(0, `import * as amp from 'angular-miniprogram';\n`),
     extraMetaChange,
   ];
-  const updateContent = `amp.propertyChange();`;
+  const updateContent = `amp.propertyChange(ctx);`;
   if (updateIfNode) {
     const updateBlock = updateIfNode.thenStatement as ts.Block;
     updateInsertChange = change.insertNode(
