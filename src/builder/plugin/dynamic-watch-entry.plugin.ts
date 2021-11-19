@@ -1,6 +1,6 @@
-import { BuilderContext } from '@angular-devkit/architect';
-import { AssetPattern } from '@angular-devkit/build-angular';
-import { normalizeAssetPatterns } from '@angular-devkit/build-angular/src/utils/normalize-asset-patterns';
+import type { BuilderContext } from '@angular-devkit/architect';
+import type { AssetPattern } from '@angular-devkit/build-angular';
+import { normalizeAssetPatterns } from '@angular-devkit/build-angular/src/utils';
 import { Path } from '@angular-devkit/core';
 import * as glob from 'glob';
 import * as path from 'path';
@@ -8,7 +8,7 @@ import { BehaviorSubject } from 'rxjs';
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
 import { BuildPlatform } from '../platform/platform';
-import { PagePattern } from '../type';
+import type { PagePattern } from '../type';
 
 function globAsync(pattern: string, options: glob.IOptions) {
   return new Promise<string[]>((resolve, reject) =>

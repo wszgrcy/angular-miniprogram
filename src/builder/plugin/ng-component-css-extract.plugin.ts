@@ -1,6 +1,4 @@
-// import { ResolvedValue } from '@angular/compiler-cli/src/ngtsc/partial_evaluator';
 import { WebpackResourceLoader } from '@ngtools/webpack/src/resource_loader';
-import ts from 'typescript';
 import * as webpack from 'webpack';
 import { RawSource } from 'webpack-sources';
 

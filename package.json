@@ -31,6 +31,7 @@
     "@commitlint/config-conventional": "^13.1.0",
     "@ngtools/webpack": "13.0.2",
     "@types/fs-extra": "^9.0.12",
+    "@types/glob": "^7.2.0",
     "@types/jasmine": "^3.7.7",
     "@types/jest": "^26.0.23",
     "@types/node": "^14",

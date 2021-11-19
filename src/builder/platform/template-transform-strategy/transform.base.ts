@@ -1,5 +1,5 @@
 import { Injectable } from 'static-injector';
-import { NgNodeMeta } from '../../html/node-handle/interface';
+import type { NgNodeMeta } from '../../html/node-handle/interface';
 
 @Injectable()
 export abstract class TemplateTransformBase {

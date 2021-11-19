@@ -46,7 +46,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
           output.target || 'bind',
           output.name,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ((output.handler as ASTWithSource).ast as any).name
+          (output.handler as ASTWithSource).source!
         )
       );
     });

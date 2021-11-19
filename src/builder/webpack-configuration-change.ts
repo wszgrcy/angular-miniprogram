@@ -1,9 +1,10 @@
-import { BuilderContext } from '@angular-devkit/architect';
+import type { BuilderContext } from '@angular-devkit/architect';
 import {
   AssetPattern,
   BrowserBuilderOptions,
 } from '@angular-devkit/build-angular';
-import { Path, getSystemPath, normalize, resolve } from '@angular-devkit/core';
+import type { Path } from '@angular-devkit/core';
+import { getSystemPath, normalize, resolve } from '@angular-devkit/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { filter } from 'rxjs/operators';
@@ -11,11 +12,12 @@ import { Injectable, Injector } from 'static-injector';
 import * as webpack from 'webpack';
 import { DefinePlugin } from 'webpack';
 import { BootstrapAssetsPlugin } from 'webpack-bootstrap-assets-plugin';
-import { BuildPlatform, PlatformType } from './platform/platform';
+import { BuildPlatform } from './platform/platform';
+import type { PlatformType } from './platform/platform';
 import { DynamicWatchEntryPlugin } from './plugin/dynamic-watch-entry.plugin';
 import { ExportMiniProgramAssetsPlugin } from './plugin/export-mini-program-assets.plugin';
 import { TS_CONFIG_TOKEN } from './token/project.token';
-import { PagePattern } from './type';
+import type { PagePattern } from './type';
 
 type OptimizationOptions = NonNullable<webpack.Configuration['optimization']>;
 type OptimizationSplitChunksOptions = Exclude<

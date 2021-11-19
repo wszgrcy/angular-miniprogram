@@ -1,4 +1,4 @@
-import {
+import type {
   NgBoundTextMeta,
   NgContentMeta,
   NgElementMeta,
@@ -12,7 +12,7 @@ import {
   isNgElementMeta,
   isNgTemplateMeta,
   isNgTextMeta,
-} from '../../../html/node-handle/node-meta/type-predicate';
+} from '../../util/type-predicate';
 
 export class WxContainer {
   directivePrefix!: string;

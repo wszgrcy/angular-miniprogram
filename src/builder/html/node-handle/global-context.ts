@@ -1,13 +1,12 @@
-import type { SelectorMatcher } from '@angular/compiler';
 import type { R3UsedDirectiveMetadata } from '@angular/compiler/src/compiler_facade_interface';
 import type { Element, Template } from '@angular/compiler/src/render3/r3_ast';
-// import type{ createCssSelector } from '@angular/compiler/src/render3/view/template';
 import { Injectable } from 'static-injector';
+import type { SelectorMatcher } from '../../angular-internal/selector';
 import { createCssSelector } from '../../angular-internal/template';
 import { getAttrsForDirectiveMatching } from '../../angular-internal/util';
 import { isTemplate } from '../type-protection';
-import { NgDefaultDirective, NgTemplateMeta } from './interface';
-import { MatchedDirective } from './type';
+import type { NgDefaultDirective, NgTemplateMeta } from './interface';
+import type { MatchedDirective } from './type';
 
 @Injectable()
 export class ComponentContext {

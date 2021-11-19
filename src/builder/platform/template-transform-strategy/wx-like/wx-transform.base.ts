@@ -1,4 +1,4 @@
-import { NgNodeMeta } from '../../../html/node-handle/interface';
+import type { NgNodeMeta } from '../../../html/node-handle/interface';
 import { TemplateTransformBase } from '../transform.base';
 import { WxContainer } from './wx-container';
 

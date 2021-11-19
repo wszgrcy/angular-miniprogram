@@ -6,6 +6,7 @@ import {
   lViewLinkToMPComponentRef,
   updateInitValue,
 } from '../component-template-hook.factory';
+import { LView } from '../internal-type';
 import type { AgentNode } from '../module/renderer-node';
 import { ComponentInitFactory, NgCompileComponent } from '../type';
 import { WxComponentInstance, WxLifetimes } from './type';
@@ -33,7 +34,7 @@ export function generateWxComponent<C>(
         if (!(index > -1)) {
           throw new Error('组件索引异常');
         }
-        const rootLView = getPageLView(this.getPageId());
+        const rootLView = getPageLView(this.getPageId()) as LView;
         const lView = findCurrentLView(rootLView, list, index);
         const initValue = updateInitValue(lView);
         this.setData({ __wxView: initValue });
@@ -162,7 +163,7 @@ export function generateWxComponent<C>(
           ref.then(
             (ngComponentInstance) => {
               this.__ngComponentInjector.get(ChangeDetectorRef).detectChanges();
-              const lView = getPageLView(this.getPageId());
+              const lView = getPageLView(this.getPageId()) as LView;
               const initValue = updateInitValue(lView);
               this.setData({ __wxView: initValue });
               lViewLinkToMPComponentRef(this, lView);

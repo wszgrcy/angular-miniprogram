@@ -8,8 +8,6 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { getHtmlTagDefinition } from './html_tags';
-
 const _SELECTOR_REGEXP = new RegExp(
   '(\\:not\\()|' + // 1: ":not("
     '(([\\.\\#]?)[-\\w]+)|' + // 2: "tag"; 3: "."/"#";
@@ -170,48 +168,12 @@ export class CssSelector {
     return attr.replace(/\\/g, '\\\\').replace(/\$/g, '\\$');
   }
 
-  isElementSelector(): boolean {
-    return (
-      this.hasElementSelector() &&
-      this.classNames.length == 0 &&
-      this.attrs.length == 0 &&
-      this.notSelectors.length === 0
-    );
-  }
-
   hasElementSelector(): boolean {
     return !!this.element;
   }
 
   setElement(element: string | null = null) {
     this.element = element;
-  }
-
-  /** Gets a template string for an element that matches the selector. */
-  getMatchingElementTemplate(): string {
-    const tagName = this.element || 'div';
-    const classAttr =
-      this.classNames.length > 0 ? ` class="${this.classNames.join(' ')}"` : '';
-
-    let attrs = '';
-    for (let i = 0; i < this.attrs.length; i += 2) {
-      const attrName = this.attrs[i];
-      const attrValue =
-        this.attrs[i + 1] !== '' ? `="${this.attrs[i + 1]}"` : '';
-      attrs += ` ${attrName}${attrValue}`;
-    }
-
-    return getHtmlTagDefinition(tagName).isVoid
-      ? `<${tagName}${classAttr}${attrs}/>`
-      : `<${tagName}${classAttr}${attrs}></${tagName}>`;
-  }
-
-  getAttrs(): string[] {
-    const result: string[] = [];
-    if (this.classNames.length > 0) {
-      result.push('class', this.classNames.join(' '));
-    }
-    return result.concat(this.attrs);
   }
 
   addAttribute(name: string, value: string = '') {

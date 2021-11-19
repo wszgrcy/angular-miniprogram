@@ -8,17 +8,16 @@ import * as path from 'path';
 import { Inject, Injectable, Injector } from 'static-injector';
 import ts from 'typescript';
 import * as webpack from 'webpack';
-import { RawSource } from 'webpack-sources';
+import { ConcatSource, RawSource } from 'webpack-sources';
 import { ExportMiniProgramAssetsPluginSymbol } from '../const';
 import { TemplateService } from '../html/template.service';
-import { StyleHookData } from '../html/type';
-import { ComponentTemplateLoaderContext } from '../loader/type';
+import type { StyleHookData } from '../html/type';
+import type { ComponentTemplateLoaderContext } from '../loader/type';
 import { BuildPlatform } from '../platform/platform';
 import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
-import { PagePattern } from '../type';
-import { NgComponentCssExtractPlugin } from './ng-component-css-extract.plugin';
+import type { PagePattern } from '../type';
 
 export interface ExportMiniProgramAssetsPluginOptions {
   /** tsConfig配置路径 */
@@ -57,7 +56,31 @@ export class ExportMiniProgramAssetsPlugin {
     this.originInputFileSystemSync.statSync = ifs.statSync;
     let oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined =
       undefined;
-
+    const styleAssets = new Map<string, any>();
+    compiler.hooks.compilation.tap(
+      'ExportMiniProgramAssetsPlugin',
+      (compilation) => {
+        compilation.hooks.processAssets.tap(
+          'ExportMiniProgramAssetsPlugin',
+          () => {
+            for (const stylePath in compilation.assets) {
+              if (
+                Object.prototype.hasOwnProperty.call(
+                  compilation.assets,
+                  stylePath
+                )
+              ) {
+                const data = compilation.assets[stylePath];
+                if (/\.(scss|css|sass|less|styl)$/.test(stylePath)) {
+                  styleAssets.set(path.normalize(stylePath), data);
+                  compilation.assets[stylePath] = new RawSource(' ') as any;
+                }
+              }
+            }
+          }
+        );
+      }
+    );
     compiler.hooks.thisCompilation.tap(
       'ExportMiniProgramAssetsPlugin',
       (compilation) => {
@@ -89,14 +112,6 @@ export class ExportMiniProgramAssetsPlugin {
         oldBuilder =
           templateService.getBuilder() as ts.EmitAndSemanticDiagnosticsBuilderProgram;
         const waitAnalyzeAsync = templateService.analyzeAsync();
-        const styleChangeMap = templateService.removeStyle();
-        this.hookFileSystemFile(styleChangeMap);
-
-        const ngComponentCssExtractPlugin = new NgComponentCssExtractPlugin(
-          styleChangeMap,
-          resourceLoader
-        );
-        ngComponentCssExtractPlugin.apply(compilation);
         const buildTemplatePromise = this.buildTemplate(
           waitAnalyzeAsync,
           templateService
@@ -119,6 +134,13 @@ export class ExportMiniProgramAssetsPlugin {
               compilation.assets[key] = new RawSource(value) as any;
             });
 
+            const map = templateService.exportComponentStyleUrlsMap();
+            map.forEach((value, outputPath) => {
+              const item = new ConcatSource(
+                ...value.map((item) => styleAssets.get(item))
+              );
+              compilation.assets[outputPath] = item as any;
+            });
             cb();
           }
         );

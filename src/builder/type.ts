@@ -1,4 +1,4 @@
-import { AssetPattern } from '@angular-devkit/build-angular';
+import type { AssetPattern } from '@angular-devkit/build-angular';
 
 export interface PagePattern extends Exclude<AssetPattern, string> {
   /** 入口名 */

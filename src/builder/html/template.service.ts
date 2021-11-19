@@ -1,9 +1,5 @@
-import type { R3ComponentMetadata, SelectorMatcher } from '@angular/compiler';
-import type {
-  NgtscProgram,
-  ParsedConfiguration,
-  // readConfiguration,
-} from '@angular/compiler-cli';
+import type { R3ComponentMetadata } from '@angular/compiler';
+import type { NgtscProgram, ParsedConfiguration } from '@angular/compiler-cli';
 import type { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
 import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
 import type {
@@ -23,11 +19,11 @@ import type {
   SourceFile,
 } from 'typescript';
 import { Compilation, Compiler } from 'webpack';
+import { SelectorMatcher } from '../angular-internal/selector';
 import { COMPONENT_META, DIRECTIVE_MATCHER } from '../token/component.token';
 import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
-// import { DecoratorMetaDataResolver } from '../ts/decorator-metadata-resolver';
 import { PagePattern } from '../type';
 import {
   angularCompilerCliPromise,
@@ -36,14 +32,11 @@ import {
 import { RawUpdater } from '../util/raw-updater';
 import { ComponentContext } from './node-handle/global-context';
 import { TemplateCompiler } from './template-compiler';
-import { StyleHookData } from './type';
-// import { getAngularCompiler } from '../util/load_esm';
-// const angularCompilerPromise = getAngularCompiler();
+
 @Injectable()
 export class TemplateService {
   private dependencyUseModule = new Map<string, string[]>();
   private cleanDependencyFileCacheSet = new Set<string>();
-  // private resolver!: DecoratorMetaDataResolver;
   builder!: ts.BuilderProgram | ts.EmitAndSemanticDiagnosticsBuilderProgram;
   private ngTscProgram!: NgtscProgram;
   private tsProgram!: ts.Program;
@@ -54,6 +47,7 @@ export class TemplateService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private ngModuleMap = new Map<ClassDeclaration, any>();
   private componentToEntryMap = new Map<string, PagePattern>();
+  private componentStyleUrlsMap = new Map<string, string[]>();
   constructor(
     private injector: Injector,
     @Inject(WEBPACK_COMPILATION) private compilation: Compilation,
@@ -63,45 +57,8 @@ export class TemplateService {
     @Inject(OLD_BUILDER)
     private oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined,
     @Inject(PAGE_PATTERN_TOKEN) private pagePatternList: PagePattern[]
-  ) {
-    // this.resolver = new DecoratorMetaDataResolver(
-    //   this.tsProgram,
-    //   this.tsProgram.getTypeChecker()
-    // );
-    // this.tsProgram
-    //   .getSourceFiles()
-    //   .filter((sf) => !sf.isDeclarationFile)
-    //   .filter((sf) => !sf.fileName.includes('node_modules'))
-    //   .forEach((item) => {
-    //     this.resolver.resolverSourceFile(item);
-    //   });
-    // this.resolver.getComponentMetaMap().forEach((value, key) => {
-    //   const fileName = key.getSourceFile().fileName;
-    //   this.componentToEntryMap.set(
-    //     fileName,
-    //     this.getComponentPagePattern(fileName)
-    //   );
-    // });
-  }
-  removeStyle() {
-    const componentChangeMap = new Map<string, StyleHookData>();
-    // this.resolver.getComponentMetaMap().forEach((value, key) => {
-    //   const sf = key.getSourceFile();
-    //   const fileName = sf.fileName;
-    //   const pagePattern = this.componentToEntryMap.get(fileName)!;
-    //   componentChangeMap.set(pagePattern.outputFiles.style, {
-    //     ...this.removeTemplateAndStyleInTs(
-    //       (key.decorators![0].expression as CallExpression)
-    //         .arguments[0] as ObjectLiteralExpression,
-    //       sf
-    //     ),
-    //     styles: value['styles'] as string[],
-    //     styleUrls: value['styleUrls'] as string[],
-    //   });
-    // });
+  ) {}
 
-    return componentChangeMap;
-  }
   private collectionInfo() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const traitCompiler: TraitCompiler = (this.ngCompiler as any).compilation
@@ -112,6 +69,7 @@ export class TemplateService {
       ClassRecord
     >;
     for (const [classDeclaration, classRecord] of classes) {
+      const fileName = classDeclaration.getSourceFile().fileName;
       const componentTraits = classRecord.traits.filter(
         (trait) => trait.handler.name === 'ComponentDecoratorHandler'
       );
@@ -119,12 +77,20 @@ export class TemplateService {
         throw new Error('组件装饰器异常');
       }
       componentTraits.forEach((trait) => {
+        const entryPattern = this.getComponentPagePattern(fileName);
+        this.componentToEntryMap.set(fileName, entryPattern);
         const meta: R3ComponentMetadata = {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).analysis?.meta,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).resolution,
         };
+        this.componentStyleUrlsMap.set(
+          entryPattern.outputFiles.style,
+          ((trait as any)?.analysis?.styleUrls || []).map(
+            (item: { url: string }) => this.resolveStyleUrl(fileName, item.url)
+          )
+        );
         this.componentMap.set(
           ts.getOriginalNode(classDeclaration) as ts.ClassDeclaration,
           meta
@@ -402,7 +368,6 @@ export class TemplateService {
     await this.initTscProgram();
     await this.ngCompiler.analyzeAsync();
     this.collectionInfo();
-
     this.componentMap.forEach((value, key) => {
       const fileName = key.getSourceFile().fileName;
       this.componentToEntryMap.set(
@@ -421,7 +386,7 @@ export class TemplateService {
       } catch (error) {}
     });
   }
-  augmentProgramWithVersioning(program: ts.Program): void {
+  private augmentProgramWithVersioning(program: ts.Program): void {
     const baseGetSourceFiles = program.getSourceFiles;
     program.getSourceFiles = function (...parameters) {
       const files: readonly (ts.SourceFile & { version?: string })[] =
@@ -435,5 +400,11 @@ export class TemplateService {
 
       return files;
     };
+  }
+  private resolveStyleUrl(componentPath: string, styleUrl: string) {
+    return path.normalize(path.resolve(path.dirname(componentPath), styleUrl));
+  }
+  exportComponentStyleUrlsMap() {
+    return this.componentStyleUrlsMap;
   }
 }

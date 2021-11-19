@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { InjectFlags, ɵɵdirectiveInject } from '@angular/core';
+import { LView } from './internal-type';
 import { AgentNode } from './module/renderer-node';
 import { PAGE_TOKEN } from './module/token/page.token';
 
 const start = 20;
 
-type LView = any;
 const initValue = new Map<LView, any>();
 export function propertyChange(context: any) {
   const lView = findCurrenComponentLView(context);
@@ -85,7 +85,7 @@ export function pageBind(context: any) {
   }
   pageMap.set(pageId, lview);
 }
-export function getPageLView(id: string) {
+export function getPageLView(id: string): any {
   return pageMap.get(id)!;
 }
 
