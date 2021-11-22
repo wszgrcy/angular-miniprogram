@@ -7,7 +7,7 @@ import type { NgNodeMeta } from './node-handle/interface';
 import { TemplateDefinition } from './template-definition';
 
 @Injectable()
-export class TemplateCompiler {
+export class ComponentCompiler {
   private nodeMetaList: NgNodeMeta[] = [];
   private templateTransform: BuildPlatform['templateTransform'];
   constructor(

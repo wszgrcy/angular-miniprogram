@@ -125,17 +125,14 @@ export class ExportMiniProgramAssetsPlugin {
         compilation.hooks.processAssets.tapAsync(
           'ExportMiniProgramAssetsPlugin',
           async (assets, cb) => {
-            const componentBuildMetaMap = await (
-              await buildTemplatePromise
-            ).outputContent;
+            const metaMap = await buildTemplatePromise;
 
-            componentBuildMetaMap.forEach((value, key) => {
+            metaMap.outputContent.forEach((value, key) => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               compilation.assets[key] = new RawSource(value) as any;
             });
 
-            const map = templateService.exportComponentStyleUrlsMap();
-            map.forEach((value, outputPath) => {
+            metaMap.style.forEach((value, outputPath) => {
               const item = new ConcatSource(
                 ...value.map((item) => styleAssets.get(item))
               );

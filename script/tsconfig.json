@@ -1,7 +1,9 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "./"
+    "rootDir": "./",
+    "esModuleInterop": true,
+    "downlevelIteration": true
   },
   "include": ["**/*"],
   "exclude": []

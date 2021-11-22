@@ -132,82 +132,26 @@
         }
       }
     },
-
-    "sub1": {
-      "projectType": "application",
-      "schematics": {
-        "@schematics/angular:component": {
-          "style": "scss"
-        }
-      },
-      "root": "projects/sub1",
-      "sourceRoot": "projects/sub1/src",
-      "prefix": "app",
+    "test-library": {
+      "projectType": "library",
+      "root": "projects/test-library",
+      "sourceRoot": "projects/test-library/src",
+      "prefix": "lib",
       "architect": {
         "build": {
-          "builder": "@angular-builders/custom-webpack:browser",
+          "builder": "@angular-devkit/build-angular:ng-packagr",
           "options": {
-            "outputPath": "dist/sub1",
-            "index": "",
-            "main": "projects/sub1/src/main.ts",
-            "polyfills": "projects/sub1/src/polyfills.ts",
-            "tsConfig": "projects/sub1/tsconfig.app.json",
-            "aot": true,
-            "assets": [
-              "projects/sub1/src/favicon.ico",
-              "projects/sub1/src/assets"
-            ],
-            "styles": ["projects/sub1/src/styles.scss"],
-            "scripts": [],
-            "customWebpackConfig": {
-              "path": "./webpack.config.sub1.ts"
+            "project": "projects/test-library/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "projects/test-library/tsconfig.lib.prod.json"
             },
-            "vendorChunk": false,
-            "deployUrl": "http://127.0.0.1:4201/"
-          },
-          "configurations": {
-            "production": {
-              "fileReplacements": [
-                {
-                  "replace": "projects/sub1/src/environments/environment.ts",
-                  "with": "projects/sub1/src/environments/environment.prod.ts"
-                }
-              ],
-              "optimization": true,
-              "outputHashing": "all",
-              "sourceMap": true,
-              "namedChunks": false,
-              "extractLicenses": true,
-              "vendorChunk": false,
-              "buildOptimizer": true,
-              "deployUrl": "/ng-cli-plugin-demo/sub1/",
-              "budgets": [
-                {
-                  "type": "initial",
-                  "maximumWarning": "2mb",
-                  "maximumError": "5mb"
-                },
-                {
-                  "type": "anyComponentStyle",
-                  "maximumWarning": "6kb",
-                  "maximumError": "10kb"
-                }
-              ]
+            "development": {
+              "tsConfig": "projects/test-library/tsconfig.lib.json"
             }
-          }
-        },
-        "serve": {
-          "builder": "@angular-builders/custom-webpack:dev-server",
-          "options": {
-            "browserTarget": "sub1:build",
-            "publicHost": "0.0.0.0:4201",
-            "port": 4201
           },
-          "configurations": {
-            "production": {
-              "browserTarget": "sub1:build:production"
-            }
-          }
+          "defaultConfiguration": "production"
         }
       }
     }
