@@ -201,6 +201,10 @@ export class WebpackConfigurationChange {
         path.join(__dirname, './loader/component-template.loader')
       ),
     });
+    this.config.module?.rules?.unshift({
+      test: /\.mjs$/,
+      loader: require.resolve(path.join(__dirname, './loader/library.loader')),
+    });
   }
   private definePlugin() {
     const defineObject: Record<string, string> = {

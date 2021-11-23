@@ -6,7 +6,7 @@ import {
 import { execute } from './index';
 
 describeBuilder(execute, LIBRARY_BUILDER_INFO, (harness) => {
-  fdescribe('', () => {
+  describe('', () => {
     it('运行', async () => {
       harness.useTarget('library', DEFAULT_ANGULAR_LIBRARY_CONFIG);
       const result = await harness.executeOnce();

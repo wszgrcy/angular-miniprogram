@@ -16,3 +16,15 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
     logic: string;
   };
 }
+
+export interface ExportLibraryComponentMeta {
+  baseDir: string;
+  content: { path: string; content: string | null };
+  contentTemplate: { path: string; content: string | null };
+  style: { path: string; content: string | null };
+  componentName: string;
+}
+
+export interface LibraryLoaderContext {
+  libraryMetaList: ExportLibraryComponentMeta[];
+}

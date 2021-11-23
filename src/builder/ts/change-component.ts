@@ -62,5 +62,10 @@ export function changeComponent(data: string, meta: string) {
     );
   }
   changeList.push(updateInsertChange);
-  return RawUpdater.update(data, changeList);
+  return {
+    content: RawUpdater.update(data, changeList),
+    componentName: (
+      componentɵcmpNode.left as ts.PropertyAccessExpression
+    ).expression.getText(),
+  };
 }

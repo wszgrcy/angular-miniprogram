@@ -17,5 +17,6 @@ register({
   },
 });
 var jasmine = new Jasmine();
+args = process.argv.slice(2) || [];
 jasmine.loadConfigFile(path.resolve(__dirname, '../jasmine.json'));
-jasmine.execute();
+jasmine.execute(undefined, args[0] || undefined);

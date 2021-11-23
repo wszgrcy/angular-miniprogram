@@ -28,5 +28,5 @@ export default async function (
     return;
   }
 
-  callback(undefined, changeData);
+  callback(undefined, changeData.content);
 }

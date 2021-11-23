@@ -5,12 +5,21 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "测试(jasmine)",
+      "name": "测试(jasmine)-library",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceRoot}",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run-script", "test"],
+      "runtimeArgs": ["run-script", "test", "library"],
+      "port": 7899
+    },
+    {
+      "name": "测试(jasmine)-browser",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceRoot}",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run-script", "test", "browser"],
       "port": 7899
     },
     {

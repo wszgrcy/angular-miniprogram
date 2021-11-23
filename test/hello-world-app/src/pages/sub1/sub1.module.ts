@@ -3,9 +3,10 @@ import { Sub1Component } from './sub1.component';
 import { Cp1Module } from '../../components/cp1/cp1.module';
 import { CommonModule } from '@angular/common';
 import { F1Directive } from './f1.directive';
+import { TestLibraryModule } from 'test-library';
 @NgModule({
   declarations: [Sub1Component, F1Directive],
-  imports: [Cp1Module, CommonModule],
+  imports: [Cp1Module, CommonModule, TestLibraryModule],
   providers: [],
   bootstrap: [],
   exports: [Sub1Component],

@@ -1,4 +1,4 @@
-import { normalize } from '@angular-devkit/core';
+import { join, normalize } from '@angular-devkit/core';
 import type {
   CompilerOptions,
   ParsedConfiguration,
@@ -29,6 +29,8 @@ import { getBuildPlatform } from '../platform/platform-info';
 import { WxTransform } from '../platform/template-transform-strategy/wx.transform';
 import { WxBuildPlatform } from '../platform/wx/wx-platform';
 import { changeComponent } from '../ts/change-component';
+import { ExportLibraryComponentMeta } from '../type';
+import { CustomStyleSheetProcessor } from './stylesheet-processor';
 
 export async function compileSourceFiles(
   graph: BuildGraph,
@@ -276,41 +278,51 @@ export async function compileSourceFiles(
           // eslint-disable-next-line prefer-rest-params
           return oldWriteFile.apply(this, arguments as any);
         }
-        // todo 保存后还需要释放
-        const exportMeta = {
-          content: metaMap.outputContent.get(originFileName),
-          contentTemplate: metaMap.outputContentTemplate.get(originFileName),
-          // contentTemplate
+        const componentName = changeData.componentName;
+        const componentPathName = path.basename(fileName, '.js');
+        const baseDir = join(
+          normalize(entryPoint.data.entryPoint.moduleId),
+          componentPathName
+        );
+        const contentPath = join(
+          baseDir,
+          componentPathName + buildPlatform.fileExtname.content
+        );
+        const contentTemplatePath = join(
+          baseDir,
+          'template' + buildPlatform.fileExtname.contentTemplate
+        );
+        const stylePath = path.join(
+          baseDir,
+          componentPathName + buildPlatform.fileExtname.style
+        );
+        const customStyleSheetProcessor =
+          stylesheetProcessor as CustomStyleSheetProcessor;
+        const styleList = metaMap.style.get(originFileName);
+        const styleContentList: string[] = [];
+        styleList?.forEach((item) => {
+          styleContentList.push(customStyleSheetProcessor.styleMap.get(item)!);
+        });
+        const styleContent = styleContentList.join('\n');
+        const insertComponentData: ExportLibraryComponentMeta = {
+          componentName: componentName,
+          baseDir: baseDir,
+          style: { path: stylePath, content: styleContent },
+          content: {
+            path: contentPath,
+            content: metaMap.outputContent.get(originFileName) || null,
+          },
+          contentTemplate: {
+            path: contentTemplatePath,
+            content: metaMap.outputContentTemplate.get(originFileName) || null,
+          },
         };
-        const contentPath = path.normalize(
-          path.resolve(
-            path.dirname(fileName),
-            `${path.basename(fileName, '.js')}${
-              buildPlatform.fileExtname.content
-            }`
-          )
-        );
-        const contentTemplatePath = path.normalize(
-          path.resolve(
-            path.dirname(fileName),
-            `${path.basename(fileName, '.js')}${
-              buildPlatform.fileExtname.contentTemplate
-            }`
-          )
-        );
-        const stylePath = path.normalize(
-          path.resolve(
-            path.dirname(fileName),
-            `${path.basename(fileName, '.js')}${
-              buildPlatform.fileExtname.style
-            }`
-          )
-        );
-        // todo content,style等写入js
         return oldWriteFile.call(
           this,
           fileName,
-          `${changeData}`,
+          `let ${componentName}_ExtraData=${JSON.stringify(
+            insertComponentData
+          )};${changeData.content}`,
           writeByteOrderMark,
           onError,
           sourceFiles

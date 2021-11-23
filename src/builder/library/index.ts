@@ -13,11 +13,12 @@ import {
 } from '@angular-devkit/architect';
 import { normalizeCacheOptions } from '@angular-devkit/build-angular/src/utils/normalize-cache';
 import { COMPILE_NGC_TRANSFORM } from 'ng-packagr/lib/ng-package/entry-point/compile-ngc.di';
+import { STYLESHEET_PROCESSOR } from 'ng-packagr/lib/styles/stylesheet-processor.di';
 import { join, resolve } from 'path';
 import { Observable, from, of } from 'rxjs';
 import { catchError, mapTo, switchMap } from 'rxjs/operators';
 import { myCompileNgcTransformFactory } from './compile-ngc.transform';
-
+import { CustomStyleSheetProcessor } from './stylesheet-processor';
 /**
  * @experimental Direct usage of this function is considered experimental.
  */
@@ -41,6 +42,7 @@ export function execute(
         throw new Error('The builder requires a target.');
       }
       COMPILE_NGC_TRANSFORM.useFactory = myCompileNgcTransformFactory;
+      STYLESHEET_PROCESSOR.useFactory = () => CustomStyleSheetProcessor;
       packager.withProviders([COMPILE_NGC_TRANSFORM]);
 
       const metadata = await context.getProjectMetadata(projectName);
