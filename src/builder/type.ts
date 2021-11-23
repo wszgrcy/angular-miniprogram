@@ -18,13 +18,19 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
 }
 
 export interface ExportLibraryComponentMeta {
+  id: string;
   baseDir: string;
-  content: { path: string; content: string | null };
-  contentTemplate: { path: string; content: string | null };
-  style: { path: string; content: string | null };
-  componentName: string;
+  content: { path: string; content: string };
+  contentTemplate?: { path: string; content: string };
+  style?: { path: string; content: string };
+  className: string;
+  logicName: string;
 }
-
+export interface LibraryComponentEntryMeta extends ExportLibraryComponentMeta {
+  importPath: string;
+  context: string;
+  contextPath: string;
+}
 export interface LibraryLoaderContext {
-  libraryMetaList: ExportLibraryComponentMeta[];
+  libraryMetaList: LibraryComponentEntryMeta[];
 }

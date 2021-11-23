@@ -1,4 +1,9 @@
 import { join, normalize } from '@angular-devkit/core';
+import {
+  camelize,
+  classify,
+  dasherize,
+} from '@angular-devkit/core/src/utils/strings';
 import type {
   CompilerOptions,
   ParsedConfiguration,
@@ -278,23 +283,23 @@ export async function compileSourceFiles(
           // eslint-disable-next-line prefer-rest-params
           return oldWriteFile.apply(this, arguments as any);
         }
-        const componentName = changeData.componentName;
-        const componentPathName = path.basename(fileName, '.js');
+        const componentClassName = changeData.componentName;
+        const componentFileName = path.basename(fileName, '.js');
         const baseDir = join(
           normalize(entryPoint.data.entryPoint.moduleId),
-          componentPathName
+          dasherize(camelize(componentFileName))
         );
         const contentPath = join(
           baseDir,
-          componentPathName + buildPlatform.fileExtname.content
+          componentFileName + buildPlatform.fileExtname.content
         );
         const contentTemplatePath = join(
           baseDir,
           'template' + buildPlatform.fileExtname.contentTemplate
         );
-        const stylePath = path.join(
+        const stylePath = join(
           baseDir,
-          componentPathName + buildPlatform.fileExtname.style
+          componentFileName + buildPlatform.fileExtname.style
         );
         const customStyleSheetProcessor =
           stylesheetProcessor as CustomStyleSheetProcessor;
@@ -305,22 +310,35 @@ export async function compileSourceFiles(
         });
         const styleContent = styleContentList.join('\n');
         const insertComponentData: ExportLibraryComponentMeta = {
-          componentName: componentName,
+          id:
+            classify(entryPoint.data.entryPoint.moduleId) +
+            classify(camelize(componentFileName)),
+          className: componentClassName,
+          logicName: componentFileName,
           baseDir: baseDir,
-          style: { path: stylePath, content: styleContent },
           content: {
             path: contentPath,
-            content: metaMap.outputContent.get(originFileName) || null,
-          },
-          contentTemplate: {
-            path: contentTemplatePath,
-            content: metaMap.outputContentTemplate.get(originFileName) || null,
+            content: metaMap.outputContent.get(originFileName)!,
           },
         };
+        if (styleContent) {
+          insertComponentData.style = {
+            path: stylePath,
+            content: styleContent,
+          };
+        }
+        const outputTemplate =
+          metaMap.outputContentTemplate.get(originFileName);
+        if (outputTemplate) {
+          insertComponentData.contentTemplate = {
+            path: contentTemplatePath,
+            content: outputTemplate,
+          };
+        }
         return oldWriteFile.call(
           this,
           fileName,
-          `let ${componentName}_ExtraData=${JSON.stringify(
+          `let ${componentClassName}_ExtraData=${JSON.stringify(
             insertComponentData
           )};${changeData.content}`,
           writeByteOrderMark,

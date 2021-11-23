@@ -1,3 +1,6 @@
 {
-  "usingComponents": { "app-cp1": "../../components/cp1/cp1.entry" }
+  "usingComponents": {
+    "app-cp1": "../../components/cp1/cp1.entry",
+    "lib-test-library": "../../library/test-library/test-library-component/test-library.component"
+  }
 }

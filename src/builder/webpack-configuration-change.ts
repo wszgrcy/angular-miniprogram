@@ -14,10 +14,12 @@ import { DefinePlugin } from 'webpack';
 import { BootstrapAssetsPlugin } from 'webpack-bootstrap-assets-plugin';
 import { BuildPlatform } from './platform/platform';
 import type { PlatformType } from './platform/platform';
+import { DynamicLibraryEntryPlugin } from './plugin/dynamic-library-entry.plugin';
 import { DynamicWatchEntryPlugin } from './plugin/dynamic-watch-entry.plugin';
 import { ExportMiniProgramAssetsPlugin } from './plugin/export-mini-program-assets.plugin';
 import { TS_CONFIG_TOKEN } from './token/project.token';
 import type { PagePattern } from './type';
+import { LIBRARY_OUTPUT_PATH } from './const';
 
 type OptimizationOptions = NonNullable<webpack.Configuration['optimization']>;
 type OptimizationSplitChunksOptions = Exclude<
@@ -87,6 +89,7 @@ export class WebpackConfigurationChange {
     this.componentTemplateLoader();
     this.definePlugin();
     this.changeStylesExportSuffix();
+    this.config.plugins?.push(new DynamicLibraryEntryPlugin());
   }
   private async pageHandle() {
     this.workspaceRoot = normalize(this.context.workspaceRoot);
@@ -148,7 +151,10 @@ export class WebpackConfigurationChange {
           .splitChunks! as unknown as OptimizationSplitChunksOptions
       ).cacheGroups!.defaultVendors as OptimizationSplitChunksCacheGroup
     ).chunks = (chunk) => {
-      if (this.entryList.find((item) => item.entryName === chunk.name)) {
+      if (
+        this.entryList.find((item) => item.entryName === chunk.name) ||
+        chunk.name.startsWith(`${LIBRARY_OUTPUT_PATH}/`)
+      ) {
         return true;
       }
       return oldChunks(chunk);
@@ -171,7 +177,8 @@ export class WebpackConfigurationChange {
     assetsPlugin.hooks.removeChunk.tap('pageHandle', (chunk) => {
       if (
         this.entryList.some((page) => page.entryName === chunk.name) ||
-        chunk.name === 'styles'
+        chunk.name === 'styles' ||
+        chunk.name.startsWith(`${LIBRARY_OUTPUT_PATH}/`)
       ) {
         return true;
       }

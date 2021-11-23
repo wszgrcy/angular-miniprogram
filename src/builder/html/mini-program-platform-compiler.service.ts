@@ -54,7 +54,7 @@ export class MiniProgramPlatformCompilerService {
           ...(trait as any).resolution,
         };
         this.componentDataMap.style.set(
-          fileName,
+          path.normalize(fileName),
           ((trait as any)?.analysis?.styleUrls || []).map(
             (item: { url: string }) => this.resolveStyleUrl(fileName, item.url)
           )
@@ -123,13 +123,13 @@ export class MiniProgramPlatformCompilerService {
         meta
       );
       this.componentDataMap.outputContent.set(
-        fileName,
+        path.normalize(fileName),
         componentBuildMeta.content
       );
 
       if (componentBuildMeta.template) {
         this.componentDataMap.outputContentTemplate.set(
-          fileName,
+          path.normalize(fileName),
           componentBuildMeta.template
         );
       }

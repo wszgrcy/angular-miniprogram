@@ -16,7 +16,7 @@ import { COMPILE_NGC_TRANSFORM } from 'ng-packagr/lib/ng-package/entry-point/com
 import { STYLESHEET_PROCESSOR } from 'ng-packagr/lib/styles/stylesheet-processor.di';
 import { join, resolve } from 'path';
 import { Observable, from, of } from 'rxjs';
-import { catchError, mapTo, switchMap } from 'rxjs/operators';
+import { catchError, mapTo, switchMap, tap } from 'rxjs/operators';
 import { myCompileNgcTransformFactory } from './compile-ngc.transform';
 import { CustomStyleSheetProcessor } from './stylesheet-processor';
 /**
@@ -62,7 +62,7 @@ export function execute(
         ? packager.watch(ngPackagrOptions)
         : packager.build(ngPackagrOptions)
     ),
-    mapTo({ success: true }),
+    mapTo({ success: true, workspaceRoot: context.workspaceRoot }),
     catchError((err) => of({ success: false, error: err.message }))
   );
 }
