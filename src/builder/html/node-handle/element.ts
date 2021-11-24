@@ -3,6 +3,7 @@ import type {
   BoundAttribute,
   Element,
 } from '@angular/compiler/src/render3/r3_ast';
+import type { MatchedComponentMeta, MatchedDirectiveMeta } from '../type';
 import { TagEventMeta } from './event';
 import { ComponentContext } from './global-context';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
@@ -21,11 +22,9 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   constructor(
     private node: Element,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    private componentMeta:
-      | { outputs: string[]; isComponent: boolean }
-      | undefined,
+    private componentMeta: MatchedComponentMeta | undefined,
     public index: number,
-    private directiveMeta: { listeners: string[] } | undefined
+    private directiveMeta: MatchedDirectiveMeta | undefined
   ) {}
   private analysis() {
     this.getTagName();

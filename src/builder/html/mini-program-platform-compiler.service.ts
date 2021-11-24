@@ -6,6 +6,7 @@ import type {
   ClassRecord,
   TraitCompiler,
 } from '@angular/compiler-cli/src/ngtsc/transform';
+import { createCssSelectorForTs } from 'cyia-code-util';
 import path from 'path';
 import { Injectable, Injector } from 'static-injector';
 import ts, { ClassDeclaration } from 'typescript';
@@ -105,9 +106,12 @@ export class MiniProgramPlatformCompilerService {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (directive as any).ref.node
           ) as ts.ClassDeclaration;
-          const directiveMeta = this.directiveMap.get(
-            directiveClassDeclaration
-          );
+          let directiveMeta = this.directiveMap.get(directiveClassDeclaration);
+          if (!directive.isComponent && !directiveMeta) {
+            directiveMeta = this.getLibraryDirectiveMeta(
+              (directive as any).ref.node
+            );
+          }
           matcher.addSelectables(
             (await angularCompilerPromise).CssSelector.parse(selector),
             {
@@ -165,5 +169,23 @@ export class MiniProgramPlatformCompilerService {
   }
   private resolveStyleUrl(componentPath: string, styleUrl: string) {
     return path.normalize(path.resolve(path.dirname(componentPath), styleUrl));
+  }
+  getDirectiveMap() {
+    return this.directiveMap;
+  }
+  private getLibraryDirectiveMeta(classDeclaration: ts.ClassDeclaration) {
+    let directiveName = classDeclaration.name!.getText();
+    let selector = createCssSelectorForTs(classDeclaration.getSourceFile());
+    let eventsNode = selector.queryOne(
+      `VariableDeclaration[name=${directiveName}_Events]`
+    ) as ts.VariableDeclaration;
+    if (!eventsNode) {
+      return undefined;
+    }
+    let events = eventsNode.type!.getText();
+    return {
+      isLibraryDirective: true,
+      listeners: JSON.parse(events),
+    };
   }
 }

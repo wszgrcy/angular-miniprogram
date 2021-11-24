@@ -1,6 +1,7 @@
 import type { R3UsedDirectiveMetadata } from '@angular/compiler/src/compiler_facade_interface';
 import type { Element, Template } from '@angular/compiler/src/render3/r3_ast';
 import { Injectable } from 'static-injector';
+import ts from 'typescript';
 import type { SelectorMatcher } from '../../angular-internal/selector';
 import { createCssSelector } from '../../angular-internal/template';
 import { getAttrsForDirectiveMatching } from '../../angular-internal/util';
@@ -56,13 +57,18 @@ export class ComponentContext {
             isComponent,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             outputs: (meta.directive as any).outputs,
+            moduleName: ((meta.directive as any).importedFile as ts.SourceFile)
+              .moduleName,
+            filePath: ((meta.directive as any).importedFile as ts.SourceFile)
+              .fileName,
+            selector: (meta.directive as any).selector,
           });
         } else {
           result.push({
             isComponent,
-            listeners: Object.keys(
-              meta.directiveMeta?.meta?.host?.listeners || []
-            ),
+            listeners: meta?.directiveMeta?.isLibraryDirective
+              ? meta.directiveMeta.listeners
+              : Object.keys(meta.directiveMeta?.meta?.host?.listeners || []),
           });
         }
       }

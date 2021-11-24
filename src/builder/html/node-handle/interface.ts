@@ -1,3 +1,4 @@
+import type { MatchedComponentMeta, MatchedDirectiveMeta } from '../type';
 import { TagEventMeta } from './event';
 import { ComponentContext } from './global-context';
 
@@ -27,13 +28,8 @@ export interface NgElementMeta extends NgNodeMeta {
   property: string[];
   outputs: TagEventMeta[];
   singleClosedTag: boolean;
-  componentMeta:
-    | {
-        outputs: string[];
-        isComponent: boolean;
-      }
-    | undefined;
-  directiveMeta: { listeners: string[] } | undefined;
+  componentMeta: MatchedComponentMeta | undefined;
+  directiveMeta: MatchedDirectiveMeta | undefined;
 }
 export interface NgBoundTextMeta extends NgNodeMeta {
   kind: NgNodeKind.BoundText;

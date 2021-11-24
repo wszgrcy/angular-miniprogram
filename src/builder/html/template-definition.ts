@@ -43,6 +43,7 @@ import { ComponentContext } from './node-handle/global-context';
 import { NgNodeMeta, ParsedNode } from './node-handle/interface';
 import { ParsedNgTemplate } from './node-handle/template';
 import { ParsedNgText } from './node-handle/text';
+import type { MatchedComponentMeta, MatchedDirectiveMeta } from './type';
 
 export class TemplateDefinition implements Visitor {
   /** 变量对应的值索引 */
@@ -51,7 +52,7 @@ export class TemplateDefinition implements Visitor {
   list: ParsedNode<NgNodeMeta>[] = [];
   private declIndex = 0;
 
-  astVistor = new CustomAstVistor(() => {
+  astVisitor = new CustomAstVisitor(() => {
     this.declIndex++;
   });
   constructor(
@@ -62,15 +63,23 @@ export class TemplateDefinition implements Visitor {
   visit?(node: Node) {}
   visitElement(element: Element) {
     const nodeIndex = this.declIndex++;
-    let componentMeta: { outputs: string[]; isComponent: boolean } | undefined;
-    let directiveMeta: { listeners: string[] } | undefined;
+    let componentMeta: MatchedComponentMeta | undefined;
+    let directiveMeta: MatchedDirectiveMeta | undefined;
     const result = this.templateGlobalContext.matchDirective(element);
     if (result) {
       if (result.some((item) => item.isComponent)) {
         const type = result.find((item) => item.isComponent)!;
-        componentMeta = { outputs: type.outputs!, isComponent: true };
-      } else {
-        const list = result.filter((item) => !item.isComponent);
+        componentMeta = {
+          outputs: type.outputs!,
+          isComponent: true,
+          moduleName: type.moduleName!,
+          filePath: type.filePath!,
+          selector: type.selector!,
+        };
+      }
+
+      const list = result.filter((item) => !item.isComponent);
+      if (list.length) {
         directiveMeta = {
           listeners: list.map((item) => item.listeners!).flat(),
         };
@@ -88,7 +97,7 @@ export class TemplateDefinition implements Visitor {
       this.parentNode.appendNgNodeChild(instance);
     }
     element.inputs.forEach((item) => {
-      item.value.visit(this.astVistor);
+      item.value.visit(this.astVisitor);
     });
     const oldParent = this.parentNode;
     this.parentNode = instance;
@@ -114,11 +123,11 @@ export class TemplateDefinition implements Visitor {
     this.prepareRefsArray(template.references);
     template.templateAttrs.forEach((item) => {
       if (typeof item.value !== 'string') {
-        item.value.visit(this.astVistor);
+        item.value.visit(this.astVisitor);
       }
     });
     template.inputs.forEach((item) => {
-      item.value.visit(this.astVistor);
+      item.value.visit(this.astVisitor);
     });
     const instance = new TemplateDefinition(
       template.children,
@@ -159,7 +168,7 @@ export class TemplateDefinition implements Visitor {
   }
   visitBoundText(text: BoundText) {
     const nodeIndex = this.declIndex++;
-    text.value.visit(this.astVistor);
+    text.value.visit(this.astVisitor);
     const instance = new ParsedNgBoundText(text, this.parentNode, nodeIndex);
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
@@ -201,7 +210,7 @@ export function visitAll<Result>(
   }
   return result;
 }
-class CustomAstVistor implements AstVisitor {
+class CustomAstVisitor implements AstVisitor {
   constructor(private pipeCallback: () => void) {}
   visitCall(ast: Call, context: any) {
     ast.receiver.visit(this);

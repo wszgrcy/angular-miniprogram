@@ -35,7 +35,9 @@ import { WxTransform } from '../platform/template-transform-strategy/wx.transfor
 import { WxBuildPlatform } from '../platform/wx/wx-platform';
 import { changeComponent } from '../ts/change-component';
 import { ExportLibraryComponentMeta } from '../type';
+import { AddDeclareMetaService } from './add-declare-meta';
 import { CustomStyleSheetProcessor } from './stylesheet-processor';
+import { DIRECTIVE_MAP, LIBRARY_ENTRY_POINT, RESOLVED_META_MAP } from './token';
 
 export async function compileSourceFiles(
   graph: BuildGraph,
@@ -83,7 +85,7 @@ export async function compileSourceFiles(
     cache.oldNgtscProgram
   );
   // todo 平台
-  const injector = Injector.create({
+  let injector = Injector.create({
     providers: [
       { provide: WxTransform },
       { provide: WxBuildPlatform },
@@ -186,7 +188,21 @@ export async function compileSourceFiles(
   miniProgramPlatformCompilerService.init();
   const metaMap =
     await miniProgramPlatformCompilerService.exportComponentBuildMetaMap();
-  metaMap;
+  injector = Injector.create({
+    parent: injector,
+    providers: [
+      {
+        provide: LIBRARY_ENTRY_POINT,
+        useValue: entryPoint.data.entryPoint.moduleId,
+      },
+      { provide: RESOLVED_META_MAP, useValue: metaMap },
+      {
+        provide: DIRECTIVE_MAP,
+        useValue: miniProgramPlatformCompilerService.getDirectiveMap(),
+      },
+      { provide: AddDeclareMetaService },
+    ],
+  });
   // Collect source file specific diagnostics
   for (const sourceFile of builder.getSourceFiles()) {
     if (!ignoreForDiagnostics.has(sourceFile)) {
@@ -267,9 +283,21 @@ export async function compileSourceFiles(
       onError,
       sourceFiles
     ) {
-      if (fileName.endsWith('.map') || fileName.endsWith('.d.ts')) {
+      if (fileName.endsWith('.map')) {
         // eslint-disable-next-line prefer-rest-params
         return oldWriteFile.apply(this, arguments as any);
+      }
+      if (fileName.endsWith('.d.ts')) {
+        const service = injector.get(AddDeclareMetaService);
+        const result = service.run(fileName, data, sourceFiles![0]);
+        return oldWriteFile.call(
+          this,
+          fileName,
+          result,
+          writeByteOrderMark,
+          onError,
+          sourceFiles
+        );
       }
       const sourceFile = sourceFiles && sourceFiles[0];
       if (sourceFile) {
@@ -284,10 +312,11 @@ export async function compileSourceFiles(
           return oldWriteFile.apply(this, arguments as any);
         }
         const componentClassName = changeData.componentName;
-        const componentFileName = path.basename(fileName, '.js');
+        const componentFileName = dasherize(camelize(componentClassName));
+        const componentDirName = dasherize(camelize(componentClassName));
         const baseDir = join(
           normalize(entryPoint.data.entryPoint.moduleId),
-          dasherize(camelize(componentFileName))
+          componentDirName
         );
         const contentPath = join(
           baseDir,
@@ -312,7 +341,7 @@ export async function compileSourceFiles(
         const insertComponentData: ExportLibraryComponentMeta = {
           id:
             classify(entryPoint.data.entryPoint.moduleId) +
-            classify(camelize(componentFileName)),
+            classify(camelize(componentDirName)),
           className: componentClassName,
           logicName: componentFileName,
           baseDir: baseDir,

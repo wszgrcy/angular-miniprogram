@@ -9,3 +9,14 @@ export interface StyleHookData {
   styles: string[];
   styleUrls: string[];
 }
+
+export interface MatchedComponentMeta {
+  outputs: string[];
+  isComponent: true;
+  moduleName: string;
+  filePath: string;
+  selector: string;
+}
+export interface MatchedDirectiveMeta {
+  listeners: string[];
+}
