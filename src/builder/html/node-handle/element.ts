@@ -3,10 +3,10 @@ import type {
   BoundAttribute,
   Element,
 } from '@angular/compiler/src/render3/r3_ast';
-import type { MatchedComponentMeta, MatchedDirectiveMeta } from '../type';
 import { TagEventMeta } from './event';
 import { ComponentContext } from './global-context';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
+import type { MatchedComponent, MatchedDirective } from './type';
 
 export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   private tagName!: string;
@@ -22,9 +22,9 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   constructor(
     private node: Element,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    private componentMeta: MatchedComponentMeta | undefined,
+    private componentMeta: MatchedComponent | undefined,
     public index: number,
-    private directiveMeta: MatchedDirectiveMeta | undefined
+    private directiveMeta: MatchedDirective | undefined
   ) {}
   private analysis() {
     this.getTagName();

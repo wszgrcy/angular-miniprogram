@@ -2,7 +2,7 @@ import { join, normalize } from '@angular-devkit/core';
 import { createCssSelectorForTs } from 'cyia-code-util';
 import ts from 'typescript';
 import * as webpack from 'webpack';
-import { LibrarySymbol, LIBRARY_OUTPUT_PATH } from '../const';
+import { LIBRARY_OUTPUT_PATH, LibrarySymbol } from '../const';
 import { ExportLibraryComponentMeta, LibraryLoaderContext } from '../type';
 
 export default function (
@@ -46,24 +46,41 @@ export default function (
       importPath: this.resourcePath,
       contextPath: this.utils.contextify(this.rootContext, this.resourcePath),
     });
+    let fileExtname = libraryLoaderContext.buildPlatform.fileExtname;
     libraryLoaderContext.libraryMetaList.forEach((item) => {
       item;
       this.emitFile(
-        join(normalize(LIBRARY_OUTPUT_PATH), item.content.path),
-        item.content.content
+        join(
+          normalize(LIBRARY_OUTPUT_PATH),
+          item.libraryPath + fileExtname.content
+        ),
+        item.content
       );
       if (item.contentTemplate) {
         this.emitFile(
-          join(normalize(LIBRARY_OUTPUT_PATH), item.contentTemplate.path),
-          item.contentTemplate.content
+          join(
+            normalize(LIBRARY_OUTPUT_PATH),
+            item.libraryPath + fileExtname.contentTemplate
+          ),
+          item.contentTemplate
         );
       }
       if (item.style) {
         this.emitFile(
-          join(normalize(LIBRARY_OUTPUT_PATH), item.style.path),
-          item.style.content
+          join(
+            normalize(LIBRARY_OUTPUT_PATH),
+            item.libraryPath + fileExtname.style
+          ),
+          item.style
         );
       }
+      this.emitFile(
+        join(
+          normalize(LIBRARY_OUTPUT_PATH),
+          item.libraryPath + (fileExtname.config || '.json')
+        ),
+        JSON.stringify({ component: true, usingComponents: item.useComponents })
+      );
     });
   }
   callback(undefined, data, map);

@@ -3,6 +3,10 @@ import { camelize, dasherize } from '@angular-devkit/core/src/utils/strings';
 import { CssSelectorForTs, createCssSelectorForTs } from 'cyia-code-util';
 import { Inject, Injectable } from 'static-injector';
 import ts from 'typescript';
+import {
+  LIBRARY_COMPONENT_EXPORT_PATH_SUFFIX,
+  LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
+} from '../const';
 import { DIRECTIVE_MAP, LIBRARY_ENTRY_POINT, RESOLVED_META_MAP } from './token';
 
 @Injectable()
@@ -45,7 +49,7 @@ export class AddDeclareMetaService {
       const className = element.name!.getText();
 
       metaList.push(
-        `declare const ${className}_ExportPath:"${join(
+        `declare const ${className}_${LIBRARY_COMPONENT_EXPORT_PATH_SUFFIX}:"${join(
           normalize(this.libraryEntryPoint),
           dasherize(camelize(className)),
           dasherize(camelize(className))
@@ -73,11 +77,11 @@ export class AddDeclareMetaService {
       }
       const className = element.name!.getText();
       for (const [key, value] of this.directiveMap.entries()) {
-        let directiveClassName = value.meta.name;
+        const directiveClassName = value.meta.name;
         if (directiveClassName === className) {
-          let listeners = value.meta.host.listeners as Record<string, string>;
+          const listeners = value.meta.host.listeners as Record<string, string>;
           metaList.push(
-            `declare const ${className}_Events:${JSON.stringify(
+            `declare const ${className}_${LIBRARY_DIRECTIVE_LISTENERS_SUFFIX}:${JSON.stringify(
               Object.keys(listeners)
             )};`
           );

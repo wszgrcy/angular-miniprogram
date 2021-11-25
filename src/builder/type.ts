@@ -1,4 +1,5 @@
 import type { AssetPattern } from '@angular-devkit/build-angular';
+import { BuildPlatform } from './platform/platform';
 
 export interface PagePattern extends Exclude<AssetPattern, string> {
   /** 入口名 */
@@ -14,17 +15,22 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
     contentTemplate: string;
     style: string;
     logic: string;
+    path: string;
+    config: string;
+  };
+  inputFiles: {
+    config: string;
   };
 }
 
 export interface ExportLibraryComponentMeta {
   id: string;
-  baseDir: string;
-  content: { path: string; content: string };
-  contentTemplate?: { path: string; content: string };
-  style?: { path: string; content: string };
+  content: string;
+  contentTemplate?: string;
+  style?: string;
   className: string;
-  logicName: string;
+  libraryPath: string;
+  useComponents: Record<string, string>;
 }
 export interface LibraryComponentEntryMeta extends ExportLibraryComponentMeta {
   importPath: string;
@@ -33,4 +39,5 @@ export interface LibraryComponentEntryMeta extends ExportLibraryComponentMeta {
 }
 export interface LibraryLoaderContext {
   libraryMetaList: LibraryComponentEntryMeta[];
+  buildPlatform: BuildPlatform;
 }

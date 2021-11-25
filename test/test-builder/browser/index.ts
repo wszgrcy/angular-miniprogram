@@ -52,11 +52,6 @@ export const DEFAULT_ANGULAR_CONFIG = {
       input: './src',
       output: './',
     },
-    {
-      glob: '**/*.entry.json',
-      input: './src',
-      output: './',
-    },
   ],
   components: [
     { glob: '**/*.entry.ts', input: './src/components', output: 'components' },

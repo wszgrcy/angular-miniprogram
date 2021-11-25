@@ -6,6 +6,7 @@ import type {
   NgTemplateMeta,
   NgTextMeta,
 } from '../../../html/node-handle/interface';
+import type { MatchedDirective } from '../../../html/node-handle/type';
 import {
   isNgBoundTextMeta,
   isNgContentMeta,
@@ -13,6 +14,7 @@ import {
   isNgTemplateMeta,
   isNgTextMeta,
 } from '../../util/type-predicate';
+import type { MetaCollection } from './type';
 
 export class WxContainer {
   directivePrefix!: string;
@@ -21,10 +23,7 @@ export class WxContainer {
   private childContainer: WxContainer[] = [];
   private level: number = 0;
   constructor(
-    private metaCollection: {
-      method: Set<string>;
-      listeners: { methodName: string; index: number; eventName: string }[];
-    },
+    private metaCollection: MetaCollection,
     private containerName = 'container',
     private parent?: WxContainer
   ) {}
@@ -49,6 +48,21 @@ export class WxContainer {
   }
 
   private ngElementTransform(node: NgElementMeta): string {
+    if (node.componentMeta) {
+      if (node.componentMeta.exportPath) {
+        this.metaCollection.libraryPath.add({
+          selector: node.componentMeta.selector,
+          path: node.componentMeta.exportPath,
+          className: node.componentMeta.className,
+        });
+      } else {
+        this.metaCollection.localPath.add({
+          path: node.componentMeta.filePath,
+          selector: node.componentMeta.selector,
+          className: node.componentMeta.className,
+        });
+      }
+    }
     const attributeStr = Object.entries(node.attributes)
       .filter(([key]) => key !== 'class' && key !== 'style')
       .map(([key, value]) => `${key}="${value}"`)
@@ -213,7 +227,7 @@ export class WxContainer {
     return ``;
   }
   private setDirectiveData(
-    directiveMeta: { listeners: string[] } | undefined,
+    directiveMeta: MatchedDirective | undefined,
     nodeIndex: number
   ) {
     if (

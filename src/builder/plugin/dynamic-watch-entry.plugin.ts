@@ -121,7 +121,15 @@ export class DynamicWatchEntryPlugin {
             ...pattern,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             outputFiles: {} as any,
+            inputFiles: {} as any,
           };
+          object.inputFiles!.config = object.src!.replace(
+            /\.ts$/,
+            this.buildPlatform.fileExtname.config || '.json'
+          );
+          object.outputFiles!.path = path
+            .join(pattern.output, object.fileName!)
+            .replace(/\.ts$/, '');
           object.outputFiles!.logic = path
             .join(pattern.output, object.fileName!)
             .replace(/\.ts$/g, '.js');
@@ -137,6 +145,9 @@ export class DynamicWatchEntryPlugin {
             path.dirname(object.outputFiles!.logic),
             `template${this.buildPlatform.fileExtname.contentTemplate}`
           );
+          object.outputFiles!.config =
+            object.outputFiles!.path +
+            (this.buildPlatform.fileExtname.config || '.json');
           return object as PagePattern;
         })
       );

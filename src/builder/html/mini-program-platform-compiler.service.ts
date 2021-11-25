@@ -11,10 +11,20 @@ import path from 'path';
 import { Injectable, Injector } from 'static-injector';
 import ts, { ClassDeclaration } from 'typescript';
 import { SelectorMatcher } from '../angular-internal/selector';
+import {
+  LIBRARY_COMPONENT_EXPORT_PATH_SUFFIX,
+  LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
+} from '../const';
 import { COMPONENT_META, DIRECTIVE_MATCHER } from '../token/component.token';
 import { angularCompilerPromise } from '../util/load_esm';
 import { ComponentContext } from './node-handle/global-context';
 import { ComponentCompiler } from './template-compiler';
+import {
+  ComponentMetaFromLibrary,
+  DirectiveMetaFromLibrary,
+  MetaFromLibrary,
+  UseComponent,
+} from './type';
 
 @Injectable()
 export class MiniProgramPlatformCompilerService {
@@ -27,6 +37,13 @@ export class MiniProgramPlatformCompilerService {
     outputContent: new Map<string, string>(),
     outputContentTemplate: new Map<string, string>(),
     meta: new Map<string, string>(),
+    useComponentPath: new Map<
+      string,
+      {
+        localPath: UseComponent[];
+        libraryPath: UseComponent[];
+      }
+    >(),
   };
   constructor(private ngTscProgram: NgtscProgram, private injector: Injector) {}
   init() {
@@ -106,9 +123,17 @@ export class MiniProgramPlatformCompilerService {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (directive as any).ref.node
           ) as ts.ClassDeclaration;
-          let directiveMeta = this.directiveMap.get(directiveClassDeclaration);
+          const directiveMeta = this.directiveMap.get(
+            directiveClassDeclaration
+          );
+          let libraryMeta: MetaFromLibrary | undefined;
+          if (directive.isComponent) {
+            libraryMeta = this.getLibraryComponentMeta(
+              (directive as any).ref.node
+            );
+          }
           if (!directive.isComponent && !directiveMeta) {
-            directiveMeta = this.getLibraryDirectiveMeta(
+            libraryMeta = this.getLibraryDirectiveMeta(
               (directive as any).ref.node
             );
           }
@@ -117,6 +142,7 @@ export class MiniProgramPlatformCompilerService {
             {
               directive,
               directiveMeta,
+              libraryMeta,
             }
           );
         }
@@ -140,6 +166,10 @@ export class MiniProgramPlatformCompilerService {
       this.componentDataMap.meta.set(
         path.normalize(fileName),
         componentBuildMeta.meta
+      );
+      this.componentDataMap.useComponentPath.set(
+        path.normalize(fileName),
+        componentBuildMeta.useComponentPath
       );
     }
 
@@ -173,19 +203,38 @@ export class MiniProgramPlatformCompilerService {
   getDirectiveMap() {
     return this.directiveMap;
   }
-  private getLibraryDirectiveMeta(classDeclaration: ts.ClassDeclaration) {
-    let directiveName = classDeclaration.name!.getText();
-    let selector = createCssSelectorForTs(classDeclaration.getSourceFile());
-    let eventsNode = selector.queryOne(
-      `VariableDeclaration[name=${directiveName}_Events]`
+  private getLibraryDirectiveMeta(
+    classDeclaration: ts.ClassDeclaration
+  ): DirectiveMetaFromLibrary | undefined {
+    const directiveName = classDeclaration.name!.getText();
+    const selector = createCssSelectorForTs(classDeclaration.getSourceFile());
+    const eventsNode = selector.queryOne(
+      `VariableDeclaration[name=${directiveName}_${LIBRARY_DIRECTIVE_LISTENERS_SUFFIX}]`
     ) as ts.VariableDeclaration;
     if (!eventsNode) {
       return undefined;
     }
-    let events = eventsNode.type!.getText();
+    const listeners = eventsNode.type!.getText();
     return {
-      isLibraryDirective: true,
-      listeners: JSON.parse(events),
+      isComponent: false,
+      listeners: JSON.parse(listeners),
+    };
+  }
+  private getLibraryComponentMeta(
+    classDeclaration: ts.ClassDeclaration
+  ): ComponentMetaFromLibrary | undefined {
+    const directiveName = classDeclaration.name!.getText();
+    const selector = createCssSelectorForTs(classDeclaration.getSourceFile());
+    const exportPathNode = selector.queryOne(
+      `VariableDeclaration[name=${directiveName}_${LIBRARY_COMPONENT_EXPORT_PATH_SUFFIX}]`
+    ) as ts.VariableDeclaration;
+    if (!exportPathNode) {
+      return undefined;
+    }
+    const exportPath = exportPathNode.type!.getText();
+    return {
+      isComponent: true,
+      exportPath: JSON.parse(exportPath),
     };
   }
 }

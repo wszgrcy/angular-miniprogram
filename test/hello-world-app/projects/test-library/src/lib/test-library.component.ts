@@ -2,7 +2,8 @@ import { Component, OnInit } from '@angular/core';
 
 @Component({
   selector: 'lib-test-library',
-  template: ` <p>test-library works!</p> `,
+  template: ` <p>test-library works!</p>
+    <app-other></app-other>`,
   styles: [
     `
       h1 {

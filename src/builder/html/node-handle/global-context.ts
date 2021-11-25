@@ -5,9 +5,10 @@ import ts from 'typescript';
 import type { SelectorMatcher } from '../../angular-internal/selector';
 import { createCssSelector } from '../../angular-internal/template';
 import { getAttrsForDirectiveMatching } from '../../angular-internal/util';
+import type { DirectiveMetaFromLibrary, MetaFromLibrary } from '../type';
 import { isTemplate } from '../type-protection';
 import type { NgDefaultDirective, NgTemplateMeta } from './interface';
-import type { MatchedDirective } from './type';
+import type { MatchedDirective, MatchedMeta } from './type';
 
 @Injectable()
 export class ComponentContext {
@@ -28,7 +29,7 @@ export class ComponentContext {
   getBindIndex() {
     return this.templateIndex++;
   }
-  matchDirective(node: Element | Template): MatchedDirective[] {
+  matchDirective(node: Element | Template): MatchedMeta[] {
     if (!this.directiveMatcher) {
       return [];
     }
@@ -42,35 +43,50 @@ export class ComponentContext {
       name,
       getAttrsForDirectiveMatching(node)
     );
-    const result: MatchedDirective[] = [];
+    const result: MatchedMeta[] = [];
     this.directiveMatcher.match(
       selector,
       (
         selector,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        meta: { directive: R3UsedDirectiveMetadata; directiveMeta: any }
+        meta: {
+          directive: R3UsedDirectiveMetadata;
+          directiveMeta: any;
+          libraryMeta: MetaFromLibrary;
+        }
       ) => {
+        let item: Partial<MatchedMeta>;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const isComponent: boolean = (meta.directive as any).isComponent;
         if (isComponent) {
-          result.push({
+          item = {
             isComponent,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             outputs: (meta.directive as any).outputs,
-            moduleName: ((meta.directive as any).importedFile as ts.SourceFile)
-              .moduleName,
             filePath: ((meta.directive as any).importedFile as ts.SourceFile)
               .fileName,
             selector: (meta.directive as any).selector,
-          });
+            className: (
+              (meta.directive as any).ref.node as ts.ClassDeclaration
+            ).name!.getText(),
+          };
+          if (meta.libraryMeta?.isComponent) {
+            item.exportPath = meta.libraryMeta.exportPath;
+          }
         } else {
-          result.push({
+          item = {
             isComponent,
-            listeners: meta?.directiveMeta?.isLibraryDirective
-              ? meta.directiveMeta.listeners
-              : Object.keys(meta.directiveMeta?.meta?.host?.listeners || []),
-          });
+            listeners: Object.keys(
+              meta.directiveMeta?.meta?.host?.listeners || []
+            ),
+          };
+          if (meta.libraryMeta && !meta.libraryMeta.isComponent) {
+            (item as MatchedDirective).listeners = (
+              meta.libraryMeta as DirectiveMetaFromLibrary
+            ).listeners!;
+          }
         }
+        result.push(item as MatchedMeta);
       }
     );
     return result;

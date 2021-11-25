@@ -1,4 +1,4 @@
-import { join, normalize } from '@angular-devkit/core';
+import { join, normalize, resolve } from '@angular-devkit/core';
 import {
   camelize,
   classify,
@@ -28,6 +28,7 @@ import { ngCompilerCli } from 'ng-packagr/lib/utils/ng-compiler-cli';
 import path from 'path';
 import { Injector } from 'static-injector';
 import ts from 'typescript';
+import { LIBRARY_OUTPUT_PATH } from '../const';
 import { MiniProgramPlatformCompilerService } from '../html/mini-program-platform-compiler.service';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatform } from '../platform/platform-info';
@@ -36,6 +37,7 @@ import { WxBuildPlatform } from '../platform/wx/wx-platform';
 import { changeComponent } from '../ts/change-component';
 import { ExportLibraryComponentMeta } from '../type';
 import { AddDeclareMetaService } from './add-declare-meta';
+import { getLibraryPath } from './get-library-path';
 import { CustomStyleSheetProcessor } from './stylesheet-processor';
 import { DIRECTIVE_MAP, LIBRARY_ENTRY_POINT, RESOLVED_META_MAP } from './token';
 
@@ -311,24 +313,23 @@ export async function compileSourceFiles(
           // eslint-disable-next-line prefer-rest-params
           return oldWriteFile.apply(this, arguments as any);
         }
+        const useComponentPath = metaMap.useComponentPath.get(originFileName)!;
+        const list = [...useComponentPath.libraryPath];
+        list.push(
+          ...useComponentPath.localPath.map((item) => {
+            const libraryEntry = getLibraryPath(
+              entryPoint.data.entryPoint.moduleId,
+              item.className
+            );
+            item.path = libraryEntry;
+            return item;
+          })
+        );
         const componentClassName = changeData.componentName;
-        const componentFileName = dasherize(camelize(componentClassName));
         const componentDirName = dasherize(camelize(componentClassName));
-        const baseDir = join(
-          normalize(entryPoint.data.entryPoint.moduleId),
-          componentDirName
-        );
-        const contentPath = join(
-          baseDir,
-          componentFileName + buildPlatform.fileExtname.content
-        );
-        const contentTemplatePath = join(
-          baseDir,
-          'template' + buildPlatform.fileExtname.contentTemplate
-        );
-        const stylePath = join(
-          baseDir,
-          componentFileName + buildPlatform.fileExtname.style
+        const libraryPath = getLibraryPath(
+          entryPoint.data.entryPoint.moduleId,
+          componentClassName
         );
         const customStyleSheetProcessor =
           stylesheetProcessor as CustomStyleSheetProcessor;
@@ -343,26 +344,23 @@ export async function compileSourceFiles(
             classify(entryPoint.data.entryPoint.moduleId) +
             classify(camelize(componentDirName)),
           className: componentClassName,
-          logicName: componentFileName,
-          baseDir: baseDir,
-          content: {
-            path: contentPath,
-            content: metaMap.outputContent.get(originFileName)!,
-          },
+          content: metaMap.outputContent.get(originFileName)!,
+          libraryPath: libraryPath,
+          useComponents: list.reduce((pre, cur) => {
+            pre[cur.selector] = resolve(
+              normalize('/'),
+              join(normalize(LIBRARY_OUTPUT_PATH), cur.path)
+            );
+            return pre;
+          }, {} as Record<string, string>),
         };
         if (styleContent) {
-          insertComponentData.style = {
-            path: stylePath,
-            content: styleContent,
-          };
+          insertComponentData.style = styleContent;
         }
         const outputTemplate =
           metaMap.outputContentTemplate.get(originFileName);
         if (outputTemplate) {
-          insertComponentData.contentTemplate = {
-            path: contentTemplatePath,
-            content: outputTemplate,
-          };
+          insertComponentData.contentTemplate = outputTemplate;
         }
         return oldWriteFile.call(
           this,

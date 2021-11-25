@@ -43,7 +43,7 @@ import { ComponentContext } from './node-handle/global-context';
 import { NgNodeMeta, ParsedNode } from './node-handle/interface';
 import { ParsedNgTemplate } from './node-handle/template';
 import { ParsedNgText } from './node-handle/text';
-import type { MatchedComponentMeta, MatchedDirectiveMeta } from './type';
+import { MatchedComponent, MatchedDirective } from './node-handle/type';
 
 export class TemplateDefinition implements Visitor {
   /** 变量对应的值索引 */
@@ -63,24 +63,23 @@ export class TemplateDefinition implements Visitor {
   visit?(node: Node) {}
   visitElement(element: Element) {
     const nodeIndex = this.declIndex++;
-    let componentMeta: MatchedComponentMeta | undefined;
-    let directiveMeta: MatchedDirectiveMeta | undefined;
+    let componentMeta: MatchedComponent | undefined;
+    let directiveMeta: MatchedDirective | undefined;
     const result = this.templateGlobalContext.matchDirective(element);
     if (result) {
       if (result.some((item) => item.isComponent)) {
-        const type = result.find((item) => item.isComponent)!;
-        componentMeta = {
-          outputs: type.outputs!,
-          isComponent: true,
-          moduleName: type.moduleName!,
-          filePath: type.filePath!,
-          selector: type.selector!,
-        };
+        const type = result.find(
+          (item) => item.isComponent
+        )! as MatchedComponent;
+        componentMeta = type;
       }
 
-      const list = result.filter((item) => !item.isComponent);
+      const list = result.filter(
+        (item) => !item.isComponent
+      ) as MatchedDirective[];
       if (list.length) {
         directiveMeta = {
+          isComponent: false,
           listeners: list.map((item) => item.listeners!).flat(),
         };
       }

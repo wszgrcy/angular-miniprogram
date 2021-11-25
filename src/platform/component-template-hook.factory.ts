@@ -7,6 +7,7 @@ import { PAGE_TOKEN } from './module/token/page.token';
 const start = 20;
 
 const initValue = new Map<LView, any>();
+// todo componentPath只进行了一层传播
 export function propertyChange(context: any) {
   const lView = findCurrenComponentLView(context);
   const nodeList = lViewToWXView(lView);

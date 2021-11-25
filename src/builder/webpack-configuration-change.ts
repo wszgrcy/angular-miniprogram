@@ -77,6 +77,7 @@ export class WebpackConfigurationChange {
             );
           },
         },
+        { provide: DynamicLibraryEntryPlugin },
       ],
     });
     this.buildPlatform = this.injector.get(BuildPlatform);
@@ -89,7 +90,7 @@ export class WebpackConfigurationChange {
     this.componentTemplateLoader();
     this.definePlugin();
     this.changeStylesExportSuffix();
-    this.config.plugins?.push(new DynamicLibraryEntryPlugin());
+    this.config.plugins?.push(this.injector.get(DynamicLibraryEntryPlugin));
   }
   private async pageHandle() {
     this.workspaceRoot = normalize(this.context.workspaceRoot);

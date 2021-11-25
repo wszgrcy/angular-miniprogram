@@ -138,6 +138,23 @@ export class ExportMiniProgramAssetsPlugin {
               );
               compilation.assets[outputPath] = item as any;
             });
+            metaMap.config.forEach((value, key) => {
+              const config = JSON.parse(
+                ifs.readFileSync(value.existConfig).toString()
+              );
+              config.usingComponents = config.usingComponents || {};
+              config.usingComponents = {
+                ...config.usingComponents,
+                ...value.usingComponents.reduce((pre, cur) => {
+                  pre[cur.selector] = cur.path;
+                  return pre;
+                }, {} as Record<string, string>),
+              };
+
+              compilation.assets[key] = new RawSource(
+                JSON.stringify(config)
+              ) as any;
+            });
             cb();
           }
         );

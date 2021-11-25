@@ -1,3 +1,4 @@
+import { normalize, resolve } from '@angular-devkit/core';
 import type { NgtscProgram, ParsedConfiguration } from '@angular/compiler-cli';
 import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
 import { externalizePath } from '@ngtools/webpack/src/ivy/paths';
@@ -13,6 +14,8 @@ import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
 import { PagePattern } from '../type';
 import { angularCompilerCliPromise } from '../util/load_esm';
 import { MiniProgramPlatformCompilerService } from './mini-program-platform-compiler.service';
+import { join } from '@angular-devkit/core';
+import { LIBRARY_OUTPUT_PATH } from '../const';
 
 @Injectable()
 export class TemplateService {
@@ -71,10 +74,44 @@ export class TemplateService {
       contentMap.set(entryPattern.outputFiles.contentTemplate, value);
     });
     metaMap.style = styleMap;
+    const config = new Map<
+      string,
+      {
+        usingComponents: { selector: string; path: string }[];
+        existConfig: string;
+      }
+    >();
+    metaMap.useComponentPath.forEach((value, key) => {
+      const entryPattern = this.getComponentPagePattern(key);
+      const list = [
+        ...value.libraryPath.map((item) => {
+          item.path = resolve(
+            normalize('/'),
+            join(normalize(LIBRARY_OUTPUT_PATH), item.path)
+          );
+          return item;
+        }),
+      ];
+      list.push(
+        ...value.localPath.map((item) => ({
+          selector: item.selector,
+          path: resolve(
+            normalize('/'),
+            normalize(this.getComponentPagePattern(item.path).outputFiles.path)
+          ),
+          className: item.className,
+        }))
+      );
+      config.set(entryPattern.outputFiles.config, {
+        usingComponents: list,
+        existConfig: entryPattern.inputFiles.config,
+      });
+    });
     return {
       style: styleMap,
       outputContent: contentMap,
       meta: metaMap.meta,
+      config: config,
     };
   }
 

@@ -1,12 +1,25 @@
 import { join, normalize } from '@angular-devkit/core';
+import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
 import { LibrarySymbol, LIBRARY_OUTPUT_PATH } from '../const';
+import { BuildPlatform } from '../platform/platform';
 import { LibraryLoaderContext } from '../type';
 
 const CUSTOM_URI = 'dynamic';
 const CUSTOM_URI_REG = /^dynamic:(.*)\.ts$/;
+@Injectable()
 export class DynamicLibraryEntryPlugin {
+  constructor(private buildPlatform: BuildPlatform) {}
   apply(compiler: webpack.Compiler) {
+    compiler.hooks.thisCompilation.tap(
+      'DynamicLibraryEntryPlugin',
+      (compilation) => {
+        (compilation as any)[LibrarySymbol] =
+          (compilation as any)[LibrarySymbol] || {};
+
+        (compilation as any)[LibrarySymbol].buildPlatform = this.buildPlatform;
+      }
+    );
     compiler.hooks.finishMake.tapAsync(
       'DynamicLibraryEntryPlugin',
       (compilation, callback) => {
@@ -43,11 +56,7 @@ export class DynamicLibraryEntryPlugin {
         for (let i = 0; i < libraryLoaderContext.libraryMetaList.length; i++) {
           const meta = libraryLoaderContext.libraryMetaList[i];
 
-          const entry = join(
-            normalize(LIBRARY_OUTPUT_PATH),
-            meta.baseDir,
-            meta.logicName
-          );
+          const entry = join(normalize(LIBRARY_OUTPUT_PATH), meta.libraryPath);
           const dep = webpack.EntryPlugin.createDependency(
             `${CUSTOM_URI}:${meta.id}.ts`,
             entry

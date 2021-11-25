@@ -10,13 +10,20 @@ export interface StyleHookData {
   styleUrls: string[];
 }
 
-export interface MatchedComponentMeta {
-  outputs: string[];
+export interface ComponentMetaFromLibrary {
   isComponent: true;
-  moduleName: string;
-  filePath: string;
-  selector: string;
+  exportPath: string;
 }
-export interface MatchedDirectiveMeta {
+export interface DirectiveMetaFromLibrary {
+  isComponent: false;
   listeners: string[];
+}
+export type MetaFromLibrary =
+  | ComponentMetaFromLibrary
+  | DirectiveMetaFromLibrary;
+
+export interface UseComponent {
+  selector: string;
+  className: string;
+  path: string;
 }
