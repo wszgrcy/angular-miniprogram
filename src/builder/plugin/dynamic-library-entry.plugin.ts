@@ -31,6 +31,10 @@ export class DynamicLibraryEntryPlugin {
           callback(undefined);
           return;
         }
+        if (!libraryLoaderContext.libraryMetaList) {
+          callback(undefined);
+          return;
+        }
         const hooks = webpack.NormalModule.getCompilationHooks(compilation);
         hooks.readResource
           .for(CUSTOM_URI)
