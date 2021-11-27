@@ -10,7 +10,7 @@ export class CustomStyleSheetProcessor extends StylesheetProcessor {
     content: string;
   }): Promise<string> {
     const result = await super.process({ filePath, content });
-    this.styleMap.set(filePath, content);
-    return result;
+    this.styleMap.set(filePath, result);
+    return '';
   }
 }
