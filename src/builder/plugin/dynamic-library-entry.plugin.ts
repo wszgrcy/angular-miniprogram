@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { join, normalize } from '@angular-devkit/core';
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
-import { LibrarySymbol, LIBRARY_OUTPUT_PATH } from '../const';
+import { LIBRARY_OUTPUT_PATH, LibrarySymbol } from '../const';
 import { BuildPlatform } from '../platform/platform';
 import { LibraryLoaderContext } from '../type';
 

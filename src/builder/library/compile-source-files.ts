@@ -1,3 +1,4 @@
+/* eslint-disable prefer-rest-params */
 import { join, normalize, resolve } from '@angular-devkit/core';
 import {
   camelize,
@@ -57,6 +58,7 @@ export async function compileSourceFiles(
     ...extraOptions,
   };
   const entryPoint: EntryPointNode = graph.find(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     isEntryPointInProgress() as any
   )!;
   const ngPackageNode: PackageNode = graph.find(isPackage)!;
@@ -286,7 +288,7 @@ export async function compileSourceFiles(
       sourceFiles
     ) {
       if (fileName.endsWith('.map')) {
-        // eslint-disable-next-line prefer-rest-params
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return oldWriteFile.apply(this, arguments as any);
       }
       if (fileName.endsWith('.d.ts')) {
@@ -310,7 +312,7 @@ export async function compileSourceFiles(
           metaMap.meta.get(originFileName)!
         );
         if (!changeData) {
-          // eslint-disable-next-line prefer-rest-params
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           return oldWriteFile.apply(this, arguments as any);
         }
         const useComponentPath = metaMap.useComponentPath.get(originFileName)!;
@@ -373,7 +375,7 @@ export async function compileSourceFiles(
           sourceFiles
         );
       }
-      // eslint-disable-next-line prefer-rest-params
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return oldWriteFile.apply(this, arguments as any);
     };
   }

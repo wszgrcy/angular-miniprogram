@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as fs from 'fs-extra';
 import path from 'path';
 import { describeBuilder } from '../../../test/plugin-describe-builder';
@@ -15,8 +16,8 @@ describeBuilder(execute, LIBRARY_BUILDER_INFO, (harness) => {
       expect(result).toBeTruthy();
       expect(result.result).toBeTruthy();
       expect(result.result.success).toBeTruthy();
-      let workspaceRoot: string = (result.result as any).workspaceRoot;
-      let output = path.join(workspaceRoot, 'dist/test-library');
+      const workspaceRoot: string = (result.result as any).workspaceRoot;
+      const output = path.join(workspaceRoot, 'dist/test-library');
       fs.copySync(
         output,
         path.resolve(

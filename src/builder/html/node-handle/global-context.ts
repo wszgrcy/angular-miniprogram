@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { SelectorMatcher } from '@angular/compiler';
 import type { R3UsedDirectiveMetadata } from '@angular/compiler/src/compiler_facade_interface';
 import type { Element, Template } from '@angular/compiler/src/render3/r3_ast';
 import { Injectable } from 'static-injector';
 import ts from 'typescript';
-import type { SelectorMatcher } from '../../angular-internal/selector';
 import { createCssSelector } from '../../angular-internal/template';
 import { getAttrsForDirectiveMatching } from '../../angular-internal/util';
 import type { DirectiveMetaFromLibrary, MetaFromLibrary } from '../type';
@@ -48,20 +49,18 @@ export class ComponentContext {
       selector,
       (
         selector,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         meta: {
           directive: R3UsedDirectiveMetadata;
+
           directiveMeta: any;
           libraryMeta: MetaFromLibrary;
         }
       ) => {
         let item: Partial<MatchedMeta>;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const isComponent: boolean = (meta.directive as any).isComponent;
         if (isComponent) {
           item = {
             isComponent,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             outputs: (meta.directive as any).outputs,
             filePath: ((meta.directive as any).importedFile as ts.SourceFile)
               .fileName,

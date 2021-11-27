@@ -121,6 +121,7 @@ export class DynamicWatchEntryPlugin {
             ...pattern,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             outputFiles: {} as any,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             inputFiles: {} as any,
           };
           object.inputFiles!.config = object.src!.replace(

@@ -1,4 +1,4 @@
-import { normalize, resolve } from '@angular-devkit/core';
+import { join, normalize, resolve } from '@angular-devkit/core';
 import type { NgtscProgram, ParsedConfiguration } from '@angular/compiler-cli';
 import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
 import { externalizePath } from '@ngtools/webpack/src/ivy/paths';
@@ -8,14 +8,13 @@ import { Inject, Injectable, Injector } from 'static-injector';
 import ts from 'typescript';
 import type { CompilerOptions } from 'typescript';
 import { Compilation, Compiler } from 'webpack';
+import { LIBRARY_OUTPUT_PATH } from '../const';
 import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
 import { PagePattern } from '../type';
 import { angularCompilerCliPromise } from '../util/load_esm';
 import { MiniProgramPlatformCompilerService } from './mini-program-platform-compiler.service';
-import { join } from '@angular-devkit/core';
-import { LIBRARY_OUTPUT_PATH } from '../const';
 
 @Injectable()
 export class TemplateService {

@@ -212,62 +212,62 @@ export function visitAll<Result>(
 }
 class CustomAstVisitor implements AstVisitor {
   constructor(private pipeCallback: () => void) {}
-  visitCall(ast: Call, context: any) {
+  visitCall(ast: Call) {
     ast.receiver.visit(this);
     this.visitAll(ast.args);
   }
-  visitSafeKeyedRead(ast: SafeKeyedRead, context: any) {
+  visitSafeKeyedRead(ast: SafeKeyedRead) {
     ast.receiver.visit(this);
     ast.key.visit(this);
   }
-  visitImplicitReceiver(ast: ImplicitReceiver, context: any) {}
-  visitInterpolation(ast: Interpolation, context: any) {
+  visitImplicitReceiver(ast: ImplicitReceiver) {}
+  visitInterpolation(ast: Interpolation) {
     this.visitAll(ast.expressions);
   }
-  visitKeyedRead(ast: KeyedRead, context: any) {
+  visitKeyedRead(ast: KeyedRead) {
     ast.receiver.visit(this);
     ast.key.visit(this);
   }
-  visitKeyedWrite(ast: KeyedWrite, context: any) {
+  visitKeyedWrite(ast: KeyedWrite) {
     ast.receiver.visit(this);
     ast.key.visit(this);
     ast.value.visit(this);
   }
-  visitLiteralArray(ast: LiteralArray, context: any) {
+  visitLiteralArray(ast: LiteralArray) {
     this.visitAll(ast.expressions);
   }
-  visitLiteralMap(ast: LiteralMap, context: any) {
+  visitLiteralMap(ast: LiteralMap) {
     this.visitAll(ast.values);
   }
-  visitLiteralPrimitive(ast: LiteralPrimitive, context: any) {}
-  visitPipe(ast: BindingPipe, context: any) {
+  visitLiteralPrimitive(ast: LiteralPrimitive) {}
+  visitPipe(ast: BindingPipe) {
     this.pipeCallback();
   }
-  visitPrefixNot(ast: PrefixNot, context: any) {
+  visitPrefixNot(ast: PrefixNot) {
     ast.expression.visit(this);
   }
-  visitNonNullAssert(ast: NonNullAssert, context: any) {
+  visitNonNullAssert(ast: NonNullAssert) {
     ast.expression.visit(this);
   }
-  visitPropertyRead(ast: PropertyRead, context: any) {
+  visitPropertyRead(ast: PropertyRead) {
     ast.receiver.visit(this);
   }
-  visitPropertyWrite(ast: PropertyWrite, context: any) {}
-  visitQuote(ast: Quote, context: any) {}
-  visitSafePropertyRead(ast: SafePropertyRead, context: any) {}
-  visitBinary(ast: Binary, context: any) {
+  visitPropertyWrite(ast: PropertyWrite) {}
+  visitQuote(ast: Quote) {}
+  visitSafePropertyRead(ast: SafePropertyRead) {}
+  visitBinary(ast: Binary) {
     ast.left.visit(this);
     ast.right.visit(this);
   }
-  visitChain(ast: Chain, context: any) {
+  visitChain(ast: Chain) {
     this.visitAll(ast.expressions);
   }
-  visitConditional(ast: Conditional, context: any) {
+  visitConditional(ast: Conditional) {
     ast.condition.visit(this);
     ast.trueExp.visit(this);
     ast.falseExp.visit(this);
   }
-  visit(ast: AST, context?: any) {}
+  visit(ast: AST) {}
   visitAll(asts: AST[]) {
     for (let i = 0; i < asts.length; ++i) {
       const original = asts[i];

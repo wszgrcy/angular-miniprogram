@@ -1,4 +1,4 @@
-import type { R3ComponentMetadata } from '@angular/compiler';
+import type { R3ComponentMetadata, SelectorMatcher } from '@angular/compiler';
 import type { NgtscProgram } from '@angular/compiler-cli';
 import type { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
 import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
@@ -10,7 +10,6 @@ import { createCssSelectorForTs } from 'cyia-code-util';
 import path from 'path';
 import { Injectable, Injector } from 'static-injector';
 import ts, { ClassDeclaration } from 'typescript';
-import { SelectorMatcher } from '../angular-internal/selector';
 import {
   LIBRARY_COMPONENT_EXPORT_PATH_SUFFIX,
   LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
@@ -31,7 +30,9 @@ import {
 export class MiniProgramPlatformCompilerService {
   private ngCompiler!: NgCompiler;
   private componentMap = new Map<ClassDeclaration, R3ComponentMetadata>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private directiveMap = new Map<ClassDeclaration, any>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private ngModuleMap = new Map<ClassDeclaration, any>();
   private componentDataMap = {
     style: new Map<string, string[]>(),
@@ -74,6 +75,7 @@ export class MiniProgramPlatformCompilerService {
         };
         this.componentDataMap.style.set(
           path.normalize(fileName),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ((trait as any)?.analysis?.styleUrls || []).map(
             (item: { url: string }) => this.resolveStyleUrl(fileName, item.url)
           )
@@ -130,11 +132,13 @@ export class MiniProgramPlatformCompilerService {
           let libraryMeta: MetaFromLibrary | undefined;
           if (directive.isComponent) {
             libraryMeta = this.getLibraryComponentMeta(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (directive as any).ref.node
             );
           }
           if (!directive.isComponent && !directiveMeta) {
             libraryMeta = this.getLibraryDirectiveMeta(
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (directive as any).ref.node
             );
           }

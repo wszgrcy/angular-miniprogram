@@ -21,6 +21,7 @@ export class AddDeclareMetaService {
       meta: Map<string, string>;
     },
     @Inject(LIBRARY_ENTRY_POINT) private libraryEntryPoint: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     @Inject(DIRECTIVE_MAP) private directiveMap: Map<ts.ClassDeclaration, any>
   ) {}
   run(dTsFileName: string, data: string, sourceFile: ts.SourceFile): string {

@@ -14,9 +14,9 @@ export async function loadEsmModule<T>(modulePath: string): Promise<T> {
 }
 
 function getAngularCompiler() {
-  return loadEsmModule<any>('@angular/compiler');
+  return loadEsmModule<typeof import('@angular/compiler')>('@angular/compiler');
 }
 export const angularCompilerPromise = getAngularCompiler();
-export const angularCompilerCliPromise = loadEsmModule<any>(
-  '@angular/compiler-cli'
-);
+export const angularCompilerCliPromise = loadEsmModule<
+  typeof import('@angular/compiler-cli')
+>('@angular/compiler-cli');

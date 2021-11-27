@@ -56,6 +56,7 @@ export class ExportMiniProgramAssetsPlugin {
     this.originInputFileSystemSync.statSync = ifs.statSync;
     let oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined =
       undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const styleAssets = new Map<string, any>();
     compiler.hooks.compilation.tap(
       'ExportMiniProgramAssetsPlugin',
@@ -73,6 +74,7 @@ export class ExportMiniProgramAssetsPlugin {
                 const data = compilation.assets[stylePath];
                 if (/\.(scss|css|sass|less|styl)$/.test(stylePath)) {
                   styleAssets.set(path.normalize(stylePath), data);
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   compilation.assets[stylePath] = new RawSource(' ') as any;
                 }
               }
@@ -136,10 +138,13 @@ export class ExportMiniProgramAssetsPlugin {
               const item = new ConcatSource(
                 ...value.map((item) => styleAssets.get(item))
               );
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               compilation.assets[outputPath] = item as any;
             });
             metaMap.config.forEach((value, key) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               let config: Record<string, any>;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               if ((ifs as any).fileSystem.existsSync(value.existConfig)) {
                 config = JSON.parse(
                   ifs.readFileSync(value.existConfig).toString()
@@ -158,6 +163,7 @@ export class ExportMiniProgramAssetsPlugin {
 
               compilation.assets[key] = new RawSource(
                 JSON.stringify(config)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ) as any;
             });
             cb();

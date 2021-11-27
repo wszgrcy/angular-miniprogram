@@ -12,6 +12,7 @@ import { Injectable, Injector } from 'static-injector';
 import * as webpack from 'webpack';
 import { DefinePlugin } from 'webpack';
 import { BootstrapAssetsPlugin } from 'webpack-bootstrap-assets-plugin';
+import { LIBRARY_OUTPUT_PATH } from './const';
 import { BuildPlatform } from './platform/platform';
 import type { PlatformType } from './platform/platform';
 import { DynamicLibraryEntryPlugin } from './plugin/dynamic-library-entry.plugin';
@@ -19,7 +20,6 @@ import { DynamicWatchEntryPlugin } from './plugin/dynamic-watch-entry.plugin';
 import { ExportMiniProgramAssetsPlugin } from './plugin/export-mini-program-assets.plugin';
 import { TS_CONFIG_TOKEN } from './token/project.token';
 import type { PagePattern } from './type';
-import { LIBRARY_OUTPUT_PATH } from './const';
 
 type OptimizationOptions = NonNullable<webpack.Configuration['optimization']>;
 type OptimizationSplitChunksOptions = Exclude<

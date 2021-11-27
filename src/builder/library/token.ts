@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { InjectionToken } from 'static-injector';
 import ts from 'typescript';
 

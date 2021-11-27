@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -6,16 +7,16 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import type { CssSelector as CssSelectorType } from '@angular/compiler';
 import { CssSelector } from './selector';
 import { splitNsName } from './tags';
-
 /**
  * Creates a `CssSelector` given a tag name and a map of attributes
  */
 export function createCssSelector(
   elementName: string,
   attributes: { [name: string]: string }
-): CssSelector {
+): CssSelectorType {
   const cssSelector = new CssSelector();
   const elementNameNoNs = splitNsName(elementName)[1];
 
@@ -32,5 +33,5 @@ export function createCssSelector(
     }
   });
 
-  return cssSelector;
+  return cssSelector as any;
 }

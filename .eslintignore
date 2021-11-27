@@ -11,3 +11,4 @@ test/util
 commitlint.config.js
 script
 **/fixture
+*.xspec.ts

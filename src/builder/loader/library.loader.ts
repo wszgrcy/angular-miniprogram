@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { join, normalize } from '@angular-devkit/core';
 import { createCssSelectorForTs } from 'cyia-code-util';
 import ts from 'typescript';
@@ -46,9 +47,8 @@ export default function (
       importPath: this.resourcePath,
       contextPath: this.utils.contextify(this.rootContext, this.resourcePath),
     });
-    let fileExtname = libraryLoaderContext.buildPlatform.fileExtname;
+    const fileExtname = libraryLoaderContext.buildPlatform.fileExtname;
     libraryLoaderContext.libraryMetaList.forEach((item) => {
-      item;
       this.emitFile(
         join(
           normalize(LIBRARY_OUTPUT_PATH),
