@@ -1,22 +1,26 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { InjectFlags, ɵɵdirectiveInject } from '@angular/core';
-import { ComponentPath, MPElementData, MPTextData, MPView } from './type';
 import { LView } from './internal-type';
 import { AgentNode } from './module/renderer-node';
 import { PAGE_TOKEN } from './module/token/page.token';
+import type { ComponentPath, MPElementData, MPTextData, MPView } from './type';
 
 const start = 20;
 
-const initValue = new Map<LView, any>();
+const initValueMap = new Map<LView, MPView>();
+const linkMap = new Map<LView, any>();
+const componentPathMap = new Map<LView, ComponentPath>();
+const pageMap = new Map<string, LView>();
+
 export function propertyChange(context: any) {
   const lView = findCurrentComponentLView(context);
-  let lviewPath = getLViewPath(lView);
+  const lviewPath = getLViewPath(lView);
   const nodeList = lViewToWXView(lView, lviewPath);
   const ctx: Partial<MPView> = { nodeList: nodeList, componentPath: lviewPath };
   if (linkMap.has(lView)) {
     linkMap.get(lView).setData({ __wxView: ctx });
   } else {
-    initValue.set(lView, ctx);
+    initValueMap.set(lView, ctx as Required<MPView>);
   }
 }
 function findCurrentComponentLView(context: any) {
@@ -66,15 +70,16 @@ function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
   return nodeList;
 }
 
-const lViewPath = new Map();
-export function setLViewPath(lView: LView, path: any[]) {
-  lViewPath.set(lView, path);
+export function setLViewPath(lView: LView, componentPath: ComponentPath) {
+  componentPath = componentPath.slice();
+  componentPathMap.set(lView, componentPath);
 }
 function getLViewPath(lView: LView) {
-  return lViewPath.get(lView);
+  return componentPathMap.get(lView);
 }
-export function updatePath(context: MPView, path: ComponentPath) {
-  context.componentPath = path;
+export function updatePath(context: MPView, componentPath: ComponentPath) {
+  componentPath = componentPath.slice();
+  context.componentPath = componentPath;
   const list: (MPView[] | MPElementData | MPTextData | MPView)[] = [
     ...context.nodeList,
   ];
@@ -84,16 +89,19 @@ export function updatePath(context: MPView, path: ComponentPath) {
       list.push(...item);
     }
     if ((item as MPView).componentPath) {
-      ((item as MPView).componentPath as any[]).unshift(path);
+      ((item as MPView).componentPath as any[]).unshift(componentPath);
     }
   }
   return context;
 }
-export function updateInitValue(lView: LView) {
-  return initValue.get(lView);
+export function getInitValue(lView: LView) {
+  const result = initValueMap.get(lView);
+  if (result) {
+    initValueMap.delete(lView);
+  }
+  return result;
 }
 
-const pageMap = new Map<string, LView>();
 export function pageBind(context: any) {
   const lView = findCurrentComponentLView(context);
   const wxComponentInstance = ɵɵdirectiveInject(
@@ -115,12 +123,8 @@ export function getPageLView(id: string): any {
   return pageMap.get(id)!;
 }
 
-export function findCurrentLView(
-  lView: LView,
-  list: ComponentPath,
-  index: number
-) {
-  list = [...list];
+export function findCurrentLView(lView: LView, list: ComponentPath): any {
+  list = list.slice();
   while (list.length) {
     const item = list.shift()!;
     if (item === 'directive') {
@@ -133,7 +137,7 @@ export function findCurrentLView(
       lView = lView[start + item];
     }
   }
-  return lView[index + start];
+  return lView;
 }
 export function findCurrentElement(
   lView: LView,
@@ -155,7 +159,15 @@ export function findCurrentElement(
   return lView[index + start];
 }
 
-const linkMap = new Map<LView, any>();
 export function lViewLinkToMPComponentRef(ref: any, lView: LView) {
   linkMap.set(lView, ref);
+}
+
+export function cleanWhenDestroy(lview: LView) {
+  const list: Function[] = (lview[7] = lview[7] || []);
+  list.push((lview: LView) => cleanAll(lview));
+}
+function cleanAll(lview: LView) {
+  linkMap.delete(lview);
+  componentPathMap.delete(lview);
 }

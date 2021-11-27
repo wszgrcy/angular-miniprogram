@@ -1,14 +1,15 @@
 import { ChangeDetectorRef, NgZone, Type } from '@angular/core';
 import {
+  cleanWhenDestroy,
   findCurrentElement,
   findCurrentLView,
+  getInitValue,
   getPageLView,
   lViewLinkToMPComponentRef,
   setLViewPath,
-  updateInitValue,
   updatePath,
 } from '../component-template-hook.factory';
-import { LView } from '../internal-type';
+import type { LView } from '../internal-type';
 import type { AgentNode } from '../module/renderer-node';
 import {
   ComponentInitFactory,
@@ -41,11 +42,13 @@ export function generateWxComponent<C>(
           throw new Error('组件索引异常');
         }
         const rootLView = getPageLView(this.getPageId()) as LView;
-        const lView = findCurrentLView(rootLView, list, index);
-        setLViewPath(lView, [...list, index]);
-        const initValue = updateInitValue(lView);
+        const componentPath = [...list, index];
+        const lView = findCurrentLView(rootLView, componentPath) as LView;
+        cleanWhenDestroy(lView);
+        setLViewPath(lView, componentPath);
+        const initValue = getInitValue(lView);
         if (initValue) {
-          this.setData({ __wxView: updatePath(initValue, [...list, index]) });
+          this.setData({ __wxView: updatePath(initValue, componentPath) });
         }
         lViewLinkToMPComponentRef(this, lView);
         this.__lView = lView;
@@ -173,7 +176,7 @@ export function generateWxComponent<C>(
             (ngComponentInstance) => {
               this.__ngComponentInjector.get(ChangeDetectorRef).detectChanges();
               const lView = getPageLView(this.getPageId()) as LView;
-              const initValue = updateInitValue(lView);
+              const initValue = getInitValue(lView);
               this.setData({ __wxView: initValue });
               lViewLinkToMPComponentRef(this, lView);
               this.__lView = lView;
