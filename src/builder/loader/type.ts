@@ -1,4 +1,4 @@
-import { BuildPlatform } from '../platform/platform';
+import type { BuildPlatform } from '../platform/platform';
 
 export interface ComponentTemplateLoaderContext {
   metaMapPromise: Promise<Map<string, string>>;

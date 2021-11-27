@@ -6,7 +6,7 @@ import {
   NgNodeMeta,
   NgTemplateMeta,
   NgTextMeta,
-} from '../interface';
+} from '../../html/node-handle/interface';
 
 export function isNgElementMeta(node: NgNodeMeta): node is NgElementMeta {
   return node.kind === NgNodeKind.Element;

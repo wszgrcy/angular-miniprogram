@@ -9,3 +9,22 @@ export interface StyleHookData {
   styles: string[];
   styleUrls: string[];
 }
+
+export interface ComponentMetaFromLibrary {
+  isComponent: true;
+  exportPath: string;
+}
+export interface DirectiveMetaFromLibrary {
+  isComponent: false;
+  listeners: string[];
+  properties: string[];
+}
+export type MetaFromLibrary =
+  | ComponentMetaFromLibrary
+  | DirectiveMetaFromLibrary;
+
+export interface UseComponent {
+  selector: string;
+  className: string;
+  path: string;
+}

@@ -29,6 +29,10 @@ export const BROWSER_BUILDER_INFO = {
   name: 'test-builder:browser',
   schemaPath: path.resolve(__dirname, 'schema.json'),
 };
+export const LIBRARY_BUILDER_INFO = {
+  name: 'test-builder:library',
+  schemaPath: path.resolve(__dirname, 'schema.json'),
+};
 
 export const DEFAULT_ANGULAR_CONFIG = {
   outputPath: 'dist/testProject',
@@ -48,11 +52,6 @@ export const DEFAULT_ANGULAR_CONFIG = {
       input: './src',
       output: './',
     },
-    {
-      glob: '**/*.entry.json',
-      input: './src',
-      output: './',
-    },
   ],
   components: [
     { glob: '**/*.entry.ts', input: './src/components', output: 'components' },
@@ -61,4 +60,9 @@ export const DEFAULT_ANGULAR_CONFIG = {
   styles: ['src/styles.css'],
   scripts: [],
   aot: true,
+};
+
+export const DEFAULT_ANGULAR_LIBRARY_CONFIG = {
+  project: 'projects/test-library/ng-package.json',
+  tsConfig: 'projects/test-library/tsconfig.lib.json',
 };

@@ -1,8 +1,12 @@
-import { ASTWithSource, BindingType, MethodCall } from '@angular/compiler';
-import { BoundAttribute, Element } from '@angular/compiler/src/render3/r3_ast';
+import type { ASTWithSource, BindingType } from '@angular/compiler';
+import type {
+  BoundAttribute,
+  Element,
+} from '@angular/compiler/src/render3/r3_ast';
 import { TagEventMeta } from './event';
 import { ComponentContext } from './global-context';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
+import type { MatchedComponent, MatchedDirective } from './type';
 
 export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   private tagName!: string;
@@ -18,11 +22,9 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   constructor(
     private node: Element,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    private componentMeta:
-      | { outputs: string[]; isComponent: boolean }
-      | undefined,
+    private componentMeta: MatchedComponent | undefined,
     public index: number,
-    private directiveMeta: { listeners: string[] } | undefined
+    private directiveMeta: MatchedDirective | undefined
   ) {}
   private analysis() {
     this.getTagName();
@@ -33,7 +35,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       });
 
     this.node.inputs.forEach((input) => {
-      if (input.type === BindingType.Property) {
+      if (input.type === 0) {
         this.property.push(input.name);
       }
     });
@@ -43,7 +45,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
           output.target || 'bind',
           output.name,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ((output.handler as ASTWithSource).ast as MethodCall).name
+          (output.handler as ASTWithSource).source!
         )
       );
     });

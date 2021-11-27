@@ -1,13 +1,13 @@
-import { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
-import { Inject, Injectable, Optional } from 'static-injector';
+import type { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
+import { Inject, Injectable } from 'static-injector';
 import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
 import { ComponentContext } from './node-handle/global-context';
-import { NgNodeMeta } from './node-handle/interface';
+import type { NgNodeMeta } from './node-handle/interface';
 import { TemplateDefinition } from './template-definition';
 
 @Injectable()
-export class TemplateCompiler {
+export class ComponentCompiler {
   private nodeMetaList: NgNodeMeta[] = [];
   private templateTransform: BuildPlatform['templateTransform'];
   constructor(

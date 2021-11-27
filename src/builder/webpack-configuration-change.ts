@@ -1,9 +1,10 @@
-import { BuilderContext } from '@angular-devkit/architect';
+import type { BuilderContext } from '@angular-devkit/architect';
 import {
   AssetPattern,
   BrowserBuilderOptions,
 } from '@angular-devkit/build-angular';
-import { Path, getSystemPath, normalize, resolve } from '@angular-devkit/core';
+import type { Path } from '@angular-devkit/core';
+import { getSystemPath, normalize, resolve } from '@angular-devkit/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { filter } from 'rxjs/operators';
@@ -11,11 +12,14 @@ import { Injectable, Injector } from 'static-injector';
 import * as webpack from 'webpack';
 import { DefinePlugin } from 'webpack';
 import { BootstrapAssetsPlugin } from 'webpack-bootstrap-assets-plugin';
-import { BuildPlatform, PlatformType } from './platform/platform';
+import { BuildPlatform } from './platform/platform';
+import type { PlatformType } from './platform/platform';
+import { DynamicLibraryEntryPlugin } from './plugin/dynamic-library-entry.plugin';
 import { DynamicWatchEntryPlugin } from './plugin/dynamic-watch-entry.plugin';
 import { ExportMiniProgramAssetsPlugin } from './plugin/export-mini-program-assets.plugin';
 import { TS_CONFIG_TOKEN } from './token/project.token';
-import { PagePattern } from './type';
+import type { PagePattern } from './type';
+import { LIBRARY_OUTPUT_PATH } from './const';
 
 type OptimizationOptions = NonNullable<webpack.Configuration['optimization']>;
 type OptimizationSplitChunksOptions = Exclude<
@@ -73,6 +77,7 @@ export class WebpackConfigurationChange {
             );
           },
         },
+        { provide: DynamicLibraryEntryPlugin },
       ],
     });
     this.buildPlatform = this.injector.get(BuildPlatform);
@@ -85,6 +90,7 @@ export class WebpackConfigurationChange {
     this.componentTemplateLoader();
     this.definePlugin();
     this.changeStylesExportSuffix();
+    this.config.plugins?.push(this.injector.get(DynamicLibraryEntryPlugin));
   }
   private async pageHandle() {
     this.workspaceRoot = normalize(this.context.workspaceRoot);
@@ -125,7 +131,8 @@ export class WebpackConfigurationChange {
       });
     this.config.plugins?.push(dynamicWatchEntryInstance);
     // 出口
-    const oldFileName = this.config.output!.filename as Function;
+    // todo改为string不知道是否完全都改了
+    const oldFileName = this.config.output!.filename as string;
     this.config.output!.filename = (chunkData) => {
       const page = this.entryList.find(
         (item) => item.entryName === chunkData.chunk!.name
@@ -133,7 +140,7 @@ export class WebpackConfigurationChange {
       if (page) {
         return page.outputFiles.logic;
       }
-      return oldFileName(chunkData);
+      return oldFileName;
     };
     // 共享依赖
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -145,7 +152,10 @@ export class WebpackConfigurationChange {
           .splitChunks! as unknown as OptimizationSplitChunksOptions
       ).cacheGroups!.defaultVendors as OptimizationSplitChunksCacheGroup
     ).chunks = (chunk) => {
-      if (this.entryList.find((item) => item.entryName === chunk.name)) {
+      if (
+        this.entryList.find((item) => item.entryName === chunk.name) ||
+        chunk.name.startsWith(`${LIBRARY_OUTPUT_PATH}/`)
+      ) {
         return true;
       }
       return oldChunks(chunk);
@@ -168,7 +178,8 @@ export class WebpackConfigurationChange {
     assetsPlugin.hooks.removeChunk.tap('pageHandle', (chunk) => {
       if (
         this.entryList.some((page) => page.entryName === chunk.name) ||
-        chunk.name === 'styles'
+        chunk.name === 'styles' ||
+        chunk.name.startsWith(`${LIBRARY_OUTPUT_PATH}/`)
       ) {
         return true;
       }
@@ -197,6 +208,10 @@ export class WebpackConfigurationChange {
       loader: (require as any).resolve(
         path.join(__dirname, './loader/component-template.loader')
       ),
+    });
+    this.config.module?.rules?.unshift({
+      test: /\.mjs$/,
+      loader: require.resolve(path.join(__dirname, './loader/library.loader')),
     });
   }
   private definePlugin() {

@@ -14,6 +14,7 @@ export class BuildPlatform {
     logic: string;
     content: string;
     contentTemplate: string;
+    config?: string;
   };
   importTemplate!: string;
   constructor(public templateTransform: TemplateTransformBase) {}

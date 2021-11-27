@@ -7,14 +7,14 @@ import {
   COMPONENT_TEMPLATE_CONTENT_TOKEN,
   DIRECTIVE_MATCHER,
 } from '../token/component.token';
-import { TemplateCompiler } from './template-compiler';
+import { ComponentCompiler } from './template-compiler';
 
 xdescribe('template-compiler', () => {
   function defaultTransform(content: string) {
     const injector = Injector.create({
       providers: [
         { provide: WxTransform },
-        { provide: TemplateCompiler },
+        { provide: ComponentCompiler },
         { provide: WxBuildPlatform },
         {
           provide: BuildPlatform,
@@ -25,7 +25,7 @@ xdescribe('template-compiler', () => {
         { provide: DIRECTIVE_MATCHER, useValue: undefined },
       ],
     });
-    const instance = injector.get(TemplateCompiler);
+    const instance = injector.get(ComponentCompiler);
     return instance.transform();
   }
   // todo 标签

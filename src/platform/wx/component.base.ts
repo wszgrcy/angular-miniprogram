@@ -1,13 +1,21 @@
 import { ChangeDetectorRef, NgZone, Type } from '@angular/core';
 import {
+  cleanWhenDestroy,
   findCurrentElement,
   findCurrentLView,
+  getInitValue,
   getPageLView,
   lViewLinkToMPComponentRef,
-  updateInitValue,
+  setLViewPath,
+  updatePath,
 } from '../component-template-hook.factory';
+import type { LView } from '../internal-type';
 import type { AgentNode } from '../module/renderer-node';
-import { ComponentInitFactory, NgCompileComponent } from '../type';
+import {
+  ComponentInitFactory,
+  ComponentPath,
+  NgCompileComponent,
+} from '../type';
 import { WxComponentInstance, WxLifetimes } from './type';
 
 export function generateWxComponent<C>(
@@ -24,7 +32,7 @@ export function generateWxComponent<C>(
     const observers = {
       ['componentPath,nodeIndex']: function (
         this: WxComponentInstance,
-        list = [],
+        list: ComponentPath = [],
         index: number
       ) {
         if (this.__isLink) {
@@ -33,10 +41,15 @@ export function generateWxComponent<C>(
         if (!(index > -1)) {
           throw new Error('组件索引异常');
         }
-        const rootLView = getPageLView(this.getPageId());
-        const lView = findCurrentLView(rootLView, list, index);
-        const initValue = updateInitValue(lView);
-        this.setData({ __wxView: initValue });
+        const rootLView = getPageLView(this.getPageId()) as LView;
+        const componentPath = [...list, index];
+        const lView = findCurrentLView(rootLView, componentPath) as LView;
+        cleanWhenDestroy(lView);
+        setLViewPath(lView, componentPath);
+        const initValue = getInitValue(lView);
+        if (initValue) {
+          this.setData({ __wxView: updatePath(initValue, componentPath) });
+        }
         lViewLinkToMPComponentRef(this, lView);
         this.__lView = lView;
         this.__ngComponentInstance = lView[8];
@@ -162,8 +175,8 @@ export function generateWxComponent<C>(
           ref.then(
             (ngComponentInstance) => {
               this.__ngComponentInjector.get(ChangeDetectorRef).detectChanges();
-              const lView = getPageLView(this.getPageId());
-              const initValue = updateInitValue(lView);
+              const lView = getPageLView(this.getPageId()) as LView;
+              const initValue = getInitValue(lView);
               this.setData({ __wxView: initValue });
               lViewLinkToMPComponentRef(this, lView);
               this.__lView = lView;

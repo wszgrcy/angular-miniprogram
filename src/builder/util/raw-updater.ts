@@ -3,7 +3,7 @@ import {
   DeleteChange,
   InsertChange,
   ReplaceChange,
-} from 'cyia-code-util/dist/change/content-change';
+} from 'cyia-code-util';
 
 export class RawUpdater {
   static update(content: string, change: Change[]) {

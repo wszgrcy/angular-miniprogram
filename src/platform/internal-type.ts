@@ -1,3 +1,3 @@
-import { ɵangular_packages_core_core_ca } from '@angular/core';
+import type { ɵLContext } from '@angular/core';
 
-export type LView = ɵangular_packages_core_core_ca;
+export type LView = ɵLContext['lView'];

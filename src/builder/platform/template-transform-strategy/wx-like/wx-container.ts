@@ -1,4 +1,4 @@
-import {
+import type {
   NgBoundTextMeta,
   NgContentMeta,
   NgElementMeta,
@@ -6,13 +6,15 @@ import {
   NgTemplateMeta,
   NgTextMeta,
 } from '../../../html/node-handle/interface';
+import type { MatchedDirective } from '../../../html/node-handle/type';
 import {
   isNgBoundTextMeta,
   isNgContentMeta,
   isNgElementMeta,
   isNgTemplateMeta,
   isNgTextMeta,
-} from '../../../html/node-handle/node-meta/type-predicate';
+} from '../../util/type-predicate';
+import type { MetaCollection } from './type';
 
 export class WxContainer {
   directivePrefix!: string;
@@ -21,10 +23,7 @@ export class WxContainer {
   private childContainer: WxContainer[] = [];
   private level: number = 0;
   constructor(
-    private metaCollection: {
-      method: Set<string>;
-      listeners: { methodName: string; index: number; eventName: string }[];
-    },
+    private metaCollection: MetaCollection,
     private containerName = 'container',
     private parent?: WxContainer
   ) {}
@@ -49,6 +48,21 @@ export class WxContainer {
   }
 
   private ngElementTransform(node: NgElementMeta): string {
+    if (node.componentMeta) {
+      if (node.componentMeta.exportPath) {
+        this.metaCollection.libraryPath.add({
+          selector: node.componentMeta.selector,
+          path: node.componentMeta.exportPath,
+          className: node.componentMeta.className,
+        });
+      } else {
+        this.metaCollection.localPath.add({
+          path: node.componentMeta.filePath,
+          selector: node.componentMeta.selector,
+          className: node.componentMeta.className,
+        });
+      }
+    }
     const attributeStr = Object.entries(node.attributes)
       .filter(([key]) => key !== 'class' && key !== 'style')
       .map(([key, value]) => `${key}="${value}"`)
@@ -81,7 +95,7 @@ export class WxContainer {
       node.property
     )} ${this.setDirectiveData(node.directiveMeta, node.index)}`;
     if (node.singleClosedTag) {
-      return `<${node.tagName} ${commonTagProperty}>`;
+      return `<${node.tagName} ${commonTagProperty}/>`;
     }
     return `<${node.tagName} ${commonTagProperty}>${children.join('')}</${
       node.tagName
@@ -213,28 +227,32 @@ export class WxContainer {
     return ``;
   }
   private setDirectiveData(
-    directiveMeta: { listeners: string[] } | undefined,
-    nodeIndex: number
+    directiveMeta: MatchedDirective | undefined,
+    index: number
   ) {
-    if (
-      typeof directiveMeta === 'undefined' ||
-      !directiveMeta.listeners.length
-    ) {
+    if (typeof directiveMeta === 'undefined') {
       return '';
     }
 
     return (
-      `data-node-path="{{componentPath}}" data-node-index="{{${nodeIndex}}}" ` +
+      `data-node-path="{{componentPath}}" data-node-index="{{${index}}}" ` +
       directiveMeta.listeners
         .map((item) => {
-          const methodName = `${this.containerName}_directive_${nodeIndex}_${item}`;
+          const methodName = `${this.containerName}_directive_${index}_${item}`;
           this.metaCollection.listeners.push({
             methodName: methodName,
-            index: nodeIndex,
+            index: index,
             eventName: item,
           });
           return `bind:${item}="${methodName}"`;
         })
+        .join(' ') +
+      ' ' +
+      directiveMeta.properties
+        .filter(
+          (item) => !(item.startsWith('class') || item.startsWith('style'))
+        )
+        .map((item) => `${item}="{{nodeList[${index}].property.${item}}}"`)
         .join(' ')
     );
   }

@@ -11,6 +11,7 @@
     "./**/fixture",
     "./**/*.template.ts",
     "./**/*.d.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "**/*.xspec.ts"
   ]
 }

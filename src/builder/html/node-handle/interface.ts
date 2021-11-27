@@ -1,5 +1,6 @@
 import { TagEventMeta } from './event';
 import { ComponentContext } from './global-context';
+import type { MatchedComponent, MatchedDirective } from './type';
 
 export interface ParsedNode<T> {
   kind: NgNodeKind;
@@ -27,13 +28,8 @@ export interface NgElementMeta extends NgNodeMeta {
   property: string[];
   outputs: TagEventMeta[];
   singleClosedTag: boolean;
-  componentMeta:
-    | {
-        outputs: string[];
-        isComponent: boolean;
-      }
-    | undefined;
-  directiveMeta: { listeners: string[] } | undefined;
+  componentMeta: MatchedComponent | undefined;
+  directiveMeta: MatchedDirective | undefined;
 }
 export interface NgBoundTextMeta extends NgNodeMeta {
   kind: NgNodeKind.BoundText;

@@ -1,37 +1,55 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  InjectFlags,
-  ɵangular_packages_core_core_bh,
-  ɵangular_packages_core_core_ca,
-  ɵɵdirectiveInject,
-} from '@angular/core';
+import { InjectFlags, ɵɵdirectiveInject } from '@angular/core';
+import { LView } from './internal-type';
 import { AgentNode } from './module/renderer-node';
 import { PAGE_TOKEN } from './module/token/page.token';
+import type { ComponentPath, MPElementData, MPTextData, MPView } from './type';
 
 const start = 20;
 
-type LView = ɵangular_packages_core_core_ca;
-const initValue = new Map<LView, any>();
-export function propertyChange() {
-  const lView = ɵangular_packages_core_core_bh();
-  const nodeList = lViewToWXView(lView);
-  const ctx = { nodeList: nodeList };
+const initValueMap = new Map<LView, MPView>();
+const linkMap = new Map<LView, any>();
+const componentPathMap = new Map<LView, ComponentPath>();
+const pageMap = new Map<string, LView>();
+
+export function propertyChange(context: any) {
+  const lView = findCurrentComponentLView(context);
+  const lviewPath = getLViewPath(lView);
+  const nodeList = lViewToWXView(lView, lviewPath);
+  const ctx: Partial<MPView> = { nodeList: nodeList, componentPath: lviewPath };
   if (linkMap.has(lView)) {
     linkMap.get(lView).setData({ __wxView: ctx });
   } else {
-    initValue.set(lView, ctx);
+    initValueMap.set(lView, ctx as Required<MPView>);
   }
+}
+function findCurrentComponentLView(context: any) {
+  let lView = context['__ngContext__'];
+  if (lView[8] === context) {
+    return lView;
+  }
+  lView = lView[13];
+  while (lView[8] !== context) {
+    lView = lView[4];
+    if (lView[1] === true) {
+      throw new Error('这是LContainer?');
+    }
+  }
+  if (!lView) {
+    throw new Error('没有找到LView');
+  }
+  return lView;
 }
 function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
   const tView = lView[1];
   const end = tView.bindingStartIndex;
-  const nodeList = [];
+  const nodeList: MPView['nodeList'] = [];
   for (let index = start; index < end; index++) {
     const item = lView[index];
     if (item instanceof AgentNode) {
       nodeList[index - start] = item.toView();
     } else if (item && item[1] === true) {
-      const lContainerList: any[] = [];
+      const lContainerList: MPView[] = [];
       const viewRefList: any[] = item[8] || [];
       viewRefList.forEach((item, itemIndex) => {
         const componentPath = [
@@ -51,13 +69,41 @@ function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
   }
   return nodeList;
 }
-export function updateInitValue(lview: LView) {
-  return initValue.get(lview);
+
+export function setLViewPath(lView: LView, componentPath: ComponentPath) {
+  componentPath = componentPath.slice();
+  componentPathMap.set(lView, componentPath);
+}
+function getLViewPath(lView: LView) {
+  return componentPathMap.get(lView);
+}
+export function updatePath(context: MPView, componentPath: ComponentPath) {
+  componentPath = componentPath.slice();
+  context.componentPath = componentPath;
+  const list: (MPView[] | MPElementData | MPTextData | MPView)[] = [
+    ...context.nodeList,
+  ];
+  while (list.length) {
+    const item = list.pop()!;
+    if (item instanceof Array) {
+      list.push(...item);
+    }
+    if ((item as MPView).componentPath) {
+      ((item as MPView).componentPath as any[]).unshift(componentPath);
+    }
+  }
+  return context;
+}
+export function getInitValue(lView: LView) {
+  const result = initValueMap.get(lView);
+  if (result) {
+    initValueMap.delete(lView);
+  }
+  return result;
 }
 
-const pageMap = new Map<string, LView>();
-export function pageBind() {
-  const lview = ɵangular_packages_core_core_bh();
+export function pageBind(context: any) {
+  const lView = findCurrentComponentLView(context);
   const wxComponentInstance = ɵɵdirectiveInject(
     PAGE_TOKEN,
     InjectFlags.Optional
@@ -71,49 +117,57 @@ export function pageBind() {
   if (pageMap.has(pageId)) {
     return;
   }
-  pageMap.set(pageId, lview);
+  pageMap.set(pageId, lView);
 }
-export function getPageLView(id: string) {
+export function getPageLView(id: string): any {
   return pageMap.get(id)!;
 }
 
-export function findCurrentLView(lview: LView, list: any[], index: number) {
-  list = [...list];
+export function findCurrentLView(lView: LView, list: ComponentPath): any {
+  list = list.slice();
   while (list.length) {
-    const item = list.shift();
+    const item = list.shift()!;
     if (item === 'directive') {
-      const index = list.shift();
-      const lContainer = lview[index + start];
-      const child: number = list.shift();
+      const index = list.shift()! as number;
+      const lContainer = lView[index + start];
+      const child = list.shift() as number;
       const viewRef = lContainer[8][child];
-      lview = viewRef['_lView'];
+      lView = viewRef['_lView'];
+    } else {
+      lView = lView[start + item];
     }
   }
-
-  return lview[index + start];
+  return lView;
 }
 export function findCurrentElement(
-  lview: LView,
-  list: (string | number)[] = [],
+  lView: LView,
+  list: ComponentPath = [],
   index: number
 ) {
   list = [...list];
   while (list.length) {
-    const item = list.shift();
+    const item = list.shift()!;
     if (item === 'directive') {
       const index = list.shift() as number;
-      const lContainer = lview[index + start];
+      const lContainer = lView[index + start];
       const child = list.shift() as number;
       const viewRef = lContainer[8][child];
-      lview = viewRef['_lView'];
+      lView = viewRef['_lView'];
     }
   }
 
-  return lview[index + start];
+  return lView[index + start];
 }
 
-const linkMap = new Map<LView, any>();
-export function lViewLinkToMPComponentRef(ref: any, lview: LView) {
-  linkMap.set(lview, ref);
+export function lViewLinkToMPComponentRef(ref: any, lView: LView) {
+  linkMap.set(lView, ref);
 }
-export function componentTemplateHookFactory() {}
+
+export function cleanWhenDestroy(lview: LView) {
+  const list: Function[] = (lview[7] = lview[7] || []);
+  list.push((lview: LView) => cleanAll(lview));
+}
+function cleanAll(lview: LView) {
+  linkMap.delete(lview);
+  componentPathMap.delete(lview);
+}

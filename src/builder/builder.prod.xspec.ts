@@ -21,7 +21,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect(result).toBeTruthy();
       expect(result.error).toBeFalsy();
       expect(result.logs[0].level !== 'error').toBeTruthy();
-      expect(result.result.success).toBeTruthy();
+      expect(result.result?.success).toBeTruthy();
     });
   });
 });

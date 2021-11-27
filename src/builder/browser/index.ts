@@ -1,9 +1,10 @@
-import { BuilderContext, createBuilder } from '@angular-devkit/architect';
-import {
+import type { BuilderContext } from '@angular-devkit/architect';
+import { createBuilder } from '@angular-devkit/architect';
+import type {
   AssetPattern,
   BrowserBuilderOptions,
-  executeBrowserBuilder,
 } from '@angular-devkit/build-angular';
+import { executeBrowserBuilder } from '@angular-devkit/build-angular';
 import { Injector } from 'static-injector';
 import * as webpack from 'webpack';
 import { BuildPlatform, PlatformType } from '../platform/platform';
