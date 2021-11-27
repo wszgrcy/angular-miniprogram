@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npm run test:jasmine",
+    "test": "npm run test:jasmine library&& npm run test:jasmine",
     "test:jest": "NODE_OPTIONS=\"--experimental-vm-modules --inspect-brk\"  TS_NODE_PROJECT=./tsconfig.spec.json jest --config ./jest.builder.config.ts",
     "test:jasmine": "node ./script/startup-jasmine",
     "prebuild": "rimraf ./dist",
