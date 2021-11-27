@@ -4,11 +4,17 @@ import {
   findCurrentLView,
   getPageLView,
   lViewLinkToMPComponentRef,
+  setLViewPath,
   updateInitValue,
+  updatePath,
 } from '../component-template-hook.factory';
 import { LView } from '../internal-type';
 import type { AgentNode } from '../module/renderer-node';
-import { ComponentInitFactory, NgCompileComponent } from '../type';
+import {
+  ComponentInitFactory,
+  ComponentPath,
+  NgCompileComponent,
+} from '../type';
 import { WxComponentInstance, WxLifetimes } from './type';
 
 export function generateWxComponent<C>(
@@ -25,7 +31,7 @@ export function generateWxComponent<C>(
     const observers = {
       ['componentPath,nodeIndex']: function (
         this: WxComponentInstance,
-        list = [],
+        list: ComponentPath = [],
         index: number
       ) {
         if (this.__isLink) {
@@ -36,8 +42,11 @@ export function generateWxComponent<C>(
         }
         const rootLView = getPageLView(this.getPageId()) as LView;
         const lView = findCurrentLView(rootLView, list, index);
+        setLViewPath(lView, [...list, index]);
         const initValue = updateInitValue(lView);
-        this.setData({ __wxView: initValue });
+        if (initValue) {
+          this.setData({ __wxView: updatePath(initValue, [...list, index]) });
+        }
         lViewLinkToMPComponentRef(this, lView);
         this.__lView = lView;
         this.__ngComponentInstance = lView[8];

@@ -59,3 +59,20 @@ export interface NgCompileComponent {
     listeners: { methodName: string; index: number; eventName: string }[];
   };
 }
+
+export interface MPView {
+  nodeList: (MPView[] | MPElementData | MPTextData)[];
+  context: any;
+  componentPath: any[];
+}
+export interface MPElementData {
+  class: string;
+  style: string;
+  property: Record<string, any>;
+}
+
+export interface MPTextData {
+  value: string;
+}
+
+export type ComponentPath = ('directive' | number)[];

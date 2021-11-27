@@ -1,3 +1,5 @@
+import type { MPElementData, MPTextData } from '../type';
+
 export class AgentNode {
   selector!: string | unknown;
   name!: string;
@@ -57,7 +59,7 @@ export class AgentNode {
     }
     this.children.splice(index, 1);
   }
-  toView() {
+  toView(): MPTextData | MPElementData {
     if (this.type === 'text') {
       return { value: this.value };
     } else {
