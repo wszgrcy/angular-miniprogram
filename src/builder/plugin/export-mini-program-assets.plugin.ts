@@ -139,9 +139,14 @@ export class ExportMiniProgramAssetsPlugin {
               compilation.assets[outputPath] = item as any;
             });
             metaMap.config.forEach((value, key) => {
-              const config = JSON.parse(
-                ifs.readFileSync(value.existConfig).toString()
-              );
+              let config: Record<string, any>;
+              if ((ifs as any).fileSystem.existsSync(value.existConfig)) {
+                config = JSON.parse(
+                  ifs.readFileSync(value.existConfig).toString()
+                );
+              } else {
+                config = {};
+              }
               config.usingComponents = config.usingComponents || {};
               config.usingComponents = {
                 ...config.usingComponents,

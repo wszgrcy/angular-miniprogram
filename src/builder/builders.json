@@ -5,6 +5,11 @@
       "implementation": "./browser",
       "schema": "./browser/schema.json",
       "description": "小程序构建builder"
+    },
+    "library": {
+      "implementation": "./library",
+      "schema": "./library/schema.json",
+      "description": "小程序构建library"
     }
   }
 }
