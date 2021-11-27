@@ -17,6 +17,7 @@ export interface ComponentMetaFromLibrary {
 export interface DirectiveMetaFromLibrary {
   isComponent: false;
   listeners: string[];
+  properties: string[];
 }
 export type MetaFromLibrary =
   | ComponentMetaFromLibrary

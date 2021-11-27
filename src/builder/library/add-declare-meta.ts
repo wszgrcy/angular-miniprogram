@@ -6,6 +6,7 @@ import ts from 'typescript';
 import {
   LIBRARY_COMPONENT_EXPORT_PATH_SUFFIX,
   LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
+  LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX,
 } from '../const';
 import { DIRECTIVE_MAP, LIBRARY_ENTRY_POINT, RESOLVED_META_MAP } from './token';
 
@@ -83,6 +84,15 @@ export class AddDeclareMetaService {
           metaList.push(
             `declare const ${className}_${LIBRARY_DIRECTIVE_LISTENERS_SUFFIX}:${JSON.stringify(
               Object.keys(listeners)
+            )};`
+          );
+          const properties = value.meta.host.properties as Record<
+            string,
+            string
+          >;
+          metaList.push(
+            `declare const ${className}_${LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX}:${JSON.stringify(
+              Object.keys(properties)
             )};`
           );
         }

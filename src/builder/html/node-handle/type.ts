@@ -10,4 +10,5 @@ export interface MatchedComponent {
 export interface MatchedDirective {
   isComponent: false;
   listeners: string[];
+  properties: string[];
 }

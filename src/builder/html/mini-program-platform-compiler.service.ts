@@ -14,6 +14,7 @@ import { SelectorMatcher } from '../angular-internal/selector';
 import {
   LIBRARY_COMPONENT_EXPORT_PATH_SUFFIX,
   LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
+  LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX,
 } from '../const';
 import { COMPONENT_META, DIRECTIVE_MATCHER } from '../token/component.token';
 import { angularCompilerPromise } from '../util/load_esm';
@@ -206,18 +207,27 @@ export class MiniProgramPlatformCompilerService {
   private getLibraryDirectiveMeta(
     classDeclaration: ts.ClassDeclaration
   ): DirectiveMetaFromLibrary | undefined {
+    let listeners: string[] = [];
+    let properties: string[] = [];
     const directiveName = classDeclaration.name!.getText();
     const selector = createCssSelectorForTs(classDeclaration.getSourceFile());
-    const eventsNode = selector.queryOne(
+    const listenersNode = selector.queryOne(
       `VariableDeclaration[name=${directiveName}_${LIBRARY_DIRECTIVE_LISTENERS_SUFFIX}]`
     ) as ts.VariableDeclaration;
-    if (!eventsNode) {
-      return undefined;
+
+    const propertiesNode = selector.queryOne(
+      `VariableDeclaration[name=${directiveName}_${LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX}]`
+    ) as ts.VariableDeclaration;
+    if (listenersNode) {
+      listeners = JSON.parse(listenersNode.type!.getText());
     }
-    const listeners = eventsNode.type!.getText();
+    if (propertiesNode) {
+      properties = JSON.parse(propertiesNode.type!.getText());
+    }
     return {
       isComponent: false,
-      listeners: JSON.parse(listeners),
+      listeners: listeners,
+      properties: properties,
     };
   }
   private getLibraryComponentMeta(

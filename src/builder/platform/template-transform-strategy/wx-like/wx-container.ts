@@ -95,7 +95,7 @@ export class WxContainer {
       node.property
     )} ${this.setDirectiveData(node.directiveMeta, node.index)}`;
     if (node.singleClosedTag) {
-      return `<${node.tagName} ${commonTagProperty}>`;
+      return `<${node.tagName} ${commonTagProperty}/>`;
     }
     return `<${node.tagName} ${commonTagProperty}>${children.join('')}</${
       node.tagName
@@ -228,27 +228,31 @@ export class WxContainer {
   }
   private setDirectiveData(
     directiveMeta: MatchedDirective | undefined,
-    nodeIndex: number
+    index: number
   ) {
-    if (
-      typeof directiveMeta === 'undefined' ||
-      !directiveMeta.listeners.length
-    ) {
+    if (typeof directiveMeta === 'undefined') {
       return '';
     }
 
     return (
-      `data-node-path="{{componentPath}}" data-node-index="{{${nodeIndex}}}" ` +
+      `data-node-path="{{componentPath}}" data-node-index="{{${index}}}" ` +
       directiveMeta.listeners
         .map((item) => {
-          const methodName = `${this.containerName}_directive_${nodeIndex}_${item}`;
+          const methodName = `${this.containerName}_directive_${index}_${item}`;
           this.metaCollection.listeners.push({
             methodName: methodName,
-            index: nodeIndex,
+            index: index,
             eventName: item,
           });
           return `bind:${item}="${methodName}"`;
         })
+        .join(' ') +
+      ' ' +
+      directiveMeta.properties
+        .filter(
+          (item) => !(item.startsWith('class') || item.startsWith('style'))
+        )
+        .map((item) => `${item}="{{nodeList[${index}].property.${item}}}"`)
         .join(' ')
     );
   }

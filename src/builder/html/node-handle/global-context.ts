@@ -79,11 +79,17 @@ export class ComponentContext {
             listeners: Object.keys(
               meta.directiveMeta?.meta?.host?.listeners || []
             ),
+            properties: Object.keys(
+              meta.directiveMeta?.meta?.host?.properties || []
+            ),
           };
           if (meta.libraryMeta && !meta.libraryMeta.isComponent) {
             (item as MatchedDirective).listeners = (
               meta.libraryMeta as DirectiveMetaFromLibrary
             ).listeners!;
+            (item as MatchedDirective).properties = (
+              meta.libraryMeta as DirectiveMetaFromLibrary
+            ).properties!;
           }
         }
         result.push(item as MatchedMeta);

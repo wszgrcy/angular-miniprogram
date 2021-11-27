@@ -80,7 +80,8 @@ export class TemplateDefinition implements Visitor {
       if (list.length) {
         directiveMeta = {
           isComponent: false,
-          listeners: list.map((item) => item.listeners!).flat(),
+          listeners: list.map((item) => item.listeners).flat(),
+          properties: list.map((item) => item.properties).flat(),
         };
       }
     }
