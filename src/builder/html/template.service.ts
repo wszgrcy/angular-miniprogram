@@ -184,6 +184,9 @@ export class TemplateService {
     moduleName: string,
     module: ts.ResolvedModule
   ) {
+    if (!module) {
+      throw new Error(`模块未被解析,文件名${filePath},模块名${moduleName}`);
+    }
     const useList =
       this.dependencyUseModule.get(path.normalize(module.resolvedFileName)) ||
       [];
