@@ -7,20 +7,12 @@ import {
   OPTIONS_TOKEN,
 } from 'ng-packagr/lib/ng-package/options.di';
 import { transformFromPromise } from 'ng-packagr/lib/graph/transform';
+import { hookWritePackage } from '../src/builder/library/remove-publish-only';
 async function main() {
   let packagr = ngPackagr();
   packagr.forProject(path.resolve(process.cwd(), './src/ng-package.json'));
   packagr.withTsConfig(path.resolve(process.cwd(), './tsconfig.module.json'));
-  //   packagr.withProviders([
-  //   provideTransform({
-  //     provide: WRITE_PACKAGE_TRANSFORM_TOKEN,
-  //     deps: [OPTIONS_TOKEN],
-  //     useFactory: (options: NgPackagrOptions) =>
-  //       transformFromPromise(async (graph) => {
-  //         return graph;
-  //       }),
-  //   }),
-  // ]);
+  packagr.withProviders([hookWritePackage()]);
   await packagr.build();
 }
 main();

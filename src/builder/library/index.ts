@@ -19,6 +19,7 @@ import { join, resolve } from 'path';
 import { Observable, from, of } from 'rxjs';
 import { catchError, mapTo, switchMap, tap } from 'rxjs/operators';
 import { myCompileNgcTransformFactory } from './compile-ngc.transform';
+import { hookWritePackage } from './remove-publish-only';
 import { CustomStyleSheetProcessor } from './stylesheet-processor';
 /**
  * @experimental Direct usage of this function is considered experimental.
@@ -44,7 +45,7 @@ export function execute(
       }
       COMPILE_NGC_TRANSFORM.useFactory = myCompileNgcTransformFactory;
       STYLESHEET_PROCESSOR.useFactory = () => CustomStyleSheetProcessor;
-      packager.withProviders([COMPILE_NGC_TRANSFORM]);
+      packager.withProviders([COMPILE_NGC_TRANSFORM, hookWritePackage()]);
 
       const metadata = await context.getProjectMetadata(projectName);
       const { enabled: cacheEnabled, path: cacheDirectory } =
