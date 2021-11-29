@@ -15,7 +15,7 @@ import { BootstrapAssetsPlugin } from 'webpack-bootstrap-assets-plugin';
 import { LIBRARY_OUTPUT_PATH } from './const';
 import { BuildPlatform } from './platform/platform';
 import type { PlatformType } from './platform/platform';
-import { DynamicLibraryEntryPlugin } from './plugin/dynamic-library-entry.plugin';
+import { DynamicLibraryComponentEntryPlugin } from './plugin/dynamic-library-entry.plugin';
 import { DynamicWatchEntryPlugin } from './plugin/dynamic-watch-entry.plugin';
 import { ExportMiniProgramAssetsPlugin } from './plugin/export-mini-program-assets.plugin';
 import { TS_CONFIG_TOKEN } from './token/project.token';
@@ -77,7 +77,7 @@ export class WebpackConfigurationChange {
             );
           },
         },
-        { provide: DynamicLibraryEntryPlugin },
+        { provide: DynamicLibraryComponentEntryPlugin },
       ],
     });
     this.buildPlatform = this.injector.get(BuildPlatform);
@@ -90,7 +90,9 @@ export class WebpackConfigurationChange {
     this.componentTemplateLoader();
     this.definePlugin();
     this.changeStylesExportSuffix();
-    this.config.plugins?.push(this.injector.get(DynamicLibraryEntryPlugin));
+    this.config.plugins?.push(
+      this.injector.get(DynamicLibraryComponentEntryPlugin)
+    );
   }
   private async pageHandle() {
     this.workspaceRoot = normalize(this.context.workspaceRoot);
