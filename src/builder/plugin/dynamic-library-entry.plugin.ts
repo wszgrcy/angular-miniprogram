@@ -4,12 +4,13 @@ import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
 import { LIBRARY_OUTPUT_PATH, LibrarySymbol } from '../const';
 import { BuildPlatform } from '../platform/platform';
-import { LibraryLoaderContext } from '../type';
+import type { LibraryComponentEntryMeta, LibraryLoaderContext } from '../type';
 
 const CUSTOM_URI = 'dynamic';
 const CUSTOM_URI_REG = /^dynamic:(.*)\.ts$/;
 @Injectable()
-export class DynamicLibraryEntryPlugin {
+export class DynamicLibraryComponentEntryPlugin {
+  private libraryComponentMap = new Map<string, LibraryComponentEntryMeta>();
   constructor(private buildPlatform: BuildPlatform) {}
   apply(compiler: webpack.Compiler) {
     compiler.hooks.thisCompilation.tap(
@@ -27,13 +28,25 @@ export class DynamicLibraryEntryPlugin {
         const libraryLoaderContext: LibraryLoaderContext = (compilation as any)[
           LibrarySymbol
         ];
+        if (compilation.name?.startsWith('angular-compiler:')) {
+          callback(undefined);
+          return;
+        }
         if (!libraryLoaderContext) {
           callback(undefined);
           return;
         }
-        if (!libraryLoaderContext.libraryMetaList) {
+        if (
+          !libraryLoaderContext.libraryMetaList &&
+          !this.libraryComponentMap.size
+        ) {
           callback(undefined);
           return;
+        }
+        if (libraryLoaderContext.libraryMetaList) {
+          libraryLoaderContext.libraryMetaList.forEach((item) => {
+            this.libraryComponentMap.set(item.id, item);
+          });
         }
         const hooks = webpack.NormalModule.getCompilationHooks(compilation);
         hooks.readResource
@@ -43,9 +56,8 @@ export class DynamicLibraryEntryPlugin {
             (loaderContext: any, callback) => {
               const resourcePath: string = loaderContext.resourcePath;
               const id = resourcePath.match(CUSTOM_URI_REG)![1];
-              const libraryMeta = libraryLoaderContext.libraryMetaList.find(
-                (item) => item.id === id
-              );
+              const libraryMeta = this.libraryComponentMap.get(id);
+
               callback(
                 undefined,
                 `
@@ -58,9 +70,7 @@ export class DynamicLibraryEntryPlugin {
             }
           );
         let j = 0;
-        for (let i = 0; i < libraryLoaderContext.libraryMetaList.length; i++) {
-          const meta = libraryLoaderContext.libraryMetaList[i];
-
+        this.libraryComponentMap.forEach((meta) => {
           const entry = join(normalize(LIBRARY_OUTPUT_PATH), meta.libraryPath);
           const dep = webpack.EntryPlugin.createDependency(
             `${CUSTOM_URI}:${meta.id}.ts`,
@@ -68,11 +78,11 @@ export class DynamicLibraryEntryPlugin {
           );
           compilation.addEntry(compiler.context, dep, entry, (err, result) => {
             j++;
-            if (j === libraryLoaderContext.libraryMetaList.length) {
+            if (j === this.libraryComponentMap.size) {
               callback(undefined);
             }
           });
-        }
+        });
       }
     );
   }

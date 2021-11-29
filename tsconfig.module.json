@@ -17,6 +17,7 @@
     "test"
   ],
   "angularCompilerOptions": {
-    "enableIvy": false
+    "enableIvy": true,
+    "compilationMode": "full"
   }
 }
