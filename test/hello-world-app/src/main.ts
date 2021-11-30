@@ -2,7 +2,7 @@ import { enableProdMode } from '@angular/core';
 
 import { MainModule } from './main.module';
 import { environment } from './environments/environment';
-import { platformWeixinMiniProgram } from '../../../src/platform';
+import { platformWeixinMiniProgram } from 'angular-miniprogram';
 import 'zone.js';
 if (environment.production) {
   enableProdMode();

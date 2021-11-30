@@ -1,8 +1,8 @@
 {
   "extends": "./tsconfig.base.json",
-  "files": ["./src/index.ts"],
+  "files": ["./src/library/index.ts"],
   "compilerOptions": {
-    "baseUrl": "./src/platform",
+    "baseUrl": "./src/library",
     "noImplicitThis": true,
     "outDir": "dist",
     "declaration": true,

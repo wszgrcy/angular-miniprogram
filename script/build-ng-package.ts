@@ -10,8 +10,10 @@ import { transformFromPromise } from 'ng-packagr/lib/graph/transform';
 import { hookWritePackage } from '../src/builder/library/remove-publish-only';
 async function main() {
   let packagr = ngPackagr();
-  packagr.forProject(path.resolve(process.cwd(), './src/ng-package.json'));
-  packagr.withTsConfig(path.resolve(process.cwd(), './tsconfig.module.json'));
+  packagr.forProject(
+    path.resolve(process.cwd(), './src/library/ng-package.json')
+  );
+  packagr.withTsConfig(path.resolve(process.cwd(), './tsconfig.library.json'));
   packagr.withProviders([hookWritePackage()]);
   await packagr.build();
 }

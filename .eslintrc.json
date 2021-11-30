@@ -28,15 +28,24 @@
     "import/newline-after-import": "warn",
     "import/no-absolute-path": "warn",
     "import/no-duplicates": "warn",
-    "import/no-extraneous-dependencies": ["off", { "devDependencies": false }],
+    "import/no-extraneous-dependencies": [
+      "off",
+      {
+        "devDependencies": false
+      }
+    ],
     "import/no-unassigned-import": [
       "warn",
-      { "allow": ["miniprogram-api-typings"] }
+      {
+        "allow": ["miniprogram-api-typings"]
+      }
     ],
     "import/order": [
       "warn",
       {
-        "alphabetize": { "order": "asc" },
+        "alphabetize": {
+          "order": "asc"
+        },
         "groups": [["builtin", "external"], "parent", "sibling", "index"]
       }
     ],
@@ -51,15 +60,30 @@
         "ignoreRegExpLiterals": true
       }
     ],
-    "max-lines-per-function": ["warn", { "max": 400 }],
+    "max-lines-per-function": [
+      "warn",
+      {
+        "max": 400
+      }
+    ],
     "no-caller": "warn",
     "no-console": "warn",
-    "no-empty": ["warn", { "allowEmptyCatch": true }],
+    "no-empty": [
+      "warn",
+      {
+        "allowEmptyCatch": true
+      }
+    ],
     "no-eval": "warn",
     "no-multiple-empty-lines": ["warn"],
     "no-throw-literal": "warn",
     "no-var": "warn",
-    "sort-imports": ["warn", { "ignoreDeclarationSort": true }],
+    "sort-imports": [
+      "warn",
+      {
+        "ignoreDeclarationSort": true
+      }
+    ],
     "spaced-comment": [
       "warn",
       "always",
@@ -95,9 +119,16 @@
     "@typescript-eslint/no-inferrable-types": "off",
     "@typescript-eslint/no-misused-promises": [
       "warn",
-      { "checksVoidReturn": false }
+      {
+        "checksVoidReturn": false
+      }
     ],
-    "@typescript-eslint/no-this-alias": ["warn", { "allowedNames": ["_this"] }]
+    "@typescript-eslint/no-this-alias": [
+      "warn",
+      {
+        "allowedNames": ["_this"]
+      }
+    ]
   },
   "overrides": [
     {
@@ -108,7 +139,10 @@
       "rules": {
         "import/no-extraneous-dependencies": [
           "warn",
-          { "devDependencies": true, "packageDir": "./" }
+          {
+            "devDependencies": true,
+            "packageDir": "./"
+          }
         ],
         "max-lines-per-function": "off",
         "no-console": "off"
@@ -127,7 +161,7 @@
       }
     },
     {
-      "files": ["./src/index.ts", "./src/platform/**/*.ts"],
+      "files": ["./src/library/**/*.ts"],
       "excludedFiles": [
         "./src/**/*.template.ts",
         "./src/**/*.d.ts",
@@ -135,7 +169,7 @@
         "test"
       ],
       "parserOptions": {
-        "project": "tsconfig.module.json"
+        "project": "tsconfig.library.json"
       }
     }
   ]

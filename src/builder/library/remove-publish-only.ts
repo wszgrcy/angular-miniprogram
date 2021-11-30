@@ -21,15 +21,19 @@ function myWritePackage(options: NgPackagrOptions) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       isEntryPointInProgress() as any
     )!;
-    const packageJsonPath = path.resolve(
-      entryPoint.data.entryPoint.destinationPath,
-      'package.json'
-    );
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath).toString());
-    delete packageJson.scripts.prepublishOnly;
-    fs.writeFileSync(
-      packageJsonPath,
-      JSON.stringify(packageJson, undefined, 2)
-    );
+    if (!entryPoint.data.entryPoint.isSecondaryEntryPoint) {
+      const packageJsonPath = path.resolve(
+        entryPoint.data.entryPoint.destinationPath,
+        'package.json'
+      );
+      const packageJson = JSON.parse(
+        fs.readFileSync(packageJsonPath).toString()
+      );
+      delete packageJson.scripts.prepublishOnly;
+      fs.writeFileSync(
+        packageJsonPath,
+        JSON.stringify(packageJson, undefined, 2)
+      );
+    }
   });
 }
