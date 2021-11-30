@@ -1,12 +1,12 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "noImplicitThis": true,
-    "outDir": "../../dist/builder",
-    "declaration": true,
+    "outDir": "./dist/builder",
+    "declaration": false,
     "strict": true
   },
-  "include": ["./"],
+  "include": ["src/builder"],
   "exclude": [
     "./**/fixture",
     "./**/*.template.ts",

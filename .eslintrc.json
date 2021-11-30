@@ -52,10 +52,10 @@
       }
     ],
     "max-lines-per-function": ["warn", { "max": 400 }],
-    "no-caller": "error",
+    "no-caller": "warn",
     "no-console": "warn",
     "no-empty": ["warn", { "allowEmptyCatch": true }],
-    "no-eval": "error",
+    "no-eval": "warn",
     "no-multiple-empty-lines": ["warn"],
     "no-throw-literal": "warn",
     "no-var": "warn",
@@ -89,7 +89,7 @@
     "@typescript-eslint/restrict-template-expressions": "off",
     "@typescript-eslint/unbound-method": "off",
     "prefer-const": "warn",
-    "prefer-rest-params": "error",
+    "prefer-rest-params": "warn",
     "prefer-spread": "warn",
     "@typescript-eslint/no-floating-promises": "warn",
     "@typescript-eslint/no-inferrable-types": "off",
@@ -123,7 +123,7 @@
         "test"
       ],
       "parserOptions": {
-        "project": "./src/builder/tsconfig.json"
+        "project": "./tsconfig.builder.json"
       }
     },
     {

@@ -4,3 +4,4 @@ test-project-host-hello-world-app-*
 dist
 __test-app
 coverage-builder
+script/startup-jasmine.js
