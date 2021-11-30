@@ -171,6 +171,13 @@
       "parserOptions": {
         "project": "tsconfig.library.json"
       }
+    },
+    {
+      "files": ["schematics/internal/**/*.ts"],
+      "excludedFiles": [],
+      "parserOptions": {
+        "project": "tsconfig.internal-schematics.json"
+      }
     }
   ]
 }

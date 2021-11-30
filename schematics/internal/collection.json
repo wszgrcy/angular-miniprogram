@@ -1,0 +1,9 @@
+{
+  "$schema": "../../node_modules/@angular-devkit/schematics/collection-schema.json",
+  "schematics": {
+    "forms-hook": {
+      "description": "Angular原表单项目hook修改",
+      "factory": "./forms-hook/index"
+    }
+  }
+}

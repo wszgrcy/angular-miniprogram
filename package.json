@@ -13,7 +13,8 @@
     "build:platform": "ts-node ./script/build-ng-package.ts",
     "build:builder": "ts-node -P ./script/tsconfig.json ./script/build.ts ./tsconfig.builder.json",
     "prepare": "husky install",
-    "lint": "eslint --max-warnings 0 \"./**/*.ts\""
+    "lint": "eslint --max-warnings 0 \"./**/*.ts\"",
+    "forms-hook": "ts-node ./script/run-forms-hook.ts"
   },
   "private": true,
   "author": "wszgrcy",
