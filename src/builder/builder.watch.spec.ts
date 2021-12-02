@@ -49,7 +49,7 @@ describeBuilder(
                 "usingComponents": { }
               }
               `,
-                  'src/pages/sub3/sub3.entry.ts': `import { pageStartup } from '../../../../../src/platform';
+                  'src/pages/sub3/sub3.entry.ts': `import { pageStartup } from 'angular-miniprogram';
               import { Sub3Component } from './sub3.component';
               import { Sub3Module } from './sub3.module';
               

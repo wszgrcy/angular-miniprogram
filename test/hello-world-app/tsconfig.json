@@ -10,12 +10,14 @@
     "experimentalDecorators": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "strictNullChecks": true,
     "target": "es2015",
     "module": "es2020",
     "typeRoots": ["node_modules/@types"],
     "lib": ["es2018", "dom"],
     "paths": {
-      "angular-miniprogram": ["../../src/platform/index.ts"]
+      "angular-miniprogram": ["../../src/library/platform/index.ts"],
+      "angular-miniprogram/forms": ["../../src/library/forms/index.ts"]
     }
   }
 }

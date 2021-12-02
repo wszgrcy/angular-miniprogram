@@ -15,3 +15,6 @@ interface NodeModule {
 //   new (...args: any[]): T;
 // }
 // declare function ngStartPage<M, C>(module: Type<M>, component: Type<C>): C;
+declare global {
+  const ngDevMode: null | any;
+}

@@ -1,14 +1,18 @@
 {
   "extends": "./tsconfig.base.json",
-  "files": ["./src/index.ts"],
+  // "files": ["./src/library/index.ts"],
+  "include": ["./src/library"],
   "compilerOptions": {
-    "baseUrl": "./src/platform",
+    "baseUrl": "./src/library",
     "noImplicitThis": true,
     "outDir": "dist",
     "declaration": true,
     "target": "ES2015",
     "module": "esnext",
-    "strict": true
+    "strict": true,
+    "lib": ["es2019", "dom"],
+    "typeRoots": ["./src/library"],
+    "types": ["declaration"]
   },
   "exclude": [
     "./src/**/*.template.ts",

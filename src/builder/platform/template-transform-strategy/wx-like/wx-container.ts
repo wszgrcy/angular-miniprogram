@@ -174,6 +174,24 @@ export class WxContainer {
         } else {
           throw new Error('未知的解析指令');
         }
+      } else if (directive.type === 'ngTemplateOutlet') {
+        content += `<block ${this.directivePrefix}:if="{{nodeList[${
+          node.index
+        }][0]}}" >
+          <template is="${directive.name}" ${this.getTemplateDataStr(
+          node.index,
+          `0`
+        )}></template>
+          </block>`;
+      } else if (directive.type === 'custom') {
+        content += `<block ${this.directivePrefix}:for="{{nodeList[${
+          node.index
+        }]}}" >
+          <template is="{{item.context.template}}" ${this.getTemplateDataStr(
+            node.index,
+            `index`
+          )}></template>
+          </block>`;
       } else {
         throw new Error('未知的解析节点');
       }
@@ -244,7 +262,7 @@ export class WxContainer {
             index: index,
             eventName: item,
           });
-          return `bind:${item}="${methodName}"`;
+          return `${item}="${methodName}"`;
         })
         .join(' ') +
       ' ' +

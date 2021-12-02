@@ -6,11 +6,13 @@ import type {
 } from '@angular/compiler/src/render3/r3_ast';
 import { ComponentContext } from './global-context';
 import {
+  NgCustomDirective,
   NgDefaultDirective,
   NgDirective,
   NgNodeKind,
   NgNodeMeta,
   NgTemplateMeta,
+  NgTemplateOutletDirective,
   ParsedNode,
 } from './interface';
 import { isElement } from './type-predicate';
@@ -51,6 +53,9 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
     const isSwitch = this.attrs.some(
       (item) => item.name === 'ngSwitchCase' || item.name === 'ngSwitchDefault'
     );
+    const isTemplateOutlet = this.attrs.some(
+      (item) => item.name === 'ngTemplateOutlet'
+    );
 
     if (isNgIf) {
       return this.ngIfTransform();
@@ -58,10 +63,14 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
       return this.ngForTransform();
     } else if (isSwitch) {
       return this.ngSwitchTransform();
-    } else if (this.node.tagName === 'ng-template') {
+    } else if (isTemplateOutlet) {
+      return [this.ngTemplateOutletTransform()];
+    } else if (this.node.tagName === 'ng-template' || !this.attrs.length) {
       return [this.defaultTransform()];
+    } else if (this.attrs.length) {
+      return [this.ngCustomStructuralDirectiveTransform()];
     } else {
-      throw new Error('没有找到对应指令.目前仅支持ngIf,ngFor,ngSwitch');
+      throw new Error('没有找到对应指令.');
     }
   }
   private defaultTransform(): NgDefaultDirective {
@@ -144,7 +153,19 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
       },
     ];
   }
+  private ngCustomStructuralDirectiveTransform(): NgCustomDirective {
+    return { type: 'custom' };
+  }
+  private ngTemplateOutletTransform(): NgTemplateOutletDirective {
+    const ngTemplateOutlet = this.attrs.find(
+      (item) => item.name === 'ngTemplateOutlet'
+    )!;
 
+    return {
+      type: 'ngTemplateOutlet',
+      name: (ngTemplateOutlet.value as ASTWithSource).source!,
+    };
+  }
   getNodeMeta(globalContext: ComponentContext): NgTemplateMeta {
     this.globalContext = globalContext;
     const staticType = globalContext.matchDirective(this.node);

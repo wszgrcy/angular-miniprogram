@@ -12,3 +12,4 @@ commitlint.config.js
 script
 **/fixture
 *.xspec.ts
+src/library

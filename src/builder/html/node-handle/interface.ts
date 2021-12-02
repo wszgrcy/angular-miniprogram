@@ -43,7 +43,9 @@ export type NgDirective =
   | NgIfDirective
   | NgForDirective
   | NgSwitchDirective
-  | NgDefaultDirective;
+  | NgDefaultDirective
+  | NgCustomDirective
+  | NgTemplateOutletDirective;
 export interface NgIfDirective {
   type: 'if';
   thenTemplateRef: string;
@@ -61,6 +63,14 @@ export interface NgSwitchDirective {
   first: boolean;
   templateName: string;
 }
+export interface NgCustomDirective {
+  type: 'custom';
+}
+export interface NgTemplateOutletDirective {
+  type: 'ngTemplateOutlet';
+  name: string;
+}
+
 export interface NgDefaultDirective {
   type: 'none';
   name: { name: string; value: string }[];

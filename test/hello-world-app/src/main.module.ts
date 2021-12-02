@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 import { DoBootstrap } from '@angular/core';
-import { MiniProgramModule } from '../../../src/platform';
+import { MiniProgramModule } from 'angular-miniprogram';
 @NgModule({
   declarations: [],
   imports: [MiniProgramModule],

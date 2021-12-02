@@ -1,4 +1,10 @@
-<input type="text" libTestLibrary />
+<ng-template #abc let-a>123456 9999 {{ a }}</ng-template>
+<ng-container
+  *ngTemplateOutlet="abc; context: { $implicit: '测试' }"
+></ng-container>
+<!-- <div *appCustomStruct="abc; name: 'abc'"></div>
+<div *ngFor="let item of [1, 2, 3]">{{ item }}</div> -->
+<!-- <input type="text" libTestLibrary />
 <lib-test-library *ngIf="display"></lib-test-library>
 <div
   [class]="'sdfsdf'"
@@ -40,4 +46,28 @@
 </div>
 <div *ngIf="true">
   <div appF1>sdfsdfsfdfgsgsgf</div>
-</div>
+</div> -->
+<!-- <input type="text" [(ngModel)]="title" (ngModelChange)="moduleChange($event)">
+<input type="number" [(ngModel)]="modelValue" (ngModelChange)="moduleChange($event)">
+<input type="idcard" [(ngModel)]="modelValue" (ngModelChange)="moduleChange($event)">
+<input type="digit" [(ngModel)]="modelValue" (ngModelChange)="moduleChange($event)">
+<input type="safe-password	" [(ngModel)]="modelValue" (ngModelChange)="moduleChange($event)"> -->
+<!-- <switch [(ngModel)]="display" (ngModelChange)="moduleChange($event)" type="switch"></switch>
+<switch [(ngModel)]="display" (ngModelChange)="moduleChange($event)" type="checkbox"></switch> -->
+<!-- <slider [(ngModel)]="num" min="100" max="1000" (ngModelChange)="moduleChange($event)"></slider>
+<slider [(ngModel)]="num" min="100" max="1000" disabled="true"></slider> -->
+<!-- <radio-group [(ngModel)]="raidoValue" (ngModelChange)="moduleChange($event)">
+  <radio value="ceshi1"></radio>
+  <radio value="ceshi"></radio>
+</radio-group> -->
+<!-- <checkbox-group [(ngModel)]="checkboxValue" (ngModelChange)="moduleChange($event)">
+  <checkbox value="ceshi1"></checkbox>
+  <checkbox value="ceshi" ></checkbox>  
+</checkbox-group> -->
+<!-- <picker
+  [range]="[1, 2, 3]"
+  mode="selector"
+  [(ngModel)]="num"
+  (ngModelChange)="moduleChange($event)"
+  >显示?{{ num }}
+</picker> -->
