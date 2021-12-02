@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npmr run forms-hook && npm run test:jasmine library&& npm run test:jasmine",
+    "test": "npm run forms-hook && npm run test:jasmine library&& npm run test:jasmine",
     "test:jest": "NODE_OPTIONS=\"--experimental-vm-modules --inspect-brk\"  TS_NODE_PROJECT=./tsconfig.spec.json jest --config ./jest.builder.config.ts",
     "test:jasmine": "tsc -p ./script/tsconfig.startup-jasmine.json && node ./script/startup-jasmine.js",
     "prebuild": "rimraf ./dist",
