@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, Inject, OnInit } from '@angular/core';
 
 @Component({
   selector: 'app-sub1',
@@ -8,13 +8,16 @@ import { Component, Inject, OnInit } from '@angular/core';
 })
 export class Sub1Component implements OnInit {
   title = 'app666';
-  display = false;
+  display = true;
   num = 0;
   obj = { a: '' };
   randomValue = 0;
   jsonObj = { a: '被格式化的对象' };
   today = new Date();
-  constructor() {
+  modelValue;
+  raidoValue = 'ceshi';
+  checkboxValue = ['ceshi'];
+  constructor(private cd: ChangeDetectorRef) {
     console.log('Sub1Component构造');
   }
   ngOnInit(): void {}
@@ -33,5 +36,9 @@ export class Sub1Component implements OnInit {
   }
   eventTest(e) {
     this.randomValue = Math.random();
+  }
+  moduleChange(e) {
+    console.log(e);
+    this.cd.detectChanges();
   }
 }

@@ -1,10 +1,13 @@
 export class TagEventMeta {
-  public methodName: string;
+  public methodName!: string;
   constructor(
     public prefix: string,
     public name: string,
     methodNameSource: string
   ) {
-    this.methodName = methodNameSource.match(/^(.*)\(.*\)$/)![1];
+    const result = methodNameSource.match(/^(.*)\(.*\)$/);
+    if (result) {
+      this.methodName = result[1];
+    }
   }
 }

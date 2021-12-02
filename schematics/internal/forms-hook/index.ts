@@ -1,7 +1,14 @@
-import { SchematicContext, Tree } from '@angular-devkit/schematics';
+import { SchematicContext, Tree, chain } from '@angular-devkit/schematics';
+import { getAngularFormsRuleFactory } from './rule/get-angular-forms.rule';
+import { mergeSourceRuleFactory } from './rule/merge-source.rule';
+import { FormsHookOptions } from './type';
 
-export default function () {
+export default function (options: FormsHookOptions) {
+  options.schecmaticPath = __dirname;
   return (tree: Tree, context: SchematicContext) => {
-    console.log('测试调用');
+    return chain([
+      getAngularFormsRuleFactory(options),
+      mergeSourceRuleFactory(options),
+    ]);
   };
 }

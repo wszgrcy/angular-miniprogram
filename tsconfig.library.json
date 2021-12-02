@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.base.json",
-  "files": ["./src/library/index.ts"],
+  // "files": ["./src/library/index.ts"],
+  "include": ["./src/library"],
   "compilerOptions": {
     "baseUrl": "./src/library",
     "noImplicitThis": true,

@@ -244,7 +244,7 @@ export class WxContainer {
             index: index,
             eventName: item,
           });
-          return `bind:${item}="${methodName}"`;
+          return `${item}="${methodName}"`;
         })
         .join(' ') +
       ' ' +
