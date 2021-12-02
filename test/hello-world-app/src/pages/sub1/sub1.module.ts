@@ -10,8 +10,14 @@ import { F1Directive } from './f1.directive';
 import { TestLibraryModule } from 'test-library';
 import { F2Directive } from './f2.directive';
 import { FormsModule } from 'angular-miniprogram/forms';
+import { CustomStructDirective } from './custom-struct.directive';
 @NgModule({
-  declarations: [Sub1Component, F1Directive, F2Directive],
+  declarations: [
+    Sub1Component,
+    F1Directive,
+    F2Directive,
+    CustomStructDirective,
+  ],
   imports: [Cp1Module, CommonModule, TestLibraryModule, FormsModule],
   providers: [],
   bootstrap: [],

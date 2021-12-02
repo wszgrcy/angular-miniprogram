@@ -9,7 +9,10 @@
     "declaration": true,
     "target": "ES2015",
     "module": "esnext",
-    "strict": true
+    "strict": true,
+    "lib": ["es2019", "dom"],
+    "typeRoots": ["./src/library"],
+    "types": ["declaration"]
   },
   "exclude": [
     "./src/**/*.template.ts",

@@ -28,7 +28,7 @@ export function mergeSourceRuleFactory(options: FormsHookOptions) {
       }
     }
     const angularFormsSource = apply(
-      url(path.relative(options.schecmaticPath, ANGULAR_FORMS_PATH)),
+      url(path.relative(options.schematicPath, ANGULAR_FORMS_PATH)),
       [
         filter((path) => {
           return path.endsWith('.ts') && !path.startsWith('/test');

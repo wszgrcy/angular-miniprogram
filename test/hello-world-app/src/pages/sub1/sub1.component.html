@@ -1,3 +1,9 @@
+<ng-template #abc let-a>123456 9999 {{ a }}</ng-template>
+<ng-container
+  *ngTemplateOutlet="abc; context: { $implicit: '测试' }"
+></ng-container>
+<!-- <div *appCustomStruct="abc; name: 'abc'"></div>
+<div *ngFor="let item of [1, 2, 3]">{{ item }}</div> -->
 <!-- <input type="text" libTestLibrary />
 <lib-test-library *ngIf="display"></lib-test-library>
 <div
@@ -58,10 +64,10 @@
   <checkbox value="ceshi1"></checkbox>
   <checkbox value="ceshi" ></checkbox>  
 </checkbox-group> -->
-<picker
+<!-- <picker
   [range]="[1, 2, 3]"
   mode="selector"
   [(ngModel)]="num"
   (ngModelChange)="moduleChange($event)"
   >显示?{{ num }}
-</picker>
+</picker> -->

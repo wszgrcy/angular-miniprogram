@@ -19,6 +19,7 @@ export function runSchematics<T extends keyof SchematicsType>(
   workflowOptions = { ...DEFAULT_WORKFLOW_OPTIONS, ...workflowOptions };
   const nodeWorkflow = new NodeWorkflow(process.cwd(), workflowOptions);
   nodeWorkflow.reporter.subscribe((event) => {
+    // eslint-disable-next-line no-console
     console.log(event.kind, event.path);
   });
   return nodeWorkflow

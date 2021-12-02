@@ -3,5 +3,5 @@ export interface FormsHookOptions {
   source: string;
   savePath: string;
   sourceInSchematicsPath: string;
-  schecmaticPath?: string;
+  schematicPath?: string;
 }

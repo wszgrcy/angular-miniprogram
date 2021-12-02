@@ -52,6 +52,15 @@ export {
   SelectControlValueAccessor,
 } from './directives/select_control_value_accessor';
 export { SelectMultipleControlValueAccessor } from './directives/select_multiple_control_value_accessor';
+export { SwitchValueAccessor } from './directives/switch_value_accessor';
+export { SliderValueAccessor } from './directives/slider_value_accessor';
+export {
+  RadioGroupValueAccessor,
+  RadioControl,
+} from './directives/radio_control_value_accessor';
+export { PickerViewValueAccessor } from './directives/picker_view_value_accessor';
+export { PickerValueAccessor } from './directives/picker_value_accessor';
+export { CheckBoxGroupValueAccessor } from './directives/checkbox_value_accessor';
 export { ɵNgSelectMultipleOption } from './directives/select_multiple_control_value_accessor';
 export {
   AsyncValidator,

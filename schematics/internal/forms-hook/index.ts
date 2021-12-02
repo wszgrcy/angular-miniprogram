@@ -4,7 +4,7 @@ import { mergeSourceRuleFactory } from './rule/merge-source.rule';
 import { FormsHookOptions } from './type';
 
 export default function (options: FormsHookOptions) {
-  options.schecmaticPath = __dirname;
+  options.schematicPath = __dirname;
   return (tree: Tree, context: SchematicContext) => {
     return chain([
       getAngularFormsRuleFactory(options),
