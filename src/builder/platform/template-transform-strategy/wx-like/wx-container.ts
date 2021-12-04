@@ -225,6 +225,9 @@ export class WxContainer {
       .forEach((key) => {
         propertyMap.set(key, `nodeList[${index!}].property.${key}`);
       });
+    node.directiveMeta?.properties.forEach((key) => {
+      propertyMap.set(key, `nodeList[${index!}].property.${key}`);
+    });
     const eventMap = new Map();
     const eventList: string[] = [
       ...node.outputs
@@ -236,6 +239,7 @@ export class WxContainer {
       ...(node.directiveMeta?.listeners || []),
       ...(node.componentMeta?.isComponent ? node.componentMeta?.listeners : []),
     ];
+
     const mergeEventMap = new Map<string, string[]>();
     eventList
       // .filter((eventName) => !eventMap.has(eventName))
