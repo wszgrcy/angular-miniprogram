@@ -262,7 +262,7 @@ export class WxHttpBackend implements HttpBackend {
    */
   private request(request: HttpRequest<any>): Observable<HttpEvent<any>> {
     return new Observable((observer: Observer<HttpEvent<any>>) => {
-      if (request.method === 'PATCH') {
+      if (['PATCH', 'JSONP'].includes(request.method)) {
         throw Error(
           'WeChat MiniProgram does not support http method as ' + request.method
         );
