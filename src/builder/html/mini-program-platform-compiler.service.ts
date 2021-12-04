@@ -212,6 +212,9 @@ export class MiniProgramPlatformCompilerService {
   getDirectiveMap() {
     return this.directiveMap;
   }
+  getComponentMap() {
+    return this.componentMap;
+  }
   private getLibraryDirectiveMeta(
     classDeclaration: ts.ClassDeclaration
   ): DirectiveMetaFromLibrary | undefined {
@@ -251,8 +254,9 @@ export class MiniProgramPlatformCompilerService {
     }
     const exportPath = exportPathNode.type!.getText();
     return {
-      isComponent: true,
       exportPath: JSON.parse(exportPath),
+      ...this.getLibraryDirectiveMeta(classDeclaration)!,
+      isComponent: true,
     };
   }
 }

@@ -8,6 +8,7 @@ export interface MatchedComponent {
   className: string;
   listeners: string[];
   inputs: string[];
+  properties: string[];
 }
 export interface MatchedDirective {
   isComponent: false;

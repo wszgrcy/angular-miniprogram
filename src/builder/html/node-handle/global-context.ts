@@ -68,19 +68,24 @@ export class ComponentContext {
             className: (
               (meta.directive as any).ref.node as ts.ClassDeclaration
             ).name!.getText(),
-            listeners: Object.keys(meta.componentMeta?.host?.listeners) || [],
+            listeners:
+              Object.keys(meta.componentMeta?.host?.listeners || {}) || [],
             inputs: meta.directive.inputs,
           };
           if (meta.libraryMeta?.isComponent) {
             item.exportPath = meta.libraryMeta.exportPath;
+            item.listeners = meta.libraryMeta.listeners;
+            item.properties = meta.libraryMeta.properties;
           }
         } else {
           item = {
             isComponent,
             listeners:
-              Object.keys(meta.directiveMeta?.meta?.host?.listeners) || [],
+              Object.keys(meta.directiveMeta?.meta?.host?.listeners || {}) ||
+              [],
             properties:
-              Object.keys(meta.directiveMeta?.meta?.host?.properties) || [],
+              Object.keys(meta.directiveMeta?.meta?.host?.properties || {}) ||
+              [],
           };
           if (meta.libraryMeta && !meta.libraryMeta.isComponent) {
             (item as MatchedDirective).listeners = (

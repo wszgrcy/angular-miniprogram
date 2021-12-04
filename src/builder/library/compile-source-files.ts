@@ -40,7 +40,12 @@ import { ExportLibraryComponentMeta } from '../type';
 import { AddDeclareMetaService } from './add-declare-meta';
 import { getLibraryPath } from './get-library-path';
 import { CustomStyleSheetProcessor } from './stylesheet-processor';
-import { DIRECTIVE_MAP, LIBRARY_ENTRY_POINT, RESOLVED_META_MAP } from './token';
+import {
+  COMPONENT_MAP,
+  DIRECTIVE_MAP,
+  LIBRARY_ENTRY_POINT,
+  RESOLVED_META_MAP,
+} from './token';
 
 export async function compileSourceFiles(
   graph: BuildGraph,
@@ -203,6 +208,10 @@ export async function compileSourceFiles(
       {
         provide: DIRECTIVE_MAP,
         useValue: miniProgramPlatformCompilerService.getDirectiveMap(),
+      },
+      {
+        provide: COMPONENT_MAP,
+        useValue: miniProgramPlatformCompilerService.getComponentMap(),
       },
       { provide: AddDeclareMetaService },
     ],

@@ -217,7 +217,7 @@ export class WxContainer {
       .forEach(([value, key]) => {
         propertyMap.set(key, value);
       });
-    node.property
+    node.inputs
       .filter(
         (property) =>
           !node.componentMeta?.inputs.some((input) => input === property)
@@ -226,6 +226,9 @@ export class WxContainer {
         propertyMap.set(key, `nodeList[${index!}].property.${key}`);
       });
     node.directiveMeta?.properties.forEach((key) => {
+      propertyMap.set(key, `nodeList[${index!}].property.${key}`);
+    });
+    node.componentMeta?.properties?.forEach((key) => {
       propertyMap.set(key, `nodeList[${index!}].property.${key}`);
     });
     const eventMap = new Map();

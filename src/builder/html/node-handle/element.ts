@@ -13,7 +13,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   private children: ParsedNode<NgNodeMeta>[] = [];
   attributeObject: Record<string, string> = {};
   kind = NgNodeKind.Element;
-  property: string[] = [];
+  inputs: string[] = [];
   outputSet: TagEventMeta[] = [];
   ngSwitch: BoundAttribute | undefined;
   ngSwitchFirst = true;
@@ -36,7 +36,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
 
     this.node.inputs.forEach((input) => {
       if (input.type === 0) {
-        this.property.push(input.name);
+        this.inputs.push(input.name);
       }
     });
     this.node.outputs.forEach((output) => {
@@ -74,7 +74,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       kind: NgNodeKind.Element,
       tagName: this.tagName,
       children: this.children.map((child) => child.getNodeMeta(globalContext)),
-      property: this.property,
+      inputs: this.inputs,
       outputs: this.outputSet,
       attributes: this.attributeObject,
       singleClosedTag: this.singleClosedTag,

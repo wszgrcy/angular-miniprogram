@@ -8,7 +8,12 @@ import {
   LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
   LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX,
 } from '../const';
-import { DIRECTIVE_MAP, LIBRARY_ENTRY_POINT, RESOLVED_META_MAP } from './token';
+import {
+  COMPONENT_MAP,
+  DIRECTIVE_MAP,
+  LIBRARY_ENTRY_POINT,
+  RESOLVED_META_MAP,
+} from './token';
 
 @Injectable()
 export class AddDeclareMetaService {
@@ -22,7 +27,9 @@ export class AddDeclareMetaService {
     },
     @Inject(LIBRARY_ENTRY_POINT) private libraryEntryPoint: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    @Inject(DIRECTIVE_MAP) private directiveMap: Map<ts.ClassDeclaration, any>
+    @Inject(DIRECTIVE_MAP) private directiveMap: Map<ts.ClassDeclaration, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    @Inject(COMPONENT_MAP) private componentMap: Map<ts.ClassDeclaration, any>
   ) {}
   run(dTsFileName: string, data: string, sourceFile: ts.SourceFile): string {
     const selector = createCssSelectorForTs(data);
@@ -48,6 +55,9 @@ export class AddDeclareMetaService {
       if (!isClassDeclaration) {
         continue;
       }
+      metaList.push(
+        ...this.getPropertyAndListener(element, this.componentMap, true)
+      );
       const className = element.name!.getText();
 
       metaList.push(
@@ -60,7 +70,6 @@ export class AddDeclareMetaService {
     }
     return metaList.join('\n');
   }
-  // todo 需要元数据支持
   private addDirectiveMeta(selector: CssSelectorForTs) {
     const list = selector.queryAll(`ClassDeclaration`) as ts.ClassDeclaration[];
     const metaList = ['\n'];
@@ -77,28 +86,38 @@ export class AddDeclareMetaService {
       if (!isClassDeclaration) {
         continue;
       }
-      const className = element.name!.getText();
-      for (const [key, value] of this.directiveMap.entries()) {
-        const directiveClassName = value.meta.name;
-        if (directiveClassName === className) {
-          const listeners = value.meta.host.listeners as Record<string, string>;
-          metaList.push(
-            `declare const ${className}_${LIBRARY_DIRECTIVE_LISTENERS_SUFFIX}:${JSON.stringify(
-              Object.keys(listeners)
-            )};`
-          );
-          const properties = value.meta.host.properties as Record<
-            string,
-            string
-          >;
-          metaList.push(
-            `declare const ${className}_${LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX}:${JSON.stringify(
-              Object.keys(properties)
-            )};`
-          );
-        }
-      }
+      metaList.push(
+        ...this.getPropertyAndListener(element, this.directiveMap, false)
+      );
     }
     return metaList.join('\n');
+  }
+  private getPropertyAndListener(
+    classNode: ts.ClassDeclaration,
+    map: Map<ts.ClassDeclaration, any>,
+    isComponent: boolean
+  ) {
+    const className: string = classNode.name!.getText();
+    const metaList: string[] = [];
+    for (const [key, value] of map.entries()) {
+      const meta = isComponent ? value : value.meta;
+      const directiveClassName = meta.name;
+      if (directiveClassName === className) {
+        const listeners = meta.host.listeners as Record<string, string>;
+        metaList.push(
+          `declare const ${className}_${LIBRARY_DIRECTIVE_LISTENERS_SUFFIX}:${JSON.stringify(
+            Object.keys(listeners)
+          )};`
+        );
+        const properties = meta.host.properties as Record<string, string>;
+        metaList.push(
+          `declare const ${className}_${LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX}:${JSON.stringify(
+            Object.keys(properties)
+          )};`
+        );
+        break;
+      }
+    }
+    return metaList;
   }
 }
