@@ -1,73 +1,8 @@
-<ng-template #abc let-a>123456 9999 {{ a }}</ng-template>
-<ng-container
-  *ngTemplateOutlet="abc; context: { $implicit: '测试' }"
-></ng-container>
-<!-- <div *appCustomStruct="abc; name: 'abc'"></div>
-<div *ngFor="let item of [1, 2, 3]">{{ item }}</div> -->
-<!-- <input type="text" libTestLibrary />
-<lib-test-library *ngIf="display"></lib-test-library>
-<div
-  [class]="'sdfsdf'"
-  [class.abc]="false"
-  [style.color]="'red'"
-  libTestLibrary
->
-  615156156516
-</div>
-<p class="myclass">hello test</p>
-这是我的一小步,是ng社区的一大步
-<app-cp1 [testInputValue]="title" (custom)="testApp($event)"></app-cp1>
-<app-cp1 [testInputValue]="title" (custom)="testApp($event)"></app-cp1>
-<button (tap)="toggle()">点击后切换</button>
-<div *ngIf="num; else test">显示的内容</div>
-<div *ngIf="display; else test" class="test">显示的内容</div>
-<ng-template #test> 不显示的模板 </ng-template>
-<ng-template #test2> 测试是不是多一个LContainer </ng-template>
-<button (tap)="changeTest($event)"></button>
-<p>待变化</p>
-<p>{{ randomValue }}</p>
-<button (tap)="eventTest($event)">测试异步</button>
-<p>{{ randomValue }}</p>
-{{ jsonObj | json }}
-{{ today | date: 'yyyy-MM-dd' }}
-<div *ngIf="true">{{ '测试' }}</div>
-<div *ngIf="true">
-  指令层测试---
-  <app-cp1></app-cp1>
-</div>
-<div *ngIf="true">
-  多指令层测试---
-  <div *ngIf="true">
-    <app-cp1></app-cp1>
-  </div>
-</div>
-<div *ngFor="let item of [1, 2]">
-  <app-cp1></app-cp1>
-</div>
-<div *ngIf="true">
-  <div appF1>sdfsdfsfdfgsgsgf</div>
-</div> -->
-<!-- <input type="text" [(ngModel)]="title" (ngModelChange)="moduleChange($event)">
-<input type="number" [(ngModel)]="modelValue" (ngModelChange)="moduleChange($event)">
-<input type="idcard" [(ngModel)]="modelValue" (ngModelChange)="moduleChange($event)">
-<input type="digit" [(ngModel)]="modelValue" (ngModelChange)="moduleChange($event)">
-<input type="safe-password	" [(ngModel)]="modelValue" (ngModelChange)="moduleChange($event)"> -->
-<!-- <switch [(ngModel)]="display" (ngModelChange)="moduleChange($event)" type="switch"></switch>
-<switch [(ngModel)]="display" (ngModelChange)="moduleChange($event)" type="checkbox"></switch> -->
-<!-- <slider [(ngModel)]="num" min="100" max="1000" (ngModelChange)="moduleChange($event)"></slider>
-<slider [(ngModel)]="num" min="100" max="1000" disabled="true"></slider> -->
-<!-- <radio-group [(ngModel)]="raidoValue" (ngModelChange)="moduleChange($event)">
-  <radio value="ceshi1"></radio>
-  <radio value="ceshi"></radio>
-</radio-group> -->
-<!-- <checkbox-group [(ngModel)]="checkboxValue" (ngModelChange)="moduleChange($event)">
-  <checkbox value="ceshi1"></checkbox>
-  <checkbox value="ceshi" ></checkbox>  
-</checkbox-group> -->
-<!-- <picker
-  [range]="[1, 2, 3]"
-  mode="selector"
-  [(ngModel)]="num"
-  (ngModelChange)="moduleChange($event)"
-  >显示?{{ num }}
-</picker> -->
+<app-cp1
+  [sdfsfd]="''"
+  [input1]="1"
+  (output1)="test($event)"
+  (tap)="tap1($event)"
+  (bindtap)="tap2($event)"
+  (bindtap)="tap3($event)"
+></app-cp1>

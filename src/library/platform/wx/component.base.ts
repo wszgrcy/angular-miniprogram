@@ -10,7 +10,7 @@ import {
   updatePath,
 } from '../component-template-hook.factory';
 import type { LView } from '../internal-type';
-import type { AgentNode } from '../module/renderer-node';
+import { AgentNode } from '../module/renderer-node';
 import {
   ComponentInitFactory,
   ComponentPath,
@@ -128,37 +128,28 @@ export function generateWxComponent<C>(
         nodeIndex: { value: NaN, type: Number },
       },
       methods: {
-        ...meta.method.reduce((pre: Record<string, Function>, cur) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          pre[cur] = function (this: WxComponentInstance, ...args: any[]) {
-            let ngZone: NgZone;
-            if (this.__lView) {
-              ngZone = this.__lView[9]!.get(NgZone);
-            } else {
-              ngZone = this.__ngComponentInjector.get(NgZone);
-            }
-            return ngZone.run(() => {
-              (this.__ngComponentInstance[cur] as Function).bind(
-                this.__ngComponentInstance
-              )(...args);
-            });
-          };
-          return pre;
-        }, {}),
         ...meta.listeners.reduce((pre: Record<string, Function>, cur) => {
           pre[cur.methodName] = function (
             this: WxComponentInstance,
             event: WechatMiniprogram.BaseEvent
           ) {
             if (this.__lView) {
-              const el = findCurrentElement(
+              let el = findCurrentElement(
                 this.__lView,
                 event.target.dataset.nodePath,
                 event.target.dataset.nodeIndex
               ) as AgentNode;
-              el.listener[cur.eventName](event);
+              if (!(el instanceof AgentNode)) {
+                el = el[0];
+                if (!(el instanceof AgentNode)) {
+                  throw new Error('查询代理节点失败');
+                }
+              }
+              cur.eventName.forEach((name) => {
+                el.listener[name](event);
+              });
             } else {
-              throw new Error('未绑定事件');
+              throw new Error('未绑定lView');
             }
           };
           return pre;

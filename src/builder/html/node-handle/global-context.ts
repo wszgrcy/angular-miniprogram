@@ -51,7 +51,7 @@ export class ComponentContext {
         selector,
         meta: {
           directive: R3UsedDirectiveMetadata;
-
+          componentMeta: any;
           directiveMeta: any;
           libraryMeta: MetaFromLibrary;
         }
@@ -68,6 +68,8 @@ export class ComponentContext {
             className: (
               (meta.directive as any).ref.node as ts.ClassDeclaration
             ).name!.getText(),
+            listeners: Object.keys(meta.componentMeta?.host?.listeners) || [],
+            inputs: meta.directive.inputs,
           };
           if (meta.libraryMeta?.isComponent) {
             item.exportPath = meta.libraryMeta.exportPath;
@@ -75,12 +77,10 @@ export class ComponentContext {
         } else {
           item = {
             isComponent,
-            listeners: Object.keys(
-              meta.directiveMeta?.meta?.host?.listeners || []
-            ),
-            properties: Object.keys(
-              meta.directiveMeta?.meta?.host?.properties || []
-            ),
+            listeners:
+              Object.keys(meta.directiveMeta?.meta?.host?.listeners) || [],
+            properties:
+              Object.keys(meta.directiveMeta?.meta?.host?.properties) || [],
           };
           if (meta.libraryMeta && !meta.libraryMeta.isComponent) {
             (item as MatchedDirective).listeners = (

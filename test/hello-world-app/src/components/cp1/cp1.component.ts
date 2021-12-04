@@ -1,6 +1,7 @@
 import {
   Component,
   EventEmitter,
+  HostListener,
   Input,
   OnInit,
   Output,
@@ -13,26 +14,19 @@ import {
   templateUrl: './cp1.component.html',
   styleUrls: ['./cp1.component.css'],
   encapsulation: ViewEncapsulation.None,
+  host: {
+    '(bindtap)': 'tap4($event)',
+  },
 })
-export class Cp1Component implements OnInit {
-  @Input() testInputValue = 111;
-  @Output() custom = new EventEmitter();
-  // 用来判断是否为一个实例
-  random = Math.random();
-  constructor() {
-    console.log('Cp1Component构造');
+export class Cp1Component {
+  @Input() input1 = 111;
+  @Output() output1 = new EventEmitter();
+  @HostListener('tap', ['$event']) tap5(e) {
+    console.log('hostlistener监听', e, this.random);
   }
-
-  ngOnInit() {
-    console.log('ngOnInit钩子');
-  }
-  testclick(event) {
-    console.log(event);
-    console.log('事件引用', this);
-    this.custom.next({ detail: '测试' });
-  }
-  ngOnChanges(changes: SimpleChanges): void {
-    console.log('ngOnChanges', changes);
-    this.random = Math.random();
+  private random = Math.random();
+  constructor() {}
+  tap4(e) {
+    console.log('host监听', e, this.random);
   }
 }

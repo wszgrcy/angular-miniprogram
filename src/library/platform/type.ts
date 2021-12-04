@@ -56,8 +56,7 @@ export interface NgCompileComponent {
     outputs: Record<string, string>;
   };
   ɵcmpExtraMeta: {
-    method: string[];
-    listeners: { methodName: string; index: number; eventName: string }[];
+    listeners: { methodName: string; index: number; eventName: string[] }[];
   };
 }
 

@@ -129,6 +129,9 @@ export class MiniProgramPlatformCompilerService {
           const directiveMeta = this.directiveMap.get(
             directiveClassDeclaration
           );
+          const componentMeta = this.componentMap.get(
+            directiveClassDeclaration
+          );
           let libraryMeta: MetaFromLibrary | undefined;
           if (directive.isComponent) {
             libraryMeta = this.getLibraryComponentMeta(
@@ -147,6 +150,7 @@ export class MiniProgramPlatformCompilerService {
             {
               directive,
               directiveMeta,
+              componentMeta,
               libraryMeta,
             }
           );

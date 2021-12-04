@@ -4,41 +4,19 @@ import { ChangeDetectorRef, Component, Inject, OnInit } from '@angular/core';
   selector: 'app-sub1',
   templateUrl: './sub1.component.html',
   styleUrls: ['./sub1.component.css'],
-  // interpolation:["((","))"]
 })
-export class Sub1Component implements OnInit {
-  title = 'app666';
-  display = true;
-  num = 0;
-  obj = { a: '' };
-  randomValue = 0;
-  jsonObj = { a: '被格式化的对象' };
-  today = new Date();
-  modelValue;
-  raidoValue = 'ceshi';
-  checkboxValue = ['ceshi'];
-  constructor(private cd: ChangeDetectorRef) {
-    console.log('Sub1Component构造');
+export class Sub1Component {
+  constructor(private cd: ChangeDetectorRef) {}
+  test(event) {
+    console.log('输出', event);
   }
-  ngOnInit(): void {}
-
-  testApp(event) {
-    console.log('外部事件:导航', event);
-    wx.navigateTo({ url: '../sub2/sub2.entry' });
+  tap1(event) {
+    console.log('第一个事件', event);
   }
-  toggle() {
-    this.display = !this.display;
+  tap2(event) {
+    console.log('第二个事件', event);
   }
-  changeTest(e) {
-    setTimeout(() => {
-      this.randomValue = Math.random();
-    }, 0);
-  }
-  eventTest(e) {
-    this.randomValue = Math.random();
-  }
-  moduleChange(e) {
-    console.log(e);
-    this.cd.detectChanges();
+  tap3(event) {
+    console.log('第三个事件', event);
   }
 }
