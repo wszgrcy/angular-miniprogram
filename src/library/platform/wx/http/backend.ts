@@ -17,7 +17,7 @@ import { WxHttpDownloadResponse, WxHttpResponse } from './response';
 /** Use this token to pass additional `wx.uploadFile()` parameter */
 export const WX_UPLOAD_FILE_TOKEN = new HttpContextToken<{
   filePath?: string;
-  fileName?: string;
+  name?: string;
   timeout?: number;
 }>(() => ({}));
 
@@ -40,7 +40,7 @@ export class WxHttpBackend implements HttpBackend {
     if (
       request.method === 'POST' &&
       // TODO angular v13.1 后采用 context.has()
-      request.context.get(WX_UPLOAD_FILE_TOKEN).filePath
+      request.context.get(WX_UPLOAD_FILE_TOKEN)?.filePath
     ) {
       return this.upload(request);
     }
@@ -48,7 +48,7 @@ export class WxHttpBackend implements HttpBackend {
     if (
       request.method === 'GET' &&
       // TODO angular v13.1 后采用 context.has()
-      request.context.get(WX_DOWNLOAD_FILE_TOKEN).filePath
+      request.context.get(WX_DOWNLOAD_FILE_TOKEN)?.filePath
     ) {
       return this.download(request);
     }
@@ -84,19 +84,19 @@ export class WxHttpBackend implements HttpBackend {
           } as HttpUploadProgressEvent);
         };
 
-      const { filePath, fileName, timeout } =
+      const { filePath, name, timeout } =
         request.context.get(WX_UPLOAD_FILE_TOKEN);
 
       const task = wx.uploadFile({
         url: request.urlWithParams,
         filePath: filePath!,
-        name: fileName!,
+        name: name!,
         header: this.buildHeaders(request),
         formData: request.body,
         timeout: timeout,
         success: ({ data, statusCode: status, errMsg: statusText }) => {
           let ok = status >= 200 && status < 300;
-          let body = null;
+          let body: any | null = null;
 
           if (
             request.responseType === 'json' &&
@@ -261,13 +261,12 @@ export class WxHttpBackend implements HttpBackend {
    * @param request
    */
   private request(request: HttpRequest<any>): Observable<HttpEvent<any>> {
+    if (['PATCH', 'JSONP'].includes(request.method)) {
+      throw Error(
+        'WeChat MiniProgram does not support http method as ' + request.method
+      );
+    }
     return new Observable((observer: Observer<HttpEvent<any>>) => {
-      if (['PATCH', 'JSONP'].includes(request.method)) {
-        throw Error(
-          'WeChat MiniProgram does not support http method as ' + request.method
-        );
-      }
-
       // The response header event handler
       const onHeadersReceived: WechatMiniprogram.OnHeadersReceivedCallback = ({
         header,

@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, NgZone, Type } from '@angular/core';
-import { ComponentFinderService } from 'platform/module/service/component-finder.service';
+import { ComponentFinderService } from '../module/service/component-finder.service';
 import {
   addDestroyFunction,
   cleanWhenDestroy,
