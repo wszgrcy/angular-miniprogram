@@ -7,6 +7,7 @@ import {
   ɵINJECTOR_SCOPE,
 } from '@angular/core';
 import { MiniProgramRendererFactory } from './mini-program.renderer.factory';
+import { ComponentFinderService } from './service/component-finder.service';
 import { PageService } from './service/page.service';
 
 export function errorHandler(): ErrorHandler {
@@ -29,6 +30,7 @@ export function errorHandler(): ErrorHandler {
       useExisting: MiniProgramRendererFactory,
     },
     PageService,
+    ComponentFinderService,
   ],
   exports: [CommonModule, ApplicationModule],
 })

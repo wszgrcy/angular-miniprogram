@@ -1,5 +1,7 @@
 import { ChangeDetectorRef, NgZone, Type } from '@angular/core';
+import { ComponentFinderService } from 'platform/module/service/component-finder.service';
 import {
+  addDestroyFunction,
   cleanWhenDestroy,
   findCurrentElement,
   findCurrentLView,
@@ -55,6 +57,13 @@ export function generateWxComponent<C>(
         this.__lView = lView;
         this.__ngComponentInstance = lView[8];
         this.__ngZone = getLViewDirective(lView)!.get(NgZone);
+        let componentFinderService = getLViewDirective(lView)!.get(
+          ComponentFinderService
+        );
+        componentFinderService.set(this.__ngComponentInstance, this);
+        addDestroyFunction(lView, () => {
+          componentFinderService.remove(this.__ngComponentInstance);
+        });
         this.__isLink = true;
       },
     };
