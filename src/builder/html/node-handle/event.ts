@@ -1,7 +1,7 @@
 export class TagEventMeta {
   public methodName!: string;
   constructor(
-    public prefix: string,
+    public prefix: string | null | undefined,
     public name: string,
     methodNameSource: string
   ) {

@@ -25,7 +25,7 @@ export interface NgElementMeta extends NgNodeMeta {
   tagName: string;
   children: NgNodeMeta[];
   attributes: Record<string, string>;
-  property: string[];
+  inputs: string[];
   outputs: TagEventMeta[];
   singleClosedTag: boolean;
   componentMeta: MatchedComponent | undefined;

@@ -9,3 +9,6 @@ export const LIBRARY_ENTRY_POINT = new InjectionToken<string>(
 export const DIRECTIVE_MAP = new InjectionToken<Map<ts.ClassDeclaration, any>>(
   'DIRECTIVE_MAP'
 );
+export const COMPONENT_MAP = new InjectionToken<Map<ts.ClassDeclaration, any>>(
+  'COMPONENT_MAP'
+);

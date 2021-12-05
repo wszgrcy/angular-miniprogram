@@ -6,6 +6,9 @@ export interface MatchedComponent {
   filePath: string;
   exportPath: string;
   className: string;
+  listeners: string[];
+  inputs: string[];
+  properties: string[];
 }
 export interface MatchedDirective {
   isComponent: false;

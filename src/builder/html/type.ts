@@ -13,6 +13,8 @@ export interface StyleHookData {
 export interface ComponentMetaFromLibrary {
   isComponent: true;
   exportPath: string;
+  listeners: string[];
+  properties: string[];
 }
 export interface DirectiveMetaFromLibrary {
   isComponent: false;

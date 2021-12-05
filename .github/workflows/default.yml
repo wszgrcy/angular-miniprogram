@@ -29,7 +29,7 @@ jobs:
           yarn lint
       - name: test
         run: |
-          yarn test
+          yarn test:ci
       - name: build
         run: |
           yarn build

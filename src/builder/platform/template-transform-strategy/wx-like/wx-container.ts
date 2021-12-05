@@ -63,37 +63,12 @@ export class WxContainer {
         });
       }
     }
-    const attributeStr = Object.entries(node.attributes)
-      .filter(([key]) => key !== 'class' && key !== 'style')
-      .map(([key, value]) => `${key}="${value}"`)
-      .join(' ');
 
-    const outputStr = node.outputs
-      .filter(
-        (item) =>
-          !node.componentMeta ||
-          (node.componentMeta &&
-            !(node.componentMeta.outputs || []).some(
-              (output) => output === item.name
-            ))
-      )
-      .map((item) => {
-        this.metaCollection.method.add(item.methodName);
-        return `${item.prefix}:${item.name}="${item.methodName}"`;
-      })
-      .join(' ');
     const children = node.children.map((child) => this._compileTemplate(child));
-    const commonTagProperty = `${attributeStr} ${outputStr} ${this.setComponentIdentification(
+    const commonTagProperty = `${this.setComponentIdentification(
       node.componentMeta?.isComponent,
       node.index
-    )} ${this.generateClassAndStyle(
-      node.componentMeta?.isComponent,
-      node.index
-    )} ${this.setProperty(
-      !!node.componentMeta?.isComponent,
-      node.index,
-      node.property
-    )} ${this.setDirectiveData(node.directiveMeta, node.index)}`;
+    )} ${this.elementPropertyAndEvent(node, node.index).join(' ')}`;
     if (node.singleClosedTag) {
       return `<${node.tagName} ${commonTagProperty}/>`;
     }
@@ -157,13 +132,13 @@ export class WxContainer {
           if (directive.first) {
             content += `<block ${this.directivePrefix}:if="{{nodeList[${
               node.index
-            }]}}"> <template is="${
+            }][0]}}"> <template is="${
               directive.templateName
             }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
           } else {
             content += `<block ${this.directivePrefix}:elif="{{nodeList[${
               node.index
-            }]}}"> <template is="${
+            }][0]}}"> <template is="${
               directive.templateName
             }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
           }
@@ -230,48 +205,88 @@ export class WxContainer {
     }
     return ``;
   }
-  generateClassAndStyle(isComponent: boolean | undefined, index: number) {
-    if (isComponent) {
-      return ``;
-    }
-    return `class="{{nodeList[${index}].class}}" style="{{nodeList[${index}].style}}"`;
-  }
-  private setProperty(isComponent: boolean, index: number, property: string[]) {
-    if (!isComponent) {
-      return property
-        .map((key) => `${key}="{{nodeList[${index!}].property.${key}}}"`)
-        .join(' ');
-    }
-    return ``;
-  }
-  private setDirectiveData(
-    directiveMeta: MatchedDirective | undefined,
-    index: number
-  ) {
-    if (typeof directiveMeta === 'undefined') {
-      return '';
-    }
 
-    return (
-      `data-node-path="{{componentPath}}" data-node-index="{{${index}}}" ` +
-      directiveMeta.listeners
-        .map((item) => {
-          const methodName = `${this.containerName}_directive_${index}_${item}`;
-          this.metaCollection.listeners.push({
-            methodName: methodName,
-            index: index,
-            eventName: item,
-          });
-          return `${item}="${methodName}"`;
-        })
-        .join(' ') +
-      ' ' +
-      directiveMeta.properties
+  private elementPropertyAndEvent(node: NgElementMeta, index: number) {
+    const propertyMap = new Map<string, string>();
+    if (!node.componentMeta?.isComponent) {
+      propertyMap.set('class', `nodeList[${index}].class`);
+      propertyMap.set('style', `nodeList[${index}].style`);
+    }
+    Object.entries(node.attributes)
+      .filter(([key]) => key !== 'class' && key !== 'style')
+      .filter(([key, value]) => value !== '')
+      .forEach(([key, value]) => {
+        propertyMap.set(key, value);
+      });
+    node.inputs
+      .filter(
+        (property) =>
+          !node.componentMeta?.inputs.some((input) => input === property)
+      )
+      .forEach((key) => {
+        propertyMap.set(key, `nodeList[${index!}].property.${key}`);
+      });
+    [
+      ...(node.directiveMeta?.properties || []),
+      ...(node.componentMeta?.properties || []),
+    ]
+      .filter((key) => !/^(class\.|style\.)/.test(key))
+      .forEach((key) => {
+        propertyMap.set(key, `nodeList[${index!}].property.${key}`);
+      });
+    const eventMap = new Map();
+    const eventList: string[] = [
+      ...node.outputs
         .filter(
-          (item) => !(item.startsWith('class') || item.startsWith('style'))
+          (item) =>
+            !node.componentMeta?.outputs.some((output) => output === item.name)
         )
-        .map((item) => `${item}="{{nodeList[${index}].property.${item}}}"`)
-        .join(' ')
-    );
+        .map((item) => item.name),
+      ...(node.directiveMeta?.listeners || []),
+      ...(node.componentMeta?.isComponent ? node.componentMeta?.listeners : []),
+    ];
+
+    const mergeEventMap = new Map<string, string[]>();
+    eventList
+      // .filter((eventName) => !eventMap.has(eventName))
+      .forEach((eventName) => {
+        const convertName = convertToEventName(eventName);
+        if (
+          eventMap.has(convertName) &&
+          !mergeEventMap.get(convertName)!.includes(eventName)
+        ) {
+          mergeEventMap.get(convertName)!.push(eventName);
+          return;
+        }
+        const methodName = `${this.containerName}_${index}_${eventName}`;
+        eventMap.set(convertName, methodName);
+
+        const eventList = [eventName];
+        mergeEventMap.set(convertName, eventList);
+        this.metaCollection.listeners.push({
+          methodName: methodName,
+          eventName: eventList,
+          index: index,
+        });
+        propertyMap.set(`data-node-path`, `componentPath`);
+        propertyMap.set(`data-node-index`, `${index}`);
+      });
+    return Array.from(propertyMap.entries())
+      .map(([key, value]) => `${key}="{{${value}}}"`)
+      .concat(
+        Array.from(eventMap.entries()).map(
+          ([key, value]) => `${key}="${value}"`
+        )
+      );
+  }
+}
+const EVENT_PREFIX_REGEXP = /^(bind|catch|mut-bind|capture-bind|capture-catch)/;
+function convertToEventName(tagEventMeta: string): string {
+  if (EVENT_PREFIX_REGEXP.test(tagEventMeta)) {
+    return tagEventMeta;
+  } else if (tagEventMeta.includes(':')) {
+    return tagEventMeta.replace(':', '');
+  } else {
+    return `bind${tagEventMeta}`;
   }
 }

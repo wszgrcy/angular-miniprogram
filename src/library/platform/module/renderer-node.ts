@@ -68,9 +68,10 @@ export class AgentNode {
           Array.from(this.classList).join(' ') +
           ' ' +
           (this.attribute.class || ''),
-        style: Object.entries(this.style)
-          .map(([style, value]) => `${style}:${value}`)
-          .join(';'),
+        style:
+          Object.entries(this.style)
+            .map(([style, value]) => `${style}:${value}`)
+            .join(';') + (this.attribute.style || ''),
         property: this.property,
       };
     }

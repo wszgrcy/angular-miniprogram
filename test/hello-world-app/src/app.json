@@ -1,5 +1,5 @@
 {
-  "pages": ["pages/sub1/sub1.entry", "pages/sub2/sub2.entry"],
+  "pages": [],
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#fff",

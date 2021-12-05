@@ -92,7 +92,7 @@ export class BuilderHarness<T> {
 
   constructor(
     private readonly builderHandler: BuilderHandlerFn<T & json.JsonObject>,
-    private readonly host: TestProjectHost,
+    public readonly host: TestProjectHost,
     builderInfo?: Partial<BuilderInfo>
   ) {
     // Generate default pseudo builder info for test purposes
@@ -400,7 +400,7 @@ export class BuilderHarness<T> {
     }
   }
 }
-class JasmineBuilderHarness<T> extends BuilderHarness<T> {
+export class JasmineBuilderHarness<T> extends BuilderHarness<T> {
   expectFile(path: string): HarnessFileMatchers {
     return expectFile(path, this);
   }

@@ -11,7 +11,7 @@ const initValueMap = new Map<LView, MPView>();
 const linkMap = new Map<LView, any>();
 const componentPathMap = new Map<LView, ComponentPath>();
 const pageMap = new Map<string, LView>();
-
+const customDestroyMap = new Map<LView, Function[]>();
 export function propertyChange(context: any) {
   const lView = findCurrentComponentLView(context);
   const lviewPath = getLViewPath(lView);
@@ -163,11 +163,22 @@ export function lViewLinkToMPComponentRef(ref: any, lView: LView) {
   linkMap.set(lView, ref);
 }
 
-export function cleanWhenDestroy(lview: LView) {
-  const list: Function[] = (lview[7] = lview[7] || []);
+export function cleanWhenDestroy(lView: LView) {
+  const list: Function[] = (lView[7] = lView[7] || []);
   list.push((lview: LView) => cleanAll(lview));
 }
 function cleanAll(lview: LView) {
   linkMap.delete(lview);
   componentPathMap.delete(lview);
+  customDestroyMap.get(lview)?.forEach((fn) => {
+    fn();
+  });
+}
+export function getLViewDirective(lView: LView) {
+  return lView[9];
+}
+export function addDestroyFunction(lView: LView, fn: Function) {
+  let list = customDestroyMap.get(lView) || [];
+  list.push(fn);
+  customDestroyMap.set(lView, list);
 }
