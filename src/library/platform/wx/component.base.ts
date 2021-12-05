@@ -4,6 +4,7 @@ import {
   findCurrentElement,
   findCurrentLView,
   getInitValue,
+  getLViewDirective,
   getPageLView,
   lViewLinkToMPComponentRef,
   setLViewPath,
@@ -53,6 +54,7 @@ export function generateWxComponent<C>(
         lViewLinkToMPComponentRef(this, lView);
         this.__lView = lView;
         this.__ngComponentInstance = lView[8];
+        this.__ngZone = getLViewDirective(lView)!.get(NgZone);
         this.__isLink = true;
       },
     };
@@ -146,7 +148,9 @@ export function generateWxComponent<C>(
                 }
               }
               cur.eventName.forEach((name) => {
-                el.listener[name](event);
+                this.__ngZone.run(() => {
+                  el.listener[name](event);
+                });
               });
             } else {
               throw new Error('未绑定lView');

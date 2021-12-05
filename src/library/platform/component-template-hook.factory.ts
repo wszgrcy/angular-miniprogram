@@ -171,3 +171,6 @@ function cleanAll(lview: LView) {
   linkMap.delete(lview);
   componentPathMap.delete(lview);
 }
+export function getLViewDirective(lView: LView) {
+  return lView[9];
+}

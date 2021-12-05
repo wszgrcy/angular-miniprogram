@@ -132,13 +132,13 @@ export class WxContainer {
           if (directive.first) {
             content += `<block ${this.directivePrefix}:if="{{nodeList[${
               node.index
-            }]}}"> <template is="${
+            }][0]}}"> <template is="${
               directive.templateName
             }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
           } else {
             content += `<block ${this.directivePrefix}:elif="{{nodeList[${
               node.index
-            }]}}"> <template is="${
+            }][0]}}"> <template is="${
               directive.templateName
             }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
           }
@@ -214,7 +214,8 @@ export class WxContainer {
     }
     Object.entries(node.attributes)
       .filter(([key]) => key !== 'class' && key !== 'style')
-      .forEach(([value, key]) => {
+      .filter(([key, value]) => value !== '')
+      .forEach(([key, value]) => {
         propertyMap.set(key, value);
       });
     node.inputs
@@ -225,12 +226,14 @@ export class WxContainer {
       .forEach((key) => {
         propertyMap.set(key, `nodeList[${index!}].property.${key}`);
       });
-    node.directiveMeta?.properties.forEach((key) => {
-      propertyMap.set(key, `nodeList[${index!}].property.${key}`);
-    });
-    node.componentMeta?.properties?.forEach((key) => {
-      propertyMap.set(key, `nodeList[${index!}].property.${key}`);
-    });
+    [
+      ...(node.directiveMeta?.properties || []),
+      ...(node.componentMeta?.properties || []),
+    ]
+      .filter((key) => !/^(class\.|style\.)/.test(key))
+      .forEach((key) => {
+        propertyMap.set(key, `nodeList[${index!}].property.${key}`);
+      });
     const eventMap = new Map();
     const eventList: string[] = [
       ...node.outputs
