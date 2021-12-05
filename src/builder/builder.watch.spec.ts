@@ -1,6 +1,4 @@
 import { join, normalize } from '@angular-devkit/core';
-import fs from 'fs-extra';
-import path from 'path';
 import { of } from 'rxjs';
 import { concatMap, skip, take } from 'rxjs/operators';
 import { describeBuilder } from '../../test/plugin-describe-builder';
@@ -8,6 +6,12 @@ import {
   BROWSER_BUILDER_INFO,
   DEFAULT_ANGULAR_CONFIG,
 } from '../../test/test-builder/browser';
+import {
+  ALL_PAGE_NAME_LIST,
+  addPageEntry,
+  changeAllFile,
+  getAllFile,
+} from '../../test/util/file';
 import { runBuilder } from './browser';
 import { PlatformType } from './platform/platform';
 
@@ -22,7 +26,36 @@ describeBuilder(
   { ...BROWSER_BUILDER_INFO, name: 'test-builder:watch' },
   (harness) => {
     describe('builder-watch-dev', () => {
-      it('运行', (cb) => {
+      it('运行', async () => {
+        const root = harness.host.root();
+        const list = await getAllFile(
+          harness,
+          normalize(join(root, 'src', '__pages'))
+        );
+        list.push(
+          ...(await getAllFile(
+            harness,
+            normalize(join(root, 'src', '__components'))
+          ))
+        );
+        await changeAllFile(harness, list);
+        await harness.host
+          .rename(
+            normalize(join(root, 'src', '__pages')),
+            normalize(join(root, 'src', 'pages'))
+          )
+          .toPromise();
+        await harness.host
+          .rename(
+            normalize(join(root, 'src', '__components')),
+            normalize(join(root, 'src', 'components'))
+          )
+          .toPromise();
+        await addPageEntry(harness, ALL_PAGE_NAME_LIST);
+        let finish: Function;
+        const waitFinish = new Promise((res) => {
+          finish = res;
+        });
         harness.useTarget('build', angularConfig);
         harness
           .execute()
@@ -117,12 +150,13 @@ describeBuilder(
               .expectFile(
                 join(
                   normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
-                  'library/test-library/test-library-component/test-library-component.js'
+                  'library/test-library/lib-comp1-component/lib-comp1-component.js'
                 )
               )
               .toExist();
-            cb();
+            finish();
           });
+        await waitFinish;
       });
     });
   }

@@ -7,7 +7,7 @@ import { BuildPlatform } from '../platform/platform';
 import type { LibraryComponentEntryMeta, LibraryLoaderContext } from '../type';
 
 const CUSTOM_URI = 'dynamic';
-const CUSTOM_URI_REG = /^dynamic:(.*)\.ts$/;
+const CUSTOM_URI_REG = /^dynamic:\/\/(.*)\.ts$/;
 @Injectable()
 export class DynamicLibraryComponentEntryPlugin {
   private libraryComponentMap = new Map<string, LibraryComponentEntryMeta>();
@@ -73,7 +73,7 @@ export class DynamicLibraryComponentEntryPlugin {
         this.libraryComponentMap.forEach((meta) => {
           const entry = join(normalize(LIBRARY_OUTPUT_PATH), meta.libraryPath);
           const dep = webpack.EntryPlugin.createDependency(
-            `${CUSTOM_URI}:${meta.id}.ts`,
+            `${CUSTOM_URI}://${meta.id}.ts`,
             entry
           );
           compilation.addEntry(compiler.context, dep, entry, (err, result) => {

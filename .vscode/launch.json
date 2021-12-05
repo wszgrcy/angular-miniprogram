@@ -23,6 +23,15 @@
       "port": 7899
     },
     {
+      "name": "测试(jasmine)-builder-prod",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceRoot}",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run-script", "test", "builder-prod"],
+      "port": 7899
+    },
+    {
       "name": "测试(jasmine)-browser-watch",
       "type": "node",
       "request": "launch",
