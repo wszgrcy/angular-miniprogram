@@ -39,4 +39,9 @@ export class RootComponent implements OnInit {
       url: '/pages/complex-property-event/complex-property-event.entry',
     });
   }
+  baseForms() {
+    wx.navigateTo({
+      url: '/pages/base-forms/base-forms.entry',
+    });
+  }
 }

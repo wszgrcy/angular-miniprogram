@@ -19,7 +19,7 @@
       "request": "launch",
       "cwd": "${workspaceRoot}",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run-script", "test", "browser"],
+      "runtimeArgs": ["run-script", "test", "builder-dev"],
       "port": 7899
     },
     {

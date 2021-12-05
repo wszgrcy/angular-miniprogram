@@ -52,7 +52,7 @@ export const NUMBER_VALUE_ACCESSOR: any = {
  */
 @Directive({
   selector: 'slider[formControlName],slider[formControl],slider[ngModel]',
-  host: { '(bindchange)': 'onChange($event.detail.value)' },
+  host: { '(bindchange)': 'valueChange($event.detail.value)' },
   providers: [NUMBER_VALUE_ACCESSOR],
 })
 export class SliderValueAccessor
@@ -70,5 +70,9 @@ export class SliderValueAccessor
     if (typeof normalizedValue !== 'undefined') {
       this.value = normalizedValue;
     }
+  }
+  valueChange(value: any) {
+    this.value = value;
+    this.onChange(value);
   }
 }

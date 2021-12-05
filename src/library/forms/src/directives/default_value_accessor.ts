@@ -81,7 +81,7 @@ export const COMPOSITION_BUFFER_MODE = new InjectionToken<boolean>(
   // https://github.com/angular/angular/issues/3011 is implemented
   // selector: '[ngModel],[formControl],[formControlName]',
   host: {
-    '(bindinput)': 'onChange($event.detail.value)',
+    '(bindinput)': 'valueChange($event.detail.value)',
     '(bindblur)': 'onTouched()',
   },
   providers: [DEFAULT_VALUE_ACCESSOR],
@@ -105,5 +105,9 @@ export class DefaultValueAccessor
     if (typeof normalizedValue !== 'undefined') {
       this.value = normalizedValue;
     }
+  }
+  valueChange(value: string) {
+    this.value = value;
+    this.onChange(value);
   }
 }

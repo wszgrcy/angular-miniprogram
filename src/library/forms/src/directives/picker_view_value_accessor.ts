@@ -53,7 +53,7 @@ export const PICKER_VIEW_VALUE_ACCESSOR: any = {
 @Directive({
   selector:
     'picker-view[formControlName],picker-view[formControl],picker-view[ngModel]',
-  host: { '(bindchange)': 'onChange($event.detail.value)' },
+  host: { '(bindchange)': 'valueChange($event.detail.value)' },
   providers: [PICKER_VIEW_VALUE_ACCESSOR],
 })
 export class PickerViewValueAccessor
@@ -72,4 +72,8 @@ export class PickerViewValueAccessor
     }
   }
   override setDisabledState() {}
+  valueChange(value: any) {
+    this.value = value;
+    this.onChange(value);
+  }
 }
