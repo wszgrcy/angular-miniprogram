@@ -5,10 +5,10 @@ import {
   DEFAULT_ANGULAR_CONFIG,
 } from '../../test/test-builder/browser';
 import {
-  getAllFile,
-  changeAllFile,
-  addPageEntry,
   ALL_PAGE_NAME_LIST,
+  addPageEntry,
+  changeAllFile,
+  getAllFile,
 } from '../../test/util/file';
 import { runBuilder } from './browser';
 import { PlatformType } from './platform/platform';

@@ -94,6 +94,7 @@ export class AddDeclareMetaService {
   }
   private getPropertyAndListener(
     classNode: ts.ClassDeclaration,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     map: Map<ts.ClassDeclaration, any>,
     isComponent: boolean
   ) {
