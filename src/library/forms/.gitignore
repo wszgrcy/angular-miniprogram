@@ -12,3 +12,4 @@
 !/src/directives/slider_value_accessor.ts
 !/src/directives/picker_value_accessor.ts
 !/src/forms.ts
+!/ng-package.json
