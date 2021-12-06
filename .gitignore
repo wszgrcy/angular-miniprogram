@@ -5,3 +5,4 @@ dist
 __test-app
 coverage-builder
 script/startup-jasmine.js
+.temp-git
