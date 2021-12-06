@@ -15,6 +15,9 @@
 </div>
 
 <div>ngFor->ng-content</div>
-<div *ngFor="let item of list">
-  <app-content> 投影内容:{{ item }} </app-content>
+<div *ngFor="let item of list; let i = index">
+  <app-content>
+    投影内容:{{ item }}
+    <div name="slot1">slot1投影{{ item }},index:{{ i }}</div>
+  </app-content>
 </div>

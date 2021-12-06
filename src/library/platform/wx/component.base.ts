@@ -131,7 +131,7 @@ export function generateWxComponent<C>(
       );
     }
     Component({
-      options: componentOptions.options,
+      options: { ...componentOptions.options, multipleSlots: isComponent },
       externalClasses: componentOptions.externalClasses,
       observers: observers,
       properties: {

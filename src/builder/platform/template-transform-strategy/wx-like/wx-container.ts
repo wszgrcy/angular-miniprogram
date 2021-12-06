@@ -208,6 +208,7 @@ export class WxContainer {
 
   private elementPropertyAndEvent(node: NgElementMeta, index: number) {
     const propertyMap = new Map<string, string>();
+    const attributeMap = new Map<string, string>();
     if (!node.componentMeta?.isComponent) {
       propertyMap.set('class', `nodeList[${index}].class`);
       propertyMap.set('style', `nodeList[${index}].style`);
@@ -216,7 +217,7 @@ export class WxContainer {
       .filter(([key]) => key !== 'class' && key !== 'style')
       .filter(([key, value]) => value !== '')
       .forEach(([key, value]) => {
-        propertyMap.set(key, value);
+        attributeMap.set(key, value);
       });
     node.inputs
       .filter(
@@ -271,13 +272,17 @@ export class WxContainer {
         propertyMap.set(`data-node-path`, `componentPath`);
         propertyMap.set(`data-node-index`, `${index}`);
       });
-    return Array.from(propertyMap.entries())
-      .map(([key, value]) => `${key}="{{${value}}}"`)
-      .concat(
-        Array.from(eventMap.entries()).map(
-          ([key, value]) => `${key}="${value}"`
-        )
-      );
+    return [
+      ...Array.from(attributeMap.entries()).map(
+        ([key, value]) => `${key}="${value}"`
+      ),
+      ...Array.from(propertyMap.entries()).map(
+        ([key, value]) => `${key}="{{${value}}}"`
+      ),
+      ...Array.from(eventMap.entries()).map(
+        ([key, value]) => `${key}="${value}"`
+      ),
+    ];
   }
 }
 const EVENT_PREFIX_REGEXP = /^(bind|catch|mut-bind|capture-bind|capture-catch)/;
