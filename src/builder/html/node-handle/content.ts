@@ -1,7 +1,7 @@
 import type { Content } from '@angular/compiler/src/render3/r3_ast';
 import { NgContentMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
 
-const SELECT_NAME_VALUE_REGEXP = /^\[name=["']?([^"']*)["']?\]$/;
+const SELECT_NAME_VALUE_REGEXP = /^\[slot=["']?([^"']*)["']?\]$/;
 export class ParsedNgContent implements ParsedNode<NgContentMeta> {
   kind = NgNodeKind.Content;
 
@@ -19,7 +19,7 @@ export class ParsedNgContent implements ParsedNode<NgContentMeta> {
       const result = nameAttr.value.match(SELECT_NAME_VALUE_REGEXP);
       if (!result) {
         throw new Error(
-          `ng-content未匹配到指定格式的select,value:${nameAttr.value},需要格式为[name="xxxx"]`
+          `ng-content未匹配到指定格式的select,value:${nameAttr.value},需要格式为[slot="xxxx"]`
         );
       }
       value = result[1];
