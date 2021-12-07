@@ -295,10 +295,8 @@ export class WxContainer {
 const EVENT_PREFIX_REGEXP = /^(bind|catch|mut-bind|capture-bind|capture-catch)/;
 function convertToEventName(tagEventMeta: string): string {
   if (EVENT_PREFIX_REGEXP.test(tagEventMeta)) {
-    return tagEventMeta;
-  } else if (tagEventMeta.includes(':')) {
-    return tagEventMeta.replace(':', '');
+    return tagEventMeta.replace(EVENT_PREFIX_REGEXP, '$1:');
   } else {
-    return `bind${tagEventMeta}`;
+    return `bind:${tagEventMeta}`;
   }
 }

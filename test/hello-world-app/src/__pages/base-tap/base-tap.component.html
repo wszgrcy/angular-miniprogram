@@ -7,3 +7,8 @@
 <div [style.color]="color">变量->字体颜色红色</div>
 <div [style.backgroundColor]="'green'">字符串->颜色背景绿色</div>
 <div [style.backgroundColor]="backgroundColor">变量->颜色背景绿色</div>
+
+<div (mut-bindtap)="mutBindTap1($event)">mut-bind使用</div>
+<div (catchtap)="catchTap1($event)">catch使用</div>
+<div (capture-bindtap)="captureBindTap1($event)">capture-bind使用</div>
+<!-- <div (capture-catch)="captureCatchTap1($event)">capture-catch使用</div> -->
