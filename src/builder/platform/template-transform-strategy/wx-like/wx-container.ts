@@ -6,7 +6,6 @@ import type {
   NgTemplateMeta,
   NgTextMeta,
 } from '../../../html/node-handle/interface';
-import type { MatchedDirective } from '../../../html/node-handle/type';
 import {
   isNgBoundTextMeta,
   isNgContentMeta,
@@ -222,7 +221,10 @@ export class WxContainer {
     node.inputs
       .filter(
         (property) =>
-          !node.componentMeta?.inputs.some((input) => input === property)
+          !(
+            node.componentMeta?.inputs.some((input) => input === property) ||
+            node.directiveMeta?.inputs.some((input) => input === property)
+          )
       )
       .forEach((key) => {
         propertyMap.set(key, `nodeList[${index!}].property.${key}`);
@@ -240,7 +242,12 @@ export class WxContainer {
       ...node.outputs
         .filter(
           (item) =>
-            !node.componentMeta?.outputs.some((output) => output === item.name)
+            !(
+              node.componentMeta?.outputs.some(
+                (output) => output === item.name
+              ) ||
+              node.directiveMeta?.outputs.some((output) => output === item.name)
+            )
         )
         .map((item) => item.name),
       ...(node.directiveMeta?.listeners || []),

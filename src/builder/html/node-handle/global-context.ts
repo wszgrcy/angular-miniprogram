@@ -86,6 +86,8 @@ export class ComponentContext {
             properties:
               Object.keys(meta.directiveMeta?.meta?.host?.properties || {}) ||
               [],
+            inputs: meta.directive.inputs,
+            outputs: meta.directive.outputs,
           };
           if (meta.libraryMeta && !meta.libraryMeta.isComponent) {
             (item as MatchedDirective).listeners = (

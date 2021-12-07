@@ -14,4 +14,6 @@ export interface MatchedDirective {
   isComponent: false;
   listeners: string[];
   properties: string[];
+  inputs: string[];
+  outputs: string[];
 }

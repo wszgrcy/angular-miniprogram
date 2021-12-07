@@ -82,6 +82,8 @@ export class TemplateDefinition implements Visitor {
           isComponent: false,
           listeners: list.map((item) => item.listeners).flat(),
           properties: list.map((item) => item.properties).flat(),
+          inputs: list.map((item) => item.inputs).flat(),
+          outputs: list.map((item) => item.outputs).flat(),
         };
       }
     }
