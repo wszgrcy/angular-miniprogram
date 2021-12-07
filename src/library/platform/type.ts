@@ -5,6 +5,7 @@ import type {
   NgModuleRef,
   NgZone,
   Type,
+  ViewRef,
 } from '@angular/core';
 import { LView } from './internal-type';
 
@@ -27,6 +28,7 @@ export interface AppOptions {
 export interface MiniProgramComponentVariable {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   __ngComponentInstance: any;
+  __ngComponentHostView: ViewRef;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   __waitNgComponentInit: Promise<any>;
   __ngComponentInjector: Injector;

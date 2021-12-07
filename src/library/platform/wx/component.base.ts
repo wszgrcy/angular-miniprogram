@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, NgZone, Type } from '@angular/core';
+import { ApplicationRef, ChangeDetectorRef, NgZone, Type } from '@angular/core';
 import { ComponentFinderService } from '../module/service/component-finder.service';
 import {
   addDestroyFunction,
@@ -19,7 +19,7 @@ import {
   ComponentPath,
   NgCompileComponent,
 } from '../type';
-import { WxComponentInstance, WxLifetimes } from './type';
+import { WxComponentInstance, WxLifetimes, PageILifeTime } from './type';
 
 export function generateWxComponent<C>(
   component: Type<C> & NgCompileComponent,
@@ -73,6 +73,7 @@ export function generateWxComponent<C>(
         wxComponentInstance
       ).then((value) => {
         const componentRef = value.componentRef;
+        wxComponentInstance.__ngComponentHostView = componentRef.hostView;
         wxComponentInstance.__ngComponentInstance = componentRef.instance;
         wxComponentInstance.__ngComponentInjector = componentRef.injector;
         wxComponentInstance.__ngZone = componentRef.injector.get(NgZone);
@@ -130,6 +131,25 @@ export function generateWxComponent<C>(
         {} as { [p in PageLifetimeKey]: (...args: any[]) => void }
       );
     }
+    let pageILifeTime: Partial<PageILifeTime> = {
+      onHide: function (this: WxComponentInstance) {
+        if (this.__ngComponentInjector) {
+          let applicationRef = this.__ngComponentInjector.get(ApplicationRef);
+          applicationRef.detachView(this.__ngComponentHostView);
+        }
+      },
+      onUnload: function (this: WxComponentInstance) {
+        if (this.__ngComponentDestroy) {
+          this.__ngComponentDestroy!();
+        }
+      },
+      onShow: function (this: WxComponentInstance) {
+        if (this.__ngComponentInjector) {
+          let applicationRef = this.__ngComponentInjector.get(ApplicationRef);
+          applicationRef.attachView(this.__ngComponentHostView);
+        }
+      },
+    };
     Component({
       options: { ...componentOptions.options, multipleSlots: isComponent },
       externalClasses: componentOptions.externalClasses,
@@ -139,6 +159,7 @@ export function generateWxComponent<C>(
         nodeIndex: { value: NaN, type: Number },
       },
       methods: {
+        ...(!isComponent ? pageILifeTime : {}),
         ...meta.listeners.reduce((pre: Record<string, Function>, cur) => {
           pre[cur.methodName] = function (
             this: WxComponentInstance,
@@ -186,19 +207,6 @@ export function generateWxComponent<C>(
               this.__lView = lView;
               this.__ngComponentInstance = lView[8];
               this.__isLink = true;
-            },
-            (rej) => {
-              throw rej;
-            }
-          );
-        },
-        detached(this: WxComponentInstance) {
-          if (isComponent) {
-            return;
-          }
-          this.__waitNgComponentInit.then(
-            (ref) => {
-              this.__ngComponentDestroy!();
             },
             (rej) => {
               throw rej;

@@ -16,3 +16,5 @@ export type WxComponentInstance = WechatMiniprogram.Component.Instance<
   Partial<MiniProgramComponentMethod>,
   MiniProgramComponentVariable
 >;
+
+export type PageILifeTime = WechatMiniprogram.Page.ILifetime;
