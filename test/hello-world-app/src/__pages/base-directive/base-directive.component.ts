@@ -9,4 +9,6 @@ export class BaseDirectiveComponent implements OnInit {
   constructor() {}
 
   ngOnInit() {}
+
+  event1() {}
 }
