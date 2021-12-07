@@ -120,7 +120,7 @@ export class WxContainer {
       } else if (directive.type === 'for') {
         content += `<block ${this.directivePrefix}:for="{{nodeList[${
           node.index
-        }]}}" >
+        }]}}" ${this.directivePrefix}:key="index">
           <template is="${directive.templateName}" ${this.getTemplateDataStr(
           node.index,
           `index`
@@ -160,7 +160,7 @@ export class WxContainer {
       } else if (directive.type === 'custom') {
         content += `<block ${this.directivePrefix}:for="{{nodeList[${
           node.index
-        }]}}" >
+        }]}}" ${this.directivePrefix}:key="index">
           <template is="{{item.context.template}}" ${this.getTemplateDataStr(
             node.index,
             `index`
