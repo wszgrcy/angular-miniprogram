@@ -64,6 +64,7 @@ export interface MPView {
   nodeList: (MPView[] | MPElementData | MPTextData)[];
   context: any;
   componentPath: any[];
+  index: number;
 }
 export interface MPElementData {
   class: string;

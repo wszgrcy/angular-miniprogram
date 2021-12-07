@@ -62,6 +62,7 @@ function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
           context: item._lView[8],
           nodeList: lViewToWXView(item._lView, componentPath),
           componentPath: componentPath,
+          index: lContainerList.length,
         });
       });
       nodeList[index - start] = lContainerList;
