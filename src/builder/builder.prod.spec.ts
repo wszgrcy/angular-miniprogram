@@ -5,10 +5,13 @@ import {
   DEFAULT_ANGULAR_CONFIG,
 } from '../../test/test-builder/browser';
 import {
+  ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
   addPageEntry,
-  changeAllFile,
+  copySpecifiedComponents,
+  copySpecifiedPages,
   getAllFile,
+  importPathRename,
 } from '../../test/util/file';
 import { runBuilder } from './browser';
 import { PlatformType } from './platform/platform';
@@ -34,24 +37,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           normalize(join(root, 'src', '__components'))
         ))
       );
-      await changeAllFile(harness, list);
-      await harness.host
-        .rename(
-          normalize(join(root, 'src', '__pages')),
-          normalize(join(root, 'src', 'pages'))
-        )
-        .toPromise();
-      await harness.host
-        .rename(
-          normalize(join(root, 'src', '__components')),
-          normalize(join(root, 'src', 'components'))
-        )
-        .toPromise();
+      await importPathRename(harness, list);
+      await copySpecifiedPages(harness, ALL_PAGE_NAME_LIST);
+      await copySpecifiedComponents(harness, ALL_COMPONENT_NAME_LIST);
       await addPageEntry(harness, ALL_PAGE_NAME_LIST);
-      let finish: Function;
-      const waitFinish = new Promise((res) => {
-        finish = res;
-      });
       harness.useTarget('build', angularConfig);
       const result = await harness.executeOnce();
       expect(result).toBeTruthy();

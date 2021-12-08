@@ -22,7 +22,7 @@ export async function getAllFile(
   return fileList;
 }
 
-export async function changeAllFile(
+export async function importPathRename(
   harness: JasmineBuilderHarness<any>,
   list: string[]
 ) {
@@ -51,6 +51,13 @@ export const ALL_PAGE_NAME_LIST = [
   `default-structural-directive`,
   `ng-content`,
 ];
+export const ALL_COMPONENT_NAME_LIST = [
+  `component1`,
+  `component2`,
+  `component3`,
+  `content`,
+  `content-multi`,
+];
 export async function addPageEntry(
   harness: JasmineBuilderHarness<any>,
   list: string[]
@@ -65,4 +72,32 @@ export async function addPageEntry(
   await harness.host
     .write(configPath, stringToFileBuffer(JSON.stringify(json)))
     .toPromise();
+}
+export async function copySpecifiedPages(
+  harness: JasmineBuilderHarness<any>,
+  list: string[]
+) {
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    await harness.host
+      .rename(
+        normalize(join(harness.host.root(), 'src', '__pages', item)),
+        normalize(join(harness.host.root(), 'src', 'pages', item))
+      )
+      .toPromise();
+  }
+}
+export async function copySpecifiedComponents(
+  harness: JasmineBuilderHarness<any>,
+  list: string[]
+) {
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    await harness.host
+      .rename(
+        normalize(join(harness.host.root(), 'src', '__components', item)),
+        normalize(join(harness.host.root(), 'src', 'components', item))
+      )
+      .toPromise();
+  }
 }
