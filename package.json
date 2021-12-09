@@ -15,7 +15,8 @@
     "build:builder": "ts-node -P ./script/tsconfig.json ./script/build.ts ./tsconfig.builder.json",
     "prepare": "husky install",
     "lint": "eslint --max-warnings 0 \"./**/*.ts\"",
-    "forms-hook": "ts-node ./script/run-forms-hook.ts"
+    "forms-hook": "ts-node ./script/run-forms-hook.ts",
+    "common-hook": "ts-node ./script/run-common-hook.ts"
   },
   "private": true,
   "author": "wszgrcy",
