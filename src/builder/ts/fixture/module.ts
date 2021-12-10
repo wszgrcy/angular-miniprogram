@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule } from 'angular-miniprogram/common';
 import { NgModule } from '@angular/core';
 import { TestComponent } from './component';
 

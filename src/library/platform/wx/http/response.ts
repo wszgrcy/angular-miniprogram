@@ -1,4 +1,4 @@
-import { HttpHeaders, HttpResponse } from '@angular/common/http';
+import { HttpHeaders, HttpResponse } from 'angular-miniprogram/common/http';
 
 export class WxHttpResponse<T> extends HttpResponse<T> {
   /**

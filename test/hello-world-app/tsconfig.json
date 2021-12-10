@@ -17,7 +17,9 @@
     "lib": ["es2018", "dom"],
     "paths": {
       "angular-miniprogram": ["../../src/library/platform/index.ts"],
-      "angular-miniprogram/forms": ["../../src/library/forms/index.ts"]
+      "angular-miniprogram/forms": ["../../src/library/forms/index.ts"],
+      "angular-miniprogram/common": ["../../src/library/common/index.ts"],
+      "angular-miniprogram/common/http": ["../../src/library/common/http/index.ts"],
     }
   }
 }

@@ -4,7 +4,7 @@ import {
   HttpClient,
   HttpHandler,
   ɵHttpInterceptingHandler,
-} from '@angular/common/http';
+} from 'angular-miniprogram/common/http';
 import { WxHttpBackend } from './backend';
 @NgModule({
   declarations: [],

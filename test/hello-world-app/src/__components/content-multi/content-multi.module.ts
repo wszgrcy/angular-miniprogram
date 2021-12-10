@@ -1,5 +1,5 @@
 import { NgModule } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule } from 'angular-miniprogram/common';
 import { ContentMultiComponent } from './content-multi.component';
 
 @NgModule({

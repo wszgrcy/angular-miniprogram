@@ -1,5 +1,5 @@
 import { NgModule } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule } from 'angular-miniprogram/common';
 import { LibComp1Component } from './lib-comp1.component';
 import { LibDir1Directive } from './lib-dir1.directive';
 

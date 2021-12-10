@@ -4,19 +4,13 @@ import {
   apply,
   chain,
   filter,
-  forEach,
   mergeWith,
   move,
-  template,
   url,
 } from '@angular-devkit/schematics';
 import path from 'path';
 import { FormsHookOptions } from '../../type';
-import {
-  ANGULAR_COMMON_PATH,
-  SCHEMATICS_ANGULAR_COMMON_PATH,
-  SCHEMATICS_COMMON_LIBRARY_PATH,
-} from '../const';
+import { ANGULAR_COMMON_PATH, SCHEMATICS_COMMON_LIBRARY_PATH } from '../const';
 
 export function mergeSourceRuleFactory(options: FormsHookOptions) {
   return (tree: Tree) => {
@@ -29,9 +23,6 @@ export function mergeSourceRuleFactory(options: FormsHookOptions) {
         move(SCHEMATICS_COMMON_LIBRARY_PATH),
       ]
     );
-    return chain([
-      // filter((file) => !file.startsWith(SCHEMATICS_COMMON_LIBRARY_PATH)),
-      mergeWith(angularFormsSource, MergeStrategy.Overwrite),
-    ]);
+    return chain([mergeWith(angularFormsSource, MergeStrategy.Overwrite)]);
   };
 }
