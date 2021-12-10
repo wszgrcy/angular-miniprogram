@@ -9,7 +9,7 @@ export class Structural1Directive {
   constructor(private viewContaienrRef: ViewContainerRef) {}
   ngOnInit(): void {
     this.viewContaienrRef.createEmbeddedView(this.appStructural1, {
-      template: this.appStructural1Name,
+      __templateName: this.appStructural1Name,
     });
   }
 }

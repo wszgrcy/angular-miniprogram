@@ -59,7 +59,9 @@ function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
           itemIndex,
         ];
         lContainerList.push({
-          context: item._lView[8],
+          __templateName: item._lView[8]
+            ? item._lView[8].__templateName
+            : undefined,
           nodeList: lViewToWXView(item._lView, componentPath),
           componentPath: componentPath,
           index: lContainerList.length,

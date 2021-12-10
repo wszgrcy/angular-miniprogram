@@ -103,7 +103,7 @@ export class WxContainer {
     content += `<block ${this.directivePrefix}:for="{{nodeList[${
       node.index
     }]}}" ${this.directivePrefix}:key="index">
-      <template is="{{item.context.template||'${defineTemplateName}'}}" ${this.getTemplateDataStr(
+      <template is="{{item.__templateName||'${defineTemplateName}'}}" ${this.getTemplateDataStr(
       node.index,
       `index`
     )}></template>
