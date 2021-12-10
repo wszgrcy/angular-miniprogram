@@ -1,13 +1,13 @@
 import path from 'path';
 import { runSchematics } from '../schematics/internal/schematics-runner';
 runSchematics(
-  'forms-hook',
+  'common-hook',
   {
     source: 'https://github.com/angular/angular.git',
     branch: '13.0.2',
-    savePath: path.resolve(process.cwd(), '.temp-git/forms-hook'),
-    sourceInSchematicsPath: '.temp-git/forms-hook',
-    subDir: 'packages/forms',
+    savePath: path.resolve(process.cwd(), '.temp-git/common-hook'),
+    sourceInSchematicsPath: '.temp-git/common-hook',
+    subDir: 'packages/common',
   },
   { dryRun: false }
 );

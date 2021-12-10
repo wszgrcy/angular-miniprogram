@@ -1,5 +1,5 @@
 import { NgModule } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule } from 'angular-miniprogram/common';
 import { ComplexPropertyEventComponent } from './complex-property-event.component';
 import { AppDir1Directive } from './app-dir1.directive';
 import { LibComp1Module } from 'test-library';

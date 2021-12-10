@@ -1,7 +1,9 @@
 {
   "extends": "./tsconfig.base.json",
   // "files": ["./src/library/index.ts"],
-  "include": ["./src/library"],
+  "include": [
+    "./src/library"
+  ],
   "compilerOptions": {
     "baseUrl": "./src/library",
     "noImplicitThis": true,
@@ -10,9 +12,25 @@
     "target": "ES2015",
     "module": "esnext",
     "strict": true,
-    "lib": ["es2019", "dom"],
-    "typeRoots": ["./src/library"],
-    "types": ["declaration"]
+    "useUnknownInCatchVariables": false,
+    "lib": [
+      "es2019",
+      "dom"
+    ],
+    "typeRoots": [
+      "./src/library"
+    ],
+    "types": [
+      "declaration"
+    ],
+    "paths": {
+      "angular-miniprogram/common": [
+        "./common/index.ts"
+      ],
+      "angular-miniprogram/common/http": [
+        "./common/http/index.ts"
+      ],
+    }
   },
   "exclude": [
     "./src/**/*.template.ts",

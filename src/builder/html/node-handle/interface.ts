@@ -1,5 +1,5 @@
+import { ComponentContext } from './component-context';
 import { TagEventMeta } from './event';
-import { ComponentContext } from './global-context';
 import type { MatchedComponent, MatchedDirective } from './type';
 
 export interface ParsedNode<T> {
@@ -39,49 +39,10 @@ export interface NgTextMeta extends NgNodeMeta {
   value: string;
 }
 
-export type NgDirective =
-  | NgIfDirective
-  | NgForDirective
-  | NgSwitchDirective
-  | NgDefaultDirective
-  | NgCustomDirective
-  | NgTemplateOutletDirective;
-export interface NgIfDirective {
-  type: 'if';
-  thenTemplateRef: string;
-  falseTemplateRef: string | null;
-}
-export interface NgForDirective {
-  type: 'for';
-
-  templateName: string;
-}
-export interface NgSwitchDirective {
-  type: 'switch';
-  case: boolean;
-  default: boolean;
-  first: boolean;
-  templateName: string;
-}
-export interface NgCustomDirective {
-  type: 'custom';
-}
-export interface NgTemplateOutletDirective {
-  type: 'ngTemplateOutlet';
-  name: string;
-}
-
-export interface NgDefaultDirective {
-  type: 'none';
-  name: { name: string; value: string }[];
-}
-export interface NgTemplateMeta<T = NgDirective> extends NgNodeMeta {
+export interface NgTemplateMeta extends NgNodeMeta {
   kind: NgNodeKind.Template;
   children: NgNodeMeta[];
-  directive: T[];
-  // todo 暂时未使用
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  staticType: any;
+  defineTemplateName: string;
 }
 export interface NgContentMeta extends NgNodeMeta {
   kind: NgNodeKind.Content;

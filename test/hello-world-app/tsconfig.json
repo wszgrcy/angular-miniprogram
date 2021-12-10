@@ -16,8 +16,10 @@
     "typeRoots": ["node_modules/@types"],
     "lib": ["es2018", "dom"],
     "paths": {
-      "angular-miniprogram": ["../../src/library/platform/index.ts"],
-      "angular-miniprogram/forms": ["../../src/library/forms/index.ts"]
+      "angular-miniprogram": ["../../dist"],
+      "angular-miniprogram/forms": ["../../dist/forms"],
+      "angular-miniprogram/common": ["../../dist/common"],
+      "angular-miniprogram/common/http": ["../../dist/common/http"],
     }
   }
 }

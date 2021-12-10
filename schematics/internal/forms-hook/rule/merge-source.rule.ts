@@ -10,13 +10,12 @@ import {
   url,
 } from '@angular-devkit/schematics';
 import path from 'path';
+import { FormsHookOptions } from '../../type';
 import {
   ANGULAR_FORMS_PATH,
-  SCHEMATICS_ANGULAR_FORMS_PATH,
   SCHEMATICS_FORMS_LIBRARY_HOOK_FILE_LIST,
   SCHEMATICS_FORMS_LIBRARY_PATH,
 } from '../const';
-import { FormsHookOptions } from '../type';
 
 export function mergeSourceRuleFactory(options: FormsHookOptions) {
   return (tree: Tree) => {

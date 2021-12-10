@@ -3,8 +3,8 @@ import type {
   BoundAttribute,
   Element,
 } from '@angular/compiler/src/render3/r3_ast';
+import { ComponentContext } from './component-context';
 import { TagEventMeta } from './event';
-import { ComponentContext } from './global-context';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
 import type { MatchedComponent, MatchedDirective } from './type';
 

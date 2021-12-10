@@ -1,5 +1,5 @@
 import { NgModule } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule } from 'angular-miniprogram/common';
 import { CustomStructuralDirectiveComponent } from './custom-structural-directive.component';
 import { Structural1Directive } from './structural1.directive';
 

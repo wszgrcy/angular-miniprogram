@@ -83,93 +83,32 @@ export class WxContainer {
   }
   private ngTemplateTransform(node: NgTemplateMeta): string {
     let content = '';
-    const directiveList = node.directive;
+    const defineTemplateName = node.defineTemplateName;
 
-    for (let i = 0; i < directiveList.length; i++) {
-      const directive = directiveList[i];
-      if (directive.type === 'none') {
-        const container = new WxContainer(
-          this.metaCollection,
-          `${this.containerName}_${this.level++}`,
-          this
-        );
-        this.childContainer.push(container);
-        container.directivePrefix = this.directivePrefix;
-        node.children.forEach((childNode) => {
-          container.compileNode(childNode);
-        });
-        this.exportTemplateList.push({
-          name: directive.name[0].name,
-          content: `<template name="${directive.name[0].name}">${container.wxmlTemplate}</template>`,
-        });
-      } else if (directive.type === 'if') {
-        if (directive.thenTemplateRef) {
-          content += `<block ${this.directivePrefix}:if="{{nodeList[${
-            node.index
-          }][0].context.$implicit}}"><template is="${
-            directive.thenTemplateRef
-          }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
-        }
-        if (directive.falseTemplateRef) {
-          content += `<block ${this.directivePrefix}:if="{{!nodeList[${
-            node.index
-          }][0].context.$implicit}}"><template is="${
-            directive.falseTemplateRef
-          }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
-        }
-      } else if (directive.type === 'for') {
-        content += `<block ${this.directivePrefix}:for="{{nodeList[${
-          node.index
-        }]}}" ${this.directivePrefix}:key="index">
-          <template is="${directive.templateName}" ${this.getTemplateDataStr(
-          node.index,
-          `index`
-        )}></template>
-          </block>`;
-      } else if (directive.type === 'switch') {
-        if (directive.case) {
-          if (directive.first) {
-            content += `<block ${this.directivePrefix}:if="{{nodeList[${
-              node.index
-            }][0]}}"> <template is="${
-              directive.templateName
-            }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
-          } else {
-            content += `<block ${this.directivePrefix}:elif="{{nodeList[${
-              node.index
-            }][0]}}"> <template is="${
-              directive.templateName
-            }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
-          }
-        } else if (directive.default) {
-          content += `<block ${this.directivePrefix}:else> <template is="${
-            directive.templateName
-          }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
-        } else {
-          throw new Error('未知的解析指令');
-        }
-      } else if (directive.type === 'ngTemplateOutlet') {
-        content += `<block ${this.directivePrefix}:if="{{nodeList[${
-          node.index
-        }][0]}}" >
-          <template is="${directive.name}" ${this.getTemplateDataStr(
-          node.index,
-          `0`
-        )}></template>
-          </block>`;
-      } else if (directive.type === 'custom') {
-        content += `<block ${this.directivePrefix}:for="{{nodeList[${
-          node.index
-        }]}}" ${this.directivePrefix}:key="index">
-          <template is="{{item.context.template}}" ${this.getTemplateDataStr(
-            node.index,
-            `index`
-          )}></template>
-          </block>`;
-      } else {
-        throw new Error('未知的解析节点');
-      }
-    }
+    const container = new WxContainer(
+      this.metaCollection,
+      `${this.containerName}_${this.level++}`,
+      this
+    );
+    this.childContainer.push(container);
+    container.directivePrefix = this.directivePrefix;
+    node.children.forEach((childNode) => {
+      container.compileNode(childNode);
+    });
+    this.exportTemplateList.push({
+      name: defineTemplateName,
+      content: `<template name="${defineTemplateName}">${container.wxmlTemplate}</template>`,
+    });
+
+    content += `<block ${this.directivePrefix}:for="{{nodeList[${
+      node.index
+    }]}}" ${this.directivePrefix}:key="index">
+      <template is="{{item.__templateName||'${defineTemplateName}'}}" ${this.getTemplateDataStr(
+      node.index,
+      `index`
+    )}></template>
+      </block>`;
+
     return content;
   }
   private ngTextTransform(node: NgTextMeta): string {

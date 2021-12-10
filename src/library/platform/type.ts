@@ -64,7 +64,7 @@ export interface NgCompileComponent {
 
 export interface MPView {
   nodeList: (MPView[] | MPElementData | MPTextData)[];
-  context: any;
+  __templateName: string | undefined;
   componentPath: any[];
   index: number;
 }

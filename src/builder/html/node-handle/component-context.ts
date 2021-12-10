@@ -8,25 +8,14 @@ import { createCssSelector } from '../../angular-internal/template';
 import { getAttrsForDirectiveMatching } from '../../angular-internal/util';
 import type { DirectiveMetaFromLibrary, MetaFromLibrary } from '../type';
 import { isTemplate } from '../type-protection';
-import type { NgDefaultDirective, NgTemplateMeta } from './interface';
 import type { MatchedDirective, MatchedMeta } from './type';
 
 @Injectable()
 export class ComponentContext {
   private templateIndex = 0;
-  private templateList: NgTemplateMeta<NgDefaultDirective>[] = [];
 
   constructor(private directiveMatcher: SelectorMatcher | undefined) {}
-  addTemplate(template: NgTemplateMeta<NgDefaultDirective>) {
-    this.templateList.push(template);
-  }
-  findTemplate(name: string) {
-    return this.templateList.find((item) =>
-      item.directive
-        .filter((item) => item.type === 'none')
-        .find((directive) => directive.name.some((item) => item.name === name))
-    );
-  }
+
   getBindIndex() {
     return this.templateIndex++;
   }

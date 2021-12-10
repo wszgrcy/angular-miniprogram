@@ -12,7 +12,7 @@ import {
   WX_DOWNLOAD_FILE_TOKEN,
   WX_REQUSET_TOKEN,
 } from 'angular-miniprogram';
-import { HttpContext, HttpContextToken } from '@angular/common/http';
+import { HttpContext, HttpContextToken } from 'angular-miniprogram/common/http';
 
 // ...
 

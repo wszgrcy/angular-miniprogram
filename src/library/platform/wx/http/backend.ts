@@ -10,7 +10,7 @@ import {
   HttpRequest,
   HttpResponse,
   HttpUploadProgressEvent,
-} from '@angular/common/http';
+} from 'angular-miniprogram/common/http';
 import { Observable, Observer } from 'rxjs';
 import { WxHttpDownloadResponse, WxHttpResponse } from './response';
 

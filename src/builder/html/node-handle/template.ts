@@ -1,21 +1,15 @@
-import type { ASTWithSource } from '@angular/compiler';
 import type {
   BoundAttribute,
   Template,
   TextAttribute,
 } from '@angular/compiler/src/render3/r3_ast';
-import { ComponentContext } from './global-context';
+import { ComponentContext } from './component-context';
 import {
-  NgCustomDirective,
-  NgDefaultDirective,
-  NgDirective,
   NgNodeKind,
   NgNodeMeta,
   NgTemplateMeta,
-  NgTemplateOutletDirective,
   ParsedNode,
 } from './interface';
-import { isElement } from './type-predicate';
 
 export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
   kind = NgNodeKind.Template;
@@ -40,152 +34,24 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
   appendNgNodeChild(child: ParsedNode<NgNodeMeta>) {
     this.children.push(child);
   }
-  private transform(): NgDirective[] {
-    /**
-     * 根据指令判断如何处理
-     *
-     */
+  private getTemplateName(): string {
     this.attrs = this.node.templateAttrs;
-    const isNgIf = this.attrs.some((item) => item.name === 'ngIf');
-    const isNgFor = this.attrs.some(
-      (item) => item.name === 'ngFor' || item.name === 'ngForOf'
-    );
-    const isSwitch = this.attrs.some(
-      (item) => item.name === 'ngSwitchCase' || item.name === 'ngSwitchDefault'
-    );
-    const isTemplateOutlet = this.attrs.some(
-      (item) => item.name === 'ngTemplateOutlet'
-    );
-
-    if (isNgIf) {
-      return this.ngIfTransform();
-    } else if (isNgFor) {
-      return this.ngForTransform();
-    } else if (isSwitch) {
-      return this.ngSwitchTransform();
-    } else if (isTemplateOutlet) {
-      return [this.ngTemplateOutletTransform()];
-    } else if (this.node.tagName === 'ng-template' || !this.attrs.length) {
-      return [this.defaultTransform()];
-    } else if (this.attrs.length) {
-      return [this.ngCustomStructuralDirectiveTransform()];
+    if (this.node.references && this.node.references.length) {
+      return this.node.references[0].name;
     } else {
-      throw new Error('没有找到对应指令.');
+      return `ngDefault_${this.globalContext.getBindIndex()}`;
     }
   }
-  private defaultTransform(): NgDefaultDirective {
-    return {
-      type: 'none',
-      name: this.node.references.map((item) => ({
-        name: item.name,
-        value: item.value,
-      })),
-    };
-  }
-  private ngIfTransform(): NgDirective[] {
-    const ngIf = this.attrs.find((item) => item.name === 'ngIf')!;
-    const ngIfElse = this.attrs.find((item) => item.name === 'ngIfElse')!;
-    const ngIfThen = this.attrs.find((item) => item.name === 'ngIfThen')!;
-    const ngIfTemplateName = `ngIf_then_${this.globalContext.getBindIndex()}`;
 
-    return [
-      {
-        type: 'if',
-        thenTemplateRef:
-          (ngIf && ngIfThen && (ngIfThen.value as ASTWithSource).source!) ||
-          ngIfTemplateName,
-        falseTemplateRef: (ngIfElse?.value as ASTWithSource)?.source,
-      },
-      {
-        type: 'none',
-        name: [{ name: ngIfTemplateName, value: ngIfTemplateName }],
-      },
-    ];
-  }
-  private ngForTransform(): NgDirective[] {
-    const ngForTemplateName = `ngFor_item_${this.globalContext.getBindIndex()}`;
-
-    return [
-      {
-        type: 'for',
-        templateName: ngForTemplateName,
-      },
-      {
-        type: 'none',
-        name: [{ name: ngForTemplateName, value: ngForTemplateName }],
-      },
-    ];
-  }
-  private ngSwitchTransform(): NgDirective[] {
-    const ngSwitchDefault = this.attrs.find(
-      (item) => item.name === 'ngSwitchDefault'
-    );
-    const ngSwitchCase = this.attrs.find(
-      (item) => item.name === 'ngSwitchCase'
-    );
-    let parent = this.parent;
-    let result:
-      | { first: boolean; ngSwitch: BoundAttribute; index: number }
-      | undefined;
-    while (parent) {
-      if (isElement(parent)) {
-        result = parent.getNgSwitch();
-        if (result) {
-          break;
-        }
-      }
-      parent = parent.parent;
-    }
-    const ngSwitchTemplateName = `ngSwitch_${
-      result?.index
-    }_${this.globalContext.getBindIndex()}`;
-    return [
-      {
-        type: 'switch',
-        default: !!ngSwitchDefault,
-        case: !!ngSwitchCase,
-        first: result!.first,
-        templateName: ngSwitchTemplateName,
-      },
-      {
-        type: 'none',
-        name: [{ name: ngSwitchTemplateName, value: ngSwitchTemplateName }],
-      },
-    ];
-  }
-  private ngCustomStructuralDirectiveTransform(): NgCustomDirective {
-    return { type: 'custom' };
-  }
-  private ngTemplateOutletTransform(): NgTemplateOutletDirective {
-    const ngTemplateOutlet = this.attrs.find(
-      (item) => item.name === 'ngTemplateOutlet'
-    )!;
-
-    return {
-      type: 'ngTemplateOutlet',
-      name: (ngTemplateOutlet.value as ASTWithSource).source!,
-    };
-  }
   getNodeMeta(globalContext: ComponentContext): NgTemplateMeta {
     this.globalContext = globalContext;
-    const staticType = globalContext.matchDirective(this.node);
-
-    const directive = this.transform()!;
-
+    const directive = this.getTemplateName()!;
     const meta: NgTemplateMeta = {
       kind: NgNodeKind.Template,
       children: this.children.map((child) => child.getNodeMeta(globalContext)),
-      directive: directive,
-      staticType: staticType,
       index: this.index,
+      defineTemplateName: directive,
     };
-    for (let i = 0; i < directive.length; i++) {
-      const element = directive[i];
-      if (element.type == 'none') {
-        globalContext.addTemplate(meta as NgTemplateMeta<NgDefaultDirective>);
-        break;
-      }
-    }
 
     return meta;
   }
