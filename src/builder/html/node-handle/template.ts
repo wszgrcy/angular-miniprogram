@@ -57,15 +57,16 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
       (item) => item.name === 'ngTemplateOutlet'
     );
 
-    if (isNgIf) {
-      return this.ngIfTransform();
-    } else if (isNgFor) {
-      return this.ngForTransform();
-    } else if (isSwitch) {
-      return this.ngSwitchTransform();
-    } else if (isTemplateOutlet) {
-      return [this.ngTemplateOutletTransform()];
-    } else if (this.node.tagName === 'ng-template' || !this.attrs.length) {
+    // if (isNgIf) {
+    //   return this.ngIfTransform();
+    // } else if (isNgFor) {
+    //   return this.ngForTransform();
+    // } else if (isSwitch) {
+    //   return this.ngSwitchTransform();
+    // } else if (isTemplateOutlet) {
+    //   return [this.ngTemplateOutletTransform()];
+    // } else 
+    if (this.node.tagName === 'ng-template' || !this.attrs.length) {
       return [this.defaultTransform()];
     } else if (this.attrs.length) {
       return [this.ngCustomStructuralDirectiveTransform()];

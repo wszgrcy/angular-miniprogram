@@ -102,62 +102,65 @@ export class WxContainer {
           name: directive.name[0].name,
           content: `<template name="${directive.name[0].name}">${container.wxmlTemplate}</template>`,
         });
-      } else if (directive.type === 'if') {
-        if (directive.thenTemplateRef) {
-          content += `<block ${this.directivePrefix}:if="{{nodeList[${
-            node.index
-          }][0].context.$implicit}}"><template is="${
-            directive.thenTemplateRef
-          }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
-        }
-        if (directive.falseTemplateRef) {
-          content += `<block ${this.directivePrefix}:if="{{!nodeList[${
-            node.index
-          }][0].context.$implicit}}"><template is="${
-            directive.falseTemplateRef
-          }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
-        }
-      } else if (directive.type === 'for') {
-        content += `<block ${this.directivePrefix}:for="{{nodeList[${
-          node.index
-        }]}}" ${this.directivePrefix}:key="index">
-          <template is="${directive.templateName}" ${this.getTemplateDataStr(
-          node.index,
-          `index`
-        )}></template>
-          </block>`;
-      } else if (directive.type === 'switch') {
-        if (directive.case) {
-          if (directive.first) {
-            content += `<block ${this.directivePrefix}:if="{{nodeList[${
-              node.index
-            }][0]}}"> <template is="${
-              directive.templateName
-            }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
-          } else {
-            content += `<block ${this.directivePrefix}:elif="{{nodeList[${
-              node.index
-            }][0]}}"> <template is="${
-              directive.templateName
-            }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
-          }
-        } else if (directive.default) {
-          content += `<block ${this.directivePrefix}:else> <template is="${
-            directive.templateName
-          }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
-        } else {
-          throw new Error('未知的解析指令');
-        }
-      } else if (directive.type === 'ngTemplateOutlet') {
-        content += `<block ${this.directivePrefix}:if="{{nodeList[${
-          node.index
-        }][0]}}" >
-          <template is="${directive.name}" ${this.getTemplateDataStr(
-          node.index,
-          `0`
-        )}></template>
-          </block>`;
-      } else if (directive.type === 'custom') {
+      } 
+      // else if (directive.type === 'if') {
+      //   if (directive.thenTemplateRef) {
+      //     content += `<block ${this.directivePrefix}:if="{{nodeList[${
+      //       node.index
+      //     }][0].context.$implicit}}"><template is="${
+      //       directive.thenTemplateRef
+      //     }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
+      //   }
+      //   if (directive.falseTemplateRef) {
+      //     content += `<block ${this.directivePrefix}:if="{{!nodeList[${
+      //       node.index
+      //     }][0].context.$implicit}}"><template is="${
+      //       directive.falseTemplateRef
+      //     }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
+      //   }
+      // } else if (directive.type === 'for') {
+      //   content += `<block ${this.directivePrefix}:for="{{nodeList[${
+      //     node.index
+      //   }]}}" ${this.directivePrefix}:key="index">
+      //     <template is="${directive.templateName}" ${this.getTemplateDataStr(
+      //     node.index,
+      //     `index`
+      //   )}></template>
+      //     </block>`;
+      // } else if (directive.type === 'switch') {
+      //   if (directive.case) {
+      //     if (directive.first) {
+      //       content += `<block ${this.directivePrefix}:if="{{nodeList[${
+      //         node.index
+      //       }][0]}}"> <template is="${
+      //         directive.templateName
+      //       }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
+      //     } else {
+      //       content += `<block ${this.directivePrefix}:elif="{{nodeList[${
+      //         node.index
+      //       }][0]}}"> <template is="${
+      //         directive.templateName
+      //       }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
+      //     }
+      //   } 
+      //   else if (directive.default) {
+      //     content += `<block ${this.directivePrefix}:else> <template is="${
+      //       directive.templateName
+      //     }" ${this.getTemplateDataStr(node.index, `0`)}></template></block>`;
+      //   } else {
+      //     throw new Error('未知的解析指令');
+      //   }
+      // } else if (directive.type === 'ngTemplateOutlet') {
+      //   content += `<block ${this.directivePrefix}:if="{{nodeList[${
+      //     node.index
+      //   }][0]}}" >
+      //     <template is="${directive.name}" ${this.getTemplateDataStr(
+      //     node.index,
+      //     `0`
+      //   )}></template>
+      //     </block>`;
+      // } 
+      else if (directive.type === 'custom') {
         content += `<block ${this.directivePrefix}:for="{{nodeList[${
           node.index
         }]}}" ${this.directivePrefix}:key="index">
