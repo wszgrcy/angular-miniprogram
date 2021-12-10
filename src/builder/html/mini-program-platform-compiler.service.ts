@@ -17,7 +17,7 @@ import {
 } from '../const';
 import { COMPONENT_META, DIRECTIVE_MATCHER } from '../token/component.token';
 import { angularCompilerPromise } from '../util/load_esm';
-import { ComponentContext } from './node-handle/global-context';
+import { ComponentContext } from './node-handle/component-context';
 import { ComponentCompiler } from './template-compiler';
 import {
   ComponentMetaFromLibrary,

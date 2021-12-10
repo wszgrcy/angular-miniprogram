@@ -37,9 +37,9 @@ import type {
   Visitor,
 } from '@angular/compiler/src/render3/r3_ast';
 import { ParsedNgBoundText } from './node-handle/bound-text';
+import { ComponentContext } from './node-handle/component-context';
 import { ParsedNgContent } from './node-handle/content';
 import { ParsedNgElement } from './node-handle/element';
-import { ComponentContext } from './node-handle/global-context';
 import { NgNodeMeta, ParsedNode } from './node-handle/interface';
 import { ParsedNgTemplate } from './node-handle/template';
 import { ParsedNgText } from './node-handle/text';
