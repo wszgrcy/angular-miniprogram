@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { join, normalize } from '@angular-devkit/core';
+import path from "path";
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
 import { LIBRARY_OUTPUT_PATH, LibrarySymbol } from '../const';
@@ -7,7 +8,7 @@ import { BuildPlatform } from '../platform/platform';
 import type { LibraryComponentEntryMeta, LibraryLoaderContext } from '../type';
 
 const CUSTOM_URI = 'dynamic';
-const CUSTOM_URI_REG = /^dynamic:\/\/(.*)\.ts$/;
+const CUSTOM_URI_REG = /^dynamic:\/\/__license(?:\/|\\)(.*)\.ts$/;
 @Injectable()
 export class DynamicLibraryComponentEntryPlugin {
   private libraryComponentMap = new Map<string, LibraryComponentEntryMeta>();
@@ -73,7 +74,9 @@ export class DynamicLibraryComponentEntryPlugin {
         this.libraryComponentMap.forEach((meta) => {
           const entry = join(normalize(LIBRARY_OUTPUT_PATH), meta.libraryPath);
           const dep = webpack.EntryPlugin.createDependency(
-            `${CUSTOM_URI}://${meta.id}.ts`,
+
+
+            `${CUSTOM_URI}://${path.join('__license',meta.id)}.ts`,
             entry
           );
           compilation.addEntry(compiler.context, dep, entry, (err, result) => {

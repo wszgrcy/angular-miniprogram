@@ -21,6 +21,7 @@ const angularConfig = {
   platform: PlatformType.wx,
   buildOptimizer: true,
   optimization: true,
+  extractLicenses: true,
 };
 
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
