@@ -14,7 +14,11 @@ describeBuilder(execute, LIBRARY_BUILDER_INFO, (harness) => {
       harness.useTarget('library', DEFAULT_ANGULAR_LIBRARY_CONFIG);
       const result = await harness.executeOnce();
       expect(result).toBeTruthy();
+
       expect(result.result).toBeTruthy();
+      if (!result.result) {
+        console.error(JSON.stringify(result));
+      }
       expect(result.result.success).toBeTruthy();
       const workspaceRoot: string = (result.result as any).workspaceRoot;
       const output = path.join(workspaceRoot, 'dist/test-library');
