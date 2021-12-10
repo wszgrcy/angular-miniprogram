@@ -50,6 +50,7 @@ export const ALL_PAGE_NAME_LIST = [
   `custom-structural-directive`,
   `default-structural-directive`,
   `ng-content`,
+  `base-forms`
 ];
 export const ALL_COMPONENT_NAME_LIST = [
   `component1`,
