@@ -1,3 +1,4 @@
+import * as fs from 'fs-extra';
 import * as path from 'path';
 import { Injectable } from 'static-injector';
 import { BuildPlatform } from '../platform';
@@ -14,7 +15,10 @@ export class WxBuildPlatform extends BuildPlatform {
     content: '.wxml',
     contentTemplate: '.wxml',
   };
-  importTemplate = path.resolve(__dirname, './template/app-template.js');
+  importTemplate = `${fs
+    .readFileSync(path.resolve(__dirname, '../template/app-template.js'))
+    .toString()};
+    wx.__global = wx.__window = obj;`;
   constructor(public templateTransform: WxTransform) {
     super(templateTransform);
   }

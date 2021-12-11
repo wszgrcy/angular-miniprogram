@@ -1,4 +1,4 @@
-var obj = {
+const obj = {
   Zone: typeof Zone !== 'undefined' && Zone,
   setTimeout: typeof setTimeout !== 'undefined' && setTimeout,
   clearTimeout: typeof clearTimeout !== 'undefined' && clearTimeout,
@@ -15,4 +15,4 @@ var obj = {
   performance: typeof performance !== 'undefined' && performance,
   navigator: typeof navigator !== 'undefined' && navigator,
 };
-wx.__global = wx.__window = obj;
+

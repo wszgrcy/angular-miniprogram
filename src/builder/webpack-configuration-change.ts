@@ -192,7 +192,7 @@ export class WebpackConfigurationChange {
     assetsPlugin.hooks.emitAssets.tap('pageHandle', (object, json) => {
       return {
         'app.js':
-          fs.readFileSync(this.buildPlatform.importTemplate).toString() +
+          this.buildPlatform.importTemplate +
           json.scripts.map((item) => `require('./${item.src}')`).join(';'),
       };
     });
