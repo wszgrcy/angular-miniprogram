@@ -260,7 +260,7 @@ export class WebpackConfigurationChange {
         new pluginPrototype.constructor({
           filename: (pluginInstance.options.filename as string).replace(
             /\.css$/,
-            '.wxss'
+            this.buildPlatform.fileExtname.style
           ),
         })
       );
