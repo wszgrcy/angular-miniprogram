@@ -180,7 +180,9 @@ export class WebpackConfigurationChange {
     assetsPlugin.hooks.removeChunk.tap('pageHandle', (chunk) => {
       if (
         this.entryList.some((page) => page.entryName === chunk.name) ||
-        chunk.name === 'styles' ||
+        [...chunk.files].some((file) =>
+          file.endsWith(this.buildPlatform.fileExtname.style)
+        ) ||
         chunk.name.startsWith(`${LIBRARY_OUTPUT_PATH}/`)
       ) {
         return true;

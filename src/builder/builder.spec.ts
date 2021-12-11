@@ -50,7 +50,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect(result.result?.success).toBeTruthy();
       harness
         .expectFile(
-          join(normalize(DEFAULT_ANGULAR_CONFIG.outputPath), 'styles.wxss')
+          join(normalize(DEFAULT_ANGULAR_CONFIG.outputPath), 'app.wxss')
         )
         .toExist();
       const realTestPath: string = result.result?.outputPath as string;
