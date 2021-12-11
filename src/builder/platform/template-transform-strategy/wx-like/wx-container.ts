@@ -147,10 +147,8 @@ export class WxContainer {
   private elementPropertyAndEvent(node: NgElementMeta, index: number) {
     const propertyMap = new Map<string, string>();
     const attributeMap = new Map<string, string>();
-    if (!node.componentMeta?.isComponent) {
       propertyMap.set('class', `nodeList[${index}].class`);
       propertyMap.set('style', `nodeList[${index}].style`);
-    }
     Object.entries(node.attributes)
       .filter(([key]) => key !== 'class' && key !== 'style')
       .filter(([key, value]) => value !== '')

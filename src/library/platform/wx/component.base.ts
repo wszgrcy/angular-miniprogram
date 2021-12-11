@@ -159,7 +159,31 @@ export function generateWxComponent<C>(
         nodeIndex: { value: NaN, type: Number },
       },
       methods: {
-        ...(!isComponent ? pageILifeTime : {}),
+        ...componentOptions.methods,
+        onHide: () => {
+          if (!isComponent) {
+            pageILifeTime.onHide!();
+          }
+          if ((componentOptions.methods as any).onHide) {
+            (componentOptions.methods as any).onHide();
+          }
+        },
+        onUnload: () => {
+          if (!isComponent) {
+            pageILifeTime.onUnload!();
+          }
+          if ((componentOptions.methods as any).onUnload) {
+            (componentOptions.methods as any).onUnload();
+          }
+        },
+        onShow: () => {
+          if (!isComponent) {
+            pageILifeTime.onShow!();
+          }
+          if ((componentOptions.methods as any).onShow) {
+            (componentOptions.methods as any).onShow();
+          }
+        },
         ...meta.listeners.reduce((pre: Record<string, Function>, cur) => {
           pre[cur.methodName] = function (
             this: WxComponentInstance,
