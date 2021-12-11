@@ -6,7 +6,9 @@ import { WxComponentInstance } from './type';
 export function pageStartup<M, C>(
   module: Type<M>,
   component: Type<C>,
-  componentOptions?: Partial<WechatMiniprogram.Component.Options<{}, {}, {}>>
+  componentOptions?: Partial<
+    WechatMiniprogram.Component.Options<{}, {}, {}, {}, true>
+  >
 ) {
   const wxComponentFactory = generateWxComponent(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
