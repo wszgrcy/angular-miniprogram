@@ -3,12 +3,14 @@ import { TemplateTransformBase } from './template-transform-strategy/transform.b
 
 export enum PlatformType {
   wx = 'wx',
+  zj = 'zj',
+  /** 这个属性只会在内部被使用 */
+  library = 'library',
 }
 @Injectable()
 export class BuildPlatform {
   globalObject!: string;
   globalVariablePrefix!: string;
-  contextPrefix!: string;
   fileExtname!: {
     style: string;
     logic: string;

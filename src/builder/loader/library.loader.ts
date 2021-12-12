@@ -5,7 +5,11 @@ import ts from 'typescript';
 import * as webpack from 'webpack';
 import { LIBRARY_OUTPUT_PATH, LibrarySymbol } from '../const';
 import { ExportLibraryComponentMeta, LibraryLoaderContext } from '../type';
+import { runScript } from '../util/run-script';
 
+function resolveContent(content: string, directivePrefix: string): string {
+  return runScript(`(()=>{return \`${content}\`})()`, { directivePrefix });
+}
 export default function (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   this: webpack.LoaderContext<any>,
@@ -54,7 +58,11 @@ export default function (
           normalize(LIBRARY_OUTPUT_PATH),
           item.libraryPath + fileExtname.content
         ),
-        item.content
+        resolveContent(
+          item.content,
+          libraryLoaderContext.buildPlatform.templateTransform.getData()
+            .directivePrefix
+        )
       );
       if (item.contentTemplate) {
         this.emitFile(
@@ -62,7 +70,11 @@ export default function (
             normalize(LIBRARY_OUTPUT_PATH),
             item.libraryPath + fileExtname.contentTemplate
           ),
-          item.contentTemplate
+          resolveContent(
+            item.contentTemplate,
+            libraryLoaderContext.buildPlatform.templateTransform.getData()
+              .directivePrefix
+          )
         );
       }
       if (item.style) {

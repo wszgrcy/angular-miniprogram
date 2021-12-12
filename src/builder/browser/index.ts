@@ -7,10 +7,8 @@ import type {
 import { executeBrowserBuilder } from '@angular-devkit/build-angular';
 import { Injector } from 'static-injector';
 import * as webpack from 'webpack';
-import { BuildPlatform, PlatformType } from '../platform/platform';
-import { getBuildPlatform } from '../platform/platform-info';
-import { WxTransform } from '../platform/template-transform-strategy/wx.transform';
-import { WxBuildPlatform } from '../platform/wx/wx-platform';
+import { PlatformType } from '../platform/platform';
+import { getBuildPlatformInjectConfig } from '../platform/platform-info';
 import { WebpackConfigurationChange } from '../webpack-configuration-change';
 
 export default createBuilder(
@@ -38,12 +36,7 @@ export function runBuilder(
     webpackConfiguration: async (options: webpack.Configuration) => {
       const injector = Injector.create({
         providers: [
-          { provide: WxTransform },
-          { provide: WxBuildPlatform },
-          {
-            provide: BuildPlatform,
-            useClass: getBuildPlatform(angularOptions.platform),
-          },
+          ...getBuildPlatformInjectConfig(angularOptions.platform),
           {
             provide: WebpackConfigurationChange,
             useFactory: (injector: Injector) => {

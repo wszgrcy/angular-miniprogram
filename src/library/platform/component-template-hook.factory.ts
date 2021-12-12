@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { InjectFlags, ɵɵdirectiveInject } from '@angular/core';
+import { InjectFlags, NgZone, ɵɵdirectiveInject } from '@angular/core';
 import { LView } from './internal-type';
 import { AgentNode } from './module/renderer-node';
 import { PAGE_TOKEN } from './module/token/page.token';
@@ -16,9 +16,12 @@ export function propertyChange(context: any) {
   const lView = findCurrentComponentLView(context);
   const lviewPath = getLViewPath(lView);
   const nodeList = lViewToWXView(lView, lviewPath);
-  const ctx: Partial<MPView> = { nodeList: nodeList, componentPath: lviewPath };
+  const ctx: Partial<MPView> = { nodeList: nodeList, componentPath: lviewPath };  
   if (linkMap.has(lView)) {
-    linkMap.get(lView).setData({ __wxView: ctx });
+    let ngZone = getLViewDirective(lView)!.get(NgZone);
+    ngZone.runOutsideAngular(() => {
+      linkMap.get(lView).setData({ __wxView: ctx });
+    });
   } else {
     initValueMap.set(lView, ctx as Required<MPView>);
   }
@@ -118,12 +121,17 @@ export function pageBind(context: any) {
   if (!wxComponentInstance) {
     return;
   }
-
-  const pageId = wxComponentInstance.getPageId();
-  if (pageMap.has(pageId)) {
-    return;
+  const ngZone = ɵɵdirectiveInject(NgZone, InjectFlags.Optional);
+  if (!ngZone) {
+    throw new Error('没有查询到NgZone');
   }
-  pageMap.set(pageId, lView);
+  ngZone.runOutsideAngular(() => {
+    const pageId = wxComponentInstance.getPageId();
+    if (pageMap.has(pageId)) {
+      return;
+    }
+    pageMap.set(pageId, lView);
+  });
 }
 export function getPageLView(id: string): any {
   return pageMap.get(id)!;

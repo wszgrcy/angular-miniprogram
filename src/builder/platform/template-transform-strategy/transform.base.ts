@@ -13,4 +13,5 @@ export abstract class TemplateTransformBase {
       libraryPath: UseComponent[];
     };
   };
+  abstract getData(): any;
 }

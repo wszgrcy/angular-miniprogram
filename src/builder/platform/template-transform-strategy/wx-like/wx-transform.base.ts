@@ -1,19 +1,19 @@
 import type { NgNodeMeta } from '../../../html/node-handle/interface';
+import { BuildPlatform } from '../../platform';
 import { TemplateTransformBase } from '../transform.base';
 import { MetaCollection } from './type';
 import { WxContainer } from './wx-container';
 
 export abstract class WxTransformLike extends TemplateTransformBase {
   abstract directivePrefix: string;
-  abstract viewContextName: string;
+  viewContextName: string = '__wxView';
   private exportTemplateList: { name: string; content: string }[] = [];
 
-  constructor() {
+  constructor(protected buildPlatform:BuildPlatform) {
     super();
   }
   compile(nodes: NgNodeMeta[]) {
     const metaCollection: MetaCollection = {
-      method: new Set(),
       listeners: [],
       localPath: new Set(),
       libraryPath: new Set(),
@@ -26,10 +26,10 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     this.exportTemplateList = container.getExportTemplate();
     const result = container.export();
     const templateImport = this.exportTemplateList.length
-      ? `<import src="./template.wxml"/>`
+      ? `<import src="./template${this.buildPlatform.fileExtname.contentTemplate}"/>`
       : '';
     return {
-      content: `${templateImport}<template name="main-template">${result.wxmlTemplate}</template><block wx:if="{{${this.viewContextName}}}"><template is="main-template" data="{{...${this.viewContextName}}}"></template></block> `,
+      content: `${templateImport}<template name="main-template">${result.wxmlTemplate}</template><block ${this.directivePrefix}:if="{{${this.viewContextName}}}"><template is="main-template" data="{{...${this.viewContextName}}}"></template></block> `,
       template: this.getExportTemplate(),
       meta: this.getExportMeta(metaCollection),
       useComponentPath: {
@@ -44,8 +44,10 @@ export abstract class WxTransformLike extends TemplateTransformBase {
   }
 
   private getExportMeta(metaCollection: MetaCollection) {
-    return `{method:${JSON.stringify([
-      ...metaCollection.method,
-    ])},listeners:${JSON.stringify(metaCollection.listeners)}}`;
+    return `{listeners:${JSON.stringify(metaCollection.listeners)}}`;
+  }
+
+  getData() {
+    return { directivePrefix: this.directivePrefix };
   }
 }

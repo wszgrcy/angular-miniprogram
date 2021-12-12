@@ -19,7 +19,7 @@ import {
   ComponentPath,
   NgCompileComponent,
 } from '../type';
-import { WxComponentInstance, WxLifetimes, PageILifeTime } from './type';
+import type { WxComponentInstance, WxLifetimes, PageILifeTime } from './type';
 
 export function generateWxComponent<C>(
   component: Type<C> & NgCompileComponent,
@@ -38,33 +38,7 @@ export function generateWxComponent<C>(
         list: ComponentPath = [],
         index: number
       ) {
-        if (this.__isLink) {
-          return;
-        }
-        if (!(index > -1)) {
-          throw new Error('组件索引异常');
-        }
-        const rootLView = getPageLView(this.getPageId()) as LView;
-        const componentPath = [...list, index];
-        const lView = findCurrentLView(rootLView, componentPath) as LView;
-        cleanWhenDestroy(lView);
-        setLViewPath(lView, componentPath);
-        const initValue = getInitValue(lView);
-        if (initValue) {
-          this.setData({ __wxView: updatePath(initValue, componentPath) });
-        }
-        lViewLinkToMPComponentRef(this, lView);
-        this.__lView = lView;
-        this.__ngComponentInstance = lView[8];
-        this.__ngZone = getLViewDirective(lView)!.get(NgZone);
-        let componentFinderService = getLViewDirective(lView)!.get(
-          ComponentFinderService
-        );
-        componentFinderService.set(this.__ngComponentInstance, this);
-        addDestroyFunction(lView, () => {
-          componentFinderService.remove(this.__ngComponentInstance);
-        });
-        this.__isLink = true;
+        linkNgComponent.call(this, [...list, index]);
       },
     };
 
@@ -155,33 +129,60 @@ export function generateWxComponent<C>(
       externalClasses: componentOptions.externalClasses,
       observers: observers,
       properties: {
-        componentPath: { value: [], type: Array },
-        nodeIndex: { value: NaN, type: Number },
+        componentPath: {
+          value: undefined,
+          type: Array,
+          observer: function (this: WxComponentInstance, a) {
+            (this as any).__componentPath = a;
+            if  (typeof (this as any).__componentPath!=='undefined'&& typeof (this as any).__nodeIndex!=='undefined') {
+              linkNgComponent.call(this,[...(this as any).__componentPath,(this as any).__nodeIndex])
+            }
+          },
+        },
+        nodeIndex: {
+          value: NaN,
+          type: Number,
+          observer: function (this: WxComponentInstance, a) {
+            (this as any).__nodeIndex = a;
+            if  (typeof (this as any).__componentPath!=='undefined'&& typeof (this as any).__nodeIndex!=='undefined') {
+              linkNgComponent.call(this,[...(this as any).__componentPath,(this as any).__nodeIndex])
+            }
+          },
+        },
       },
       methods: {
         ...componentOptions.methods,
-        onHide: () => {
+        onHide: function () {
           if (!isComponent) {
-            pageILifeTime.onHide!();
+            pageILifeTime.onHide!.call(this);
           }
-          if ((componentOptions.methods as any).onHide) {
-            (componentOptions.methods as any).onHide();
+          if (
+            componentOptions.methods &&
+            (componentOptions.methods as any).onHide
+          ) {
+            (componentOptions.methods as any).onHide.call(this);
           }
         },
-        onUnload: () => {
+        onUnload: function () {
           if (!isComponent) {
-            pageILifeTime.onUnload!();
+            pageILifeTime.onUnload!.call(this);
           }
-          if ((componentOptions.methods as any).onUnload) {
-            (componentOptions.methods as any).onUnload();
+          if (
+            componentOptions.methods &&
+            (componentOptions.methods as any).onUnload
+          ) {
+            (componentOptions.methods as any).onUnload.call(this);
           }
         },
-        onShow: () => {
+        onShow: function () {
           if (!isComponent) {
-            pageILifeTime.onShow!();
+            pageILifeTime.onShow!.call(this);
           }
-          if ((componentOptions.methods as any).onShow) {
-            (componentOptions.methods as any).onShow();
+          if (
+            componentOptions.methods &&
+            (componentOptions.methods as any).onShow
+          ) {
+            (componentOptions.methods as any).onShow.call(this);
           }
         },
         ...meta.listeners.reduce((pre: Record<string, Function>, cur) => {
@@ -244,4 +245,30 @@ export function generateWxComponent<C>(
       relations: componentOptions.relations,
     });
   };
+}
+function linkNgComponent(this: WxComponentInstance, list: any[]) {
+  if (this.__isLink) {
+    return;
+  }
+  const rootLView = getPageLView(this.getPageId()) as LView;
+  const componentPath = list;
+  const lView = findCurrentLView(rootLView, componentPath) as LView;
+  cleanWhenDestroy(lView);
+  setLViewPath(lView, componentPath);
+  const initValue = getInitValue(lView);
+  if (initValue) {
+    this.setData({ __wxView: updatePath(initValue, componentPath) });
+  }
+  lViewLinkToMPComponentRef(this, lView);
+  this.__lView = lView;
+  this.__ngComponentInstance = lView[8];
+  this.__ngZone = getLViewDirective(lView)!.get(NgZone);
+  let componentFinderService = getLViewDirective(lView)!.get(
+    ComponentFinderService
+  );
+  componentFinderService.set(this.__ngComponentInstance, this);
+  addDestroyFunction(lView, () => {
+    componentFinderService.remove(this.__ngComponentInstance);
+  });
+  this.__isLink = true;
 }
