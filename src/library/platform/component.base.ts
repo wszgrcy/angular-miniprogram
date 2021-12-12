@@ -1,5 +1,5 @@
 import { ApplicationRef, ChangeDetectorRef, NgZone, Type } from '@angular/core';
-import { ComponentFinderService } from '../module/service/component-finder.service';
+import { ComponentFinderService } from './module/service/component-finder.service';
 import {
   addDestroyFunction,
   cleanWhenDestroy,
@@ -11,16 +11,51 @@ import {
   lViewLinkToMPComponentRef,
   setLViewPath,
   updatePath,
-} from '../component-template-hook.factory';
-import type { LView } from '../internal-type';
-import { AgentNode } from '../module/renderer-node';
+} from './component-template-hook.factory';
+import type { LView } from 'angular-miniprogram/platform/type';
+import { AgentNode } from './module/renderer-node';
 import {
   ComponentInitFactory,
   ComponentPath,
   NgCompileComponent,
-} from '../type';
+} from 'angular-miniprogram/platform/type';
 import type { WxComponentInstance, WxLifetimes, PageILifeTime } from './type';
 
+function linkNgComponent(this: WxComponentInstance, list: any[]) {
+  const rootLView = getPageLView(this.getPageId()) as LView;
+  const componentPath = list;
+  const lView = findCurrentLView(rootLView, componentPath) as LView;
+  cleanWhenDestroy(lView);
+  setLViewPath(lView, componentPath);
+  const initValue = getInitValue(lView);
+  if (initValue) {
+    this.setData({ __wxView: updatePath(initValue, componentPath) });
+  }
+  lViewLinkToMPComponentRef(this, lView);
+  this.__lView = lView;
+  this.__ngComponentInstance = lView[8];
+  this.__ngZone = getLViewDirective(lView)!.get(NgZone);
+  let componentFinderService = getLViewDirective(lView)!.get(
+    ComponentFinderService
+  );
+  componentFinderService.set(this.__ngComponentInstance, this);
+  addDestroyFunction(lView, () => {
+    componentFinderService.remove(this.__ngComponentInstance);
+  });
+  this.__isLink = true;
+}
+const observers = {
+  ['componentPath,nodeIndex']: function (
+    this: WxComponentInstance,
+    list: ComponentPath = [],
+    index: number
+  ) {
+    if (this.__isLink) {
+      return;
+    }
+    linkNgComponent.call(this, [...list, index]);
+  },
+};
 export function generateWxComponent<C>(
   component: Type<C> & NgCompileComponent,
   componentOptions: Partial<
@@ -31,17 +66,6 @@ export function generateWxComponent<C>(
   const meta = component.ɵcmpExtraMeta;
 
   return (componentInitFactory: ComponentInitFactory, isPage?: boolean) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const observers = {
-      ['componentPath,nodeIndex']: function (
-        this: WxComponentInstance,
-        list: ComponentPath = [],
-        index: number
-      ) {
-        linkNgComponent.call(this, [...list, index]);
-      },
-    };
-
     const bootStrapFn = (wxComponentInstance: WxComponentInstance) => {
       return (wxComponentInstance.__waitNgComponentInit = componentInitFactory(
         wxComponentInstance
@@ -132,20 +156,38 @@ export function generateWxComponent<C>(
         componentPath: {
           value: undefined,
           type: Array,
-          observer: function (this: WxComponentInstance, a) {
-            (this as any).__componentPath = a;
-            if  (typeof (this as any).__componentPath!=='undefined'&& typeof (this as any).__nodeIndex!=='undefined') {
-              linkNgComponent.call(this,[...(this as any).__componentPath,(this as any).__nodeIndex])
+          observer: function (this: WxComponentInstance, list) {
+            if (this.__isLink) {
+              return;
+            }
+            this.__componentPath = list || [];
+            if (
+              typeof this.__componentPath !== 'undefined' &&
+              typeof this.__nodeIndex !== 'undefined'
+            ) {
+              linkNgComponent.call(this, [
+                ...this.__componentPath,
+                this.__nodeIndex,
+              ]);
             }
           },
         },
         nodeIndex: {
           value: NaN,
           type: Number,
-          observer: function (this: WxComponentInstance, a) {
-            (this as any).__nodeIndex = a;
-            if  (typeof (this as any).__componentPath!=='undefined'&& typeof (this as any).__nodeIndex!=='undefined') {
-              linkNgComponent.call(this,[...(this as any).__componentPath,(this as any).__nodeIndex])
+          observer: function (this: WxComponentInstance, index) {
+            if (this.__isLink) {
+              return;
+            }
+            this.__nodeIndex = index;
+            if (
+              typeof this.__componentPath !== 'undefined' &&
+              typeof this.__nodeIndex !== 'undefined'
+            ) {
+              linkNgComponent.call(this, [
+                ...this.__componentPath,
+                this.__nodeIndex,
+              ]);
             }
           },
         },
@@ -245,30 +287,4 @@ export function generateWxComponent<C>(
       relations: componentOptions.relations,
     });
   };
-}
-function linkNgComponent(this: WxComponentInstance, list: any[]) {
-  if (this.__isLink) {
-    return;
-  }
-  const rootLView = getPageLView(this.getPageId()) as LView;
-  const componentPath = list;
-  const lView = findCurrentLView(rootLView, componentPath) as LView;
-  cleanWhenDestroy(lView);
-  setLViewPath(lView, componentPath);
-  const initValue = getInitValue(lView);
-  if (initValue) {
-    this.setData({ __wxView: updatePath(initValue, componentPath) });
-  }
-  lViewLinkToMPComponentRef(this, lView);
-  this.__lView = lView;
-  this.__ngComponentInstance = lView[8];
-  this.__ngZone = getLViewDirective(lView)!.get(NgZone);
-  let componentFinderService = getLViewDirective(lView)!.get(
-    ComponentFinderService
-  );
-  componentFinderService.set(this.__ngComponentInstance, this);
-  addDestroyFunction(lView, () => {
-    componentFinderService.remove(this.__ngComponentInstance);
-  });
-  this.__isLink = true;
 }

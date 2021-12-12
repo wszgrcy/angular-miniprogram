@@ -1,5 +1,5 @@
 import { Type } from '@angular/core';
-import { AppOptions } from '../type';
+import { AppOptions } from 'angular-miniprogram/platform/type'
 import { generateWxComponent } from './component.base';
 import { WxComponentInstance } from './type';
 

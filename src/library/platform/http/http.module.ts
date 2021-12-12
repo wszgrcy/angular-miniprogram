@@ -5,7 +5,7 @@ import {
   HttpHandler,
   ɵHttpInterceptingHandler,
 } from 'angular-miniprogram/common/http';
-import { WxHttpBackend } from './backend';
+import { MiniprogramHttpBackend } from './backend';
 @NgModule({
   declarations: [],
   imports: [],
@@ -13,8 +13,8 @@ import { WxHttpBackend } from './backend';
   providers: [
     HttpClient,
     { provide: HttpHandler, useClass: ɵHttpInterceptingHandler },
-    WxHttpBackend,
-    { provide: HttpBackend, useExisting: WxHttpBackend },
+    MiniprogramHttpBackend,
+    { provide: HttpBackend, useExisting: MiniprogramHttpBackend },
   ],
 })
-export class WxHttpClientModule {}
+export class HttpClientModule {}

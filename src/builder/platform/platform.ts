@@ -9,6 +9,7 @@ export enum PlatformType {
 }
 @Injectable()
 export class BuildPlatform {
+  packageName!: string;
   globalObject!: string;
   globalVariablePrefix!: string;
   fileExtname!: {

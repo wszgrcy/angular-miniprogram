@@ -93,6 +93,12 @@ export class WebpackConfigurationChange {
     this.config.plugins?.push(
       this.injector.get(DynamicLibraryComponentEntryPlugin)
     );
+    this.config.plugins?.push(
+      new webpack.NormalModuleReplacementPlugin(
+        /^angular-miniprogram\/platform\/wx$/,
+        `angular-miniprogram/platform/${this.buildPlatform.packageName}`
+      )
+    );
   }
   private async pageHandle() {
     this.workspaceRoot = normalize(this.context.workspaceRoot);
@@ -167,7 +173,10 @@ export class WebpackConfigurationChange {
       test: (module: webpack.NormalModule) => {
         const name = module.nameForCondition();
         return (
-          name && name.endsWith('.ts') && !/[\\/]node_modules[\\/]/.test(name)
+          (name &&
+            name.endsWith('.ts') &&
+            !/[\\/]node_modules[\\/]/.test(name)) ||
+          name?.includes('angular-miniprogram\\dist')
         );
       },
       minChunks: 2,

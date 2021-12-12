@@ -1,6 +1,6 @@
 import { HttpHeaders, HttpResponse } from 'angular-miniprogram/common/http';
 
-export class WxHttpResponse<T> extends HttpResponse<T> {
+export class MiniProgramHttpResponse<T> extends HttpResponse<T> {
   /**
    * 开发者服务器返回的 cookies，格式为字符串数组
    */
@@ -29,7 +29,7 @@ export class WxHttpResponse<T> extends HttpResponse<T> {
     this.profile = init.profile ?? null;
   }
 
-  clone(): WxHttpResponse<T>;
+  clone(): MiniProgramHttpResponse<T>;
   clone(update: {
     headers?: HttpHeaders;
     status?: number;
@@ -37,7 +37,7 @@ export class WxHttpResponse<T> extends HttpResponse<T> {
     url?: string;
     cookies?: string[];
     profile?: WechatMiniprogram.RequestProfile;
-  }): WxHttpResponse<T>;
+  }): MiniProgramHttpResponse<T>;
   clone<V>(update: {
     body?: V | null;
     headers?: HttpHeaders;
@@ -46,7 +46,7 @@ export class WxHttpResponse<T> extends HttpResponse<T> {
     url?: string;
     cookies?: string[];
     profile?: WechatMiniprogram.RequestProfile;
-  }): WxHttpResponse<V>;
+  }): MiniProgramHttpResponse<V>;
   clone(
     update: {
       body?: any | null;
@@ -57,8 +57,8 @@ export class WxHttpResponse<T> extends HttpResponse<T> {
       cookies?: string[];
       profile?: WechatMiniprogram.RequestProfile;
     } = {}
-  ): WxHttpResponse<any> {
-    return new WxHttpResponse<any>({
+  ): MiniProgramHttpResponse<any> {
+    return new MiniProgramHttpResponse<any>({
       body: update.body !== undefined ? update.body : this.body,
       headers: update.headers || this.headers,
       status: update.status !== undefined ? update.status : this.status,
@@ -70,7 +70,7 @@ export class WxHttpResponse<T> extends HttpResponse<T> {
   }
 }
 
-export class WxHttpDownloadResponse<T> extends HttpResponse<T> {
+export class MiniProgramHttpDownloadResponse<T> extends HttpResponse<T> {
   /** 用户文件路径 (本地路径)。传入 filePath 时会返回，跟传入的 filePath 一致 */
   readonly filePath: string | null;
   /** 临时文件路径 (本地路径)。没传入 filePath 指定文件存储路径时会返回，下载后的文件会存储到一个临时文件 */
@@ -101,7 +101,7 @@ export class WxHttpDownloadResponse<T> extends HttpResponse<T> {
     this.profile = init.profile ?? null;
   }
 
-  clone(): WxHttpDownloadResponse<T>;
+  clone(): MiniProgramHttpDownloadResponse<T>;
   clone(update: {
     headers?: HttpHeaders;
     status?: number;
@@ -110,7 +110,7 @@ export class WxHttpDownloadResponse<T> extends HttpResponse<T> {
     filePath?: string;
     tempFilePath?: string;
     profile?: WechatMiniprogram.RequestProfile;
-  }): WxHttpDownloadResponse<T>;
+  }): MiniProgramHttpDownloadResponse<T>;
   clone<V>(update: {
     body?: V | null;
     headers?: HttpHeaders;
@@ -120,7 +120,7 @@ export class WxHttpDownloadResponse<T> extends HttpResponse<T> {
     filePath?: string;
     tempFilePath?: string;
     profile?: WechatMiniprogram.RequestProfile;
-  }): WxHttpDownloadResponse<V>;
+  }): MiniProgramHttpDownloadResponse<V>;
   clone(
     update: {
       body?: any | null;
@@ -132,8 +132,8 @@ export class WxHttpDownloadResponse<T> extends HttpResponse<T> {
       tempFilePath?: string;
       profile?: WechatMiniprogram.RequestProfile;
     } = {}
-  ): WxHttpDownloadResponse<any> {
-    return new WxHttpDownloadResponse<any>({
+  ): MiniProgramHttpDownloadResponse<any> {
+    return new MiniProgramHttpDownloadResponse<any>({
       body: update.body !== undefined ? update.body : this.body,
       headers: update.headers || this.headers,
       status: update.status !== undefined ? update.status : this.status,

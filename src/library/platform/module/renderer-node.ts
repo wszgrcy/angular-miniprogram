@@ -1,4 +1,4 @@
-import type { MPElementData, MPTextData } from '../type';
+import type { MPElementData, MPTextData } from 'angular-miniprogram/platform/type';
 
 export class AgentNode {
   selector!: string | unknown;

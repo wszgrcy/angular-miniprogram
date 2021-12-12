@@ -6,6 +6,7 @@ import { WxTransform } from './wx.transform';
 
 @Injectable()
 export class WxBuildPlatform extends BuildPlatform {
+  packageName = 'wx';
   globalObject = 'wx';
   globalVariablePrefix = 'wx.__window';
   fileExtname = {

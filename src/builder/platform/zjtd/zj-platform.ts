@@ -6,6 +6,7 @@ import { ZjTransform } from './zj.transform';
 /** 字节小程序适配 */
 @Injectable()
 export class ZjBuildPlatform extends BuildPlatform {
+  packageName = 'zjtd';
   globalObject = 'tt';
   globalVariablePrefix = 'tt.__window';
   fileExtname = {

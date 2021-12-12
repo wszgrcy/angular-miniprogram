@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { InjectFlags, NgZone, ɵɵdirectiveInject } from '@angular/core';
-import { LView } from './internal-type';
+import { LView } from 'angular-miniprogram/platform/type';
 import { AgentNode } from './module/renderer-node';
 import { PAGE_TOKEN } from './module/token/page.token';
-import type { ComponentPath, MPElementData, MPTextData, MPView } from './type';
+import type { ComponentPath, MPElementData, MPTextData, MPView } from 'angular-miniprogram/platform/type';
 
 const start = 20;
 

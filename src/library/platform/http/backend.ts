@@ -11,36 +11,37 @@ import {
   HttpResponse,
   HttpUploadProgressEvent,
 } from 'angular-miniprogram/common/http';
+import { MiniProgramCore } from 'angular-miniprogram/platform/wx';
 import { Observable, Observer } from 'rxjs';
-import { WxHttpDownloadResponse, WxHttpResponse } from './response';
+import { MiniProgramHttpDownloadResponse, MiniProgramHttpResponse } from './response';
 
 /** Use this token to pass additional `wx.uploadFile()` parameter */
-export const WX_UPLOAD_FILE_TOKEN = new HttpContextToken<{
+export const UPLOAD_FILE_TOKEN = new HttpContextToken<{
   filePath?: string;
   name?: string;
   timeout?: number;
 }>(() => ({}));
 
 /** Use this token to pass additional `wx.downloadFile()` parameter */
-export const WX_DOWNLOAD_FILE_TOKEN = new HttpContextToken<{
+export const DOWNLOAD_FILE_TOKEN = new HttpContextToken<{
   filePath?: string;
   timeout?: number;
 }>(() => ({}));
 
 /** Use this token to pass additional `wx.request()` parameter */
-export const WX_REQUSET_TOKEN = new HttpContextToken<{
+export const REQUSET_TOKEN = new HttpContextToken<{
   enableCache?: boolean;
   enableHttp2?: boolean;
   enableQuic?: boolean;
   timeout?: number;
 }>(() => ({}));
 
-export class WxHttpBackend implements HttpBackend {
+export class MiniprogramHttpBackend implements HttpBackend {
   handle(request: HttpRequest<any>): Observable<HttpEvent<any>> {
     if (
       request.method === 'POST' &&
       // TODO angular v13.1 后采用 context.has()
-      request.context.get(WX_UPLOAD_FILE_TOKEN)?.filePath
+      request.context.get(UPLOAD_FILE_TOKEN)?.filePath
     ) {
       return this.upload(request);
     }
@@ -48,7 +49,7 @@ export class WxHttpBackend implements HttpBackend {
     if (
       request.method === 'GET' &&
       // TODO angular v13.1 后采用 context.has()
-      request.context.get(WX_DOWNLOAD_FILE_TOKEN)?.filePath
+      request.context.get(DOWNLOAD_FILE_TOKEN)?.filePath
     ) {
       return this.download(request);
     }
@@ -85,9 +86,9 @@ export class WxHttpBackend implements HttpBackend {
         };
 
       const { filePath, name, timeout } =
-        request.context.get(WX_UPLOAD_FILE_TOKEN);
+        request.context.get(UPLOAD_FILE_TOKEN);
 
-      const task = wx.uploadFile({
+      const task = MiniProgramCore.MINIPROGRAM_GLOBAL.uploadFile({
         url: request.urlWithParams,
         filePath: filePath!,
         name: name!,
@@ -190,9 +191,9 @@ export class WxHttpBackend implements HttpBackend {
           } as HttpDownloadProgressEvent);
         };
 
-      const { filePath, timeout } = request.context.get(WX_DOWNLOAD_FILE_TOKEN);
+      const { filePath, timeout } = request.context.get(DOWNLOAD_FILE_TOKEN);
 
-      const task = wx.downloadFile({
+      const task = MiniProgramCore.MINIPROGRAM_GLOBAL.downloadFile({
         url: request.urlWithParams,
         filePath: filePath,
         header: this.buildHeaders(request),
@@ -208,7 +209,7 @@ export class WxHttpBackend implements HttpBackend {
 
           if (ok) {
             observer.next(
-              new WxHttpDownloadResponse({
+              new MiniProgramHttpDownloadResponse({
                 url: request.url,
                 status,
                 statusText,
@@ -279,7 +280,7 @@ export class WxHttpBackend implements HttpBackend {
         );
       };
 
-      const task = wx.request({
+      const task = MiniProgramCore.MINIPROGRAM_GLOBAL.request({
         url: request.urlWithParams,
         method: request.method as WechatMiniprogram.RequestOption['method'],
         data: request.body,
@@ -304,7 +305,7 @@ export class WxHttpBackend implements HttpBackend {
 
           if (ok) {
             observer.next(
-              new WxHttpResponse({
+              new MiniProgramHttpResponse({
                 url: request.url,
                 body: data,
                 status,
@@ -335,7 +336,7 @@ export class WxHttpBackend implements HttpBackend {
             })
           );
         },
-        ...request.context.get(WX_REQUSET_TOKEN),
+        ...request.context.get(REQUSET_TOKEN),
       });
 
       observer.next({ type: HttpEventType.Sent });
