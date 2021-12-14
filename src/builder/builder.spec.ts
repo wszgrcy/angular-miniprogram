@@ -24,8 +24,12 @@ import { PlatformType } from './platform/platform';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,
-  platform: PlatformType.wx,
+  platform: PlatformType.zfb,
+  buildOptimizer: true,
+  optimization: true,
   sourceMap: false,
+  extractLicenses: true,
+
 };
 
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {

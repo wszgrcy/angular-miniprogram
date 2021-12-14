@@ -7,8 +7,15 @@ import { LIBRARY_OUTPUT_PATH, LibrarySymbol } from '../const';
 import { ExportLibraryComponentMeta, LibraryLoaderContext } from '../type';
 import { runScript } from '../util/run-script';
 
-function resolveContent(content: string, directivePrefix: string): string {
-  return runScript(`(()=>{return \`${content}\`})()`, { directivePrefix });
+function resolveContent(
+  content: string,
+  directivePrefix: string,
+  eventNameConvert: (name: string) => string
+): string {
+  return runScript(`(()=>{return \`${content}\`})()`, {
+    directivePrefix,
+    eventNameConvert,
+  });
 }
 export default function (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -61,7 +68,8 @@ export default function (
         resolveContent(
           item.content,
           libraryLoaderContext.buildPlatform.templateTransform.getData()
-            .directivePrefix
+            .directivePrefix,
+          libraryLoaderContext.buildPlatform.templateTransform.eventNameConvert
         )
       );
       if (item.contentTemplate) {
@@ -73,7 +81,9 @@ export default function (
           resolveContent(
             item.contentTemplate,
             libraryLoaderContext.buildPlatform.templateTransform.getData()
-              .directivePrefix
+              .directivePrefix,
+            libraryLoaderContext.buildPlatform.templateTransform
+              .eventNameConvert
           )
         );
       }

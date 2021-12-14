@@ -11,7 +11,7 @@ export class ComponentCompiler {
   private nodeMetaList: NgNodeMeta[] = [];
   private templateTransform: BuildPlatform['templateTransform'];
   constructor(
-    buildPlatform: BuildPlatform,
+    private buildPlatform: BuildPlatform,
     @Inject(COMPONENT_META) private componentMeta: ComponentResolutionData,
     private componentContext: ComponentContext
   ) {
@@ -20,7 +20,12 @@ export class ComponentCompiler {
 
   private buildPlatformTemplate() {
     this.collectionNode();
-    return this.templateTransform.compile(this.nodeMetaList);
+    const result = this.templateTransform.compile(this.nodeMetaList);
+    const templateImport = result.template
+      ? `<import src="./template${this.buildPlatform.fileExtname.contentTemplate}"/>`
+      : '';
+    result.content = templateImport + result.content;
+    return result;
   }
   private collectionNode() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

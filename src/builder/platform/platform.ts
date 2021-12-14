@@ -4,6 +4,11 @@ import { TemplateTransformBase } from './template-transform-strategy/transform.b
 export enum PlatformType {
   wx = 'wx',
   zj = 'zj',
+  jd = 'jd',
+  bdzn = 'bdzn',
+  zfb = 'zfb',
+  qq = 'qq',
+  dd = 'dd',
   /** 这个属性只会在内部被使用 */
   library = 'library',
 }
@@ -20,5 +25,7 @@ export class BuildPlatform {
     config?: string;
   };
   importTemplate!: string;
-  constructor(public templateTransform: TemplateTransformBase) {}
+  constructor(public templateTransform: TemplateTransformBase) {
+    this.templateTransform.init();
+  }
 }

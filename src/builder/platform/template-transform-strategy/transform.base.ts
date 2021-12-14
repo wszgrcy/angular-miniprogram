@@ -4,6 +4,7 @@ import { UseComponent } from '../../html/type';
 
 @Injectable()
 export abstract class TemplateTransformBase {
+  abstract init(): any;
   abstract compile(nodes: NgNodeMeta[]): {
     template: string;
     meta: string;
@@ -14,4 +15,5 @@ export abstract class TemplateTransformBase {
     };
   };
   abstract getData(): any;
+  abstract eventNameConvert(name: string): string;
 }
