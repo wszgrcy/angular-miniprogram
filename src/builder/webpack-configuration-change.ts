@@ -85,6 +85,8 @@ export class WebpackConfigurationChange {
   }
 
   async change() {
+    this.config.resolve?.conditionNames?.shift();
+    this.config.resolve?.mainFields?.shift();
     await this.pageHandle();
     this.exportMiniProgramAssetsPlugin();
     this.componentTemplateLoader();

@@ -5,5 +5,7 @@ export const MiniProgramCore = {
     const appInstance = getApp();
     return appInstance;
   },
-  MINIPROGRAM_GLOBAL: wx,
+  MINIPROGRAM_GLOBAL: (typeof wx === 'undefined'
+    ? undefined
+    : wx) as any as WechatMiniprogram.Wx,
 };
