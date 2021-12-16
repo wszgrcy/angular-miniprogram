@@ -6,9 +6,11 @@ import {
   RendererFactory2,
   ɵINJECTOR_SCOPE,
 } from '@angular/core';
-import { MiniProgramRendererFactory } from './mini-program.renderer.factory';
-import { ComponentFinderService } from './service/component-finder.service';
-import { PageService } from './service/page.service';
+import {
+  MiniProgramRendererFactory,
+  ComponentFinderService,
+} from 'angular-miniprogram/platform/wx';
+import { PageService } from './page.service';
 
 export function errorHandler(): ErrorHandler {
   return new ErrorHandler();

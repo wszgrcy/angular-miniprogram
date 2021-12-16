@@ -1,3 +1,4 @@
-import { MiniProgramCore as Base } from 'angular-miniprogram/platform/default';
+import { MiniProgramCore } from 'angular-miniprogram/platform/default';
 declare const tt: any;
-export const MiniProgramCore = { ...Base, MINIPROGRAM_GLOBAL: tt };
+MiniProgramCore.MINIPROGRAM_GLOBAL = tt;
+export * from 'angular-miniprogram/platform/default';

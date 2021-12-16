@@ -1,10 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { InjectFlags, NgZone, ɵɵdirectiveInject } from '@angular/core';
 import { LView } from 'angular-miniprogram/platform/type';
-import { AgentNode } from './module/renderer-node';
-import { PAGE_TOKEN } from './module/token/page.token';
-import type { ComponentPath, MPElementData, MPTextData, MPView } from 'angular-miniprogram/platform/type';
-
+import { AgentNode } from './renderer-node';
+import { PAGE_TOKEN } from './token';
+import type {
+  ComponentPath,
+  MPElementData,
+  MPTextData,
+  MPView,
+} from 'angular-miniprogram/platform/type';
+export const LVIEW_CONTEXT = 8;
 const start = 20;
 
 const initValueMap = new Map<LView, MPView>();
@@ -16,9 +21,9 @@ export function propertyChange(context: any) {
   const lView = findCurrentComponentLView(context);
   const lviewPath = getLViewPath(lView);
   const nodeList = lViewToWXView(lView, lviewPath);
-  const ctx: Partial<MPView> = { nodeList: nodeList, componentPath: lviewPath };  
+  const ctx: Partial<MPView> = { nodeList: nodeList, componentPath: lviewPath };
   if (linkMap.has(lView)) {
-    let ngZone = getLViewDirective(lView)!.get(NgZone);
+    let ngZone = getLViewInjector(lView)!.get(NgZone);
     ngZone.runOutsideAngular(() => {
       linkMap.get(lView).setData({ __wxView: ctx });
     });
@@ -110,29 +115,31 @@ export function getInitValue(lView: LView) {
   }
   return result;
 }
+export function pageBindFactory(getPageId: (component: any) => string) {
+  return function (context: any) {
+    const lView = findCurrentComponentLView(context);
+    const wxComponentInstance = ɵɵdirectiveInject(
+      PAGE_TOKEN,
+      InjectFlags.Optional
+    );
 
-export function pageBind(context: any) {
-  const lView = findCurrentComponentLView(context);
-  const wxComponentInstance = ɵɵdirectiveInject(
-    PAGE_TOKEN,
-    InjectFlags.Optional
-  );
-
-  if (!wxComponentInstance) {
-    return;
-  }
-  const ngZone = ɵɵdirectiveInject(NgZone, InjectFlags.Optional);
-  if (!ngZone) {
-    throw new Error('没有查询到NgZone');
-  }
-  ngZone.runOutsideAngular(() => {
-    const pageId = wxComponentInstance.getPageId();
-    if (pageMap.has(pageId)) {
+    if (!wxComponentInstance) {
       return;
     }
-    pageMap.set(pageId, lView);
-  });
+    const ngZone = ɵɵdirectiveInject(NgZone, InjectFlags.Optional);
+    if (!ngZone) {
+      throw new Error('没有查询到NgZone');
+    }
+    ngZone.runOutsideAngular(() => {
+      const pageId = getPageId(wxComponentInstance);
+      if (pageMap.has(pageId)) {
+        return;
+      }
+      pageMap.set(pageId, lView);
+    });
+  };
 }
+export const pageBind = pageBindFactory((component) => component.getPageId());
 export function getPageLView(id: string): any {
   return pageMap.get(id)!;
 }
@@ -188,8 +195,8 @@ function cleanAll(lview: LView) {
     fn();
   });
 }
-export function getLViewDirective(lView: LView) {
-  return lView[9];
+export function getLViewInjector(lView: LView) {
+  return lView[9]!;
 }
 export function addDestroyFunction(lView: LView, fn: Function) {
   let list = customDestroyMap.get(lView) || [];

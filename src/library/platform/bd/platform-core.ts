@@ -1,3 +1,5 @@
-import { MiniProgramCore as Base } from 'angular-miniprogram/platform/default';
+import { MiniProgramCore } from 'angular-miniprogram/platform/default';
 declare const swan: any;
-export const MiniProgramCore = { ...Base, MINIPROGRAM_GLOBAL: swan };
+
+MiniProgramCore.MINIPROGRAM_GLOBAL = swan;
+export * from 'angular-miniprogram/platform/default';

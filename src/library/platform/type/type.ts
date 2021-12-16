@@ -42,6 +42,7 @@ export interface MiniProgramComponentVariable {
 }
 export interface MiniProgramComponentMethod {
   __ngComponentDestroy: () => void;
+  __getPageId: () => string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,3 +82,19 @@ export interface MPTextData {
 }
 
 export type ComponentPath = ('directive' | number)[];
+export interface MiniProgramComponentBuiltIn {
+  getPageId(): string;
+  setData(data: Partial<Record<string, any>>): void;
+}
+export type MiniProgramComponentInstance = MiniProgramComponentVariable &
+  MiniProgramComponentMethod &
+  MiniProgramComponentBuiltIn &
+  MiniProgramPageOptions &
+  MiniProgramComponentOptions;
+
+export interface MiniProgramPageOptions {
+  mpPageOptions?: any;
+}
+export interface MiniProgramComponentOptions {
+  mpComponentOptions?: any;
+}

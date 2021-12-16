@@ -3,7 +3,7 @@ import {
   createPlatformFactory,
   platformCore,
 } from '@angular/core';
-import { APP_TOKEN, MINIPROGRAM_GLOBAL_TOKEN } from '../module/token/app.token';
+import { APP_TOKEN, MINIPROGRAM_GLOBAL_TOKEN } from './token';
 import { MiniProgramCore } from 'angular-miniprogram/platform/wx';
 export function platformMiniProgram<T>(
   extraProviders: StaticProvider[] = [],

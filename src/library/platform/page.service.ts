@@ -8,8 +8,8 @@ import {
   Type,
 } from '@angular/core';
 import { AppOptions } from 'angular-miniprogram/platform/type';
-import { APP_TOKEN } from '../token/app.token';
-import { PAGE_TOKEN } from '../token/page.token';
+import { APP_TOKEN } from './token';
+import { PAGE_TOKEN } from 'angular-miniprogram/platform/wx';
 
 @Injectable()
 export class PageService {

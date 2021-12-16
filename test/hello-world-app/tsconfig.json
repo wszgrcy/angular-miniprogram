@@ -13,38 +13,18 @@
     "strictNullChecks": true,
     "target": "es2015",
     "module": "es2020",
-    "typeRoots": [
-      "node_modules/@types"
-    ],
-    "lib": [
-      "es2018",
-      "dom"
-    ],
+    "typeRoots": ["node_modules/@types"],
+    "lib": ["es2018", "dom"],
     "paths": {
-      "angular-miniprogram": [
-        "../../dist"
-      ],
-      "angular-miniprogram/platform": [
-        "../../dist/platform"
-      ],
-      "angular-miniprogram/platform/type": [
-        "../../dist/platform/type"
-      ],
-      "angular-miniprogram/platform/wx": [
-        "../../dist/platform/wx"
-      ],
-      "angular-miniprogram/platform/zjtd": [
-        "../../dist/platform/zjtd"
-      ],
-      "angular-miniprogram/forms": [
-        "../../dist/forms"
-      ],
-      "angular-miniprogram/common": [
-        "../../dist/common"
-      ],
-      "angular-miniprogram/common/http": [
-        "../../dist/common/http"
-      ],
+      "angular-miniprogram": ["../../dist"],
+      "angular-miniprogram/platform": ["../../dist/platform"],
+      "angular-miniprogram/platform/type": ["../../dist/platform/type"],
+      "angular-miniprogram/platform/wx": ["../../dist/platform/wx"],
+      "angular-miniprogram/platform/default": ["../../dist/platform/default"],
+      "angular-miniprogram/platform/zjtd": ["../../dist/platform/zjtd"],
+      "angular-miniprogram/forms": ["../../dist/forms"],
+      "angular-miniprogram/common": ["../../dist/common"],
+      "angular-miniprogram/common/http": ["../../dist/common/http"]
     }
   }
 }

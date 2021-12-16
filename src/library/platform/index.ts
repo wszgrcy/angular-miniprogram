@@ -1,5 +1,9 @@
-export { propertyChange, pageBind } from './component-template-hook.factory';
+import { MiniProgramCore } from 'angular-miniprogram/platform/wx';
 export * from './http';
-export * from './module';
-export * from './page';
-export * from './component';
+export * from './mini-program.module';
+export * from './platform-miniprogram';
+export { propertyChange, pageBind } from 'angular-miniprogram/platform/wx';
+export const pageStartup = MiniProgramCore.pageStartup;
+export const componentRegistry = MiniProgramCore.componentRegistry;
+export * from './token';
+export { PAGE_TOKEN } from 'angular-miniprogram/platform/wx';
