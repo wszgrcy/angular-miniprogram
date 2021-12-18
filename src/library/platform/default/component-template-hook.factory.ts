@@ -21,11 +21,15 @@ export function propertyChange(context: any) {
   const lView = findCurrentComponentLView(context);
   const lviewPath = getLViewPath(lView);
   const nodeList = lViewToWXView(lView, lviewPath);
-  const ctx: Partial<MPView> = { nodeList: nodeList, componentPath: lviewPath };
+  const ctx: Partial<MPView> = {
+    nodeList: nodeList,
+    componentPath: lviewPath,
+    hasLoad: true,
+  };
   if (linkMap.has(lView)) {
     let ngZone = getLViewInjector(lView)!.get(NgZone);
     ngZone.runOutsideAngular(() => {
-      linkMap.get(lView).setData({ __wxView: ctx });
+      linkMap.get(lView).setData(ctx);
     });
   } else {
     initValueMap.set(lView, ctx as Required<MPView>);

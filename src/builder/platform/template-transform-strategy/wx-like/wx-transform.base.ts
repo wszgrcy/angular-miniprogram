@@ -9,7 +9,6 @@ export abstract class WxTransformLike extends TemplateTransformBase {
   seq = ':';
   templateInterpolation: [string, string] = ['{{', '}}'];
   abstract directivePrefix: string;
-  viewContextName: string = '__wxView';
   private exportTemplateList: { name: string; content: string }[] = [];
 
   constructor() {
@@ -37,7 +36,7 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     this.exportTemplateList = container.getExportTemplate();
     const result = container.export();
     return {
-      content: `<template name="main-template">${result.wxmlTemplate}</template><block ${this.directivePrefix}${this.seq}if="{{${this.viewContextName}}}"><template is="main-template" data="${this.templateInterpolation[0]}...${this.viewContextName}${this.templateInterpolation[1]}"></template></block> `,
+      content: `<block ${this.directivePrefix}${this.seq}if="{{hasLoad}}">${result.wxmlTemplate}</block> `,
       template: this.getExportTemplate(),
       meta: this.getExportMeta(metaCollection),
       useComponentPath: {

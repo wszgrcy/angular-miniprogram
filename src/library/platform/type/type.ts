@@ -39,6 +39,7 @@ export interface MiniProgramComponentVariable {
   __lView: LView;
   __componentPath: ComponentPath;
   __nodeIndex: number;
+  __isDetachView: boolean;
 }
 export interface MiniProgramComponentMethod {
   __ngComponentDestroy: () => void;
@@ -70,6 +71,7 @@ export interface MPView {
   __templateName: string | undefined;
   componentPath: ComponentPath;
   index: number;
+  hasLoad?: boolean;
 }
 export interface MPElementData {
   class: string;

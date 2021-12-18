@@ -53,13 +53,14 @@ export class MiniProgramCoreFactory {
     mpComponentInstance: MiniProgramComponentInstance,
     list: ComponentPath
   ) {
+    mpComponentInstance.__isLink = true;
     let rootLView = getPageLView(this.getPageId(mpComponentInstance)) as LView;
     let currentLView = findCurrentLView(rootLView, list);
     cleanWhenDestroy(currentLView);
     setLViewPath(currentLView, list);
     const initValue = getInitValue(currentLView);
     if (initValue) {
-      mpComponentInstance.setData({ __wxView: updatePath(initValue, list) });
+      mpComponentInstance.setData(updatePath(initValue, list));
     }
     lViewLinkToMPComponentRef(mpComponentInstance, currentLView);
     mpComponentInstance.__lView = currentLView;
@@ -76,7 +77,6 @@ export class MiniProgramCoreFactory {
       componentFinderService.remove(mpComponentInstance.__ngComponentInstance);
     });
     this.setComponentInstancePageId(mpComponentInstance);
-    mpComponentInstance.__isLink = true;
   }
 
   protected listenerEvent(component: NgCompileComponent) {
@@ -119,13 +119,15 @@ export class MiniProgramCoreFactory {
       }
     },
     attachView: function (this: MiniProgramComponentInstance) {
-      if (this.__ngComponentInjector) {
+      if (this.__ngComponentInjector && this.__isDetachView) {
         let applicationRef = this.__ngComponentInjector.get(ApplicationRef);
         applicationRef.attachView(this.__ngComponentHostView);
+        this.__isDetachView = false;
       }
     },
     detachView: function (this: MiniProgramComponentInstance) {
       if (this.__ngComponentInjector) {
+        this.__isDetachView = true;
         let applicationRef = this.__ngComponentInjector.get(ApplicationRef);
         applicationRef.detachView(this.__ngComponentHostView);
       }
@@ -147,7 +149,7 @@ export class MiniProgramCoreFactory {
       .detectChanges();
     const lView = getPageLView(this.getPageId(mpComponentInstance)) as LView;
     const initValue = getInitValue(lView);
-    mpComponentInstance.setData({ __wxView: initValue });
+    mpComponentInstance.setData(initValue!);
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__lView = lView;
     mpComponentInstance.__ngComponentInstance = lView[LVIEW_CONTEXT];
@@ -161,7 +163,7 @@ export class MiniProgramCoreFactory {
     return Page({
       ...options,
       ...this.listenerEvent(component as any as NgCompileComponent),
-      data: { __wxView: false },
+      data: { hasLoad: false },
       onLoad: function (this: MiniProgramComponentInstance, query) {
         const app = getApp<AppOptions>();
         let componentRef = app.__ngStartPage(
@@ -243,7 +245,7 @@ export class MiniProgramCoreFactory {
     let options = this.getComponentOptions(component) || {};
     let config: WechatMiniprogram.Component.Options<{}, {}, {}> = {
       ...options,
-      data: { __wxView: false },
+      data: { hasLoad: false },
       options: { ...options?.options, multipleSlots: true },
       methods: {
         ...options?.methods,

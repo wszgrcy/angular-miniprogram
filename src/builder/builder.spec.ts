@@ -24,7 +24,7 @@ import { PlatformType } from './platform/platform';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,
-  platform: PlatformType.qq,
+  platform: PlatformType.bdzn,
   sourceMap: false,
   // buildOptimizer: true,
   // optimization: true,
