@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import vm from 'vm';
 
 export function runScript(code: string, context?: vm.Context) {

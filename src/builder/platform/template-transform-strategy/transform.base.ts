@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Injectable } from 'static-injector';
 import type { NgNodeMeta } from '../../html/node-handle/interface';
 import { UseComponent } from '../../html/type';
