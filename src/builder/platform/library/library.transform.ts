@@ -7,6 +7,10 @@ import {
 @Injectable()
 export class LibraryTransform extends WxTransformLike {
   directivePrefix = '${directivePrefix}';
+  templateInterpolation: [string, string] = [
+    '${templateInterpolation[0]}',
+    '${templateInterpolation[1]}',
+  ];
   override eventNameConvert(name: string) {
     let convertName: string;
     if (!EVENT_PREFIX_REGEXP.test(name)) {

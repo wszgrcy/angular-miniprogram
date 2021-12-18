@@ -19,6 +19,7 @@ export interface WxContainerGlobalConfig {
   seq: string;
   directivePrefix: string;
   eventNameConvert: (name: string) => string;
+  templateInterpolation: [string, string];
 }
 export class WxContainer {
   private exportTemplateList: { name: string; content: string }[] = [];
@@ -121,7 +122,7 @@ export class WxContainer {
   }
 
   private getTemplateDataStr(directiveIndex: number, indexName: string) {
-    return `data="{{...nodeList[${directiveIndex}][${indexName}] }}"`;
+    return `data="${WxContainer.globalConfig.templateInterpolation[0]}...nodeList[${directiveIndex}][${indexName}] ${WxContainer.globalConfig.templateInterpolation[1]}"`;
   }
   getExportTemplate(): {
     name: string;
@@ -144,7 +145,7 @@ export class WxContainer {
     nodeIndex: number | undefined
   ) {
     if (isComponent) {
-      return `componentPath="{{componentPath}}" nodeIndex="${nodeIndex}"`;
+      return `componentPath="{{componentPath||[]}}" nodeIndex="${nodeIndex}"`;
     }
     return ``;
   }

@@ -3,9 +3,11 @@ import { TemplateTransformBase } from '../transform.base';
 import { MetaCollection } from './type';
 import { WxContainer } from './wx-container';
 
-export const EVENT_PREFIX_REGEXP = /^(bind|catch|mut-bind|capture-bind|capture-catch)/;
+export const EVENT_PREFIX_REGEXP =
+  /^(bind|catch|mut-bind|capture-bind|capture-catch)/;
 export abstract class WxTransformLike extends TemplateTransformBase {
   seq = ':';
+  templateInterpolation: [string, string] = ['{{', '}}'];
   abstract directivePrefix: string;
   viewContextName: string = '__wxView';
   private exportTemplateList: { name: string; content: string }[] = [];
@@ -18,6 +20,7 @@ export abstract class WxTransformLike extends TemplateTransformBase {
       seq: this.seq,
       directivePrefix: this.directivePrefix,
       eventNameConvert: this.eventNameConvert,
+      templateInterpolation: this.templateInterpolation,
     });
   }
   compile(nodes: NgNodeMeta[]) {
@@ -34,7 +37,7 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     this.exportTemplateList = container.getExportTemplate();
     const result = container.export();
     return {
-      content: `<template name="main-template">${result.wxmlTemplate}</template><block ${this.directivePrefix}${this.seq}if="{{${this.viewContextName}}}"><template is="main-template" data="{{...${this.viewContextName}}}"></template></block> `,
+      content: `<template name="main-template">${result.wxmlTemplate}</template><block ${this.directivePrefix}${this.seq}if="{{${this.viewContextName}}}"><template is="main-template" data="${this.templateInterpolation[0]}...${this.viewContextName}${this.templateInterpolation[1]}"></template></block> `,
       template: this.getExportTemplate(),
       meta: this.getExportMeta(metaCollection),
       useComponentPath: {

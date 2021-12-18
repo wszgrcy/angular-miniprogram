@@ -3,6 +3,7 @@ import { WxTransformLike } from '../template-transform-strategy/wx-like/wx-trans
 
 @Injectable()
 export class BdZnTransform extends WxTransformLike {
-  directivePrefix = 's';
-  sep = '-';
+  override directivePrefix = 's';
+  override seq = '-';
+  override templateInterpolation: [string, string] = ['{{{', '}}}'];
 }

@@ -89,8 +89,10 @@ export class MiniProgramCoreFactory {
         if (this.__lView) {
           let el = findCurrentElement(
             this.__lView,
-            event.target.dataset.nodePath,
-            event.target.dataset.nodeIndex
+            event.currentTarget?.dataset?.nodePath ||
+              event.target.dataset.nodePath,
+            event.currentTarget?.dataset?.nodeIndex ||
+              event.target.dataset.nodeIndex
           ) as AgentNode;
           if (!(el instanceof AgentNode)) {
             el = el[0];
@@ -196,13 +198,15 @@ export class MiniProgramCoreFactory {
     let self = this;
     config.properties = {
       componentPath: {
-        type: Array,
         observer: function (
           this: MiniProgramComponentInstance,
           list: ComponentPath
         ) {
           if (this.__isLink) {
             return;
+          }
+          if (typeof list === 'string') {
+            list = JSON.parse(list);
           }
           this.__componentPath = list || [];
           if (typeof this.__nodeIndex !== 'undefined') {
@@ -214,10 +218,12 @@ export class MiniProgramCoreFactory {
         },
       },
       nodeIndex: {
-        type: Number,
         observer: function (this: MiniProgramComponentInstance, index: number) {
           if (this.__isLink) {
             return;
+          }
+          if (typeof index === 'string') {
+            index = parseInt(index, 10);
           }
           this.__nodeIndex = index;
           if (typeof this.__componentPath !== 'undefined') {

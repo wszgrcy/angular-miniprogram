@@ -10,11 +10,13 @@ import { runScript } from '../util/run-script';
 function resolveContent(
   content: string,
   directivePrefix: string,
-  eventNameConvert: (name: string) => string
+  eventNameConvert: (name: string) => string,
+  templateInterpolation: [string, string]
 ): string {
   return runScript(`(()=>{return \`${content}\`})()`, {
     directivePrefix,
     eventNameConvert,
+    templateInterpolation,
   });
 }
 export default function (
@@ -69,7 +71,9 @@ export default function (
           item.content,
           libraryLoaderContext.buildPlatform.templateTransform.getData()
             .directivePrefix,
-          libraryLoaderContext.buildPlatform.templateTransform.eventNameConvert
+          libraryLoaderContext.buildPlatform.templateTransform.eventNameConvert,
+          libraryLoaderContext.buildPlatform.templateTransform
+            .templateInterpolation
         )
       );
       if (item.contentTemplate) {
@@ -83,7 +87,9 @@ export default function (
             libraryLoaderContext.buildPlatform.templateTransform.getData()
               .directivePrefix,
             libraryLoaderContext.buildPlatform.templateTransform
-              .eventNameConvert
+              .eventNameConvert,
+            libraryLoaderContext.buildPlatform.templateTransform
+              .templateInterpolation
           )
         );
       }

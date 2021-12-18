@@ -16,4 +16,5 @@ export abstract class TemplateTransformBase {
   };
   abstract getData(): any;
   abstract eventNameConvert(name: string): string;
+  abstract templateInterpolation: [string, string];
 }
