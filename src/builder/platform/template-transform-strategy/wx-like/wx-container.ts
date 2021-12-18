@@ -145,7 +145,7 @@ export class WxContainer {
     nodeIndex: number | undefined
   ) {
     if (isComponent) {
-      return `componentPath="{{componentPath||[]}}" nodeIndex="${nodeIndex}"`;
+      return `componentPath="{{componentPath}}" nodeIndex="${nodeIndex}"`;
     }
     return ``;
   }

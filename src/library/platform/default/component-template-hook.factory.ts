@@ -23,7 +23,7 @@ export function propertyChange(context: any) {
   const nodeList = lViewToWXView(lView, lviewPath);
   const ctx: Partial<MPView> = {
     nodeList: nodeList,
-    componentPath: lviewPath,
+    componentPath: lviewPath || [],
     hasLoad: true,
   };
   if (linkMap.has(lView)) {
