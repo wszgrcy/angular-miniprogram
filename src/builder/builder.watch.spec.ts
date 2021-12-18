@@ -106,12 +106,12 @@ describeBuilder(
             expect(result).toBeTruthy();
             expect(result.error).toBeFalsy();
             expect(result.result?.success).toBeTruthy();
-            expect(result.logs[0].message).toContain('sub3.entry.js');
+            expect(result.logs[0].message).toContain('sub3-entry.js');
             harness
               .expectFile(
                 join(
                   normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
-                  'pages/sub3/sub3.entry.js'
+                  'pages/sub3/sub3-entry.js'
                 )
               )
               .toExist();
@@ -119,7 +119,7 @@ describeBuilder(
               .expectFile(
                 join(
                   normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
-                  'pages/sub3/sub3.entry.json'
+                  'pages/sub3/sub3-entry.json'
                 )
               )
               .toExist();
@@ -127,7 +127,7 @@ describeBuilder(
               .expectFile(
                 join(
                   normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
-                  'pages/sub3/sub3.entry.wxml'
+                  'pages/sub3/sub3-entry.wxml'
                 )
               )
               .toExist();
@@ -135,7 +135,7 @@ describeBuilder(
               .expectFile(
                 join(
                   normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
-                  'pages/sub3/sub3.entry.wxss'
+                  'pages/sub3/sub3-entry.wxss'
                 )
               )
               .toExist();
