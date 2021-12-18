@@ -207,3 +207,6 @@ export function addDestroyFunction(lView: LView, fn: Function) {
   list.push(fn);
   customDestroyMap.set(lView, list);
 }
+export function removePageLinkLView(id: string) {
+  pageMap.delete(id);
+}

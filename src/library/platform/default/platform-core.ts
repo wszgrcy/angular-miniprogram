@@ -27,6 +27,7 @@ import {
   getPageLView,
   lViewLinkToMPComponentRef,
   LVIEW_CONTEXT,
+  removePageLinkLView,
   setLViewPath,
   updatePath,
 } from './component-template-hook.factory';
@@ -137,12 +138,14 @@ export class MiniProgramCoreFactory {
     mpComponentInstance: MiniProgramComponentInstance,
     componentRef: ComponentRef<any>
   ) {
+    mpComponentInstance.__isLink = true;
     mpComponentInstance.__ngComponentHostView = componentRef.hostView;
     mpComponentInstance.__ngComponentInstance = componentRef.instance;
     mpComponentInstance.__ngComponentInjector = componentRef.injector;
     mpComponentInstance.__ngZone = componentRef.injector.get(NgZone);
     mpComponentInstance.__ngComponentDestroy = () => {
       componentRef.destroy();
+      removePageLinkLView(this.getPageId(mpComponentInstance));
     };
     mpComponentInstance.__ngComponentInjector
       .get(ChangeDetectorRef)
@@ -154,7 +157,6 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.__lView = lView;
     mpComponentInstance.__ngComponentInstance = lView[LVIEW_CONTEXT];
     this.setComponentInstancePageId(mpComponentInstance);
-    mpComponentInstance.__isLink = true;
   }
 
   public pageStartup = (module: Type<any>, component: Type<any>) => {
