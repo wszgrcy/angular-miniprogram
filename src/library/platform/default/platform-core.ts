@@ -198,6 +198,7 @@ export class MiniProgramCoreFactory {
     let self = this;
     config.properties = {
       componentPath: {
+        type: null,
         observer: function (
           this: MiniProgramComponentInstance,
           list: ComponentPath
@@ -218,6 +219,7 @@ export class MiniProgramCoreFactory {
         },
       },
       nodeIndex: {
+        type: null,
         observer: function (this: MiniProgramComponentInstance, index: number) {
           if (this.__isLink) {
             return;

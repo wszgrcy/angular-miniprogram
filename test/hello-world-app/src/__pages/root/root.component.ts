@@ -11,44 +11,44 @@ export class RootComponent implements OnInit {
 
   ngOnInit() {}
   baseTag() {
-    this.global.navigateTo({ url: '/pages/base-tap/base-tap.entry' });
+    this.global.navigateTo({ url: '/pages/base-tap/base-tap-entry' });
   }
   baseComponent() {
     this.global.navigateTo({
-      url: '/pages/base-component/base-component.entry',
+      url: '/pages/base-component/base-component-entry',
     });
   }
   baseDirective() {
     this.global.navigateTo({
-      url: '/pages/base-directive/base-directive.entry',
+      url: '/pages/base-directive/base-directive-entry',
     });
   }
   ngContent() {
-    this.global.navigateTo({ url: '/pages/ng-content/ng-content.entry' });
+    this.global.navigateTo({ url: '/pages/ng-content/ng-content-entry' });
   }
   defaultStructuralDirective() {
     this.global.navigateTo({
-      url: '/pages/default-structural-directive/default-structural-directive.entry',
+      url: '/pages/default-structural-directive/default-structural-directive-entry',
     });
   }
   customStructuralDirective() {
     this.global.navigateTo({
-      url: '/pages/custom-structural-directive/custom-structural-directive.entry',
+      url: '/pages/custom-structural-directive/custom-structural-directive-entry',
     });
   }
   complexStructure() {
     this.global.navigateTo({
-      url: '/pages/complex-structure/complex-structure.entry',
+      url: '/pages/complex-structure/complex-structure-entry',
     });
   }
   complexPropertyEvent() {
     this.global.navigateTo({
-      url: '/pages/complex-property-event/complex-property-event.entry',
+      url: '/pages/complex-property-event/complex-property-event-entry',
     });
   }
   baseForms() {
     this.global.navigateTo({
-      url: '/pages/base-forms/base-forms.entry',
+      url: '/pages/base-forms/base-forms-entry',
     });
   }
 }
