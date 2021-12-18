@@ -128,11 +128,13 @@ export class DynamicWatchEntryPlugin {
             /\.ts$/,
             this.buildPlatform.fileExtname.config || '.json'
           );
+          const outputFileName =
+            object.fileName?.replace(/\.ts$/, '').replace(/\./g, '-') + '.ts';
           object.outputFiles!.path = path
-            .join(pattern.output, object.fileName!)
+            .join(pattern.output, outputFileName)
             .replace(/\.ts$/, '');
           object.outputFiles!.logic = path
-            .join(pattern.output, object.fileName!)
+            .join(pattern.output, outputFileName)
             .replace(/\.ts$/g, '.js');
           object.outputFiles!.style = object.outputFiles!.logic.replace(
             /\.js$/g,

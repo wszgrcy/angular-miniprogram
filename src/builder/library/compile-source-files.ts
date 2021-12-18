@@ -32,9 +32,7 @@ import ts from 'typescript';
 import { LIBRARY_OUTPUT_PATH } from '../const';
 import { MiniProgramPlatformCompilerService } from '../html/mini-program-platform-compiler.service';
 import { BuildPlatform, PlatformType } from '../platform/platform';
-import { getBuildPlatform } from '../platform/platform-info';
-import { WxTransform } from '../platform/template-transform-strategy/wx.transform';
-import { WxBuildPlatform } from '../platform/wx/wx-platform';
+import { getBuildPlatformInjectConfig } from '../platform/platform-info';
 import { changeComponent } from '../ts/change-component';
 import { ExportLibraryComponentMeta } from '../type';
 import { AddDeclareMetaService } from './add-declare-meta';
@@ -93,15 +91,9 @@ export async function compileSourceFiles(
     tsCompilerHost,
     cache.oldNgtscProgram
   );
-  // todo 平台
   let injector = Injector.create({
     providers: [
-      { provide: WxTransform },
-      { provide: WxBuildPlatform },
-      {
-        provide: BuildPlatform,
-        useClass: getBuildPlatform(PlatformType.wx),
-      },
+      ...getBuildPlatformInjectConfig(PlatformType.library),
       {
         provide: MiniProgramPlatformCompilerService,
         useFactory: (injector: Injector) => {

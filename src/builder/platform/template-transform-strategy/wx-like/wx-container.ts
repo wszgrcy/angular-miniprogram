@@ -15,8 +15,13 @@ import {
 } from '../../util/type-predicate';
 import type { MetaCollection } from './type';
 
+export interface WxContainerGlobalConfig {
+  seq: string;
+  directivePrefix: string;
+  eventNameConvert: (name: string) => string;
+  templateInterpolation: [string, string];
+}
 export class WxContainer {
-  directivePrefix!: string;
   private exportTemplateList: { name: string; content: string }[] = [];
   private wxmlTemplate: string = '';
   private childContainer: WxContainer[] = [];
@@ -91,7 +96,6 @@ export class WxContainer {
       this
     );
     this.childContainer.push(container);
-    container.directivePrefix = this.directivePrefix;
     node.children.forEach((childNode) => {
       container.compileNode(childNode);
     });
@@ -100,9 +104,11 @@ export class WxContainer {
       content: `<template name="${defineTemplateName}">${container.wxmlTemplate}</template>`,
     });
 
-    content += `<block ${this.directivePrefix}:for="{{nodeList[${
-      node.index
-    }]}}" ${this.directivePrefix}:key="index">
+    content += `<block ${WxContainer.globalConfig.directivePrefix}${
+      WxContainer.globalConfig.seq
+    }for="{{nodeList[${node.index}]}}" ${
+      WxContainer.globalConfig.directivePrefix
+    }${WxContainer.globalConfig.seq}key="index">
       <template is="{{item.__templateName||'${defineTemplateName}'}}" ${this.getTemplateDataStr(
       node.index,
       `index`
@@ -116,7 +122,7 @@ export class WxContainer {
   }
 
   private getTemplateDataStr(directiveIndex: number, indexName: string) {
-    return `data="{{...nodeList[${directiveIndex}][${indexName}] }}"`;
+    return `data="${WxContainer.globalConfig.templateInterpolation[0]}...nodeList[${directiveIndex}][${indexName}] ${WxContainer.globalConfig.templateInterpolation[1]}"`;
   }
   getExportTemplate(): {
     name: string;
@@ -147,8 +153,8 @@ export class WxContainer {
   private elementPropertyAndEvent(node: NgElementMeta, index: number) {
     const propertyMap = new Map<string, string>();
     const attributeMap = new Map<string, string>();
-      propertyMap.set('class', `nodeList[${index}].class`);
-      propertyMap.set('style', `nodeList[${index}].style`);
+    propertyMap.set('class', `nodeList[${index}].class`);
+    propertyMap.set('style', `nodeList[${index}].style`);
     Object.entries(node.attributes)
       .filter(([key]) => key !== 'class' && key !== 'style')
       .filter(([key, value]) => value !== '')
@@ -195,7 +201,8 @@ export class WxContainer {
     eventList
       // .filter((eventName) => !eventMap.has(eventName))
       .forEach((eventName) => {
-        const convertName = convertToEventName(eventName);
+        const convertName =
+          WxContainer.globalConfig.eventNameConvert(eventName);
         if (
           eventMap.has(convertName) &&
           !mergeEventMap.get(convertName)!.includes(eventName)
@@ -228,12 +235,8 @@ export class WxContainer {
       ),
     ];
   }
-}
-const EVENT_PREFIX_REGEXP = /^(bind|catch|mut-bind|capture-bind|capture-catch)/;
-function convertToEventName(tagEventMeta: string): string {
-  if (EVENT_PREFIX_REGEXP.test(tagEventMeta)) {
-    return tagEventMeta.replace(EVENT_PREFIX_REGEXP, '$1:');
-  } else {
-    return `bind:${tagEventMeta}`;
+  static globalConfig: WxContainerGlobalConfig;
+  static initWxContainerFactory(globalConfig: WxContainerGlobalConfig) {
+    this.globalConfig = globalConfig;
   }
 }

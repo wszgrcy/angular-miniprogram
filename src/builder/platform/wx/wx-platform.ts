@@ -1,20 +1,24 @@
+import * as fs from 'fs-extra';
 import * as path from 'path';
 import { Injectable } from 'static-injector';
 import { BuildPlatform } from '../platform';
-import { WxTransform } from '../template-transform-strategy/wx.transform';
+import { WxTransform } from './wx.transform';
 
 @Injectable()
 export class WxBuildPlatform extends BuildPlatform {
+  packageName = 'wx';
   globalObject = 'wx';
   globalVariablePrefix = 'wx.__window';
-  contextPrefix = 'ctx.originVar';
   fileExtname = {
     style: '.wxss',
     logic: '.js',
     content: '.wxml',
     contentTemplate: '.wxml',
   };
-  importTemplate = path.resolve(__dirname, './template/app-template.js');
+  importTemplate = `${fs
+    .readFileSync(path.resolve(__dirname, '../template/app-template.js'))
+    .toString()};
+    wx.__global = wx.__window = obj;`;
   constructor(public templateTransform: WxTransform) {
     super(templateTransform);
   }

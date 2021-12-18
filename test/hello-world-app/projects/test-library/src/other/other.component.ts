@@ -9,4 +9,7 @@ export class OtherComponent implements OnInit {
   constructor() {}
 
   ngOnInit() {}
+  click() {
+    console.log('other被点击');
+  }
 }

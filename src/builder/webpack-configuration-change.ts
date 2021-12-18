@@ -85,6 +85,8 @@ export class WebpackConfigurationChange {
   }
 
   async change() {
+    this.config.resolve?.conditionNames?.shift();
+    this.config.resolve?.mainFields?.shift();
     await this.pageHandle();
     this.exportMiniProgramAssetsPlugin();
     this.componentTemplateLoader();
@@ -92,6 +94,12 @@ export class WebpackConfigurationChange {
     this.changeStylesExportSuffix();
     this.config.plugins?.push(
       this.injector.get(DynamicLibraryComponentEntryPlugin)
+    );
+    this.config.plugins?.push(
+      new webpack.NormalModuleReplacementPlugin(
+        /^angular-miniprogram\/platform\/wx$/,
+        `angular-miniprogram/platform/${this.buildPlatform.packageName}`
+      )
     );
   }
   private async pageHandle() {
@@ -167,7 +175,10 @@ export class WebpackConfigurationChange {
       test: (module: webpack.NormalModule) => {
         const name = module.nameForCondition();
         return (
-          name && name.endsWith('.ts') && !/[\\/]node_modules[\\/]/.test(name)
+          (name &&
+            name.endsWith('.ts') &&
+            !/[\\/]node_modules[\\/]/.test(name)) ||
+          name?.includes('angular-miniprogram\\dist')
         );
       },
       minChunks: 2,
@@ -180,7 +191,9 @@ export class WebpackConfigurationChange {
     assetsPlugin.hooks.removeChunk.tap('pageHandle', (chunk) => {
       if (
         this.entryList.some((page) => page.entryName === chunk.name) ||
-        chunk.name === 'styles' ||
+        [...chunk.files].some((file) =>
+          file.endsWith(this.buildPlatform.fileExtname.style)
+        ) ||
         chunk.name.startsWith(`${LIBRARY_OUTPUT_PATH}/`)
       ) {
         return true;
@@ -190,7 +203,7 @@ export class WebpackConfigurationChange {
     assetsPlugin.hooks.emitAssets.tap('pageHandle', (object, json) => {
       return {
         'app.js':
-          fs.readFileSync(this.buildPlatform.importTemplate).toString() +
+          this.buildPlatform.importTemplate +
           json.scripts.map((item) => `require('./${item.src}')`).join(';'),
       };
     });
@@ -258,7 +271,7 @@ export class WebpackConfigurationChange {
         new pluginPrototype.constructor({
           filename: (pluginInstance.options.filename as string).replace(
             /\.css$/,
-            '.wxss'
+            this.buildPlatform.fileExtname.style
           ),
         })
       );

@@ -3,33 +3,40 @@ import { TemplateTransformBase } from '../transform.base';
 import { MetaCollection } from './type';
 import { WxContainer } from './wx-container';
 
+export const EVENT_PREFIX_REGEXP =
+  /^(bind|catch|mut-bind|capture-bind|capture-catch)/;
 export abstract class WxTransformLike extends TemplateTransformBase {
+  seq = ':';
+  templateInterpolation: [string, string] = ['{{', '}}'];
   abstract directivePrefix: string;
-  abstract viewContextName: string;
   private exportTemplateList: { name: string; content: string }[] = [];
 
   constructor() {
     super();
   }
+  init() {
+    WxContainer.initWxContainerFactory({
+      seq: this.seq,
+      directivePrefix: this.directivePrefix,
+      eventNameConvert: this.eventNameConvert,
+      templateInterpolation: this.templateInterpolation,
+    });
+  }
   compile(nodes: NgNodeMeta[]) {
     const metaCollection: MetaCollection = {
-      method: new Set(),
       listeners: [],
       localPath: new Set(),
       libraryPath: new Set(),
     };
     const container = new WxContainer(metaCollection);
-    container.directivePrefix = this.directivePrefix;
+
     nodes.forEach((node) => {
       container.compileNode(node);
     });
     this.exportTemplateList = container.getExportTemplate();
     const result = container.export();
-    const templateImport = this.exportTemplateList.length
-      ? `<import src="./template.wxml"/>`
-      : '';
     return {
-      content: `${templateImport}<template name="main-template">${result.wxmlTemplate}</template><block wx:if="{{${this.viewContextName}}}"><template is="main-template" data="{{...${this.viewContextName}}}"></template></block> `,
+      content: `<block ${this.directivePrefix}${this.seq}if="{{hasLoad}}">${result.wxmlTemplate}</block> `,
       template: this.getExportTemplate(),
       meta: this.getExportMeta(metaCollection),
       useComponentPath: {
@@ -44,8 +51,17 @@ export abstract class WxTransformLike extends TemplateTransformBase {
   }
 
   private getExportMeta(metaCollection: MetaCollection) {
-    return `{method:${JSON.stringify([
-      ...metaCollection.method,
-    ])},listeners:${JSON.stringify(metaCollection.listeners)}}`;
+    return `{listeners:${JSON.stringify(metaCollection.listeners)}}`;
+  }
+
+  getData() {
+    return { directivePrefix: this.directivePrefix };
+  }
+  eventNameConvert(tagEventMeta: string) {
+    if (EVENT_PREFIX_REGEXP.test(tagEventMeta)) {
+      return tagEventMeta.replace(EVENT_PREFIX_REGEXP, '$1:');
+    } else {
+      return `bind:${tagEventMeta}`;
+    }
   }
 }

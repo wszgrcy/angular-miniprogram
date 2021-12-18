@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
+import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram';
 
 @Component({
   selector: 'app-root',
@@ -6,42 +7,48 @@ import { Component, OnInit } from '@angular/core';
   styleUrls: ['./root.component.css'],
 })
 export class RootComponent implements OnInit {
-  constructor() {}
+  constructor(@Inject(MINIPROGRAM_GLOBAL_TOKEN) private global: any) {}
 
   ngOnInit() {}
   baseTag() {
-    wx.navigateTo({ url: '/pages/base-tap/base-tap.entry' });
+    this.global.navigateTo({ url: '/pages/base-tap/base-tap-entry' });
   }
   baseComponent() {
-    wx.navigateTo({ url: '/pages/base-component/base-component.entry' });
+    this.global.navigateTo({
+      url: '/pages/base-component/base-component-entry',
+    });
   }
   baseDirective() {
-    wx.navigateTo({ url: '/pages/base-directive/base-directive.entry' });
+    this.global.navigateTo({
+      url: '/pages/base-directive/base-directive-entry',
+    });
   }
   ngContent() {
-    wx.navigateTo({ url: '/pages/ng-content/ng-content.entry' });
+    this.global.navigateTo({ url: '/pages/ng-content/ng-content-entry' });
   }
   defaultStructuralDirective() {
-    wx.navigateTo({
-      url: '/pages/default-structural-directive/default-structural-directive.entry',
+    this.global.navigateTo({
+      url: '/pages/default-structural-directive/default-structural-directive-entry',
     });
   }
   customStructuralDirective() {
-    wx.navigateTo({
-      url: '/pages/custom-structural-directive/custom-structural-directive.entry',
+    this.global.navigateTo({
+      url: '/pages/custom-structural-directive/custom-structural-directive-entry',
     });
   }
   complexStructure() {
-    wx.navigateTo({ url: '/pages/complex-structure/complex-structure.entry' });
+    this.global.navigateTo({
+      url: '/pages/complex-structure/complex-structure-entry',
+    });
   }
   complexPropertyEvent() {
-    wx.navigateTo({
-      url: '/pages/complex-property-event/complex-property-event.entry',
+    this.global.navigateTo({
+      url: '/pages/complex-property-event/complex-property-event-entry',
     });
   }
   baseForms() {
-    wx.navigateTo({
-      url: '/pages/base-forms/base-forms.entry',
+    this.global.navigateTo({
+      url: '/pages/base-forms/base-forms-entry',
     });
   }
 }

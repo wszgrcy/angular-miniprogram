@@ -6524,6 +6524,11 @@ mini-css-extract-plugin@2.4.3:
   dependencies:
     schema-utils "^3.1.0"
 
+mini-types@^0.1.7:
+  version "0.1.7"
+  resolved "https://registry.yarnpkg.com/mini-types/-/mini-types-0.1.7.tgz#36d5ea2cf18653b16f5d1a02c8d9b329c727d20a"
+  integrity sha512-aSoVvrIr/O9tbzFjSCeKr/T53Hu+un+FXkfWPfGcb/q8eAHXX1CDgSHv8l0GtFTlfHzznmn4hbRGB3UTWmZ3fA==
+
 minimalistic-assert@^1.0.0:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/minimalistic-assert/-/minimalistic-assert-1.0.1.tgz#2e194de044626d4a10e7f7fbc00ce73e83e4d5c7"

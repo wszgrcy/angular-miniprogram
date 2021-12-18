@@ -1,7 +1,9 @@
-export * from './module/token/app.token';
-export * from './type';
-export * from './module/mini-program.module';
-export * from './module/token/page.token';
-export * from './module/token/app.token';
-export { propertyChange, pageBind } from './component-template-hook.factory';
-export * from './wx';
+import { MiniProgramCore } from 'angular-miniprogram/platform/wx';
+export * from './http';
+export * from './mini-program.module';
+export * from './platform-miniprogram';
+export { propertyChange, pageBind } from 'angular-miniprogram/platform/wx';
+export const pageStartup = MiniProgramCore.pageStartup;
+export const componentRegistry = MiniProgramCore.componentRegistry;
+export * from './token';
+export { PAGE_TOKEN } from 'angular-miniprogram/platform/wx';

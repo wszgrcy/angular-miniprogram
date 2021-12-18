@@ -50,7 +50,7 @@ export const ALL_PAGE_NAME_LIST = [
   `custom-structural-directive`,
   `default-structural-directive`,
   `ng-content`,
-  `base-forms`
+  `base-forms`,
 ];
 export const ALL_COMPONENT_NAME_LIST = [
   `component1`,
@@ -67,7 +67,7 @@ export async function addPageEntry(
   const file = await harness.host.read(configPath).toPromise();
   const json = JSON.parse(fileBufferToString(file));
   const entryList = ALL_PAGE_NAME_LIST.map(
-    (item) => `pages/${item}/${item}.entry`
+    (item) => `pages/${item}/${item}-entry`
   );
   json.pages = entryList;
   await harness.host

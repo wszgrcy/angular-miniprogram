@@ -1,1 +1,1 @@
-export * from './platform';
+export * from 'angular-miniprogram/platform';
