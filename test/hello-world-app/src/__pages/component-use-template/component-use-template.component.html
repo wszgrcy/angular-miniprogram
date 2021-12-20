@@ -1,0 +1,8 @@
+<ng-template #$$mp$$TestLibrary$$first>
+  这个是外部定义模板 引入组件<app-component1
+    [input1]="'外部模板'"
+  ></app-component1>
+</ng-template>
+<app-outside-template
+  [template]="$$mp$$TestLibrary$$first"
+></app-outside-template>

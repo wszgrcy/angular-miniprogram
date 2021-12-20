@@ -15,8 +15,10 @@ import {
   LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
   LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX,
 } from '../const';
+import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META, DIRECTIVE_MATCHER } from '../token/component.token';
 import { angularCompilerPromise } from '../util/load_esm';
+import { MetaCollection } from './meta-collection';
 import { ComponentContext } from './node-handle/component-context';
 import { ComponentCompiler } from './template-compiler';
 import {
@@ -38,7 +40,7 @@ export class MiniProgramPlatformCompilerService {
     style: new Map<string, string[]>(),
     outputContent: new Map<string, string>(),
     outputContentTemplate: new Map<string, string>(),
-    meta: new Map<string, string>(),
+    meta: new Map<string, { listeners: MetaCollection['listeners'] }>(),
     useComponentPath: new Map<
       string,
       {
@@ -46,8 +48,13 @@ export class MiniProgramPlatformCompilerService {
         libraryPath: UseComponent[];
       }
     >(),
+    oterMetaCollectionGroup: {} as Record<string, MetaCollection>,
   };
-  constructor(private ngTscProgram: NgtscProgram, private injector: Injector) {}
+  constructor(
+    private ngTscProgram: NgtscProgram,
+    private injector: Injector,
+    private buildPlatform: BuildPlatform
+  ) {}
   init() {
     this.ngCompiler = this.ngTscProgram.compiler;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -180,7 +187,43 @@ export class MiniProgramPlatformCompilerService {
         path.normalize(fileName),
         componentBuildMeta.useComponentPath
       );
+      for (const key in componentBuildMeta.otherMetaGroup) {
+        if (
+          Object.prototype.hasOwnProperty.call(
+            componentBuildMeta.otherMetaGroup,
+            key
+          )
+        ) {
+          const element = componentBuildMeta.otherMetaGroup[key];
+          this.componentDataMap.oterMetaCollectionGroup[key] =
+            this.componentDataMap.oterMetaCollectionGroup[key] ||
+            new MetaCollection();
+          this.componentDataMap.oterMetaCollectionGroup[key].merge(element);
+        }
+      }
     }
+    const extraMetaCollection =
+      this.componentDataMap.oterMetaCollectionGroup['$self'];
+    // todo library中无法使用
+    if (extraMetaCollection) {
+      this.componentDataMap.outputContent.forEach((value, key) => {
+        value = `<import src="/mp-self-template/self${this.buildPlatform.fileExtname.contentTemplate}"/>${value}`;
+        this.componentDataMap.outputContent.set(key, value);
+      });
+      this.componentDataMap.outputContentTemplate.forEach((value, key) => {
+        value = `<import src="/mp-self-template/self${this.buildPlatform.fileExtname.contentTemplate}"/>${value}`;
+        this.componentDataMap.outputContentTemplate.set(key, value);
+      });
+      this.componentDataMap.useComponentPath.forEach((value, key) => {
+        value.libraryPath.push(...extraMetaCollection.libraryPath);
+        value.localPath.push(...extraMetaCollection.localPath);
+      });
+      delete this.componentDataMap.oterMetaCollectionGroup['$self'];
+    }
+    this.componentDataMap.useComponentPath.forEach((value, key) => {
+      value.libraryPath = Array.from(new Set(value.libraryPath));
+      value.localPath = Array.from(new Set(value.localPath));
+    });
 
     return this.componentDataMap;
   }

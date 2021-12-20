@@ -96,13 +96,14 @@ export async function compileSourceFiles(
       ...getBuildPlatformInjectConfig(PlatformType.library),
       {
         provide: MiniProgramPlatformCompilerService,
-        useFactory: (injector: Injector) => {
+        useFactory: (injector: Injector, buildPlatform: BuildPlatform) => {
           return new MiniProgramPlatformCompilerService(
             angularProgram,
-            injector
+            injector,
+            buildPlatform
           );
         },
-        deps: [Injector],
+        deps: [Injector, BuildPlatform],
       },
     ],
   });
@@ -356,6 +357,7 @@ export async function compileSourceFiles(
             );
             return pre;
           }, {} as Record<string, string>),
+          moduleId: injector.get(LIBRARY_ENTRY_POINT),
         };
         if (styleContent) {
           insertComponentData.style = styleContent;

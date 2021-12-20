@@ -40,7 +40,7 @@ export class ExportMiniProgramAssetsPlugin {
   private options: ExportMiniProgramAssetsPluginOptions;
   constructor(
     @Inject(TS_CONFIG_TOKEN) tsConfig: string,
-    buildPlatform: BuildPlatform,
+    private buildPlatform: BuildPlatform,
     private injector: Injector
   ) {
     this.options = {
@@ -122,6 +122,9 @@ export class ExportMiniProgramAssetsPlugin {
         (compilation as any)[ExportMiniProgramAssetsPluginSymbol] = {
           metaMapPromise: buildTemplatePromise.then((item) => item.meta),
           buildPlatform: this.options.buildPlatform,
+          otherMetaGroupPromise: buildTemplatePromise.then(
+            (item) => item.oterMetaCollectionGroup
+          ),
         } as ComponentTemplateLoaderContext;
 
         compilation.hooks.processAssets.tapAsync(
@@ -166,6 +169,21 @@ export class ExportMiniProgramAssetsPlugin {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ) as any;
             });
+            for (const key in metaMap.oterMetaCollectionGroup) {
+              if (
+                Object.prototype.hasOwnProperty.call(
+                  metaMap.oterMetaCollectionGroup,
+                  key
+                )
+              ) {
+                const element = metaMap.oterMetaCollectionGroup[key];
+                const libaryTemplatePath = `/mp-library-template/${key}${this.buildPlatform.fileExtname.contentTemplate}`;
+                compilation.assets[libaryTemplatePath] = new RawSource(
+                  compilation.assets[libaryTemplatePath].source() +
+                    element.templateList.map((item) => item.content).join('')
+                ) as any;
+              }
+            }
             cb();
           }
         );

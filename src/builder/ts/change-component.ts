@@ -2,7 +2,7 @@ import { InsertChange, TsChange, createCssSelectorForTs } from 'cyia-code-util';
 import * as ts from 'typescript';
 import { RawUpdater } from '../util/raw-updater';
 
-export function changeComponent(data: string, meta: string) {
+export function changeComponent(data: string, meta: Record<string, any>) {
   const sf = ts.createSourceFile('', data, ts.ScriptTarget.Latest, true);
   const selector = createCssSelectorForTs(sf);
   const componentɵcmpNode = selector.queryOne(
@@ -32,7 +32,7 @@ export function changeComponent(data: string, meta: string) {
   const change = new TsChange(sf);
   const extraMetaChange = change.insertNode(
     componentɵcmpNode,
-    `;${componentɵcmpNode.left.getText()}ExtraMeta=${meta}`,
+    `;${componentɵcmpNode.left.getText()}ExtraMeta=${JSON.stringify(meta)}`,
     'end'
   );
   const initInsertChange = change.insertNode(

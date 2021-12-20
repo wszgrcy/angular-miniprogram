@@ -23,7 +23,8 @@ export default async function (
     return;
   }
   const changeData = changeComponent(data, meta)!;
-  if (typeof data === 'undefined') {
+
+  if (typeof data === 'undefined' || typeof changeData === 'undefined') {
     callback(undefined, data, map);
     return;
   }

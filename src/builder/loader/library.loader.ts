@@ -1,25 +1,34 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { join, normalize } from '@angular-devkit/core';
+import { dirname, join, normalize } from '@angular-devkit/core';
+import { classify } from '@angular-devkit/core/src/utils/strings';
 import { createCssSelectorForTs } from 'cyia-code-util';
 import ts from 'typescript';
 import * as webpack from 'webpack';
-import { LIBRARY_OUTPUT_PATH, LibrarySymbol } from '../const';
+import {
+  ExportMiniProgramAssetsPluginSymbol,
+  LIBRARY_OUTPUT_PATH,
+  LibrarySymbol,
+} from '../const';
+import { MetaCollection } from '../html/meta-collection';
 import { ExportLibraryComponentMeta, LibraryLoaderContext } from '../type';
 import { runScript } from '../util/run-script';
+import { ComponentTemplateLoaderContext } from './type';
 
 function resolveContent(
   content: string,
   directivePrefix: string,
   eventNameConvert: (name: string) => string,
-  templateInterpolation: [string, string]
+  templateInterpolation: [string, string],
+  fileExtname: any
 ): string {
   return runScript(`(()=>{return \`${content}\`})()`, {
     directivePrefix,
     eventNameConvert,
     templateInterpolation,
+    fileExtname,
   });
 }
-export default function (
+export default async function (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   this: webpack.LoaderContext<any>,
   data: string,
@@ -32,6 +41,10 @@ export default function (
     callback(undefined, data, map);
     return;
   }
+  const context: ComponentTemplateLoaderContext = (this._compilation! as any)[
+    ExportMiniProgramAssetsPluginSymbol
+  ];
+  const otherMetaGroup = await context.otherMetaGroupPromise;
   for (let i = 0; i < list.length; i++) {
     const element = list[i] as ts.BinaryExpression;
     const componentName = (
@@ -62,35 +75,49 @@ export default function (
     });
     const fileExtname = libraryLoaderContext.buildPlatform.fileExtname;
     libraryLoaderContext.libraryMetaList.forEach((item) => {
+      const otherMetaCollection: MetaCollection =
+        otherMetaGroup[classify(item.moduleId)];
+      const globalTemplatePath = join(
+        normalize('/mp-library-template'),
+        classify(item.moduleId) +
+          libraryLoaderContext.buildPlatform.fileExtname.contentTemplate
+      );
+      this.emitFile(globalTemplatePath, '');
       this.emitFile(
         join(
           normalize(LIBRARY_OUTPUT_PATH),
           item.libraryPath + fileExtname.content
         ),
-        resolveContent(
-          item.content,
-          libraryLoaderContext.buildPlatform.templateTransform.getData()
-            .directivePrefix,
-          libraryLoaderContext.buildPlatform.templateTransform.eventNameConvert,
-          libraryLoaderContext.buildPlatform.templateTransform
-            .templateInterpolation
-        )
-      );
-      if (item.contentTemplate) {
-        this.emitFile(
-          join(
-            normalize(LIBRARY_OUTPUT_PATH),
-            item.libraryPath + fileExtname.contentTemplate
-          ),
+        `<import  src="${globalTemplatePath}"/>` +
           resolveContent(
-            item.contentTemplate,
+            item.content,
             libraryLoaderContext.buildPlatform.templateTransform.getData()
               .directivePrefix,
             libraryLoaderContext.buildPlatform.templateTransform
               .eventNameConvert,
             libraryLoaderContext.buildPlatform.templateTransform
-              .templateInterpolation
+              .templateInterpolation,
+            libraryLoaderContext.buildPlatform.fileExtname
           )
+      );
+      if (item.contentTemplate) {
+        this.emitFile(
+          join(
+            normalize(LIBRARY_OUTPUT_PATH),
+            dirname(normalize(item.libraryPath)),
+            'template' + fileExtname.contentTemplate
+          ),
+          `<import  src="${globalTemplatePath}"/>` +
+            resolveContent(
+              item.contentTemplate,
+              libraryLoaderContext.buildPlatform.templateTransform.getData()
+                .directivePrefix,
+              libraryLoaderContext.buildPlatform.templateTransform
+                .eventNameConvert,
+              libraryLoaderContext.buildPlatform.templateTransform
+                .templateInterpolation,
+              libraryLoaderContext.buildPlatform.fileExtname
+            )
         );
       }
       if (item.style) {
@@ -107,7 +134,19 @@ export default function (
           normalize(LIBRARY_OUTPUT_PATH),
           item.libraryPath + (fileExtname.config || '.json')
         ),
-        JSON.stringify({ component: true, usingComponents: item.useComponents })
+        JSON.stringify({
+          component: true,
+          usingComponents: {
+            ...item.useComponents,
+            ...[
+              ...otherMetaCollection.localPath,
+              ...otherMetaCollection.libraryPath,
+            ].reduce((pre, cur) => {
+              pre[cur.selector] = cur.path;
+              return pre;
+            }, {} as Record<string, string>),
+          },
+        })
       );
     });
   }

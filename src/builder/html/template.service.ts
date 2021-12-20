@@ -9,6 +9,7 @@ import ts from 'typescript';
 import type { CompilerOptions } from 'typescript';
 import { Compilation, Compiler } from 'webpack';
 import { LIBRARY_OUTPUT_PATH } from '../const';
+import { BuildPlatform } from '../platform/platform';
 import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
@@ -41,13 +42,14 @@ export class TemplateService {
       providers: [
         {
           provide: MiniProgramPlatformCompilerService,
-          useFactory: (injector: Injector) => {
+          useFactory: (injector: Injector, buildPlatform: BuildPlatform) => {
             return new MiniProgramPlatformCompilerService(
               this.ngTscProgram,
-              injector
+              injector,
+              buildPlatform
             );
           },
-          deps: [Injector],
+          deps: [Injector, BuildPlatform],
         },
       ],
       parent: this.injector,
@@ -106,11 +108,34 @@ export class TemplateService {
         existConfig: entryPattern.inputFiles.config,
       });
     });
+    for (const key in metaMap.oterMetaCollectionGroup) {
+      if (
+        Object.prototype.hasOwnProperty.call(
+          metaMap.oterMetaCollectionGroup,
+          key
+        )
+      ) {
+        const element = metaMap.oterMetaCollectionGroup[key];
+        element.localPath.forEach((item) => {
+          item.path = resolve(
+            normalize('/'),
+            normalize(this.getComponentPagePattern(item.path).outputFiles.path)
+          );
+        });
+        element.libraryPath.forEach((item) => {
+          item.path = resolve(
+            normalize('/'),
+            join(normalize(LIBRARY_OUTPUT_PATH), item.path)
+          );
+        });
+      }
+    }
     return {
       style: styleMap,
       outputContent: contentMap,
       meta: metaMap.meta,
       config: config,
+      oterMetaCollectionGroup: metaMap.oterMetaCollectionGroup,
     };
   }
 

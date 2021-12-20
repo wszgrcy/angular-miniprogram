@@ -106,8 +106,11 @@ export function updatePath(context: MPView, componentPath: ComponentPath) {
     if (item instanceof Array) {
       list.push(...item);
     }
+    if ((item as any).nodeList && (item as any).nodeList.length) {
+      list.push(...(item as any).nodeList);
+    }
     if ((item as MPView).componentPath) {
-      ((item as MPView).componentPath as any[]).unshift(componentPath);
+      ((item as MPView).componentPath as any[]).unshift(...componentPath);
     }
   }
   return context;

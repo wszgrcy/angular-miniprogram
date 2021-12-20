@@ -51,6 +51,7 @@ export const ALL_PAGE_NAME_LIST = [
   `default-structural-directive`,
   `ng-content`,
   `base-forms`,
+  `component-use-template`,
 ];
 export const ALL_COMPONENT_NAME_LIST = [
   `component1`,

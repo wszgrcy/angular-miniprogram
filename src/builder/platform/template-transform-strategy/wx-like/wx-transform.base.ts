@@ -1,6 +1,5 @@
 import type { NgNodeMeta } from '../../../html/node-handle/interface';
 import { TemplateTransformBase } from '../transform.base';
-import { MetaCollection } from './type';
 import { WxContainer } from './wx-container';
 
 export const EVENT_PREFIX_REGEXP =
@@ -9,7 +8,6 @@ export abstract class WxTransformLike extends TemplateTransformBase {
   seq = ':';
   templateInterpolation: [string, string] = ['{{', '}}'];
   abstract directivePrefix: string;
-  private exportTemplateList: { name: string; content: string }[] = [];
 
   constructor() {
     super();
@@ -23,35 +21,27 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     });
   }
   compile(nodes: NgNodeMeta[]) {
-    const metaCollection: MetaCollection = {
-      listeners: [],
-      localPath: new Set(),
-      libraryPath: new Set(),
-    };
-    const container = new WxContainer(metaCollection);
+    const container = new WxContainer();
 
     nodes.forEach((node) => {
       container.compileNode(node);
     });
-    this.exportTemplateList = container.getExportTemplate();
     const result = container.export();
+    const metaCollectionGroup = container.exportMetaCollectionGroup();
+    const inlineMetaCollection = metaCollectionGroup.$inline;
+    delete metaCollectionGroup.$inline;
     return {
       content: `<block ${this.directivePrefix}${this.seq}if="{{hasLoad}}">${result.wxmlTemplate}</block> `,
-      template: this.getExportTemplate(),
-      meta: this.getExportMeta(metaCollection),
+      template: inlineMetaCollection.templateList
+        .map((item) => item.content)
+        .join(''),
+      meta: { listeners: inlineMetaCollection.listeners },
       useComponentPath: {
-        localPath: [...metaCollection.localPath],
-        libraryPath: [...metaCollection.libraryPath],
+        localPath: [...inlineMetaCollection.localPath],
+        libraryPath: [...inlineMetaCollection.libraryPath],
       },
+      otherMetaGroup: metaCollectionGroup,
     };
-  }
-
-  private getExportTemplate() {
-    return this.exportTemplateList.map((item) => item.content).join('');
-  }
-
-  private getExportMeta(metaCollection: MetaCollection) {
-    return `{listeners:${JSON.stringify(metaCollection.listeners)}}`;
   }
 
   getData() {
