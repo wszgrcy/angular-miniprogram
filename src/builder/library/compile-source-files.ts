@@ -1,5 +1,5 @@
 /* eslint-disable prefer-rest-params */
-import { join, normalize, resolve } from '@angular-devkit/core';
+import { dirname, join, normalize, resolve } from '@angular-devkit/core';
 import {
   camelize,
   classify,
@@ -36,11 +36,14 @@ import { getBuildPlatformInjectConfig } from '../platform/platform-info';
 import { changeComponent } from '../ts/change-component';
 import { ExportLibraryComponentMeta } from '../type';
 import { AddDeclareMetaService } from './add-declare-meta';
+import { AddGlobalTemplateService } from './add-global-template';
 import { getLibraryPath } from './get-library-path';
+import { getUseComponents } from './merge-using-component-path';
 import { CustomStyleSheetProcessor } from './stylesheet-processor';
 import {
   COMPONENT_MAP,
   DIRECTIVE_MAP,
+  ENTRY_FILE_TOKEN,
   LIBRARY_ENTRY_POINT,
   RESOLVED_META_MAP,
 } from './token';
@@ -104,6 +107,13 @@ export async function compileSourceFiles(
           );
         },
         deps: [Injector, BuildPlatform],
+      },
+      {
+        provide: ENTRY_FILE_TOKEN,
+        useValue: join(
+          dirname(normalize(tsConfig.rootNames[0])),
+          normalize(tsConfigOptions.flatModuleOutFile!)
+        ),
       },
     ],
   });
@@ -207,6 +217,7 @@ export async function compileSourceFiles(
         useValue: miniProgramPlatformCompilerService.getComponentMap(),
       },
       { provide: AddDeclareMetaService },
+      { provide: AddGlobalTemplateService },
     ],
   });
   // Collect source file specific diagnostics
@@ -289,6 +300,7 @@ export async function compileSourceFiles(
       onError,
       sourceFiles
     ) {
+      const entryFileName = injector.get(ENTRY_FILE_TOKEN);
       if (fileName.endsWith('.map')) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return oldWriteFile.apply(this, arguments as any);
@@ -307,6 +319,21 @@ export async function compileSourceFiles(
       }
       const sourceFile = sourceFiles && sourceFiles[0];
       if (sourceFile) {
+        if (
+          entryFileName ===
+          normalize(sourceFile.fileName.replace(/\.ts$/, '.js'))
+        ) {
+          const service = injector.get(AddGlobalTemplateService);
+          const result = service.run(fileName, data, sourceFiles![0]);
+          return oldWriteFile.call(
+            this,
+            fileName,
+            result,
+            writeByteOrderMark,
+            onError,
+            sourceFiles
+          );
+        }
         const originFileName = path.normalize(sourceFile.fileName);
 
         const changeData = changeComponent(
@@ -318,17 +345,7 @@ export async function compileSourceFiles(
           return oldWriteFile.apply(this, arguments as any);
         }
         const useComponentPath = metaMap.useComponentPath.get(originFileName)!;
-        const list = [...useComponentPath.libraryPath];
-        list.push(
-          ...useComponentPath.localPath.map((item) => {
-            const libraryEntry = getLibraryPath(
-              entryPoint.data.entryPoint.moduleId,
-              item.className
-            );
-            item.path = libraryEntry;
-            return item;
-          })
-        );
+
         const componentClassName = changeData.componentName;
         const componentDirName = dasherize(camelize(componentClassName));
         const libraryPath = getLibraryPath(
@@ -343,20 +360,32 @@ export async function compileSourceFiles(
           styleContentList.push(customStyleSheetProcessor.styleMap.get(item)!);
         });
         const styleContent = styleContentList.join('\n');
+        const selfTemplate = metaMap.otherMetaCollectionGroup['$self']
+          ? `<import src="${resolve(
+              normalize('/'),
+              join(
+                normalize(LIBRARY_OUTPUT_PATH),
+                entryPoint.data.entryPoint.moduleId,
+                'self' + buildPlatform.fileExtname.contentTemplate
+              )
+            )}"/>`
+          : '';
+
         const insertComponentData: ExportLibraryComponentMeta = {
           id:
             classify(entryPoint.data.entryPoint.moduleId) +
             classify(camelize(componentDirName)),
           className: componentClassName,
-          content: metaMap.outputContent.get(originFileName)!,
+          content: selfTemplate + metaMap.outputContent.get(originFileName)!,
           libraryPath: libraryPath,
-          useComponents: list.reduce((pre, cur) => {
-            pre[cur.selector] = resolve(
-              normalize('/'),
-              join(normalize(LIBRARY_OUTPUT_PATH), cur.path)
-            );
-            return pre;
-          }, {} as Record<string, string>),
+          useComponents: {
+            ...getUseComponents(
+              useComponentPath.libraryPath,
+              useComponentPath.localPath,
+              entryPoint.data.entryPoint.moduleId
+            ),
+            ...injector.get(AddGlobalTemplateService).getSelfUseComponents(),
+          },
           moduleId: injector.get(LIBRARY_ENTRY_POINT),
         };
         if (styleContent) {
@@ -365,7 +394,7 @@ export async function compileSourceFiles(
         const outputTemplate =
           metaMap.outputContentTemplate.get(originFileName);
         if (outputTemplate) {
-          insertComponentData.contentTemplate = outputTemplate;
+          insertComponentData.contentTemplate = selfTemplate + outputTemplate;
         }
         return oldWriteFile.call(
           this,

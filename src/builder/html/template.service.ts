@@ -34,7 +34,8 @@ export class TemplateService {
     @Inject(TS_CONFIG_TOKEN) private tsConfig: string,
     @Inject(OLD_BUILDER)
     private oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined,
-    @Inject(PAGE_PATTERN_TOKEN) private pagePatternList: PagePattern[]
+    @Inject(PAGE_PATTERN_TOKEN) private pagePatternList: PagePattern[],
+    private buildPlatform: BuildPlatform
   ) {}
 
   async exportComponentBuildMetaMap() {
@@ -60,6 +61,27 @@ export class TemplateService {
     miniProgramPlatformCompilerService.init();
     const metaMap =
       await miniProgramPlatformCompilerService.exportComponentBuildMetaMap();
+
+    const extraMetaCollection = metaMap.otherMetaCollectionGroup['$self'];
+    if (extraMetaCollection) {
+      metaMap.outputContent.forEach((value, key) => {
+        value = `<import src="/mp-self-template/self${this.buildPlatform.fileExtname.contentTemplate}"/>${value}`;
+        metaMap.outputContent.set(key, value);
+      });
+      metaMap.outputContentTemplate.forEach((value, key) => {
+        value = `<import src="/mp-self-template/self${this.buildPlatform.fileExtname.contentTemplate}"/>${value}`;
+        metaMap.outputContentTemplate.set(key, value);
+      });
+      metaMap.useComponentPath.forEach((value, key) => {
+        value.libraryPath.push(...extraMetaCollection.libraryPath);
+        value.localPath.push(...extraMetaCollection.localPath);
+      });
+      delete metaMap.otherMetaCollectionGroup['$self'];
+    }
+    metaMap.useComponentPath.forEach((value, key) => {
+      value.libraryPath = Array.from(new Set(value.libraryPath));
+      value.localPath = Array.from(new Set(value.localPath));
+    });
     const styleMap = new Map<string, string[]>();
     metaMap.style.forEach((value, key) => {
       const entryPattern = this.getComponentPagePattern(key);
@@ -108,14 +130,15 @@ export class TemplateService {
         existConfig: entryPattern.inputFiles.config,
       });
     });
-    for (const key in metaMap.oterMetaCollectionGroup) {
+
+    for (const key in metaMap.otherMetaCollectionGroup) {
       if (
         Object.prototype.hasOwnProperty.call(
-          metaMap.oterMetaCollectionGroup,
+          metaMap.otherMetaCollectionGroup,
           key
         )
       ) {
-        const element = metaMap.oterMetaCollectionGroup[key];
+        const element = metaMap.otherMetaCollectionGroup[key];
         element.localPath.forEach((item) => {
           item.path = resolve(
             normalize('/'),
@@ -135,7 +158,7 @@ export class TemplateService {
       outputContent: contentMap,
       meta: metaMap.meta,
       config: config,
-      oterMetaCollectionGroup: metaMap.oterMetaCollectionGroup,
+      oterMetaCollectionGroup: metaMap.otherMetaCollectionGroup,
     };
   }
 

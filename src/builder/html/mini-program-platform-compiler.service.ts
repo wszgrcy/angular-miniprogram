@@ -48,7 +48,7 @@ export class MiniProgramPlatformCompilerService {
         libraryPath: UseComponent[];
       }
     >(),
-    oterMetaCollectionGroup: {} as Record<string, MetaCollection>,
+    otherMetaCollectionGroup: {} as Record<string, MetaCollection>,
   };
   constructor(
     private ngTscProgram: NgtscProgram,
@@ -195,31 +195,14 @@ export class MiniProgramPlatformCompilerService {
           )
         ) {
           const element = componentBuildMeta.otherMetaGroup[key];
-          this.componentDataMap.oterMetaCollectionGroup[key] =
-            this.componentDataMap.oterMetaCollectionGroup[key] ||
+          this.componentDataMap.otherMetaCollectionGroup[key] =
+            this.componentDataMap.otherMetaCollectionGroup[key] ||
             new MetaCollection();
-          this.componentDataMap.oterMetaCollectionGroup[key].merge(element);
+          this.componentDataMap.otherMetaCollectionGroup[key].merge(element);
         }
       }
     }
-    const extraMetaCollection =
-      this.componentDataMap.oterMetaCollectionGroup['$self'];
-    // todo library中无法使用
-    if (extraMetaCollection) {
-      this.componentDataMap.outputContent.forEach((value, key) => {
-        value = `<import src="/mp-self-template/self${this.buildPlatform.fileExtname.contentTemplate}"/>${value}`;
-        this.componentDataMap.outputContent.set(key, value);
-      });
-      this.componentDataMap.outputContentTemplate.forEach((value, key) => {
-        value = `<import src="/mp-self-template/self${this.buildPlatform.fileExtname.contentTemplate}"/>${value}`;
-        this.componentDataMap.outputContentTemplate.set(key, value);
-      });
-      this.componentDataMap.useComponentPath.forEach((value, key) => {
-        value.libraryPath.push(...extraMetaCollection.libraryPath);
-        value.localPath.push(...extraMetaCollection.localPath);
-      });
-      delete this.componentDataMap.oterMetaCollectionGroup['$self'];
-    }
+
     this.componentDataMap.useComponentPath.forEach((value, key) => {
       value.libraryPath = Array.from(new Set(value.libraryPath));
       value.localPath = Array.from(new Set(value.localPath));

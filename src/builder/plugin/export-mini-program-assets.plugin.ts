@@ -1,3 +1,4 @@
+import { join, normalize } from '@angular-devkit/core';
 import { normalizePath } from '@ngtools/webpack/src/ivy/paths';
 import {
   InputFileSystemSync,
@@ -9,7 +10,11 @@ import { Inject, Injectable, Injector } from 'static-injector';
 import ts from 'typescript';
 import * as webpack from 'webpack';
 import { ConcatSource, RawSource } from 'webpack-sources';
-import { ExportMiniProgramAssetsPluginSymbol } from '../const';
+import {
+  ExportMiniProgramAssetsPluginSymbol,
+  InjectorSymbol,
+  LIBRARY_OUTPUT_PATH,
+} from '../const';
 import { TemplateService } from '../html/template.service';
 import type { StyleHookData } from '../html/type';
 import type { ComponentTemplateLoaderContext } from '../loader/type';
@@ -92,7 +97,7 @@ export class ExportMiniProgramAssetsPlugin {
         );
         this.restore();
         this.compilation = compilation;
-
+        (this.compilation as any)[InjectorSymbol] = this.injector;
         const injector = Injector.create({
           providers: [
             { provide: TemplateService },
@@ -125,6 +130,8 @@ export class ExportMiniProgramAssetsPlugin {
           otherMetaGroupPromise: buildTemplatePromise.then(
             (item) => item.oterMetaCollectionGroup
           ),
+          addLibraryExtraUseComponents: this.addLibraryExtraUseComponents,
+          addExtraTemplateNameMapping: this.addExtraTemplateNameMapping,
         } as ComponentTemplateLoaderContext;
 
         compilation.hooks.processAssets.tapAsync(
@@ -177,13 +184,34 @@ export class ExportMiniProgramAssetsPlugin {
                 )
               ) {
                 const element = metaMap.oterMetaCollectionGroup[key];
-                const libaryTemplatePath = `/mp-library-template/${key}${this.buildPlatform.fileExtname.contentTemplate}`;
+                const libaryTemplatePath = `/library-template/${key}${this.buildPlatform.fileExtname.contentTemplate}`;
                 compilation.assets[libaryTemplatePath] = new RawSource(
                   compilation.assets[libaryTemplatePath].source() +
                     element.templateList.map((item) => item.content).join('')
                 ) as any;
               }
             }
+            this.extraTemplateNameMapping.forEach((value, key) => {
+              const extraConfig = this.libraryExtrayUseComponentsMap.get(key);
+              value.forEach((item) => {
+                const filePath = join(
+                  normalize(LIBRARY_OUTPUT_PATH),
+                  item + (this.buildPlatform.fileExtname.config || '.json')
+                );
+                const config = compilation.assets[filePath];
+                let json: Record<string, any> = {};
+                if (config) {
+                  json = JSON.parse(config.source() as string);
+                }
+                json.usingComponents = {
+                  ...json.usingComponents,
+                  ...extraConfig,
+                };
+                compilation.assets[filePath] = new RawSource(
+                  JSON.stringify(json)
+                ) as any;
+              });
+            });
             cb();
           }
         );
@@ -231,4 +259,19 @@ export class ExportMiniProgramAssetsPlugin {
     const result = await service.exportComponentBuildMetaMap();
     return result;
   }
+  libraryExtrayUseComponentsMap = new Map();
+  addLibraryExtraUseComponents = (
+    key: string,
+    useComponents: Record<string, string>
+  ) => {
+    let obj = this.libraryExtrayUseComponentsMap.get(key) || {};
+    obj = { ...obj, ...useComponents };
+    this.libraryExtrayUseComponentsMap.set(key, obj);
+  };
+  extraTemplateNameMapping = new Map<string, string[]>();
+  addExtraTemplateNameMapping = (key: string, value: string) => {
+    const list = this.extraTemplateNameMapping.get(key) || [];
+    list.push(value);
+    this.extraTemplateNameMapping.set(key, list);
+  };
 }

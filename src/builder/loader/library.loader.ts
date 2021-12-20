@@ -77,8 +77,12 @@ export default async function (
     libraryLoaderContext.libraryMetaList.forEach((item) => {
       const otherMetaCollection: MetaCollection =
         otherMetaGroup[classify(item.moduleId)];
+      context.addExtraTemplateNameMapping(
+        classify(item.moduleId),
+        item.libraryPath
+      );
       const globalTemplatePath = join(
-        normalize('/mp-library-template'),
+        normalize('/library-template'),
         classify(item.moduleId) +
           libraryLoaderContext.buildPlatform.fileExtname.contentTemplate
       );
