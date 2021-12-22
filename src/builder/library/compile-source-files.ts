@@ -1,10 +1,11 @@
 /* eslint-disable prefer-rest-params */
-import { dirname, join, normalize, resolve } from '@angular-devkit/core';
 import {
-  camelize,
-  classify,
-  dasherize,
-} from '@angular-devkit/core/src/utils/strings';
+  dirname,
+  join,
+  normalize,
+  resolve,
+  strings,
+} from '@angular-devkit/core';
 import type {
   CompilerOptions,
   ParsedConfiguration,
@@ -347,7 +348,9 @@ export async function compileSourceFiles(
         const useComponentPath = metaMap.useComponentPath.get(originFileName)!;
 
         const componentClassName = changeData.componentName;
-        const componentDirName = dasherize(camelize(componentClassName));
+        const componentDirName = strings.dasherize(
+          strings.camelize(componentClassName)
+        );
         const libraryPath = getLibraryPath(
           entryPoint.data.entryPoint.moduleId,
           componentClassName
@@ -373,8 +376,8 @@ export async function compileSourceFiles(
 
         const insertComponentData: ExportLibraryComponentMeta = {
           id:
-            classify(entryPoint.data.entryPoint.moduleId) +
-            classify(camelize(componentDirName)),
+            strings.classify(entryPoint.data.entryPoint.moduleId) +
+            strings.classify(strings.camelize(componentDirName)),
           className: componentClassName,
           content: selfTemplate + metaMap.outputContent.get(originFileName)!,
           libraryPath: libraryPath,

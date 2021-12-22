@@ -63,19 +63,25 @@ export class TemplateService {
       await miniProgramPlatformCompilerService.exportComponentBuildMetaMap();
 
     const extraMetaCollection = metaMap.otherMetaCollectionGroup['$self'];
+    const selfTemplate: Record<string, string> = {};
     if (extraMetaCollection) {
+      const importSelfTemplatePath = `/self-template/self${this.buildPlatform.fileExtname.contentTemplate}`;
+      const importSelfTemplate = `<import src="${importSelfTemplatePath}"/>`;
       metaMap.outputContent.forEach((value, key) => {
-        value = `<import src="/mp-self-template/self${this.buildPlatform.fileExtname.contentTemplate}"/>${value}`;
+        value = `${importSelfTemplate}${value}`;
         metaMap.outputContent.set(key, value);
       });
       metaMap.outputContentTemplate.forEach((value, key) => {
-        value = `<import src="/mp-self-template/self${this.buildPlatform.fileExtname.contentTemplate}"/>${value}`;
+        value = `${importSelfTemplate}${value}`;
         metaMap.outputContentTemplate.set(key, value);
       });
       metaMap.useComponentPath.forEach((value, key) => {
         value.libraryPath.push(...extraMetaCollection.libraryPath);
         value.localPath.push(...extraMetaCollection.localPath);
       });
+      selfTemplate[importSelfTemplatePath] = extraMetaCollection.templateList
+        .map((item) => item.content)
+        .join('');
       delete metaMap.otherMetaCollectionGroup['$self'];
     }
     metaMap.useComponentPath.forEach((value, key) => {
@@ -158,7 +164,8 @@ export class TemplateService {
       outputContent: contentMap,
       meta: metaMap.meta,
       config: config,
-      oterMetaCollectionGroup: metaMap.otherMetaCollectionGroup,
+      otherMetaCollectionGroup: metaMap.otherMetaCollectionGroup,
+      selfTemplate,
     };
   }
 

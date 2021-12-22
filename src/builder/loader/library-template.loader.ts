@@ -8,7 +8,9 @@ import {
   GLOBAL_TEMPLATE_SUFFIX,
   InjectorSymbol,
   LIBRARY_OUTPUT_PATH,
+  TemplateScopeSymbol,
 } from '../const';
+import { TemplateScopeOutside } from '../html/library-template-scope.service';
 import { ExtraTemplateData } from '../library/type';
 import { BuildPlatform } from '../platform/platform';
 import { ComponentTemplateLoaderContext } from './type';
@@ -28,6 +30,9 @@ export default async function (
     ExportMiniProgramAssetsPluginSymbol
   ];
   const buildPlatform = injector.get(BuildPlatform);
+  const templateScopeOutside = (this._compilation as any)[
+    TemplateScopeSymbol
+  ] as TemplateScopeOutside;
   if (selfTemplateNode) {
     const content = selfTemplateNode.initializer!.getText();
     const config: ExtraTemplateData = new Function('', `return ${content}`)();
@@ -55,10 +60,10 @@ export default async function (
     for (const key in config) {
       if (Object.prototype.hasOwnProperty.call(config, key)) {
         const element = config[key];
-        const filePath = `/library-template/${key}${buildPlatform.fileExtname.contentTemplate}`;
-        const file = this._compilation!.assets[filePath];
-        this.emitFile(filePath, (file ? file.source() : '') + element.template);
-        context.addLibraryExtraUseComponents(key, element.useComponents!);
+        templateScopeOutside.setScopeExtraUseComponents(key, {
+          useComponents: element.useComponents!,
+          templateList: [element.template],
+        });
       }
     }
   }

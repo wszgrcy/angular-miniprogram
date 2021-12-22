@@ -3,6 +3,7 @@ export const ExportMiniProgramAssetsPluginSymbol = Symbol.for(
 );
 export const LibrarySymbol = Symbol.for('LibrarySymbol');
 export const InjectorSymbol = Symbol.for('InjectorSymbol');
+export const TemplateScopeSymbol = Symbol.for('TemplateScopeSymbol');
 export const LIBRARY_OUTPUT_PATH = 'library';
 export const LIBRARY_DIRECTIVE_LISTENERS_SUFFIX = 'Listeners';
 export const LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX = 'Properties';

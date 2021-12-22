@@ -15,6 +15,7 @@ import {
   InjectorSymbol,
   LIBRARY_OUTPUT_PATH,
 } from '../const';
+import { LibraryTemplateScopeService } from '../html/library-template-scope.service';
 import { TemplateService } from '../html/template.service';
 import type { StyleHookData } from '../html/type';
 import type { ComponentTemplateLoaderContext } from '../loader/type';
@@ -46,7 +47,8 @@ export class ExportMiniProgramAssetsPlugin {
   constructor(
     @Inject(TS_CONFIG_TOKEN) tsConfig: string,
     private buildPlatform: BuildPlatform,
-    private injector: Injector
+    private injector: Injector,
+    private libraryTemplateScopeService: LibraryTemplateScopeService
   ) {
     this.options = {
       tsConfig: tsConfig,
@@ -97,6 +99,7 @@ export class ExportMiniProgramAssetsPlugin {
         );
         this.restore();
         this.compilation = compilation;
+        this.libraryTemplateScopeService.register(compilation);
         (this.compilation as any)[InjectorSymbol] = this.injector;
         const injector = Injector.create({
           providers: [
@@ -128,10 +131,8 @@ export class ExportMiniProgramAssetsPlugin {
           metaMapPromise: buildTemplatePromise.then((item) => item.meta),
           buildPlatform: this.options.buildPlatform,
           otherMetaGroupPromise: buildTemplatePromise.then(
-            (item) => item.oterMetaCollectionGroup
+            (item) => item.otherMetaCollectionGroup
           ),
-          addLibraryExtraUseComponents: this.addLibraryExtraUseComponents,
-          addExtraTemplateNameMapping: this.addExtraTemplateNameMapping,
         } as ComponentTemplateLoaderContext;
 
         compilation.hooks.processAssets.tapAsync(
@@ -176,42 +177,57 @@ export class ExportMiniProgramAssetsPlugin {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ) as any;
             });
-            for (const key in metaMap.oterMetaCollectionGroup) {
+            const componentConfigGroup =
+              this.libraryTemplateScopeService.exportLibraryComponentConfig();
+            for (const item of componentConfigGroup) {
+              compilation.assets[item.filePath] = new RawSource(
+                JSON.stringify(item.content)
+              ) as any;
+            }
+            const templateGroup =
+              this.libraryTemplateScopeService.exportLibraryTemplate();
+            for (const key in templateGroup) {
+              if (Object.prototype.hasOwnProperty.call(templateGroup, key)) {
+                const element = templateGroup[key];
+                compilation.assets[key] = new RawSource(element) as any;
+              }
+            }
+            for (const key in metaMap.otherMetaCollectionGroup) {
               if (
                 Object.prototype.hasOwnProperty.call(
-                  metaMap.oterMetaCollectionGroup,
+                  metaMap.otherMetaCollectionGroup,
                   key
                 )
               ) {
-                const element = metaMap.oterMetaCollectionGroup[key];
-                const libaryTemplatePath = `/library-template/${key}${this.buildPlatform.fileExtname.contentTemplate}`;
-                compilation.assets[libaryTemplatePath] = new RawSource(
-                  compilation.assets[libaryTemplatePath].source() +
-                    element.templateList.map((item) => item.content).join('')
-                ) as any;
+                const element = metaMap.otherMetaCollectionGroup[key];
+                this.libraryTemplateScopeService.setScopeExtraUseComponents(
+                  key,
+                  {
+                    useComponents: {
+                      ...[...element.localPath, ...element.libraryPath].reduce(
+                        (pre, cur) => {
+                          pre[cur.selector] = cur.path;
+                          return pre;
+                        },
+                        {} as Record<string, string>
+                      ),
+                    },
+                    templateList: element.templateList.map(
+                      (item) => item.content
+                    ),
+                  }
+                );
               }
             }
-            this.extraTemplateNameMapping.forEach((value, key) => {
-              const extraConfig = this.libraryExtrayUseComponentsMap.get(key);
-              value.forEach((item) => {
-                const filePath = join(
-                  normalize(LIBRARY_OUTPUT_PATH),
-                  item + (this.buildPlatform.fileExtname.config || '.json')
-                );
-                const config = compilation.assets[filePath];
-                let json: Record<string, any> = {};
-                if (config) {
-                  json = JSON.parse(config.source() as string);
-                }
-                json.usingComponents = {
-                  ...json.usingComponents,
-                  ...extraConfig,
-                };
-                compilation.assets[filePath] = new RawSource(
-                  JSON.stringify(json)
-                ) as any;
-              });
-            });
+
+            for (const key in metaMap.selfTemplate) {
+              if (
+                Object.prototype.hasOwnProperty.call(metaMap.selfTemplate, key)
+              ) {
+                const element = metaMap.selfTemplate[key];
+                compilation.assets[key] = new RawSource(element) as any;
+              }
+            }
             cb();
           }
         );
@@ -259,19 +275,4 @@ export class ExportMiniProgramAssetsPlugin {
     const result = await service.exportComponentBuildMetaMap();
     return result;
   }
-  libraryExtrayUseComponentsMap = new Map();
-  addLibraryExtraUseComponents = (
-    key: string,
-    useComponents: Record<string, string>
-  ) => {
-    let obj = this.libraryExtrayUseComponentsMap.get(key) || {};
-    obj = { ...obj, ...useComponents };
-    this.libraryExtrayUseComponentsMap.set(key, obj);
-  };
-  extraTemplateNameMapping = new Map<string, string[]>();
-  addExtraTemplateNameMapping = (key: string, value: string) => {
-    const list = this.extraTemplateNameMapping.get(key) || [];
-    list.push(value);
-    this.extraTemplateNameMapping.set(key, list);
-  };
 }

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { dirname, join, normalize } from '@angular-devkit/core';
-import { classify } from '@angular-devkit/core/src/utils/strings';
+import { dirname, join, normalize, strings } from '@angular-devkit/core';
+
 import { createCssSelectorForTs } from 'cyia-code-util';
 import ts from 'typescript';
 import * as webpack from 'webpack';
@@ -8,9 +8,14 @@ import {
   ExportMiniProgramAssetsPluginSymbol,
   LIBRARY_OUTPUT_PATH,
   LibrarySymbol,
+  TemplateScopeSymbol,
 } from '../const';
-import { MetaCollection } from '../html/meta-collection';
+import {
+  ExtraTemplateData,
+  TemplateScopeOutside,
+} from '../html/library-template-scope.service';
 import { ExportLibraryComponentMeta, LibraryLoaderContext } from '../type';
+import { libraryTemplateScopeName } from '../util/library-template-scope-name';
 import { runScript } from '../util/run-script';
 import { ComponentTemplateLoaderContext } from './type';
 
@@ -44,7 +49,10 @@ export default async function (
   const context: ComponentTemplateLoaderContext = (this._compilation! as any)[
     ExportMiniProgramAssetsPluginSymbol
   ];
-  const otherMetaGroup = await context.otherMetaGroupPromise;
+  const templateScopeOutside = (this._compilation as any)[
+    TemplateScopeSymbol
+  ] as TemplateScopeOutside;
+  const scopeLibraryObj: Record<string, ExtraTemplateData[]> = {};
   for (let i = 0; i < list.length; i++) {
     const element = list[i] as ts.BinaryExpression;
     const componentName = (
@@ -54,8 +62,7 @@ export default async function (
       `VariableDeclaration[name="${componentName}_ExtraData"]`
     ) as ts.VariableDeclaration;
     if (!extraNode) {
-      callback(undefined, data, map);
-      return;
+      continue;
     }
     const content = extraNode.initializer!.getText();
     const fn = new Function('', `return ${content}`);
@@ -75,18 +82,26 @@ export default async function (
     });
     const fileExtname = libraryLoaderContext.buildPlatform.fileExtname;
     libraryLoaderContext.libraryMetaList.forEach((item) => {
-      const otherMetaCollection: MetaCollection =
-        otherMetaGroup[classify(item.moduleId)];
-      context.addExtraTemplateNameMapping(
-        classify(item.moduleId),
-        item.libraryPath
-      );
       const globalTemplatePath = join(
         normalize('/library-template'),
-        classify(item.moduleId) +
+        strings.classify(item.moduleId) +
           libraryLoaderContext.buildPlatform.fileExtname.contentTemplate
       );
-      this.emitFile(globalTemplatePath, '');
+      const LIBRARY_SCOPE_ID = libraryTemplateScopeName(item.moduleId);
+      const configPath = join(
+        normalize(LIBRARY_OUTPUT_PATH),
+        item.libraryPath + (fileExtname.config || '.json')
+      );
+      const list = scopeLibraryObj[LIBRARY_SCOPE_ID] || [];
+      list.push({
+        configPath: configPath,
+        useComponents: item.useComponents,
+        templateList: [],
+        templatePath: globalTemplatePath,
+      });
+
+      scopeLibraryObj[LIBRARY_SCOPE_ID] = list;
+
       this.emitFile(
         join(
           normalize(LIBRARY_OUTPUT_PATH),
@@ -133,26 +148,13 @@ export default async function (
           item.style
         );
       }
-      this.emitFile(
-        join(
-          normalize(LIBRARY_OUTPUT_PATH),
-          item.libraryPath + (fileExtname.config || '.json')
-        ),
-        JSON.stringify({
-          component: true,
-          usingComponents: {
-            ...item.useComponents,
-            ...[
-              ...otherMetaCollection.localPath,
-              ...otherMetaCollection.libraryPath,
-            ].reduce((pre, cur) => {
-              pre[cur.selector] = cur.path;
-              return pre;
-            }, {} as Record<string, string>),
-          },
-        })
-      );
     });
+  }
+  for (const key in scopeLibraryObj) {
+    if (Object.prototype.hasOwnProperty.call(scopeLibraryObj, key)) {
+      const element = scopeLibraryObj[key];
+      templateScopeOutside.setScopeLibraryUseComponents(key, element);
+    }
   }
   callback(undefined, data, map);
 }

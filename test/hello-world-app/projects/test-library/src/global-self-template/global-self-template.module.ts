@@ -6,5 +6,6 @@ import { OtherModule } from '../other/other.module';
 @NgModule({
   imports: [OutsideTemplateModule, OtherModule],
   declarations: [GlobalSelfTemplateComponent],
+  exports: [GlobalSelfTemplateComponent],
 })
 export class GlobalSelfTemplateModule {}

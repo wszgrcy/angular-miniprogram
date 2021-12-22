@@ -32,6 +32,9 @@ export class AddGlobalTemplateService {
   private getSelfTemplate() {
     const selfMetaCollection =
       this.resolvedMetaMap.otherMetaCollectionGroup['$self'];
+    if (!selfMetaCollection) {
+      return '';
+    }
     this.selfMetaCollection = selfMetaCollection;
     const templateStr = selfMetaCollection.templateList
       .map((item) => item.content)
@@ -49,6 +52,9 @@ export class AddGlobalTemplateService {
     )}`;
   }
   private getLibraryTemplate() {
+    if (!Object.keys(this.resolvedMetaMap.otherMetaCollectionGroup).length) {
+      return '';
+    }
     const obj: Record<string, any> = {};
     for (const key in this.resolvedMetaMap.otherMetaCollectionGroup) {
       if (
