@@ -13,6 +13,7 @@ import {
 import { TemplateScopeOutside } from '../html/library-template-scope.service';
 import { ExtraTemplateData } from '../library/type';
 import { BuildPlatform } from '../platform/platform';
+import { libraryTemplateResolve } from '../util/library-template-resolve';
 import { ComponentTemplateLoaderContext } from './type';
 
 export default async function (
@@ -45,7 +46,13 @@ export default async function (
           'self' + buildPlatform.fileExtname.contentTemplate
         )
       ),
-      config.template
+      libraryTemplateResolve(
+        config.template,
+        buildPlatform.templateTransform.getData().directivePrefix,
+        buildPlatform.templateTransform.eventListConvert,
+        buildPlatform.templateTransform.templateInterpolation,
+        buildPlatform.fileExtname
+      )
     );
   }
   const libraryTemplateNode = selector.queryOne(

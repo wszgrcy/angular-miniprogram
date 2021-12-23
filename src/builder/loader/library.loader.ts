@@ -15,24 +15,11 @@ import {
   TemplateScopeOutside,
 } from '../html/library-template-scope.service';
 import { ExportLibraryComponentMeta, LibraryLoaderContext } from '../type';
+import { libraryTemplateResolve } from '../util/library-template-resolve';
 import { libraryTemplateScopeName } from '../util/library-template-scope-name';
 import { runScript } from '../util/run-script';
 import { ComponentTemplateLoaderContext } from './type';
 
-function resolveContent(
-  content: string,
-  directivePrefix: string,
-  eventNameConvert: (name: string) => string,
-  templateInterpolation: [string, string],
-  fileExtname: any
-): string {
-  return runScript(`(()=>{return \`${content}\`})()`, {
-    directivePrefix,
-    eventNameConvert,
-    templateInterpolation,
-    fileExtname,
-  });
-}
 export default async function (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   this: webpack.LoaderContext<any>,
@@ -108,12 +95,12 @@ export default async function (
           item.libraryPath + fileExtname.content
         ),
         `<import  src="${globalTemplatePath}"/>` +
-          resolveContent(
+          libraryTemplateResolve(
             item.content,
             libraryLoaderContext.buildPlatform.templateTransform.getData()
               .directivePrefix,
             libraryLoaderContext.buildPlatform.templateTransform
-              .eventNameConvert,
+              .eventListConvert,
             libraryLoaderContext.buildPlatform.templateTransform
               .templateInterpolation,
             libraryLoaderContext.buildPlatform.fileExtname
@@ -127,12 +114,12 @@ export default async function (
             'template' + fileExtname.contentTemplate
           ),
           `<import  src="${globalTemplatePath}"/>` +
-            resolveContent(
+            libraryTemplateResolve(
               item.contentTemplate,
               libraryLoaderContext.buildPlatform.templateTransform.getData()
                 .directivePrefix,
               libraryLoaderContext.buildPlatform.templateTransform
-                .eventNameConvert,
+                .eventListConvert,
               libraryLoaderContext.buildPlatform.templateTransform
                 .templateInterpolation,
               libraryLoaderContext.buildPlatform.fileExtname

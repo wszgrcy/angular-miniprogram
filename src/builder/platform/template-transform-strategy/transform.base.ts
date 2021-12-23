@@ -9,7 +9,6 @@ export abstract class TemplateTransformBase {
   abstract init(): any;
   abstract compile(nodes: NgNodeMeta[]): {
     template: string;
-    meta: { listeners: MetaCollection['listeners'] };
     content: string;
     useComponentPath: {
       localPath: UseComponent[];
@@ -18,6 +17,7 @@ export abstract class TemplateTransformBase {
     otherMetaGroup: Record<string, MetaCollection>;
   };
   abstract getData(): any;
-  abstract eventNameConvert(name: string): string;
+
   abstract templateInterpolation: [string, string];
+  abstract eventListConvert: (list: string[]) => string;
 }

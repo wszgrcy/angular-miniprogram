@@ -24,6 +24,7 @@ import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
 import type { PagePattern } from '../type';
+import { libraryTemplateResolve } from '../util/library-template-resolve';
 
 export interface ExportMiniProgramAssetsPluginOptions {
   /** tsConfig配置路径 */
@@ -128,7 +129,6 @@ export class ExportMiniProgramAssetsPlugin {
         );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (compilation as any)[ExportMiniProgramAssetsPluginSymbol] = {
-          metaMapPromise: buildTemplatePromise.then((item) => item.meta),
           buildPlatform: this.options.buildPlatform,
           otherMetaGroupPromise: buildTemplatePromise.then(
             (item) => item.otherMetaCollectionGroup
@@ -177,21 +177,6 @@ export class ExportMiniProgramAssetsPlugin {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ) as any;
             });
-            const componentConfigGroup =
-              this.libraryTemplateScopeService.exportLibraryComponentConfig();
-            for (const item of componentConfigGroup) {
-              compilation.assets[item.filePath] = new RawSource(
-                JSON.stringify(item.content)
-              ) as any;
-            }
-            const templateGroup =
-              this.libraryTemplateScopeService.exportLibraryTemplate();
-            for (const key in templateGroup) {
-              if (Object.prototype.hasOwnProperty.call(templateGroup, key)) {
-                const element = templateGroup[key];
-                compilation.assets[key] = new RawSource(element) as any;
-              }
-            }
             for (const key in metaMap.otherMetaCollectionGroup) {
               if (
                 Object.prototype.hasOwnProperty.call(
@@ -217,6 +202,30 @@ export class ExportMiniProgramAssetsPlugin {
                     ),
                   }
                 );
+              }
+            }
+            const componentConfigGroup =
+              this.libraryTemplateScopeService.exportLibraryComponentConfig();
+            for (const item of componentConfigGroup) {
+              compilation.assets[item.filePath] = new RawSource(
+                JSON.stringify(item.content)
+              ) as any;
+            }
+            const templateGroup =
+              this.libraryTemplateScopeService.exportLibraryTemplate();
+            for (const key in templateGroup) {
+              if (Object.prototype.hasOwnProperty.call(templateGroup, key)) {
+                const element = templateGroup[key];
+                compilation.assets[key] = new RawSource(
+                  libraryTemplateResolve(
+                    element,
+                    this.buildPlatform.templateTransform.getData()
+                      .directivePrefix,
+                    this.buildPlatform.templateTransform.eventListConvert,
+                    this.buildPlatform.templateTransform.templateInterpolation,
+                    this.buildPlatform.fileExtname
+                  )
+                ) as any;
               }
             }
 

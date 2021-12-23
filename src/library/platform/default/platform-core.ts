@@ -45,6 +45,16 @@ export class MiniProgramCoreFactory {
   public getPageId(component: MiniProgramComponentInstance) {
     return component.getPageId();
   }
+  protected eventPrefixList = [
+    { listener: 'bind', prefix: 'bind' },
+    { listener: 'catch', prefix: 'catch' },
+    { listener: 'mutBind', prefix: 'mut-bind' },
+    { listener: 'captureBind', prefix: 'capture-bind' },
+    { listener: 'captureCatch', prefix: 'capture-catch' },
+  ];
+  protected getListenerEventMapping(prefix: string, name: string) {
+    return [name, prefix + name];
+  }
   protected setComponentInstancePageId(
     component: MiniProgramComponentInstance
   ) {
@@ -81,35 +91,40 @@ export class MiniProgramCoreFactory {
   }
 
   protected listenerEvent(component: NgCompileComponent) {
-    let extraMeta = component.ɵcmpExtraMeta;
-    return extraMeta.listeners.reduce((pre: Record<string, Function>, cur) => {
-      pre[cur.methodName] = function (
+    let self = this;
+    return this.eventPrefixList.reduce((pre: Record<string, Function>, cur) => {
+      pre[cur.listener + 'Event'] = function (
         this: MiniProgramComponentInstance,
         event: any
       ) {
         if (this.__lView) {
-          let el = findCurrentElement(
-            this.__lView,
-            event.currentTarget?.dataset?.nodePath ||
-              event.target.dataset.nodePath,
-            event.currentTarget?.dataset?.nodeIndex ||
-              event.target.dataset.nodeIndex
-          ) as AgentNode;
+          let dataset = event.currentTarget?.dataset || event.target.dataset;
+          let currentPath = [...(dataset.nodePath || []), dataset.nodeIndex];
+          let componentPath = this.__completePath || [];
+          let relativePath = currentPath.slice(componentPath.length);
+          let el = findCurrentElement(this.__lView, relativePath) as AgentNode;
           if (!(el instanceof AgentNode)) {
             el = el[0];
             if (!(el instanceof AgentNode)) {
               throw new Error('查询代理节点失败');
             }
           }
-          cur.eventName.forEach((name) => {
-            this.__ngZone.run(() => {
-              el.listener[name](event);
+
+          let eventName = event.type;
+          self
+            .getListenerEventMapping(cur.prefix, eventName)
+            .forEach((name) => {
+              this.__ngZone.run(() => {
+                if (el.listener[name]) {
+                  el.listener[name](event);
+                }
+              });
             });
-          });
         } else {
           throw new Error('未绑定lView');
         }
       };
+
       return pre;
     }, {});
   }
@@ -215,10 +230,8 @@ export class MiniProgramCoreFactory {
           }
           this.__componentPath = list || [];
           if (typeof this.__nodeIndex !== 'undefined') {
-            self.linkNgComponentWithPath(this, [
-              ...this.__componentPath,
-              this.__nodeIndex,
-            ]);
+            this.__completePath = [...this.__componentPath, this.__nodeIndex];
+            self.linkNgComponentWithPath(this, this.__completePath);
           }
         },
       },
@@ -233,10 +246,8 @@ export class MiniProgramCoreFactory {
           }
           this.__nodeIndex = index;
           if (typeof this.__componentPath !== 'undefined') {
-            self.linkNgComponentWithPath(this, [
-              ...this.__componentPath,
-              this.__nodeIndex,
-            ]);
+            this.__completePath = [...this.__componentPath, this.__nodeIndex];
+            self.linkNgComponentWithPath(this, this.__completePath);
           }
         },
       },

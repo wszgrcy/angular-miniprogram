@@ -10,6 +10,23 @@ class MiniProgramCoreFactory extends BaseFactory {
     return component.$page ? component.$page.$id : component.$id;
   }
   override MINIPROGRAM_GLOBAL = my;
+  override eventPrefixList = [
+    { listener: 'on', prefix: 'on' },
+    { listener: 'catch', prefix: 'catch' },
+  ];
+  override getListenerEventMapping(prefix: string, name: string) {
+    let upperName = name[0].toLocaleUpperCase() + name.substr(1);
+    let isOn = prefix === 'on';
+
+    return [
+      name,
+      prefix + name,
+      prefix + upperName,
+      ...(isOn
+        ? ['mut-bind' + name, 'capture-bind' + name, 'bind' + name]
+        : ['capture-catch' + name]),
+    ];
+  }
   override addNgComponentLinkLogic(config: any) {
     let self = this;
     config.props = {

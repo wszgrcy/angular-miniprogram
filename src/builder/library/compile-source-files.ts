@@ -337,10 +337,7 @@ export async function compileSourceFiles(
         }
         const originFileName = path.normalize(sourceFile.fileName);
 
-        const changeData = changeComponent(
-          data,
-          metaMap.meta.get(originFileName)!
-        );
+        const changeData = changeComponent(data);
         if (!changeData) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           return oldWriteFile.apply(this, arguments as any);

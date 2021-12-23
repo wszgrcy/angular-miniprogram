@@ -11,13 +11,8 @@ export class LibraryTransform extends WxTransformLike {
     '${templateInterpolation[0]}',
     '${templateInterpolation[1]}',
   ];
-  override eventNameConvert(name: string) {
-    let convertName: string;
-    if (!EVENT_PREFIX_REGEXP.test(name)) {
-      convertName = 'bind' + name;
-    } else {
-      convertName = name;
-    }
-    return `\${eventNameConvert("${convertName}")}`;
-  }
+
+  override eventListConvert = (list: string[]) => {
+    return `\${eventListConvert(${JSON.stringify(list)})}`;
+  };
 }

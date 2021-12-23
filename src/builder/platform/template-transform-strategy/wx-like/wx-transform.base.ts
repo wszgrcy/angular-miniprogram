@@ -1,9 +1,10 @@
+import { strings } from '@angular-devkit/core';
 import type { NgNodeMeta } from '../../../html/node-handle/interface';
 import { TemplateTransformBase } from '../transform.base';
 import { WxContainer } from './wx-container';
 
 export const EVENT_PREFIX_REGEXP =
-  /^(bind|catch|mut-bind|capture-bind|capture-catch)/;
+  /^(bind|catch|mut-bind|capture-bind|capture-catch)(.*)$/;
 export abstract class WxTransformLike extends TemplateTransformBase {
   seq = ':';
   templateInterpolation: [string, string] = ['{{', '}}'];
@@ -16,7 +17,7 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     WxContainer.initWxContainerFactory({
       seq: this.seq,
       directivePrefix: this.directivePrefix,
-      eventNameConvert: this.eventNameConvert,
+      eventListConvert: this.eventListConvert,
       templateInterpolation: this.templateInterpolation,
     });
   }
@@ -35,7 +36,6 @@ export abstract class WxTransformLike extends TemplateTransformBase {
       template: inlineMetaCollection.templateList
         .map((item) => item.content)
         .join(''),
-      meta: { listeners: inlineMetaCollection.listeners },
       useComponentPath: {
         localPath: [...inlineMetaCollection.localPath],
         libraryPath: [...inlineMetaCollection.libraryPath],
@@ -48,10 +48,37 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     return { directivePrefix: this.directivePrefix };
   }
   eventNameConvert(tagEventMeta: string) {
-    if (EVENT_PREFIX_REGEXP.test(tagEventMeta)) {
-      return tagEventMeta.replace(EVENT_PREFIX_REGEXP, '$1:');
-    } else {
-      return `bind:${tagEventMeta}`;
+    const result = tagEventMeta.match(EVENT_PREFIX_REGEXP);
+    let prefix: string = 'bind';
+    let type: string = tagEventMeta;
+    if (result) {
+      prefix = result[1];
+      type = result[2];
     }
+    return {
+      prefix,
+      type,
+      name: `${prefix}:${type}`,
+    };
   }
+  eventListConvert = (list: string[]) => {
+    const nodeEventGroup: Record<string, Record<string, string[]>> = {};
+    const eventMap = new Map();
+    list.forEach((eventName) => {
+      const result = this.eventNameConvert(eventName);
+      const prefix = strings.camelize(result.prefix);
+      if (nodeEventGroup[prefix] && nodeEventGroup[prefix][result.type]) {
+      }
+      const eventList = [eventName];
+      nodeEventGroup[prefix] = nodeEventGroup[prefix] || {};
+      nodeEventGroup[prefix][result.type] = eventList;
+      eventMap.set(result.name, `${prefix}Event`);
+    });
+
+    return [
+      ...Array.from(eventMap.entries()).map(
+        ([key, value]) => `${key}="${value}"`
+      ),
+    ].join(' ');
+  };
 }

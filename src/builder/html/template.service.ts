@@ -162,7 +162,6 @@ export class TemplateService {
     return {
       style: styleMap,
       outputContent: contentMap,
-      meta: metaMap.meta,
       config: config,
       otherMetaCollectionGroup: metaMap.otherMetaCollectionGroup,
       selfTemplate,

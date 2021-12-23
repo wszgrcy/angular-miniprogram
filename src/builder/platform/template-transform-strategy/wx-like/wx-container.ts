@@ -1,3 +1,4 @@
+import { strings } from '@angular-devkit/core';
 import { MetaCollection } from '../../../html/meta-collection';
 import type {
   NgBoundTextMeta,
@@ -18,7 +19,7 @@ import {
 export interface WxContainerGlobalConfig {
   seq: string;
   directivePrefix: string;
-  eventNameConvert: (name: string) => string;
+  eventListConvert: (name: string[]) => string;
   templateInterpolation: [string, string];
 }
 export class WxContainer {
@@ -190,7 +191,7 @@ export class WxContainer {
       .forEach((key) => {
         propertyMap.set(key, `nodeList[${index!}].property.${key}`);
       });
-    const eventMap = new Map();
+    // const eventMap = new Map();
     const eventList: string[] = [
       ...node.outputs
         .filter(
@@ -207,32 +208,11 @@ export class WxContainer {
       ...(node.componentMeta?.isComponent ? node.componentMeta?.listeners : []),
     ];
 
-    const mergeEventMap = new Map<string, string[]>();
-    eventList
-      // .filter((eventName) => !eventMap.has(eventName))
-      .forEach((eventName) => {
-        const convertName =
-          WxContainer.globalConfig.eventNameConvert(eventName);
-        if (
-          eventMap.has(convertName) &&
-          !mergeEventMap.get(convertName)!.includes(eventName)
-        ) {
-          mergeEventMap.get(convertName)!.push(eventName);
-          return;
-        }
-        const methodName = `${this.containerName}_${index}_${eventName}`;
-        eventMap.set(convertName, methodName);
-
-        const eventList = [eventName];
-        mergeEventMap.set(convertName, eventList);
-        this.metaCollection.listeners.push({
-          methodName: methodName,
-          eventName: eventList,
-          index: index,
-        });
-        propertyMap.set(`data-node-path`, `componentPath`);
-        propertyMap.set(`data-node-index`, `${index}`);
-      });
+    const result = WxContainer.globalConfig.eventListConvert(eventList);
+    if (result) {
+      propertyMap.set(`data-node-path`, `componentPath`);
+      propertyMap.set(`data-node-index`, `${index}`);
+    }
     return [
       ...Array.from(attributeMap.entries()).map(
         ([key, value]) => `${key}="${value}"`
@@ -240,9 +220,7 @@ export class WxContainer {
       ...Array.from(propertyMap.entries()).map(
         ([key, value]) => `${key}="{{${value}}}"`
       ),
-      ...Array.from(eventMap.entries()).map(
-        ([key, value]) => `${key}="${value}"`
-      ),
+      result,
     ];
   }
   static globalConfig: WxContainerGlobalConfig;

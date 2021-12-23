@@ -40,7 +40,6 @@ export class MiniProgramPlatformCompilerService {
     style: new Map<string, string[]>(),
     outputContent: new Map<string, string>(),
     outputContentTemplate: new Map<string, string>(),
-    meta: new Map<string, { listeners: MetaCollection['listeners'] }>(),
     useComponentPath: new Map<
       string,
       {
@@ -179,10 +178,6 @@ export class MiniProgramPlatformCompilerService {
           componentBuildMeta.template
         );
       }
-      this.componentDataMap.meta.set(
-        path.normalize(fileName),
-        componentBuildMeta.meta
-      );
       this.componentDataMap.useComponentPath.set(
         path.normalize(fileName),
         componentBuildMeta.useComponentPath

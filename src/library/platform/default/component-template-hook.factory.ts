@@ -167,11 +167,7 @@ export function findCurrentLView(lView: LView, list: ComponentPath): any {
   }
   return lView;
 }
-export function findCurrentElement(
-  lView: LView,
-  list: ComponentPath = [],
-  index: number
-) {
+export function findCurrentElement(lView: LView, list: ComponentPath = []) {
   list = [...list];
   while (list.length) {
     const item = list.shift()!;
@@ -181,10 +177,12 @@ export function findCurrentElement(
       const child = list.shift() as number;
       const viewRef = lContainer[8][child];
       lView = viewRef['_lView'];
+    } else {
+      lView = lView[item + start];
     }
   }
 
-  return lView[index + start];
+  return lView as any;
 }
 
 export function lViewLinkToMPComponentRef(ref: any, lView: LView) {
