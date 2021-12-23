@@ -1,25 +1,26 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { join, normalize } from '@angular-devkit/core';
+import { dirname, join, normalize, strings } from '@angular-devkit/core';
+
 import { createCssSelectorForTs } from 'cyia-code-util';
 import ts from 'typescript';
 import * as webpack from 'webpack';
-import { LIBRARY_OUTPUT_PATH, LibrarySymbol } from '../const';
+import {
+  ExportMiniProgramAssetsPluginSymbol,
+  LIBRARY_OUTPUT_PATH,
+  LibrarySymbol,
+  TemplateScopeSymbol,
+} from '../const';
+import {
+  ExtraTemplateData,
+  TemplateScopeOutside,
+} from '../html/library-template-scope.service';
 import { ExportLibraryComponentMeta, LibraryLoaderContext } from '../type';
+import { libraryTemplateResolve } from '../util/library-template-resolve';
+import { libraryTemplateScopeName } from '../util/library-template-scope-name';
 import { runScript } from '../util/run-script';
+import { ComponentTemplateLoaderContext } from './type';
 
-function resolveContent(
-  content: string,
-  directivePrefix: string,
-  eventNameConvert: (name: string) => string,
-  templateInterpolation: [string, string]
-): string {
-  return runScript(`(()=>{return \`${content}\`})()`, {
-    directivePrefix,
-    eventNameConvert,
-    templateInterpolation,
-  });
-}
-export default function (
+export default async function (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   this: webpack.LoaderContext<any>,
   data: string,
@@ -32,6 +33,13 @@ export default function (
     callback(undefined, data, map);
     return;
   }
+  const context: ComponentTemplateLoaderContext = (this._compilation! as any)[
+    ExportMiniProgramAssetsPluginSymbol
+  ];
+  const templateScopeOutside = (this._compilation as any)[
+    TemplateScopeSymbol
+  ] as TemplateScopeOutside;
+  const scopeLibraryObj: Record<string, ExtraTemplateData[]> = {};
   for (let i = 0; i < list.length; i++) {
     const element = list[i] as ts.BinaryExpression;
     const componentName = (
@@ -41,8 +49,7 @@ export default function (
       `VariableDeclaration[name="${componentName}_ExtraData"]`
     ) as ts.VariableDeclaration;
     if (!extraNode) {
-      callback(undefined, data, map);
-      return;
+      continue;
     }
     const content = extraNode.initializer!.getText();
     const fn = new Function('', `return ${content}`);
@@ -62,35 +69,61 @@ export default function (
     });
     const fileExtname = libraryLoaderContext.buildPlatform.fileExtname;
     libraryLoaderContext.libraryMetaList.forEach((item) => {
+      const globalTemplatePath = join(
+        normalize('/library-template'),
+        strings.classify(item.moduleId) +
+          libraryLoaderContext.buildPlatform.fileExtname.contentTemplate
+      );
+      const LIBRARY_SCOPE_ID = libraryTemplateScopeName(item.moduleId);
+      const configPath = join(
+        normalize(LIBRARY_OUTPUT_PATH),
+        item.libraryPath + (fileExtname.config || '.json')
+      );
+      const list = scopeLibraryObj[LIBRARY_SCOPE_ID] || [];
+      list.push({
+        configPath: configPath,
+        useComponents: item.useComponents,
+        templateList: [],
+        templatePath: globalTemplatePath,
+      });
+
+      scopeLibraryObj[LIBRARY_SCOPE_ID] = list;
+
       this.emitFile(
         join(
           normalize(LIBRARY_OUTPUT_PATH),
           item.libraryPath + fileExtname.content
         ),
-        resolveContent(
-          item.content,
-          libraryLoaderContext.buildPlatform.templateTransform.getData()
-            .directivePrefix,
-          libraryLoaderContext.buildPlatform.templateTransform.eventNameConvert,
-          libraryLoaderContext.buildPlatform.templateTransform
-            .templateInterpolation
-        )
+        `<import  src="${globalTemplatePath}"/>` +
+          libraryTemplateResolve(
+            item.content,
+            libraryLoaderContext.buildPlatform.templateTransform.getData()
+              .directivePrefix,
+            libraryLoaderContext.buildPlatform.templateTransform
+              .eventListConvert,
+            libraryLoaderContext.buildPlatform.templateTransform
+              .templateInterpolation,
+            libraryLoaderContext.buildPlatform.fileExtname
+          )
       );
       if (item.contentTemplate) {
         this.emitFile(
           join(
             normalize(LIBRARY_OUTPUT_PATH),
-            item.libraryPath + fileExtname.contentTemplate
+            dirname(normalize(item.libraryPath)),
+            'template' + fileExtname.contentTemplate
           ),
-          resolveContent(
-            item.contentTemplate,
-            libraryLoaderContext.buildPlatform.templateTransform.getData()
-              .directivePrefix,
-            libraryLoaderContext.buildPlatform.templateTransform
-              .eventNameConvert,
-            libraryLoaderContext.buildPlatform.templateTransform
-              .templateInterpolation
-          )
+          `<import  src="${globalTemplatePath}"/>` +
+            libraryTemplateResolve(
+              item.contentTemplate,
+              libraryLoaderContext.buildPlatform.templateTransform.getData()
+                .directivePrefix,
+              libraryLoaderContext.buildPlatform.templateTransform
+                .eventListConvert,
+              libraryLoaderContext.buildPlatform.templateTransform
+                .templateInterpolation,
+              libraryLoaderContext.buildPlatform.fileExtname
+            )
         );
       }
       if (item.style) {
@@ -102,14 +135,13 @@ export default function (
           item.style
         );
       }
-      this.emitFile(
-        join(
-          normalize(LIBRARY_OUTPUT_PATH),
-          item.libraryPath + (fileExtname.config || '.json')
-        ),
-        JSON.stringify({ component: true, usingComponents: item.useComponents })
-      );
     });
+  }
+  for (const key in scopeLibraryObj) {
+    if (Object.prototype.hasOwnProperty.call(scopeLibraryObj, key)) {
+      const element = scopeLibraryObj[key];
+      templateScopeOutside.setScopeLibraryUseComponents(key, element);
+    }
   }
   callback(undefined, data, map);
 }

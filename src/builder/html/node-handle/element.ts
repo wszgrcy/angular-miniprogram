@@ -61,6 +61,8 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     this.tagName = originTagName;
     if (/^(div|p|h1|h2|h3|h4|h5|h6|span)$/.test(originTagName)) {
       this.tagName = 'view';
+    } else if (originTagName === 'ng-container') {
+      this.tagName = 'block';
     }
   }
 

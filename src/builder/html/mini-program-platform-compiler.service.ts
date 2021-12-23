@@ -15,8 +15,10 @@ import {
   LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
   LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX,
 } from '../const';
+import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META, DIRECTIVE_MATCHER } from '../token/component.token';
 import { angularCompilerPromise } from '../util/load_esm';
+import { MetaCollection } from './meta-collection';
 import { ComponentContext } from './node-handle/component-context';
 import { ComponentCompiler } from './template-compiler';
 import {
@@ -38,7 +40,6 @@ export class MiniProgramPlatformCompilerService {
     style: new Map<string, string[]>(),
     outputContent: new Map<string, string>(),
     outputContentTemplate: new Map<string, string>(),
-    meta: new Map<string, string>(),
     useComponentPath: new Map<
       string,
       {
@@ -46,8 +47,13 @@ export class MiniProgramPlatformCompilerService {
         libraryPath: UseComponent[];
       }
     >(),
+    otherMetaCollectionGroup: {} as Record<string, MetaCollection>,
   };
-  constructor(private ngTscProgram: NgtscProgram, private injector: Injector) {}
+  constructor(
+    private ngTscProgram: NgtscProgram,
+    private injector: Injector,
+    private buildPlatform: BuildPlatform
+  ) {}
   init() {
     this.ngCompiler = this.ngTscProgram.compiler;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,15 +178,30 @@ export class MiniProgramPlatformCompilerService {
           componentBuildMeta.template
         );
       }
-      this.componentDataMap.meta.set(
-        path.normalize(fileName),
-        componentBuildMeta.meta
-      );
       this.componentDataMap.useComponentPath.set(
         path.normalize(fileName),
         componentBuildMeta.useComponentPath
       );
+      for (const key in componentBuildMeta.otherMetaGroup) {
+        if (
+          Object.prototype.hasOwnProperty.call(
+            componentBuildMeta.otherMetaGroup,
+            key
+          )
+        ) {
+          const element = componentBuildMeta.otherMetaGroup[key];
+          this.componentDataMap.otherMetaCollectionGroup[key] =
+            this.componentDataMap.otherMetaCollectionGroup[key] ||
+            new MetaCollection();
+          this.componentDataMap.otherMetaCollectionGroup[key].merge(element);
+        }
+      }
     }
+
+    this.componentDataMap.useComponentPath.forEach((value, key) => {
+      value.libraryPath = Array.from(new Set(value.libraryPath));
+      value.localPath = Array.from(new Set(value.localPath));
+    });
 
     return this.componentDataMap;
   }

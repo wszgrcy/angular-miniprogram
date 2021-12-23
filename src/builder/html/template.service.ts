@@ -9,6 +9,7 @@ import ts from 'typescript';
 import type { CompilerOptions } from 'typescript';
 import { Compilation, Compiler } from 'webpack';
 import { LIBRARY_OUTPUT_PATH } from '../const';
+import { BuildPlatform } from '../platform/platform';
 import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
@@ -33,7 +34,8 @@ export class TemplateService {
     @Inject(TS_CONFIG_TOKEN) private tsConfig: string,
     @Inject(OLD_BUILDER)
     private oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined,
-    @Inject(PAGE_PATTERN_TOKEN) private pagePatternList: PagePattern[]
+    @Inject(PAGE_PATTERN_TOKEN) private pagePatternList: PagePattern[],
+    private buildPlatform: BuildPlatform
   ) {}
 
   async exportComponentBuildMetaMap() {
@@ -41,13 +43,14 @@ export class TemplateService {
       providers: [
         {
           provide: MiniProgramPlatformCompilerService,
-          useFactory: (injector: Injector) => {
+          useFactory: (injector: Injector, buildPlatform: BuildPlatform) => {
             return new MiniProgramPlatformCompilerService(
               this.ngTscProgram,
-              injector
+              injector,
+              buildPlatform
             );
           },
-          deps: [Injector],
+          deps: [Injector, BuildPlatform],
         },
       ],
       parent: this.injector,
@@ -58,6 +61,33 @@ export class TemplateService {
     miniProgramPlatformCompilerService.init();
     const metaMap =
       await miniProgramPlatformCompilerService.exportComponentBuildMetaMap();
+
+    const extraMetaCollection = metaMap.otherMetaCollectionGroup['$self'];
+    const selfTemplate: Record<string, string> = {};
+    if (extraMetaCollection) {
+      const importSelfTemplatePath = `/self-template/self${this.buildPlatform.fileExtname.contentTemplate}`;
+      const importSelfTemplate = `<import src="${importSelfTemplatePath}"/>`;
+      metaMap.outputContent.forEach((value, key) => {
+        value = `${importSelfTemplate}${value}`;
+        metaMap.outputContent.set(key, value);
+      });
+      metaMap.outputContentTemplate.forEach((value, key) => {
+        value = `${importSelfTemplate}${value}`;
+        metaMap.outputContentTemplate.set(key, value);
+      });
+      metaMap.useComponentPath.forEach((value, key) => {
+        value.libraryPath.push(...extraMetaCollection.libraryPath);
+        value.localPath.push(...extraMetaCollection.localPath);
+      });
+      selfTemplate[importSelfTemplatePath] = extraMetaCollection.templateList
+        .map((item) => item.content)
+        .join('');
+      delete metaMap.otherMetaCollectionGroup['$self'];
+    }
+    metaMap.useComponentPath.forEach((value, key) => {
+      value.libraryPath = Array.from(new Set(value.libraryPath));
+      value.localPath = Array.from(new Set(value.localPath));
+    });
     const styleMap = new Map<string, string[]>();
     metaMap.style.forEach((value, key) => {
       const entryPattern = this.getComponentPagePattern(key);
@@ -106,11 +136,35 @@ export class TemplateService {
         existConfig: entryPattern.inputFiles.config,
       });
     });
+
+    for (const key in metaMap.otherMetaCollectionGroup) {
+      if (
+        Object.prototype.hasOwnProperty.call(
+          metaMap.otherMetaCollectionGroup,
+          key
+        )
+      ) {
+        const element = metaMap.otherMetaCollectionGroup[key];
+        element.localPath.forEach((item) => {
+          item.path = resolve(
+            normalize('/'),
+            normalize(this.getComponentPagePattern(item.path).outputFiles.path)
+          );
+        });
+        element.libraryPath.forEach((item) => {
+          item.path = resolve(
+            normalize('/'),
+            join(normalize(LIBRARY_OUTPUT_PATH), item.path)
+          );
+        });
+      }
+    }
     return {
       style: styleMap,
       outputContent: contentMap,
-      meta: metaMap.meta,
       config: config,
+      otherMetaCollectionGroup: metaMap.otherMetaCollectionGroup,
+      selfTemplate,
     };
   }
 

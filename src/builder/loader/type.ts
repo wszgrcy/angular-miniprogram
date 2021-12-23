@@ -1,6 +1,7 @@
+import { MetaCollection } from '../html/meta-collection';
 import type { BuildPlatform } from '../platform/platform';
 
 export interface ComponentTemplateLoaderContext {
-  metaMapPromise: Promise<Map<string, string>>;
   buildPlatform: BuildPlatform;
+  otherMetaGroupPromise: Promise<Record<string, MetaCollection>>;
 }

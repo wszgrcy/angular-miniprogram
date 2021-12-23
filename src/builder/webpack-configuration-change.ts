@@ -13,6 +13,7 @@ import * as webpack from 'webpack';
 import { DefinePlugin } from 'webpack';
 import { BootstrapAssetsPlugin } from 'webpack-bootstrap-assets-plugin';
 import { LIBRARY_OUTPUT_PATH } from './const';
+import { LibraryTemplateScopeService } from './html/library-template-scope.service';
 import { BuildPlatform } from './platform/platform';
 import type { PlatformType } from './platform/platform';
 import { DynamicLibraryComponentEntryPlugin } from './plugin/dynamic-library-entry.plugin';
@@ -52,6 +53,7 @@ export class WebpackConfigurationChange {
       parent: this.injector,
       providers: [
         { provide: ExportMiniProgramAssetsPlugin },
+        { provide: LibraryTemplateScopeService },
         {
           provide: TS_CONFIG_TOKEN,
           useValue: path.resolve(
@@ -227,6 +229,12 @@ export class WebpackConfigurationChange {
     this.config.module?.rules?.unshift({
       test: /\.mjs$/,
       loader: require.resolve(path.join(__dirname, './loader/library.loader')),
+    });
+    this.config.module?.rules?.unshift({
+      test: /\.mjs$/,
+      loader: require.resolve(
+        path.join(__dirname, './loader/library-template.loader')
+      ),
     });
   }
   private definePlugin() {

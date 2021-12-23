@@ -13,3 +13,7 @@ export * from './lib-comp1/lib-dir1.directive';
 export * from './directive/directive.module';
 export * from './directive/input-output.directive';
 export * from './other/other.module';
+export * from './outside-template/outside-template.module';
+export * from './outside-template/outside-template.component';
+export * from './global-self-template/global-self-template.module';
+export * from './global-self-template/global-self-template.component';

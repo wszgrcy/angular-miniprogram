@@ -31,6 +31,7 @@ export interface ExportLibraryComponentMeta {
   className: string;
   libraryPath: string;
   useComponents: Record<string, string>;
+  moduleId: string;
 }
 export interface LibraryComponentEntryMeta extends ExportLibraryComponentMeta {
   importPath: string;

@@ -40,6 +40,7 @@ export interface MiniProgramComponentVariable {
   __componentPath: ComponentPath;
   __nodeIndex: number;
   __isDetachView: boolean;
+  __completePath: ComponentPath;
 }
 export interface MiniProgramComponentMethod {
   __ngComponentDestroy: () => void;
@@ -60,9 +61,6 @@ export interface NgCompileComponent {
   ɵcmp: {
     inputs: Record<string, string[] | string>;
     outputs: Record<string, string>;
-  };
-  ɵcmpExtraMeta: {
-    listeners: { methodName: string; index: number; eventName: string[] }[];
   };
 }
 

@@ -1,3 +1,5 @@
+import { strings } from '@angular-devkit/core';
+import { MetaCollection } from '../../../html/meta-collection';
 import type {
   NgBoundTextMeta,
   NgContentMeta,
@@ -13,21 +15,24 @@ import {
   isNgTemplateMeta,
   isNgTextMeta,
 } from '../../util/type-predicate';
-import type { MetaCollection } from './type';
 
 export interface WxContainerGlobalConfig {
   seq: string;
   directivePrefix: string;
-  eventNameConvert: (name: string) => string;
+  eventListConvert: (name: string[]) => string;
   templateInterpolation: [string, string];
 }
 export class WxContainer {
-  private exportTemplateList: { name: string; content: string }[] = [];
   private wxmlTemplate: string = '';
   private childContainer: WxContainer[] = [];
   private level: number = 0;
+  // todo 如果是全局模板,声明来自哪个,并且追加
+  // todo 声明位置默认先不加,如果有两用再追加
+  // todo 需要暴露组件
+  fromTemplate!: string;
+  defineTemplateName!: string;
+  private metaCollection: MetaCollection = new MetaCollection();
   constructor(
-    private metaCollection: MetaCollection,
     private containerName = 'container',
     private parent?: WxContainer
   ) {}
@@ -47,6 +52,7 @@ export class WxContainer {
       throw new Error('未知的ng节点元数据');
     }
   }
+
   compileNode(node: NgNodeMeta) {
     this.wxmlTemplate += this._compileTemplate(node);
   }
@@ -76,9 +82,9 @@ export class WxContainer {
     if (node.singleClosedTag) {
       return `<${node.tagName} ${commonTagProperty}/>`;
     }
-    return `<${node.tagName} ${commonTagProperty}>${children.join('')}</${
-      node.tagName
-    }>`;
+    return `<${node.tagName} ${
+      node.tagName === 'block' ? '' : commonTagProperty
+    }>${children.join('')}</${node.tagName}>`;
   }
   private ngBoundTextTransform(node: NgBoundTextMeta): string {
     return `{{nodeList[${node.index}].value}}`;
@@ -89,20 +95,34 @@ export class WxContainer {
   private ngTemplateTransform(node: NgTemplateMeta): string {
     let content = '';
     const defineTemplateName = node.defineTemplateName;
-
+    // todo这里追加
     const container = new WxContainer(
-      this.metaCollection,
       `${this.containerName}_${this.level++}`,
       this
     );
+    const globalTemplate = this.isGlobalTemplate(node.defineTemplateName);
+    if (globalTemplate) {
+      if (this.fromTemplate && this.fromTemplate !== globalTemplate) {
+        console.error('全局ng-template中不可包含其他位置的ng-template');
+        throw new Error('全局ng-template中不可包含其他位置的ng-template');
+      } else if (globalTemplate) {
+        container.fromTemplate = globalTemplate;
+        container.defineTemplateName = defineTemplateName;
+      }
+    } else {
+      container.fromTemplate = this.fromTemplate;
+      container.defineTemplateName = defineTemplateName;
+    }
     this.childContainer.push(container);
     node.children.forEach((childNode) => {
       container.compileNode(childNode);
     });
-    this.exportTemplateList.push({
-      name: defineTemplateName,
-      content: `<template name="${defineTemplateName}">${container.wxmlTemplate}</template>`,
-    });
+    if (this.fromTemplate === container.fromTemplate) {
+      this.metaCollection.templateList.push({
+        name: defineTemplateName,
+        content: `<template name="${defineTemplateName}">${container.wxmlTemplate}</template>`,
+      });
+    }
 
     content += `<block ${WxContainer.globalConfig.directivePrefix}${
       WxContainer.globalConfig.seq
@@ -123,15 +143,6 @@ export class WxContainer {
 
   private getTemplateDataStr(directiveIndex: number, indexName: string) {
     return `data="${WxContainer.globalConfig.templateInterpolation[0]}...nodeList[${directiveIndex}][${indexName}] ${WxContainer.globalConfig.templateInterpolation[1]}"`;
-  }
-  getExportTemplate(): {
-    name: string;
-    content: string;
-  }[] {
-    return [
-      ...this.exportTemplateList,
-      ...this.childContainer.map((child) => child.getExportTemplate()).flat(),
-    ];
   }
 
   export(): { wxmlTemplate: string } {
@@ -180,7 +191,7 @@ export class WxContainer {
       .forEach((key) => {
         propertyMap.set(key, `nodeList[${index!}].property.${key}`);
       });
-    const eventMap = new Map();
+    // const eventMap = new Map();
     const eventList: string[] = [
       ...node.outputs
         .filter(
@@ -197,32 +208,11 @@ export class WxContainer {
       ...(node.componentMeta?.isComponent ? node.componentMeta?.listeners : []),
     ];
 
-    const mergeEventMap = new Map<string, string[]>();
-    eventList
-      // .filter((eventName) => !eventMap.has(eventName))
-      .forEach((eventName) => {
-        const convertName =
-          WxContainer.globalConfig.eventNameConvert(eventName);
-        if (
-          eventMap.has(convertName) &&
-          !mergeEventMap.get(convertName)!.includes(eventName)
-        ) {
-          mergeEventMap.get(convertName)!.push(eventName);
-          return;
-        }
-        const methodName = `${this.containerName}_${index}_${eventName}`;
-        eventMap.set(convertName, methodName);
-
-        const eventList = [eventName];
-        mergeEventMap.set(convertName, eventList);
-        this.metaCollection.listeners.push({
-          methodName: methodName,
-          eventName: eventList,
-          index: index,
-        });
-        propertyMap.set(`data-node-path`, `componentPath`);
-        propertyMap.set(`data-node-index`, `${index}`);
-      });
+    const result = WxContainer.globalConfig.eventListConvert(eventList);
+    if (result) {
+      propertyMap.set(`data-node-path`, `componentPath`);
+      propertyMap.set(`data-node-index`, `${index}`);
+    }
     return [
       ...Array.from(attributeMap.entries()).map(
         ([key, value]) => `${key}="${value}"`
@@ -230,13 +220,50 @@ export class WxContainer {
       ...Array.from(propertyMap.entries()).map(
         ([key, value]) => `${key}="{{${value}}}"`
       ),
-      ...Array.from(eventMap.entries()).map(
-        ([key, value]) => `${key}="${value}"`
-      ),
+      result,
     ];
   }
   static globalConfig: WxContainerGlobalConfig;
   static initWxContainerFactory(globalConfig: WxContainerGlobalConfig) {
     this.globalConfig = globalConfig;
+  }
+  private isGlobalTemplate(name: string) {
+    const result = name.match(/^\$\$mp\$\$([^$]+)\$\$(.*)/);
+    if (!result) {
+      return undefined;
+    }
+    return result[1];
+  }
+  exportMetaCollectionGroup() {
+    const obj: Record<string, MetaCollection> = {};
+    if (!this.fromTemplate) {
+      obj.$inline = obj.$inline || new MetaCollection();
+      obj.$inline.merge(this.metaCollection);
+    } else if (this.fromTemplate == '__self__') {
+      obj.$self = obj.$self || new MetaCollection();
+      obj.$self.merge(this.metaCollection);
+      obj.$self.templateList.push({
+        name: this.defineTemplateName,
+        content: `<template name="${this.defineTemplateName}">${this.wxmlTemplate}</template>`,
+      });
+    } else {
+      obj[this.fromTemplate] = obj[this.fromTemplate] || new MetaCollection();
+      obj[this.fromTemplate].merge(this.metaCollection);
+      obj[this.fromTemplate].templateList.push({
+        name: this.defineTemplateName,
+        content: `<template name="${this.defineTemplateName}">${this.wxmlTemplate}</template>`,
+      });
+    }
+    this.childContainer.forEach((container) => {
+      const result = container.exportMetaCollectionGroup();
+      for (const key in result) {
+        if (Object.prototype.hasOwnProperty.call(result, key)) {
+          const element = result[key];
+          obj[key] = obj[key] || new MetaCollection();
+          obj[key].merge(element);
+        }
+      }
+    });
+    return obj;
   }
 }

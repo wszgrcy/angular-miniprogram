@@ -1,3 +1,4 @@
+import { join, normalize } from '@angular-devkit/core';
 import { normalizePath } from '@ngtools/webpack/src/ivy/paths';
 import {
   InputFileSystemSync,
@@ -9,7 +10,12 @@ import { Inject, Injectable, Injector } from 'static-injector';
 import ts from 'typescript';
 import * as webpack from 'webpack';
 import { ConcatSource, RawSource } from 'webpack-sources';
-import { ExportMiniProgramAssetsPluginSymbol } from '../const';
+import {
+  ExportMiniProgramAssetsPluginSymbol,
+  InjectorSymbol,
+  LIBRARY_OUTPUT_PATH,
+} from '../const';
+import { LibraryTemplateScopeService } from '../html/library-template-scope.service';
 import { TemplateService } from '../html/template.service';
 import type { StyleHookData } from '../html/type';
 import type { ComponentTemplateLoaderContext } from '../loader/type';
@@ -18,6 +24,7 @@ import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
 import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
 import type { PagePattern } from '../type';
+import { libraryTemplateResolve } from '../util/library-template-resolve';
 
 export interface ExportMiniProgramAssetsPluginOptions {
   /** tsConfig配置路径 */
@@ -40,8 +47,9 @@ export class ExportMiniProgramAssetsPlugin {
   private options: ExportMiniProgramAssetsPluginOptions;
   constructor(
     @Inject(TS_CONFIG_TOKEN) tsConfig: string,
-    buildPlatform: BuildPlatform,
-    private injector: Injector
+    private buildPlatform: BuildPlatform,
+    private injector: Injector,
+    private libraryTemplateScopeService: LibraryTemplateScopeService
   ) {
     this.options = {
       tsConfig: tsConfig,
@@ -92,7 +100,8 @@ export class ExportMiniProgramAssetsPlugin {
         );
         this.restore();
         this.compilation = compilation;
-
+        this.libraryTemplateScopeService.register(compilation);
+        (this.compilation as any)[InjectorSymbol] = this.injector;
         const injector = Injector.create({
           providers: [
             { provide: TemplateService },
@@ -120,8 +129,10 @@ export class ExportMiniProgramAssetsPlugin {
         );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (compilation as any)[ExportMiniProgramAssetsPluginSymbol] = {
-          metaMapPromise: buildTemplatePromise.then((item) => item.meta),
           buildPlatform: this.options.buildPlatform,
+          otherMetaGroupPromise: buildTemplatePromise.then(
+            (item) => item.otherMetaCollectionGroup
+          ),
         } as ComponentTemplateLoaderContext;
 
         compilation.hooks.processAssets.tapAsync(
@@ -166,6 +177,66 @@ export class ExportMiniProgramAssetsPlugin {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ) as any;
             });
+            for (const key in metaMap.otherMetaCollectionGroup) {
+              if (
+                Object.prototype.hasOwnProperty.call(
+                  metaMap.otherMetaCollectionGroup,
+                  key
+                )
+              ) {
+                const element = metaMap.otherMetaCollectionGroup[key];
+                this.libraryTemplateScopeService.setScopeExtraUseComponents(
+                  key,
+                  {
+                    useComponents: {
+                      ...[...element.localPath, ...element.libraryPath].reduce(
+                        (pre, cur) => {
+                          pre[cur.selector] = cur.path;
+                          return pre;
+                        },
+                        {} as Record<string, string>
+                      ),
+                    },
+                    templateList: element.templateList.map(
+                      (item) => item.content
+                    ),
+                  }
+                );
+              }
+            }
+            const componentConfigGroup =
+              this.libraryTemplateScopeService.exportLibraryComponentConfig();
+            for (const item of componentConfigGroup) {
+              compilation.assets[item.filePath] = new RawSource(
+                JSON.stringify(item.content)
+              ) as any;
+            }
+            const templateGroup =
+              this.libraryTemplateScopeService.exportLibraryTemplate();
+            for (const key in templateGroup) {
+              if (Object.prototype.hasOwnProperty.call(templateGroup, key)) {
+                const element = templateGroup[key];
+                compilation.assets[key] = new RawSource(
+                  libraryTemplateResolve(
+                    element,
+                    this.buildPlatform.templateTransform.getData()
+                      .directivePrefix,
+                    this.buildPlatform.templateTransform.eventListConvert,
+                    this.buildPlatform.templateTransform.templateInterpolation,
+                    this.buildPlatform.fileExtname
+                  )
+                ) as any;
+              }
+            }
+
+            for (const key in metaMap.selfTemplate) {
+              if (
+                Object.prototype.hasOwnProperty.call(metaMap.selfTemplate, key)
+              ) {
+                const element = metaMap.selfTemplate[key];
+                compilation.assets[key] = new RawSource(element) as any;
+              }
+            }
             cb();
           }
         );

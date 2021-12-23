@@ -2,7 +2,7 @@ import { InsertChange, TsChange, createCssSelectorForTs } from 'cyia-code-util';
 import * as ts from 'typescript';
 import { RawUpdater } from '../util/raw-updater';
 
-export function changeComponent(data: string, meta: string) {
+export function changeComponent(data: string) {
   const sf = ts.createSourceFile('', data, ts.ScriptTarget.Latest, true);
   const selector = createCssSelectorForTs(sf);
   const componentɵcmpNode = selector.queryOne(
@@ -30,11 +30,6 @@ export function changeComponent(data: string, meta: string) {
 
   const initContent = `amp.pageBind(ctx);`;
   const change = new TsChange(sf);
-  const extraMetaChange = change.insertNode(
-    componentɵcmpNode,
-    `;${componentɵcmpNode.left.getText()}ExtraMeta=${meta}`,
-    'end'
-  );
   const initInsertChange = change.insertNode(
     initBlock.statements[initBlock.statements.length - 1],
     initContent,
@@ -44,7 +39,6 @@ export function changeComponent(data: string, meta: string) {
   const changeList = [
     initInsertChange,
     new InsertChange(0, `import * as amp from 'angular-miniprogram';\n`),
-    extraMetaChange,
   ];
   const updateContent = `amp.propertyChange(ctx);`;
   if (updateIfNode) {

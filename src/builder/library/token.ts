@@ -12,3 +12,5 @@ export const DIRECTIVE_MAP = new InjectionToken<Map<ts.ClassDeclaration, any>>(
 export const COMPONENT_MAP = new InjectionToken<Map<ts.ClassDeclaration, any>>(
   'COMPONENT_MAP'
 );
+
+export const ENTRY_FILE_TOKEN = new InjectionToken<string>('ENTRY_FILE_TOKEN');

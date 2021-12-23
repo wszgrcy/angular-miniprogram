@@ -51,4 +51,9 @@ export class RootComponent implements OnInit {
       url: '/pages/base-forms/base-forms-entry',
     });
   }
+  componentUseTemplate() {
+    this.global.navigateTo({
+      url: '/pages/component-use-template/component-use-template-entry',
+    });
+  }
 }
