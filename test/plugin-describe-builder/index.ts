@@ -50,6 +50,7 @@ export function describeBuilder<T>(
   options: { name?: string; schemaPath: string },
   specDefinitions: (harness: JasmineBuilderHarness<T>) => void
 ): void {
+  errorAndExitHook();
   jasmine.DEFAULT_TIMEOUT_INTERVAL = 50 * 1000;
   let optionSchema = optionSchemaCache.get(options.schemaPath);
   if (optionSchema === undefined) {
@@ -729,4 +730,11 @@ function createFailureExpectation<T>(base: T, message: string): T {
   });
 
   return expectation;
+}
+function errorAndExitHook() {
+  const errorFn = console.error;
+  console.error = function () {
+    errorFn.apply(this, Array.from(arguments));
+    process.exit(100);
+  };
 }

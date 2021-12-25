@@ -103,7 +103,6 @@ export class WxContainer {
     const globalTemplate = this.isGlobalTemplate(node.defineTemplateName);
     if (globalTemplate) {
       if (this.fromTemplate && this.fromTemplate !== globalTemplate) {
-        console.error('全局ng-template中不可包含其他位置的ng-template');
         throw new Error('全局ng-template中不可包含其他位置的ng-template');
       } else if (globalTemplate) {
         container.fromTemplate = globalTemplate;

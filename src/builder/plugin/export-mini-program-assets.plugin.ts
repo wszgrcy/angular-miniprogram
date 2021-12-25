@@ -280,8 +280,13 @@ export class ExportMiniProgramAssetsPlugin {
     waitAnalyzeAsync: Promise<void>,
     service: TemplateService
   ) {
-    await waitAnalyzeAsync;
-    const result = await service.exportComponentBuildMetaMap();
-    return result;
+    try {
+      await waitAnalyzeAsync;
+      const result = await service.exportComponentBuildMetaMap();
+      return result;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
   }
 }

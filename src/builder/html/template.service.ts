@@ -239,8 +239,6 @@ export class TemplateService {
     module: ts.ResolvedModule
   ) {
     if (!module) {
-      // eslint-disable-next-line no-console
-      console.error(`模块未被解析,文件名${filePath},模块名${moduleName}`);
       throw new Error(`模块未被解析,文件名${filePath},模块名${moduleName}`);
     }
     const useList =
