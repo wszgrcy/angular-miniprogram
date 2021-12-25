@@ -8,6 +8,7 @@ import { getAngularSubDirRuleFactory } from '../rule/get-angular-sub-dir.rule';
 import { CommonHookOptions } from '../type';
 import { changeStructuralDirectiveRuleFactory } from './rule/change-structual-directive.rule';
 import { mergeSourceRuleFactory } from './rule/merge-source.rule';
+import { removeI18nRuleFactory } from './rule/remove-i18n.rule';
 import { removeNgComponentOutletRuleFactory } from './rule/remove-ng-component-outlet.rule';
 
 export default function (options: CommonHookOptions) {
@@ -18,6 +19,7 @@ export default function (options: CommonHookOptions) {
       mergeSourceRuleFactory(options),
       changeStructuralDirectiveRuleFactory(options),
       removeNgComponentOutletRuleFactory(),
+      removeI18nRuleFactory(),
       forEach((entry) => {
         if (
           entry.path.startsWith('/src/library/common') &&
