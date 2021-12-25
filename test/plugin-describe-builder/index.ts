@@ -15,6 +15,7 @@ import {
 import { TestProjectHost } from '@angular-devkit/architect/testing';
 
 import {
+  Path,
   analytics,
   getSystemPath,
   join,
@@ -22,6 +23,10 @@ import {
   logging,
   normalize,
 } from '@angular-devkit/core';
+import {
+  fileBufferToString,
+  stringToFileBuffer,
+} from '@angular-devkit/core/src/virtual-fs/host';
 import { readFileSync } from 'fs';
 import { Observable, Subject, from, of } from 'rxjs';
 import {
@@ -33,8 +38,62 @@ import {
   shareReplay,
 } from 'rxjs/operators';
 
+export class MyTestProjectHost extends TestProjectHost {
+  async getFileList(dirPath: Path): Promise<string[]> {
+    const fileList: string[] = [];
+    const list = await this.list(dirPath).toPromise();
+    for (let i = 0; i < list.length; i++) {
+      const element = list[i];
+      const filePath = join(dirPath, element);
+      if (await this.isDirectory(filePath).toPromise()) {
+        fileList.push(...(await this.getFileList(filePath)));
+      } else {
+        fileList.push(filePath);
+      }
+    }
+    return fileList;
+  }
+
+  async importPathRename(list: string[]) {
+    for (let i = 0; i < list.length; i++) {
+      const element = list[i];
+      const content = await this.read(normalize(element)).toPromise();
+      let contentString = fileBufferToString(content);
+
+      contentString = contentString
+        .replace(/\/__components\//g, '/components/')
+        .replace(/\/__pages\//g, '/pages/');
+
+      await this.write(
+        normalize(element),
+        stringToFileBuffer(contentString)
+      ).toPromise();
+    }
+  }
+
+  async moveDir(list: string[], from: string, to: string) {
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      await this.rename(
+        normalize(join(this.root(), 'src', from, item)),
+        normalize(join(this.root(), 'src', to, item))
+      ).toPromise();
+    }
+  }
+  async addPageEntry(list: string[]) {
+    const configPath = join(normalize(this.root()), 'src', 'app.json');
+    const file = await this.read(configPath).toPromise();
+    const json = JSON.parse(fileBufferToString(file));
+    const entryList = list.map((item) => `pages/${item}/${item}-entry`);
+    json.pages = entryList;
+    await this.write(
+      configPath,
+      stringToFileBuffer(JSON.stringify(json))
+    ).toPromise();
+  }
+}
 export const workspaceRoot = join(normalize(__dirname), `../hello-world-app/`);
-export const host = new TestProjectHost(workspaceRoot);
+export const host = new MyTestProjectHost(workspaceRoot);
 /**
  * @license
  * Copyright Google Inc. All Rights Reserved.
@@ -93,7 +152,7 @@ export class BuilderHarness<T> {
 
   constructor(
     private readonly builderHandler: BuilderHandlerFn<T & json.JsonObject>,
-    public readonly host: TestProjectHost,
+    public readonly host: MyTestProjectHost,
     builderInfo?: Partial<BuilderInfo>
   ) {
     // Generate default pseudo builder info for test purposes

@@ -1,8 +1,4 @@
 import { Path, join, normalize } from '@angular-devkit/core';
-import {
-  fileBufferToString,
-  stringToFileBuffer,
-} from '@angular-devkit/core/src/virtual-fs/host';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import { Injector, inject } from 'static-injector';
@@ -14,11 +10,6 @@ import {
 import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
-  addPageEntry,
-  copySpecifiedComponents,
-  copySpecifiedPages,
-  getAllFile,
-  importPathRename,
 } from '../../test/util/file';
 import { runBuilder } from './browser';
 import { BuildPlatform, PlatformType } from './platform/platform';
@@ -36,20 +27,22 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('builder-dev', () => {
     it('运行全部', async () => {
       const root = harness.host.root();
-      const list = await getAllFile(
-        harness,
+      const list = await harness.host.getFileList(
         normalize(join(root, 'src', '__pages'))
       );
       list.push(
-        ...(await getAllFile(
-          harness,
+        ...(await harness.host.getFileList(
           normalize(join(root, 'src', '__components'))
         ))
       );
-      await importPathRename(harness, list);
-      await copySpecifiedPages(harness, ALL_PAGE_NAME_LIST);
-      await copySpecifiedComponents(harness, ALL_COMPONENT_NAME_LIST);
-      await addPageEntry(harness, ALL_PAGE_NAME_LIST);
+      await harness.host.importPathRename(list);
+      await harness.host.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
+      await harness.host.moveDir(
+        ALL_COMPONENT_NAME_LIST,
+        '__components',
+        'components'
+      );
+      await harness.host.addPageEntry(ALL_PAGE_NAME_LIST);
       harness.useTarget('build', angularConfig);
       const result = await harness.executeOnce();
       expect(result).toBeTruthy();
