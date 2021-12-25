@@ -5,6 +5,7 @@ import {
 } from '@angular-devkit/core/src/virtual-fs/host';
 import * as fs from 'fs-extra';
 import * as path from 'path';
+import { Injector, inject } from 'static-injector';
 import { describeBuilder } from '../../test/plugin-describe-builder';
 import {
   BROWSER_BUILDER_INFO,
@@ -20,7 +21,8 @@ import {
   importPathRename,
 } from '../../test/util/file';
 import { runBuilder } from './browser';
-import { PlatformType } from './platform/platform';
+import { BuildPlatform, PlatformType } from './platform/platform';
+import { getBuildPlatformInjectConfig } from './platform/platform-info';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,
@@ -54,11 +56,17 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect(result.error).toBeFalsy();
       expect(result.logs[0].level !== 'error').toBeTruthy();
       expect(result.result?.success).toBeTruthy();
-      // harness
-      //   .expectFile(
-      //     join(normalize(DEFAULT_ANGULAR_CONFIG.outputPath), 'app.wxss')
-      //   )
-      //   .toExist();
+      const injectList = getBuildPlatformInjectConfig(angularConfig.platform);
+      const injector = Injector.create({ providers: injectList });
+      const buildPlatform = injector.get(BuildPlatform);
+      harness
+        .expectFile(
+          join(
+            normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
+            `app${buildPlatform.fileExtname.style}`
+          )
+        )
+        .toExist();
       const realTestPath: string = result.result?.outputPath as string;
       const appTestPath = path.resolve(process.cwd(), '__test-app');
       fs.copySync(realTestPath, path.resolve(process.cwd(), '__test-app'));
