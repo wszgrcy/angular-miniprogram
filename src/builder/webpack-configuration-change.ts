@@ -5,7 +5,6 @@ import {
 } from '@angular-devkit/build-angular';
 import type { Path } from '@angular-devkit/core';
 import { getSystemPath, normalize, resolve } from '@angular-devkit/core';
-import * as fs from 'fs';
 import * as path from 'path';
 import { filter } from 'rxjs/operators';
 import { Injectable, Injector } from 'static-injector';
@@ -33,11 +32,8 @@ type OptimizationSplitChunksCacheGroup = Exclude<
 >;
 @Injectable()
 export class WebpackConfigurationChange {
-  workspaceRoot!: Path;
-  absoluteProjectRoot!: Path;
-  absoluteProjectSourceRoot!: Path;
   exportMiniProgramAssetsPluginInstance!: ExportMiniProgramAssetsPlugin;
-  private buildPlatform: BuildPlatform;
+  private buildPlatform!: BuildPlatform;
   private entryList!: PagePattern[];
   constructor(
     private options: BrowserBuilderOptions & {
@@ -48,7 +44,8 @@ export class WebpackConfigurationChange {
     private context: BuilderContext,
     private config: webpack.Configuration,
     private injector: Injector
-  ) {
+  ) {}
+  init() {
     this.injector = Injector.create({
       parent: this.injector,
       providers: [
@@ -69,10 +66,8 @@ export class WebpackConfigurationChange {
               {
                 pages: this.options.pages,
                 components: this.options.components,
-                workspaceRoot: this.workspaceRoot,
-                absoluteProjectRoot: this.absoluteProjectRoot,
+                workspaceRoot: normalize(this.context.workspaceRoot),
                 context: this.context,
-                absoluteProjectSourceRoot: this.absoluteProjectSourceRoot,
                 config: this.config,
               },
               buildPlatform
@@ -83,16 +78,16 @@ export class WebpackConfigurationChange {
       ],
     });
     this.buildPlatform = this.injector.get(BuildPlatform);
-    config.output!.globalObject = this.buildPlatform.globalObject;
+    this.buildPlatform.fileExtname.config =
+      this.buildPlatform.fileExtname.config || '.json';
+    this.config.output!.globalObject = this.buildPlatform.globalObject;
   }
-
   async change() {
-    this.config.resolve?.conditionNames?.shift();
-    this.config.resolve?.mainFields?.shift();
+    this.buildPlatformCompatible();
+    this.exportAssets();
     await this.pageHandle();
-    this.exportMiniProgramAssetsPlugin();
-    this.componentTemplateLoader();
-    this.definePlugin();
+    this.addLoader();
+    this.globalVariableChange();
     this.changeStylesExportSuffix();
     this.config.plugins?.push(
       this.injector.get(DynamicLibraryComponentEntryPlugin)
@@ -104,34 +99,17 @@ export class WebpackConfigurationChange {
       )
     );
   }
+  private buildPlatformCompatible() {
+    if (this.buildPlatform.packageName == 'zfb') {
+      this.config.resolve?.conditionNames?.shift();
+      this.config.resolve?.mainFields?.shift();
+    }
+  }
   private async pageHandle() {
-    this.workspaceRoot = normalize(this.context.workspaceRoot);
-    const projectName = this.context.target && this.context.target.project;
-    if (!projectName) {
-      throw new Error('The builder requires a target.');
-    }
-    const projectMetadata = await this.context.getProjectMetadata(projectName);
-    this.absoluteProjectRoot = normalize(
-      getSystemPath(
-        resolve(
-          this.workspaceRoot,
-          normalize((projectMetadata.root as string) || '')
-        )
-      )
-    );
-    const relativeSourceRoot = projectMetadata.sourceRoot as string | undefined;
-    const absoluteSourceRootPath =
-      typeof relativeSourceRoot === 'string'
-        ? resolve(this.workspaceRoot, normalize(relativeSourceRoot))
-        : undefined;
-    if (relativeSourceRoot) {
-      this.absoluteProjectSourceRoot = normalize(
-        getSystemPath(absoluteSourceRootPath!)
-      )!;
-    }
     const dynamicWatchEntryInstance = this.injector.get(
       DynamicWatchEntryPlugin
     );
+    await dynamicWatchEntryInstance.init();
     dynamicWatchEntryInstance.entryPattern$
       .pipe(filter((item) => !!item))
       .subscribe((result) => {
@@ -143,7 +121,6 @@ export class WebpackConfigurationChange {
       });
     this.config.plugins?.push(dynamicWatchEntryInstance);
     // 出口
-    // todo改为string不知道是否完全都改了
     const oldFileName = this.config.output!.filename as string;
     this.config.output!.filename = (chunkData) => {
       const page = this.entryList.find(
@@ -211,18 +188,17 @@ export class WebpackConfigurationChange {
     });
     this.config.plugins!.push(assetsPlugin);
   }
-  exportMiniProgramAssetsPlugin() {
+  private exportAssets() {
     this.exportMiniProgramAssetsPluginInstance = this.injector.get(
       ExportMiniProgramAssetsPlugin
     );
     this.config.plugins!.unshift(this.exportMiniProgramAssetsPluginInstance);
   }
 
-  private componentTemplateLoader() {
+  private addLoader() {
     this.config.module!.rules!.unshift({
       test: /\.ts$/,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      loader: (require as any).resolve(
+      loader: require.resolve(
         path.join(__dirname, './loader/component-template.loader')
       ),
     });
@@ -237,7 +213,7 @@ export class WebpackConfigurationChange {
       ),
     });
   }
-  private definePlugin() {
+  private globalVariableChange() {
     const defineObject: Record<string, string> = {
       global: `${this.buildPlatform.globalObject}.__global`,
       window: `${this.buildPlatform.globalVariablePrefix}`,
@@ -255,6 +231,7 @@ export class WebpackConfigurationChange {
       cancelAnimationFrame: `${this.buildPlatform.globalVariablePrefix}.cancelAnimationFrame`,
       performance: `${this.buildPlatform.globalVariablePrefix}.performance`,
       navigator: `${this.buildPlatform.globalVariablePrefix}.navigator`,
+      wx: this.buildPlatform.globalObject,
     };
     if (this.config.mode === 'development') {
       defineObject[
@@ -264,12 +241,12 @@ export class WebpackConfigurationChange {
     this.config.plugins!.push(new DefinePlugin(defineObject));
   }
   private changeStylesExportSuffix() {
-    const index = this.config.plugins?.findIndex(
+    const index = this.config.plugins!.findIndex(
       (plugin) =>
         Object.getPrototypeOf(plugin).constructor.name ===
         'MiniCssExtractPlugin'
     );
-    if (typeof index === 'number') {
+    if (index > -1) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const pluginInstance = this.config.plugins![index] as any;
       const pluginPrototype = Object.getPrototypeOf(pluginInstance);
@@ -283,6 +260,8 @@ export class WebpackConfigurationChange {
           ),
         })
       );
+    } else {
+      throw new Error('没有找到MiniCssExtractPlugin插件,无法修改生成style');
     }
   }
 }

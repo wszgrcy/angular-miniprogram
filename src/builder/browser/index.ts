@@ -52,6 +52,7 @@ export function runBuilder(
         ],
       });
       const config = injector.get(WebpackConfigurationChange);
+      config.init();
       await config.change();
       return options;
     },

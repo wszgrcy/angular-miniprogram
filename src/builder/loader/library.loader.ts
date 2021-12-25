@@ -77,7 +77,7 @@ export default async function (
       const LIBRARY_SCOPE_ID = libraryTemplateScopeName(item.moduleId);
       const configPath = join(
         normalize(LIBRARY_OUTPUT_PATH),
-        item.libraryPath + (fileExtname.config || '.json')
+        item.libraryPath + fileExtname.config
       );
       const list = scopeLibraryObj[LIBRARY_SCOPE_ID] || [];
       list.push({
