@@ -88,6 +88,9 @@ export class AddGlobalTemplateService {
       const currentSelf =
         this.selfMetaCollection ||
         this.resolvedMetaMap.otherMetaCollectionGroup['$self'];
+      if (!currentSelf) {
+        return {};
+      }
       const useComponents = getUseComponents(
         Array.from(currentSelf.libraryPath),
         Array.from(currentSelf.localPath),
