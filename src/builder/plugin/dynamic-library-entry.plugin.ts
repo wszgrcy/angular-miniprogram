@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { join, normalize } from '@angular-devkit/core';
-import path from "path";
+import path from 'path';
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
 import { LIBRARY_OUTPUT_PATH, LibrarySymbol } from '../const';
@@ -16,40 +16,11 @@ export class DynamicLibraryComponentEntryPlugin {
   apply(compiler: webpack.Compiler) {
     compiler.hooks.thisCompilation.tap(
       'DynamicLibraryEntryPlugin',
-      (compilation) => {
-        (compilation as any)[LibrarySymbol] =
-          (compilation as any)[LibrarySymbol] || {};
-
-        (compilation as any)[LibrarySymbol].buildPlatform = this.buildPlatform;
-      }
-    );
-    compiler.hooks.finishMake.tapAsync(
-      'DynamicLibraryEntryPlugin',
-      (compilation, callback) => {
-        const libraryLoaderContext: LibraryLoaderContext = (compilation as any)[
+      (thisCompilation) => {
+        (thisCompilation as any)[LibrarySymbol] = (thisCompilation as any)[
           LibrarySymbol
-        ];
-        if (compilation.name?.startsWith('angular-compiler:')) {
-          callback(undefined);
-          return;
-        }
-        if (!libraryLoaderContext) {
-          callback(undefined);
-          return;
-        }
-        if (
-          !libraryLoaderContext.libraryMetaList &&
-          !this.libraryComponentMap.size
-        ) {
-          callback(undefined);
-          return;
-        }
-        if (libraryLoaderContext.libraryMetaList) {
-          libraryLoaderContext.libraryMetaList.forEach((item) => {
-            this.libraryComponentMap.set(item.id, item);
-          });
-        }
-        const hooks = webpack.NormalModule.getCompilationHooks(compilation);
+        ] || { buildPlatform: this.buildPlatform };
+        const hooks = webpack.NormalModule.getCompilationHooks(thisCompilation);
         hooks.readResource
           .for(CUSTOM_URI)
           .tapAsync(
@@ -70,22 +41,46 @@ export class DynamicLibraryComponentEntryPlugin {
               return;
             }
           );
-        let j = 0;
-        this.libraryComponentMap.forEach((meta) => {
-          const entry = join(normalize(LIBRARY_OUTPUT_PATH), meta.libraryPath);
-          const dep = webpack.EntryPlugin.createDependency(
-
-
-            `${CUSTOM_URI}://${path.join('__license',meta.id)}.ts`,
-            entry
-          );
-          compilation.addEntry(compiler.context, dep, entry, (err, result) => {
-            j++;
-            if (j === this.libraryComponentMap.size) {
+        compiler.hooks.finishMake.tapAsync(
+          'DynamicLibraryEntryPlugin',
+          (compilation, callback) => {
+            const libraryLoaderContext: LibraryLoaderContext = (
+              compilation as any
+            )[LibrarySymbol];
+            if (compilation !== thisCompilation) {
               callback(undefined);
+              return;
             }
-          });
-        });
+            if (libraryLoaderContext.libraryMetaList) {
+              libraryLoaderContext.libraryMetaList.forEach((item) => {
+                this.libraryComponentMap.set(item.id, item);
+              });
+            }
+
+            let j = 0;
+            this.libraryComponentMap.forEach((meta) => {
+              const entry = join(
+                normalize(LIBRARY_OUTPUT_PATH),
+                meta.libraryPath
+              );
+              const dep = webpack.EntryPlugin.createDependency(
+                `${CUSTOM_URI}://${path.join('__license', meta.id)}.ts`,
+                entry
+              );
+              compilation.addEntry(
+                compiler.context,
+                dep,
+                entry,
+                (err, result) => {
+                  j++;
+                  if (j === this.libraryComponentMap.size) {
+                    callback(undefined);
+                  }
+                }
+              );
+            });
+          }
+        );
       }
     );
   }
