@@ -46,7 +46,7 @@ export class CheckBoxGroupValueAccessor
   valueChange(list: string[]) {
     if (this.children) {
       this.children.forEach((item) => {
-        item.checked = list.some((value) => value === item.value);
+        item.updateChecked(list.some((value) => value === item.value));
       });
     }
     this.onChange(list);
@@ -54,7 +54,7 @@ export class CheckBoxGroupValueAccessor
   writeValue(list: string[]) {
     if (this.children) {
       this.children.forEach((item) => {
-        item.checked = list.some((value) => value === item.value);
+        item.updateChecked(list.some((value) => value === item.value));
       });
     }
   }
@@ -91,7 +91,11 @@ export class CheckboxControl {
    * @description
    * Tracks the value of the radio input element
    */
-  @Input('value') readonly value!: string | undefined;
+  @HostBinding('value') @Input() readonly value!: string | undefined;
   @HostBinding('checked')
   checked: boolean | undefined;
+  constructor(private elementRef: ElementRef, private renderer: Renderer2) {}
+  updateChecked(value: boolean) {
+    this.renderer.setProperty(this.elementRef.nativeElement, 'checked', value);
+  }
 }

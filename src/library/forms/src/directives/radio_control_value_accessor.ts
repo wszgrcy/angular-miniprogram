@@ -124,7 +124,7 @@ export class RadioGroupValueAccessor
   valueChange(value: string) {
     if (this.children) {
       this.children.forEach((item) => {
-        item.checked = item.value === value;
+        item.updateChecked(item.value === value);
       });
     }
     this.onChange(value);
@@ -132,7 +132,7 @@ export class RadioGroupValueAccessor
   writeValue(value: string) {
     if (this.children) {
       this.children.forEach((item) => {
-        item.checked = item.value === value;
+        item.updateChecked(item.value === value);
       });
     }
   }
@@ -168,14 +168,18 @@ export class RadioControl {
    * Tracks the value of the radio input element
    */
 
-  @Input('value') readonly value!: string | undefined;
+  @HostBinding('value') @Input() readonly value!: string | undefined;
   @HostBinding('checked')
   checked: boolean | undefined;
 
   constructor(
-    renderer: Renderer2,
-    elementRef: ElementRef,
+    private renderer: Renderer2,
+    private elementRef: ElementRef,
     private _registry: RadioControlRegistry,
     private _injector: Injector
   ) {}
+
+  updateChecked(value: boolean) {
+    this.renderer.setProperty(this.elementRef.nativeElement, 'checked', value);
+  }
 }

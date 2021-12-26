@@ -7,10 +7,14 @@ import { Component, OnInit } from '@angular/core';
 })
 export class BaseFormsComponent implements OnInit {
   value = '默认值';
+  checked = ['1'];
   constructor() {}
 
   ngOnInit() {}
   modelChange(e) {
     console.log('数据变更', e);
+  }
+  checkboxChange(e) {
+    console.log(e);
   }
 }

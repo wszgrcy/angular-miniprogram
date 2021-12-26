@@ -175,8 +175,12 @@ export class WxContainer {
       .filter(
         (property) =>
           !(
-            node.componentMeta?.inputs.some((input) => input === property) ||
-            node.directiveMeta?.inputs.some((input) => input === property)
+            (node.componentMeta?.inputs?.includes(property) ||
+              node.directiveMeta?.inputs?.includes(property)) &&
+            !(
+              node.directiveMeta?.properties?.includes(property) ||
+              node.componentMeta?.properties?.includes(property)
+            )
           )
       )
       .forEach((key) => {
