@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { SelectorMatcher } from '@angular/compiler';
+import type {
+  R3ComponentMetadata,
+  R3DirectiveMetadata,
+  SelectorMatcher,
+} from '@angular/compiler';
 import type { R3UsedDirectiveMetadata } from '@angular/compiler/src/compiler_facade_interface';
 import type { Element, Template } from '@angular/compiler/src/render3/r3_ast';
 import { Injectable } from 'static-injector';
@@ -40,8 +44,8 @@ export class ComponentContext {
         selector,
         meta: {
           directive: R3UsedDirectiveMetadata;
-          componentMeta: any;
-          directiveMeta: any;
+          componentMeta: R3ComponentMetadata;
+          directiveMeta: R3DirectiveMetadata;
           libraryMeta: MetaFromLibrary;
         }
       ) => {
@@ -70,11 +74,9 @@ export class ComponentContext {
           item = {
             isComponent,
             listeners:
-              Object.keys(meta.directiveMeta?.meta?.host?.listeners || {}) ||
-              [],
+              Object.keys(meta.directiveMeta?.host?.listeners || {}) || [],
             properties:
-              Object.keys(meta.directiveMeta?.meta?.host?.properties || {}) ||
-              [],
+              Object.keys(meta.directiveMeta?.host?.properties || {}) || [],
             inputs: meta.directive.inputs,
             outputs: meta.directive.outputs,
           };

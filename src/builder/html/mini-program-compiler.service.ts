@@ -1,4 +1,8 @@
-import type { R3ComponentMetadata, SelectorMatcher } from '@angular/compiler';
+import type {
+  R3ComponentMetadata,
+  R3DirectiveMetadata,
+  SelectorMatcher,
+} from '@angular/compiler';
 import type { NgtscProgram } from '@angular/compiler-cli';
 import type { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
 import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
@@ -32,8 +36,7 @@ import {
 export class MiniProgramCompilerService {
   private ngCompiler!: NgCompiler;
   private componentMap = new Map<ClassDeclaration, R3ComponentMetadata>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private directiveMap = new Map<ClassDeclaration, any>();
+  private directiveMap = new Map<ClassDeclaration, R3DirectiveMetadata>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private ngModuleMap = new Map<ClassDeclaration, any>();
   private componentDataMap = {
@@ -101,7 +104,7 @@ export class MiniProgramCompilerService {
         this.directiveMap.set(
           ts.getOriginalNode(classDeclaration) as ts.ClassDeclaration,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (trait as any).analysis
+          (trait as any).analysis?.meta
         );
       });
       const ngModuleTraits = classRecord.traits.filter(
@@ -121,8 +124,10 @@ export class MiniProgramCompilerService {
   }
 
   async exportComponentBuildMetaMap() {
-    for (const [key, meta] of this.componentMap) {
-      const fileName = path.normalize(key.getSourceFile().fileName);
+    for (const [classDeclaration, meta] of this.componentMap) {
+      const fileName = path.normalize(
+        classDeclaration.getSourceFile().fileName
+      );
       let directiveMatcher: SelectorMatcher | undefined;
       if (meta.directives.length > 0) {
         const matcher = new (await angularCompilerPromise).SelectorMatcher();
