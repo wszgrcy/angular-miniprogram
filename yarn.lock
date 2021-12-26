@@ -9277,10 +9277,10 @@ webidl-conversions@^6.1.0:
   resolved "https://registry.yarnpkg.com/webidl-conversions/-/webidl-conversions-6.1.0.tgz#9111b4d7ea80acd40f5270d666621afa78b69514"
   integrity sha512-qBIvFLGiBpLjfwmYAaHPXsn+ho5xZnGvyGvsarywGNc8VyQJUMHJ8OBKGGrPER0okBeMDaan4mNBlgBROxuI8w==
 
-webpack-bootstrap-assets-plugin@^2.0.2:
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/webpack-bootstrap-assets-plugin/-/webpack-bootstrap-assets-plugin-2.0.2.tgz#cb26de25d3453e2063a2b5a20cd47926b0d6b942"
-  integrity sha512-+Azzws1lcJlGU+223y2eF48GacP87gy7pQM1KbOLsa5A0zrD4JnR+CzQr33x4S+gsl8eqnsem5P4AspnEIDZ0g==
+webpack-bootstrap-assets-plugin@^2.0.3:
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/webpack-bootstrap-assets-plugin/-/webpack-bootstrap-assets-plugin-2.0.3.tgz#ffb0014d113d6e5e7937939ba1262a5633732ae0"
+  integrity sha512-xKcSzQnbLjlv3fyUHxM+W0TFUW4KwcTCP4x+r0FBFNaTvz4GbSp2sKVNuxh1MYRuj9mRzFk9ewHAznlDnpSWFw==
 
 webpack-dev-middleware@5.2.1:
   version "5.2.1"

@@ -1,4 +1,3 @@
-import { join, normalize } from '@angular-devkit/core';
 import { normalizePath } from '@ngtools/webpack/src/ivy/paths';
 import {
   InputFileSystemSync,
@@ -8,8 +7,8 @@ import { WebpackResourceLoader } from '@ngtools/webpack/src/resource_loader';
 import * as path from 'path';
 import { Inject, Injectable, Injector } from 'static-injector';
 import ts from 'typescript';
+import { sources } from 'webpack';
 import * as webpack from 'webpack';
-import { ConcatSource, RawSource } from 'webpack-sources';
 import {
   ExportMiniProgramAssetsPluginSymbol,
   InjectorSymbol,
@@ -25,6 +24,7 @@ import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
 import type { PagePattern } from '../type';
 import { libraryTemplateResolve } from '../util/library-template-resolve';
+import { setCompilationAsset } from '../util/set-compilation-asset';
 
 export interface ExportMiniProgramAssetsPluginOptions {
   /** tsConfig配置路径 */
@@ -65,7 +65,7 @@ export class ExportMiniProgramAssetsPlugin {
     let oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined =
       undefined;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const styleAssets = new Map<string, any>();
+    const styleAssets = new Map<string, sources.Source>();
     compiler.hooks.compilation.tap(
       'ExportMiniProgramAssetsPlugin',
       (compilation) => {
@@ -79,11 +79,14 @@ export class ExportMiniProgramAssetsPlugin {
                   stylePath
                 )
               ) {
-                const data = compilation.assets[stylePath];
+                const data = compilation.getAsset(stylePath)!;
                 if (/\.(scss|css|sass|less|styl)$/.test(stylePath)) {
-                  styleAssets.set(path.normalize(stylePath), data);
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  compilation.assets[stylePath] = new RawSource(' ') as any;
+                  styleAssets.set(path.normalize(stylePath), data.source);
+                  setCompilationAsset(
+                    compilation,
+                    stylePath,
+                    new sources.RawSource(' ')
+                  );
                 }
               }
             }
@@ -142,15 +145,21 @@ export class ExportMiniProgramAssetsPlugin {
 
             metaMap.outputContent.forEach((value, key) => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              compilation.assets[key] = new RawSource(value) as any;
+              setCompilationAsset(
+                compilation,
+                key,
+                new sources.RawSource(value)
+              );
             });
 
             metaMap.style.forEach((value, outputPath) => {
-              const item = new ConcatSource(
-                ...value.map((item) => styleAssets.get(item))
+              setCompilationAsset(
+                compilation,
+                outputPath,
+                new sources.ConcatSource(
+                  ...value.map((item) => styleAssets.get(item)!)
+                )
               );
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              compilation.assets[outputPath] = item as any;
             });
             metaMap.config.forEach((value, key) => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,11 +180,11 @@ export class ExportMiniProgramAssetsPlugin {
                   return pre;
                 }, {} as Record<string, string>),
               };
-
-              compilation.assets[key] = new RawSource(
-                JSON.stringify(config)
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ) as any;
+              setCompilationAsset(
+                compilation,
+                key,
+                new sources.RawSource(JSON.stringify(config))
+              );
             });
             for (const key in metaMap.otherMetaCollectionGroup) {
               if (
@@ -207,25 +216,32 @@ export class ExportMiniProgramAssetsPlugin {
             const componentConfigGroup =
               this.libraryTemplateScopeService.exportLibraryComponentConfig();
             for (const item of componentConfigGroup) {
-              compilation.assets[item.filePath] = new RawSource(
-                JSON.stringify(item.content)
-              ) as any;
+              setCompilationAsset(
+                compilation,
+                item.filePath,
+                new sources.RawSource(JSON.stringify(item.content))
+              );
             }
             const templateGroup =
               this.libraryTemplateScopeService.exportLibraryTemplate();
             for (const key in templateGroup) {
               if (Object.prototype.hasOwnProperty.call(templateGroup, key)) {
                 const element = templateGroup[key];
-                compilation.assets[key] = new RawSource(
-                  libraryTemplateResolve(
-                    element,
-                    this.buildPlatform.templateTransform.getData()
-                      .directivePrefix,
-                    this.buildPlatform.templateTransform.eventListConvert,
-                    this.buildPlatform.templateTransform.templateInterpolation,
-                    this.buildPlatform.fileExtname
+                setCompilationAsset(
+                  compilation,
+                  key,
+                  new sources.RawSource(
+                    libraryTemplateResolve(
+                      element,
+                      this.buildPlatform.templateTransform.getData()
+                        .directivePrefix,
+                      this.buildPlatform.templateTransform.eventListConvert,
+                      this.buildPlatform.templateTransform
+                        .templateInterpolation,
+                      this.buildPlatform.fileExtname
+                    )
                   )
-                ) as any;
+                );
               }
             }
 
@@ -234,7 +250,11 @@ export class ExportMiniProgramAssetsPlugin {
                 Object.prototype.hasOwnProperty.call(metaMap.selfTemplate, key)
               ) {
                 const element = metaMap.selfTemplate[key];
-                compilation.assets[key] = new RawSource(element) as any;
+                setCompilationAsset(
+                  compilation,
+                  key,
+                  new sources.RawSource(element)
+                );
               }
             }
             cb();

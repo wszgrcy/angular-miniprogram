@@ -74,6 +74,11 @@ export class DynamicWatchEntryPlugin {
         throw new Error('未匹配入口');
       }
       const list = [...entryPattern.pageList, ...entryPattern.componentList];
+      if (originEntryConfig['app']) {
+        throw new Error(
+          '资源文件不能指定为app文件名或bundleName,请重新修改(不影响导出)'
+        );
+      }
       return {
         ...originEntryConfig,
         ...list.reduce((pre, cur) => {

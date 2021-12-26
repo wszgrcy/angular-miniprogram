@@ -254,10 +254,7 @@ export class WebpackConfigurationChange {
         index,
         1,
         new pluginPrototype.constructor({
-          filename: (pluginInstance.options.filename as string).replace(
-            /\.css$/,
-            this.buildPlatform.fileExtname.style
-          ),
+          filename: 'app' + this.buildPlatform.fileExtname.style,
         })
       );
     } else {

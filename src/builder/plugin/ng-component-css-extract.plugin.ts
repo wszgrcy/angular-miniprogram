@@ -1,6 +1,7 @@
 import { WebpackResourceLoader } from '@ngtools/webpack/src/resource_loader';
 import * as webpack from 'webpack';
-import { RawSource } from 'webpack-sources';
+import { sources } from 'webpack';
+import { setCompilationAsset } from '../util/set-compilation-asset';
 
 export class NgComponentCssExtractPlugin {
   constructor(
@@ -35,10 +36,11 @@ export class NgComponentCssExtractPlugin {
       'NgComponentCssExtractPlugin',
       async (assets, cb) => {
         for (const [key, value] of cssMap.entries()) {
-          compilation.assets[key] = new RawSource(
-            await value
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ) as any;
+          setCompilationAsset(
+            compilation,
+            key,
+            new sources.RawSource(await value)
+          );
         }
         cb();
       }

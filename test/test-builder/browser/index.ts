@@ -59,8 +59,8 @@ export const DEFAULT_ANGULAR_CONFIG = {
   pages: [{ glob: '**/*.entry.ts', input: './src/pages', output: 'pages' }],
   styles: [
     {
-      input: 'src/app.css',
-      bundleName: 'app',
+      input: 'src/styles.css',
+      bundleName: 'app1',
       inject: false,
     },
   ],
