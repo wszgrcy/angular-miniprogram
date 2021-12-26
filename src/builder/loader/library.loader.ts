@@ -17,7 +17,7 @@ import {
 import { ExportLibraryComponentMeta, LibraryLoaderContext } from '../type';
 import { libraryTemplateResolve } from '../util/library-template-resolve';
 import { libraryTemplateScopeName } from '../util/library-template-scope-name';
-import { runScript } from '../util/run-script';
+import { stringConfigToObjectConfig } from '../util/string-config-to-object-config';
 import { ComponentTemplateLoaderContext } from './type';
 
 export default async function (
@@ -52,8 +52,8 @@ export default async function (
       continue;
     }
     const content = extraNode.initializer!.getText();
-    const fn = new Function('', `return ${content}`);
-    const meta: ExportLibraryComponentMeta = fn();
+    const meta: ExportLibraryComponentMeta =
+      stringConfigToObjectConfig(content);
     (this._compilation as any)[LibrarySymbol] =
       (this._compilation as any)[LibrarySymbol] || {};
     const libraryLoaderContext: LibraryLoaderContext = (

@@ -4,7 +4,6 @@ import { Injector } from 'static-injector';
 import { VariableDeclaration } from 'typescript';
 import * as webpack from 'webpack';
 import {
-  ExportMiniProgramAssetsPluginSymbol,
   GLOBAL_TEMPLATE_SUFFIX,
   InjectorSymbol,
   LIBRARY_OUTPUT_PATH,
@@ -14,7 +13,7 @@ import { TemplateScopeOutside } from '../html/library-template-scope.service';
 import { ExtraTemplateData } from '../library/type';
 import { BuildPlatform } from '../platform/platform';
 import { libraryTemplateResolve } from '../util/library-template-resolve';
-import { ComponentTemplateLoaderContext } from './type';
+import { stringConfigToObjectConfig } from '../util/string-config-to-object-config';
 
 export default async function (
   this: webpack.LoaderContext<any>,
@@ -23,20 +22,18 @@ export default async function (
 ) {
   const callback = this.async();
   const selector = createCssSelectorForTs(data);
-  const selfTemplateNode = selector.queryOne(
-    `VariableDeclaration[name="$self_${GLOBAL_TEMPLATE_SUFFIX}"]`
-  ) as VariableDeclaration;
   const injector: Injector = (this._compilation! as any)[InjectorSymbol];
-  const context: ComponentTemplateLoaderContext = (this._compilation! as any)[
-    ExportMiniProgramAssetsPluginSymbol
-  ];
   const buildPlatform = injector.get(BuildPlatform);
   const templateScopeOutside = (this._compilation as any)[
     TemplateScopeSymbol
   ] as TemplateScopeOutside;
+  const selfTemplateNode = selector.queryOne(
+    `VariableDeclaration[name="$self_${GLOBAL_TEMPLATE_SUFFIX}"]`
+  ) as VariableDeclaration;
   if (selfTemplateNode) {
     const content = selfTemplateNode.initializer!.getText();
-    const config: ExtraTemplateData = new Function('', `return ${content}`)();
+    const config: ExtraTemplateData = stringConfigToObjectConfig(content);
+
     this.emitFile(
       resolve(
         normalize('/'),
@@ -60,10 +57,9 @@ export default async function (
   ) as VariableDeclaration;
   if (libraryTemplateNode) {
     const content = libraryTemplateNode.initializer!.getText();
-    const config: Record<string, ExtraTemplateData> = new Function(
-      '',
-      `return ${content}`
-    )();
+    const config: Record<string, ExtraTemplateData> =
+      stringConfigToObjectConfig(content);
+
     for (const key in config) {
       if (Object.prototype.hasOwnProperty.call(config, key)) {
         const element = config[key];
