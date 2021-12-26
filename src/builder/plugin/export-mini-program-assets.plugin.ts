@@ -10,7 +10,7 @@ import { sources } from 'webpack';
 import * as webpack from 'webpack';
 import { ExportMiniProgramAssetsPluginSymbol, InjectorSymbol } from '../const';
 import { LibraryTemplateScopeService } from '../html/library-template-scope.service';
-import { TemplateService } from '../html/template.service';
+import { MiniProgramApplicationAnalysisService } from '../html/mini-program-application-analysis.service';
 import type { ComponentTemplateLoaderContext } from '../loader/type';
 import { BuildPlatform } from '../platform/platform';
 import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
@@ -76,7 +76,7 @@ export class ExportMiniProgramAssetsPlugin {
         (compilation as any)[InjectorSymbol] = this.injector;
         const injector = Injector.create({
           providers: [
-            { provide: TemplateService },
+            { provide: MiniProgramApplicationAnalysisService },
             { provide: WEBPACK_COMPILATION, useValue: compilation },
             { provide: WEBPACK_COMPILER, useValue: compiler },
             { provide: OLD_BUILDER, useValue: oldBuilder },
@@ -91,7 +91,9 @@ export class ExportMiniProgramAssetsPlugin {
           ],
           parent: this.injector,
         });
-        const templateService = injector.get(TemplateService);
+        const templateService = injector.get(
+          MiniProgramApplicationAnalysisService
+        );
         oldBuilder =
           templateService.getBuilder() as ts.EmitAndSemanticDiagnosticsBuilderProgram;
         const buildTemplatePromise = this.buildTemplate(templateService);
@@ -233,7 +235,7 @@ export class ExportMiniProgramAssetsPlugin {
     this.pageList = pageList;
     this.componentList = componentList;
   }
-  async buildTemplate(service: TemplateService) {
+  async buildTemplate(service: MiniProgramApplicationAnalysisService) {
     try {
       await service.analyzeAsync();
       const result = await service.exportComponentBuildMetaMap();

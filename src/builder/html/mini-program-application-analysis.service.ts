@@ -15,10 +15,10 @@ import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
 import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
 import { PagePattern } from '../type';
 import { angularCompilerCliPromise } from '../util/load_esm';
-import { MiniProgramPlatformCompilerService } from './mini-program-platform-compiler.service';
+import { MiniProgramCompilerService } from './mini-program-compiler.service';
 
 @Injectable()
-export class TemplateService {
+export class MiniProgramApplicationAnalysisService {
   private dependencyUseModule = new Map<string, string[]>();
   private cleanDependencyFileCacheSet = new Set<string>();
   builder!: ts.BuilderProgram | ts.EmitAndSemanticDiagnosticsBuilderProgram;
@@ -42,9 +42,9 @@ export class TemplateService {
     const injector = Injector.create({
       providers: [
         {
-          provide: MiniProgramPlatformCompilerService,
+          provide: MiniProgramCompilerService,
           useFactory: (injector: Injector, buildPlatform: BuildPlatform) => {
-            return new MiniProgramPlatformCompilerService(
+            return new MiniProgramCompilerService(
               this.ngTscProgram,
               injector,
               buildPlatform
@@ -55,16 +55,14 @@ export class TemplateService {
       ],
       parent: this.injector,
     });
-    const miniProgramPlatformCompilerService = injector.get(
-      MiniProgramPlatformCompilerService
-    );
-    miniProgramPlatformCompilerService.init();
+    const miniProgramCompilerService = injector.get(MiniProgramCompilerService);
+    miniProgramCompilerService.init();
     const metaMap =
-      await miniProgramPlatformCompilerService.exportComponentBuildMetaMap();
+      await miniProgramCompilerService.exportComponentBuildMetaMap();
 
-    const extraMetaCollection = metaMap.otherMetaCollectionGroup['$self'];
+    const selfMetaCollection = metaMap.otherMetaCollectionGroup['$self'];
     const selfTemplate: Record<string, string> = {};
-    if (extraMetaCollection) {
+    if (selfMetaCollection) {
       const importSelfTemplatePath = `/self-template/self${this.buildPlatform.fileExtname.contentTemplate}`;
       const importSelfTemplate = `<import src="${importSelfTemplatePath}"/>`;
       metaMap.outputContent.forEach((value, key) => {
@@ -76,10 +74,10 @@ export class TemplateService {
         metaMap.outputContentTemplate.set(key, value);
       });
       metaMap.useComponentPath.forEach((value, key) => {
-        value.libraryPath.push(...extraMetaCollection.libraryPath);
-        value.localPath.push(...extraMetaCollection.localPath);
+        value.libraryPath.push(...selfMetaCollection.libraryPath);
+        value.localPath.push(...selfMetaCollection.localPath);
       });
-      selfTemplate[importSelfTemplatePath] = extraMetaCollection.templateList
+      selfTemplate[importSelfTemplatePath] = selfMetaCollection.templateList
         .map((item) => item.content)
         .join('');
       delete metaMap.otherMetaCollectionGroup['$self'];
@@ -145,16 +143,16 @@ export class TemplateService {
         )
       ) {
         const element = metaMap.otherMetaCollectionGroup[key];
-        element.localPath.forEach((item) => {
-          item.path = resolve(
-            normalize('/'),
-            normalize(this.getComponentPagePattern(item.path).outputFiles.path)
-          );
-        });
         element.libraryPath.forEach((item) => {
           item.path = resolve(
             normalize('/'),
             join(normalize(LIBRARY_OUTPUT_PATH), item.path)
+          );
+        });
+        element.localPath.forEach((item) => {
+          item.path = resolve(
+            normalize('/'),
+            normalize(this.getComponentPagePattern(item.path).outputFiles.path)
           );
         });
       }
@@ -175,12 +173,10 @@ export class TemplateService {
     return host;
   }
   private async initTscProgram() {
-    const config = (await angularCompilerCliPromise).readConfiguration(
-      this.tsConfig,
-      undefined
-    );
+    const { readConfiguration, NgtscProgram } = await angularCompilerCliPromise;
+    const config = readConfiguration(this.tsConfig, undefined);
     const host = this.initHost(config);
-    this.ngTscProgram = new (await angularCompilerCliPromise).NgtscProgram(
+    this.ngTscProgram = new NgtscProgram(
       config.rootNames,
       config.options,
       host

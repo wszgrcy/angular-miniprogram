@@ -29,7 +29,7 @@ import {
 } from './type';
 
 @Injectable()
-export class MiniProgramPlatformCompilerService {
+export class MiniProgramCompilerService {
   private ngCompiler!: NgCompiler;
   private componentMap = new Map<ClassDeclaration, R3ComponentMetadata>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

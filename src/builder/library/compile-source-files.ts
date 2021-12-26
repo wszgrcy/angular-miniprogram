@@ -31,7 +31,7 @@ import path from 'path';
 import { Injector } from 'static-injector';
 import ts from 'typescript';
 import { LIBRARY_OUTPUT_PATH } from '../const';
-import { MiniProgramPlatformCompilerService } from '../html/mini-program-platform-compiler.service';
+import { MiniProgramCompilerService } from '../html/mini-program-compiler.service';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-info';
 import { changeComponent } from '../ts/change-component';
@@ -99,9 +99,9 @@ export async function compileSourceFiles(
     providers: [
       ...getBuildPlatformInjectConfig(PlatformType.library),
       {
-        provide: MiniProgramPlatformCompilerService,
+        provide: MiniProgramCompilerService,
         useFactory: (injector: Injector, buildPlatform: BuildPlatform) => {
-          return new MiniProgramPlatformCompilerService(
+          return new MiniProgramCompilerService(
             angularProgram,
             injector,
             buildPlatform
@@ -120,7 +120,7 @@ export async function compileSourceFiles(
   });
 
   const miniProgramPlatformCompilerService = injector.get(
-    MiniProgramPlatformCompilerService
+    MiniProgramCompilerService
   );
   const buildPlatform = injector.get(BuildPlatform);
   const angularCompiler = angularProgram.compiler;
