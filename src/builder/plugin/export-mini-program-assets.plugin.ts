@@ -3,20 +3,14 @@ import {
   InputFileSystemSync,
   createWebpackSystem,
 } from '@ngtools/webpack/src/ivy/system';
-import { WebpackResourceLoader } from '@ngtools/webpack/src/resource_loader';
 import * as path from 'path';
 import { Inject, Injectable, Injector } from 'static-injector';
 import ts from 'typescript';
 import { sources } from 'webpack';
 import * as webpack from 'webpack';
-import {
-  ExportMiniProgramAssetsPluginSymbol,
-  InjectorSymbol,
-  LIBRARY_OUTPUT_PATH,
-} from '../const';
+import { ExportMiniProgramAssetsPluginSymbol, InjectorSymbol } from '../const';
 import { LibraryTemplateScopeService } from '../html/library-template-scope.service';
 import { TemplateService } from '../html/template.service';
-import type { StyleHookData } from '../html/type';
 import type { ComponentTemplateLoaderContext } from '../loader/type';
 import { BuildPlatform } from '../platform/platform';
 import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
@@ -26,42 +20,19 @@ import type { PagePattern } from '../type';
 import { libraryTemplateResolve } from '../util/library-template-resolve';
 import { setCompilationAsset } from '../util/set-compilation-asset';
 
-export interface ExportMiniProgramAssetsPluginOptions {
-  /** tsConfig配置路径 */
-  tsConfig: string;
-  buildPlatform: BuildPlatform;
-}
 @Injectable()
 export class ExportMiniProgramAssetsPlugin {
   private pageList!: PagePattern[];
   private componentList!: PagePattern[];
   private system!: ts.System;
-  // private program!: ts.Program;
-  private compiler!: webpack.Compiler;
-  private compilation!: webpack.Compilation;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private originInputFileSystemSync: { readFileSync: any; statSync: any } = {
-    readFileSync: undefined,
-    statSync: undefined,
-  };
-  private options: ExportMiniProgramAssetsPluginOptions;
   constructor(
     @Inject(TS_CONFIG_TOKEN) tsConfig: string,
     private buildPlatform: BuildPlatform,
     private injector: Injector,
     private libraryTemplateScopeService: LibraryTemplateScopeService
-  ) {
-    this.options = {
-      tsConfig: tsConfig,
-      buildPlatform: buildPlatform,
-    };
-  }
+  ) {}
   apply(compiler: webpack.Compiler) {
-    this.compiler = compiler;
-    const resourceLoader = new WebpackResourceLoader(compiler.watchMode);
-    const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
-    this.originInputFileSystemSync.readFileSync = ifs.readFileSync;
-    this.originInputFileSystemSync.statSync = ifs.statSync;
+    const ifs = compiler.inputFileSystem as InputFileSystemSync;
     let oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined =
       undefined;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,10 +72,8 @@ export class ExportMiniProgramAssetsPlugin {
           compiler.inputFileSystem as InputFileSystemSync,
           normalizePath(compiler.context)
         );
-        this.restore();
-        this.compilation = compilation;
         this.libraryTemplateScopeService.register(compilation);
-        (this.compilation as any)[InjectorSymbol] = this.injector;
+        (compilation as any)[InjectorSymbol] = this.injector;
         const injector = Injector.create({
           providers: [
             { provide: TemplateService },
@@ -132,7 +101,7 @@ export class ExportMiniProgramAssetsPlugin {
         );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (compilation as any)[ExportMiniProgramAssetsPluginSymbol] = {
-          buildPlatform: this.options.buildPlatform,
+          buildPlatform: this.buildPlatform,
           otherMetaGroupPromise: buildTemplatePromise.then(
             (item) => item.otherMetaCollectionGroup
           ),
@@ -144,7 +113,6 @@ export class ExportMiniProgramAssetsPlugin {
             const metaMap = await buildTemplatePromise;
 
             metaMap.outputContent.forEach((value, key) => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setCompilationAsset(
                 compilation,
                 key,
@@ -265,33 +233,6 @@ export class ExportMiniProgramAssetsPlugin {
     );
   }
 
-  private restore() {
-    const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
-    ifs.readFileSync = this.originInputFileSystemSync.readFileSync;
-    ifs.statSync = this.originInputFileSystemSync.statSync;
-  }
-  private hookFileSystemFile(map: Map<string, StyleHookData>) {
-    const ifs = this.compiler.inputFileSystem as InputFileSystemSync;
-    const oldReadFileSync = ifs.readFileSync;
-    ifs.readFileSync = function (filePath: string) {
-      const changeFile = map.get(path.normalize(filePath));
-      if (changeFile) {
-        return Buffer.from(changeFile.content);
-      }
-      return oldReadFileSync.call(this, filePath);
-    };
-    const oldStatSync = ifs.statSync;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ifs.statSync = function (filePath: string, ...args: any[]) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const stat = (oldStatSync as any).apply(this, [filePath, ...args]);
-      const changeFile = map.get(path.normalize(filePath));
-      if (changeFile) {
-        stat.size = stat.size - changeFile.sizeOffset;
-      }
-      return stat;
-    };
-  }
   public setEntry(pageList: PagePattern[], componentList: PagePattern[]) {
     this.pageList = pageList;
     this.componentList = componentList;
