@@ -94,11 +94,7 @@ export class ExportMiniProgramAssetsPlugin {
         const templateService = injector.get(TemplateService);
         oldBuilder =
           templateService.getBuilder() as ts.EmitAndSemanticDiagnosticsBuilderProgram;
-        const waitAnalyzeAsync = templateService.analyzeAsync();
-        const buildTemplatePromise = this.buildTemplate(
-          waitAnalyzeAsync,
-          templateService
-        );
+        const buildTemplatePromise = this.buildTemplate(templateService);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (compilation as any)[ExportMiniProgramAssetsPluginSymbol] = {
           buildPlatform: this.buildPlatform,
@@ -237,12 +233,9 @@ export class ExportMiniProgramAssetsPlugin {
     this.pageList = pageList;
     this.componentList = componentList;
   }
-  async buildTemplate(
-    waitAnalyzeAsync: Promise<void>,
-    service: TemplateService
-  ) {
+  async buildTemplate(service: TemplateService) {
     try {
-      await waitAnalyzeAsync;
+      await service.analyzeAsync();
       const result = await service.exportComponentBuildMetaMap();
       return result;
     } catch (error) {
