@@ -5,15 +5,15 @@ import { createCssSelectorForTs } from 'cyia-code-util';
 import ts from 'typescript';
 import * as webpack from 'webpack';
 import {
+  ExtraTemplateData,
+  TemplateScopeOutside,
+} from '../browser/library-template-scope.service';
+import {
   ExportMiniProgramAssetsPluginSymbol,
   LIBRARY_OUTPUT_PATH,
   LibrarySymbol,
   TemplateScopeSymbol,
 } from '../const';
-import {
-  ExtraTemplateData,
-  TemplateScopeOutside,
-} from '../html/library-template-scope.service';
 import { ExportLibraryComponentMeta, LibraryLoaderContext } from '../type';
 import { libraryTemplateResolve } from '../util/library-template-resolve';
 import { libraryTemplateScopeName } from '../util/library-template-scope-name';

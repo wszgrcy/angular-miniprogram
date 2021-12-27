@@ -1,6 +1,6 @@
 import { join, normalize, resolve } from '@angular-devkit/core';
 import { LIBRARY_OUTPUT_PATH } from '../const';
-import { UseComponent } from '../html/type';
+import { UseComponent } from '../mini-program-compiler';
 import { getLibraryPath } from './get-library-path';
 
 export function getUseComponents(

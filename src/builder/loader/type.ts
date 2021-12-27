@@ -1,4 +1,4 @@
-import { MetaCollection } from '../html/meta-collection';
+import { MetaCollection } from '../mini-program-compiler';
 import type { BuildPlatform } from '../platform/platform';
 
 export interface ComponentTemplateLoaderContext {

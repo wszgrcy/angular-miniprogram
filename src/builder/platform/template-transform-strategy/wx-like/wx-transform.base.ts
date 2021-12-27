@@ -1,5 +1,5 @@
 import { strings } from '@angular-devkit/core';
-import type { NgNodeMeta } from '../../../html/node-handle/interface';
+import type { NgNodeMeta } from '../../../mini-program-compiler';
 import { TemplateTransformBase } from '../transform.base';
 import { WxContainer } from './wx-container';
 

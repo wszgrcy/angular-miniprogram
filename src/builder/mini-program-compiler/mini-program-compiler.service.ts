@@ -22,9 +22,9 @@ import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
 import { angularCompilerPromise } from '../util/load_esm';
 import { stringConfigToObjectConfig } from '../util/string-config-to-object-config';
-import { ComponentCompiler } from './component-compiler';
+import { ComponentCompilerService } from './component-compiler.service';
 import { MetaCollection } from './meta-collection';
-import { ComponentContext } from './node-handle/component-context';
+import { ComponentContext } from './parse-node';
 import {
   ComponentMetaFromLibrary,
   DirectiveMetaFromLibrary,
@@ -201,7 +201,7 @@ export class MiniProgramCompilerService {
     const injector = Injector.create({
       parent: this.injector,
       providers: [
-        { provide: ComponentCompiler },
+        { provide: ComponentCompilerService },
         { provide: COMPONENT_META, useValue: componentMeta },
         {
           provide: ComponentContext,
@@ -211,7 +211,7 @@ export class MiniProgramCompilerService {
         },
       ],
     });
-    const instance = injector.get(ComponentCompiler);
+    const instance = injector.get(ComponentCompilerService);
     return instance.compile();
   }
   private resolveStyleUrl(componentPath: string, styleUrl: string) {

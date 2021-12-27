@@ -3,13 +3,13 @@ import { createCssSelectorForTs } from 'cyia-code-util';
 import { Injector } from 'static-injector';
 import { VariableDeclaration } from 'typescript';
 import * as webpack from 'webpack';
+import { TemplateScopeOutside } from '../browser/library-template-scope.service';
 import {
   GLOBAL_TEMPLATE_SUFFIX,
   InjectorSymbol,
   LIBRARY_OUTPUT_PATH,
   TemplateScopeSymbol,
 } from '../const';
-import { TemplateScopeOutside } from '../html/library-template-scope.service';
 import { ExtraTemplateData } from '../library/type';
 import { BuildPlatform } from '../platform/platform';
 import { libraryTemplateResolve } from '../util/library-template-resolve';

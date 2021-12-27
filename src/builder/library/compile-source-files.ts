@@ -31,7 +31,7 @@ import path from 'path';
 import { Injector } from 'static-injector';
 import ts from 'typescript';
 import { LIBRARY_OUTPUT_PATH } from '../const';
-import { MiniProgramCompilerService } from '../html/mini-program-compiler.service';
+import { MiniProgramCompilerService } from '../mini-program-compiler';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-info';
 import { changeComponent } from '../ts/change-component';

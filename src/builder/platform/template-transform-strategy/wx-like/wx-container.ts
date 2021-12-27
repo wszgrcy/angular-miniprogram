@@ -1,4 +1,3 @@
-import { MetaCollection } from '../../../html/meta-collection';
 import type {
   NgBoundTextMeta,
   NgContentMeta,
@@ -6,7 +5,8 @@ import type {
   NgNodeMeta,
   NgTemplateMeta,
   NgTextMeta,
-} from '../../../html/node-handle/interface';
+} from '../../../mini-program-compiler';
+import { MetaCollection } from '../../../mini-program-compiler';
 import {
   isNgBoundTextMeta,
   isNgContentMeta,

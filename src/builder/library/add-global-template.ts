@@ -1,7 +1,7 @@
 import { Inject, Injectable } from 'static-injector';
 import ts from 'typescript';
 import { GLOBAL_TEMPLATE_SUFFIX } from '../const';
-import { MetaCollection } from '../html/meta-collection';
+import { MetaCollection } from '../mini-program-compiler';
 import { getUseComponents } from './merge-using-component-path';
 import {
   ENTRY_FILE_TOKEN,

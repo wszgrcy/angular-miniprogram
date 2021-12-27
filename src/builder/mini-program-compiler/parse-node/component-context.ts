@@ -9,28 +9,22 @@ import type {
   ImportedFile,
   Reference,
 } from '@angular/compiler-cli/src/ngtsc/imports';
-import type { Element, Template } from '@angular/compiler/src/render3/r3_ast';
+import type { Element } from '@angular/compiler/src/render3/r3_ast';
 import { Injectable } from 'static-injector';
 import ts from 'typescript';
 import { createCssSelector } from '../../angular-internal/template';
 import { getAttrsForDirectiveMatching } from '../../angular-internal/util';
 import type { DirectiveMetaFromLibrary, MetaFromLibrary } from '../type';
-import { isTemplate } from '../type-protection';
 import type { MatchedDirective, MatchedMeta } from './type';
 
 @Injectable()
 export class ComponentContext {
   constructor(private directiveMatcher: SelectorMatcher | undefined) {}
-  matchDirective(node: Element | Template): MatchedMeta[] {
+  matchDirective(node: Element): MatchedMeta[] {
     if (!this.directiveMatcher) {
       return [];
     }
-    let name: string;
-    if (isTemplate(node)) {
-      name = 'ng-template';
-    } else {
-      name = node.name;
-    }
+    const name: string = node.name;
     const selector = createCssSelector(
       name,
       getAttrsForDirectiveMatching(node)

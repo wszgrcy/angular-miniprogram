@@ -36,14 +36,14 @@ import type {
   Variable,
   Visitor,
 } from '@angular/compiler/src/render3/r3_ast';
-import { ParsedNgBoundText } from './node-handle/bound-text';
-import { ComponentContext } from './node-handle/component-context';
-import { ParsedNgContent } from './node-handle/content';
-import { ParsedNgElement } from './node-handle/element';
-import { NgNodeMeta, ParsedNode } from './node-handle/interface';
-import { ParsedNgTemplate } from './node-handle/template';
-import { ParsedNgText } from './node-handle/text';
-import { MatchedComponent, MatchedDirective } from './node-handle/type';
+import { ParsedNgBoundText } from './bound-text';
+import { ComponentContext } from './component-context';
+import { ParsedNgContent } from './content';
+import { ParsedNgElement } from './element';
+import { NgNodeMeta, ParsedNode } from './interface';
+import { ParsedNgTemplate } from './template';
+import { ParsedNgText } from './text';
+import { MatchedComponent, MatchedDirective } from './type';
 
 export class TemplateDefinition implements Visitor {
   private templateDefinitionMap = new Map<Template, TemplateDefinition>();

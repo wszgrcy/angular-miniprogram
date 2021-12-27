@@ -2,11 +2,10 @@ import type { R3ComponentMetadata } from '@angular/compiler';
 import { Inject, Injectable } from 'static-injector';
 import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
-import { ComponentContext } from './node-handle/component-context';
-import { TemplateDefinition } from './template-definition';
+import { ComponentContext, TemplateDefinition } from './parse-node';
 
 @Injectable()
-export class ComponentCompiler {
+export class ComponentCompilerService {
   constructor(
     private buildPlatform: BuildPlatform,
     @Inject(COMPONENT_META) private componentMeta: R3ComponentMetadata,
