@@ -1,5 +1,4 @@
 import { ComponentContext } from './component-context';
-import { TagEventMeta } from './event';
 import type { MatchedComponent, MatchedDirective } from './type';
 
 export interface ParsedNode<T> {
@@ -26,7 +25,7 @@ export interface NgElementMeta extends NgNodeMeta {
   children: NgNodeMeta[];
   attributes: Record<string, string>;
   inputs: string[];
-  outputs: TagEventMeta[];
+  outputs: string[];
   singleClosedTag: boolean;
   componentMeta: MatchedComponent | undefined;
   directiveMeta: MatchedDirective | undefined;

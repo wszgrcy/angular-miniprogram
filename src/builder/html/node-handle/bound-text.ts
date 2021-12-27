@@ -14,9 +14,7 @@ export class ParsedNgBoundText implements ParsedNode<NgBoundTextMeta> {
     public parent: ParsedNode<NgNodeMeta> | undefined,
     public index: number
   ) {}
-  analysis() {}
   getNodeMeta(): NgBoundTextMeta {
-    this.analysis();
     return {
       kind: NgNodeKind.BoundText,
       index: this.index,

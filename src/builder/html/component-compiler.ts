@@ -1,4 +1,4 @@
-import type { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
+import type { R3ComponentMetadata } from '@angular/compiler';
 import { Inject, Injectable } from 'static-injector';
 import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
@@ -12,24 +12,14 @@ export class ComponentCompiler {
   private templateTransform: BuildPlatform['templateTransform'];
   constructor(
     private buildPlatform: BuildPlatform,
-    @Inject(COMPONENT_META) private componentMeta: ComponentResolutionData,
+    @Inject(COMPONENT_META) private componentMeta: R3ComponentMetadata,
     private componentContext: ComponentContext
   ) {
     this.templateTransform = buildPlatform.templateTransform;
   }
 
-  private buildPlatformTemplate() {
-    this.collectionNode();
-    const result = this.templateTransform.compile(this.nodeMetaList);
-    const templateImport = result.template
-      ? `<import src="./template${this.buildPlatform.fileExtname.contentTemplate}"/>`
-      : '';
-    result.content = templateImport + result.content;
-    return result;
-  }
   private collectionNode() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nodes = (this.componentMeta as any).template.nodes;
+    const nodes = this.componentMeta.template.nodes;
     const templateDefinition = new TemplateDefinition(
       nodes,
       this.componentContext
@@ -40,7 +30,13 @@ export class ComponentCompiler {
     );
   }
 
-  transform() {
-    return this.buildPlatformTemplate();
+  compile() {
+    this.collectionNode();
+    const result = this.templateTransform.compile(this.nodeMetaList);
+    const templateImport = result.template
+      ? `<import src="./template${this.buildPlatform.fileExtname.contentTemplate}"/>`
+      : '';
+    result.content = templateImport + result.content;
+    return result;
   }
 }

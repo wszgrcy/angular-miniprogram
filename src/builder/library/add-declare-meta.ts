@@ -1,5 +1,9 @@
 import { join, normalize } from '@angular-devkit/core';
 import { camelize, dasherize } from '@angular-devkit/core/src/utils/strings';
+import type {
+  R3ComponentMetadata,
+  R3DirectiveMetadata,
+} from '@angular/compiler';
 import { CssSelectorForTs, createCssSelectorForTs } from 'cyia-code-util';
 import { Inject, Injectable } from 'static-injector';
 import ts from 'typescript';
@@ -26,10 +30,10 @@ export class AddDeclareMetaService {
       meta: Map<string, string>;
     },
     @Inject(LIBRARY_ENTRY_POINT) private libraryEntryPoint: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    @Inject(DIRECTIVE_MAP) private directiveMap: Map<ts.ClassDeclaration, any>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    @Inject(COMPONENT_MAP) private componentMap: Map<ts.ClassDeclaration, any>
+    @Inject(DIRECTIVE_MAP)
+    private directiveMap: Map<ts.ClassDeclaration, R3DirectiveMetadata>,
+    @Inject(COMPONENT_MAP)
+    private componentMap: Map<ts.ClassDeclaration, R3ComponentMetadata>
   ) {}
   run(dTsFileName: string, data: string, sourceFile: ts.SourceFile): string {
     const selector = createCssSelectorForTs(data);
@@ -55,9 +59,7 @@ export class AddDeclareMetaService {
       if (!isClassDeclaration) {
         continue;
       }
-      metaList.push(
-        ...this.getPropertyAndListener(element, this.componentMap, true)
-      );
+      metaList.push(...this.getPropertyAndListener(element, this.componentMap));
       const className = element.name!.getText();
 
       metaList.push(
@@ -86,22 +88,17 @@ export class AddDeclareMetaService {
       if (!isClassDeclaration) {
         continue;
       }
-      metaList.push(
-        ...this.getPropertyAndListener(element, this.directiveMap, false)
-      );
+      metaList.push(...this.getPropertyAndListener(element, this.directiveMap));
     }
     return metaList.join('\n');
   }
   private getPropertyAndListener(
     classNode: ts.ClassDeclaration,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    map: Map<ts.ClassDeclaration, any>,
-    isComponent: boolean
+    map: Map<ts.ClassDeclaration, R3DirectiveMetadata>
   ) {
     const className: string = classNode.name!.getText();
     const metaList: string[] = [];
-    for (const [key, value] of map.entries()) {
-      const meta = isComponent ? value : value.meta;
+    for (const [key, meta] of map.entries()) {
       const directiveClassName = meta.name;
       if (directiveClassName === className) {
         const listeners = meta.host.listeners as Record<string, string>;

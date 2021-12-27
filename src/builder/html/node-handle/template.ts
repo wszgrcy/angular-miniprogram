@@ -13,10 +13,6 @@ import {
 
 export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
   kind = NgNodeKind.Template;
-  attrs!: (BoundAttribute | TextAttribute)[];
-
-  declareContext: Record<string, string> = {};
-  globalContext!: ComponentContext;
   private children: ParsedNode<NgNodeMeta>[] = [];
 
   constructor(
@@ -25,30 +21,24 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
     public index: number
   ) {}
 
-  getOriginChildren() {
-    return this.node.children;
-  }
-  setNgNodeChildren(children: ParsedNode<NgNodeMeta>[]) {
-    this.children = children;
-  }
   appendNgNodeChild(child: ParsedNode<NgNodeMeta>) {
     this.children.push(child);
   }
   private getTemplateName(): string {
-    this.attrs = this.node.templateAttrs;
     if (this.node.references && this.node.references.length) {
       return this.node.references[0].name;
     } else {
-      return `ngDefault_${this.globalContext.getBindIndex()}`;
+      return `ngDefault_${this.index}`;
     }
   }
 
-  getNodeMeta(globalContext: ComponentContext): NgTemplateMeta {
-    this.globalContext = globalContext;
+  getNodeMeta(componentContext: ComponentContext): NgTemplateMeta {
     const directive = this.getTemplateName()!;
     const meta: NgTemplateMeta = {
       kind: NgNodeKind.Template,
-      children: this.children.map((child) => child.getNodeMeta(globalContext)),
+      children: this.children.map((child) =>
+        child.getNodeMeta(componentContext)
+      ),
       index: this.index,
       defineTemplateName: directive,
     };

@@ -10,5 +10,4 @@ export const TEMPLATE_COMPILER_OPTIONS_TOKEN = new InjectionToken(
   'TEMPLATE_COMPILER_TOKEN'
 );
 
-export const DIRECTIVE_MATCHER = new InjectionToken('DIRECTIVE_MATCHER');
 export const COMPONENT_META = new InjectionToken('COMPONENT_META');

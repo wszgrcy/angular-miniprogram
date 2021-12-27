@@ -46,7 +46,6 @@ import { ParsedNgText } from './node-handle/text';
 import { MatchedComponent, MatchedDirective } from './node-handle/type';
 
 export class TemplateDefinition implements Visitor {
-  /** 变量对应的值索引 */
   private templateDefinitionMap = new Map<Template, TemplateDefinition>();
   private parentNode: ParsedNgElement | ParsedNgTemplate | undefined;
   list: ParsedNode<NgNodeMeta>[] = [];
@@ -57,7 +56,7 @@ export class TemplateDefinition implements Visitor {
   });
   constructor(
     private nodes: Node[],
-    private templateGlobalContext: ComponentContext
+    private componentContext: ComponentContext
   ) {}
   init() {}
   visit?(node: Node) {}
@@ -65,27 +64,21 @@ export class TemplateDefinition implements Visitor {
     const nodeIndex = this.declIndex++;
     let componentMeta: MatchedComponent | undefined;
     let directiveMeta: MatchedDirective | undefined;
-    const result = this.templateGlobalContext.matchDirective(element);
-    if (result) {
-      if (result.some((item) => item.isComponent)) {
-        const type = result.find(
-          (item) => item.isComponent
-        )! as MatchedComponent;
-        componentMeta = type;
+    const result = this.componentContext.matchDirective(element);
+    const directiveMetaList = result.filter((item) => {
+      if (item.isComponent) {
+        componentMeta = item;
       }
-
-      const list = result.filter(
-        (item) => !item.isComponent
-      ) as MatchedDirective[];
-      if (list.length) {
-        directiveMeta = {
-          isComponent: false,
-          listeners: list.map((item) => item.listeners).flat(),
-          properties: list.map((item) => item.properties).flat(),
-          inputs: list.map((item) => item.inputs).flat(),
-          outputs: list.map((item) => item.outputs).flat(),
-        };
-      }
+      return !item.isComponent;
+    });
+    if (directiveMetaList.length) {
+      directiveMeta = {
+        isComponent: false,
+        listeners: directiveMetaList.map((item) => item.listeners).flat(),
+        properties: directiveMetaList.map((item) => item.properties).flat(),
+        inputs: directiveMetaList.map((item) => item.inputs).flat(),
+        outputs: directiveMetaList.map((item) => item.outputs).flat(),
+      };
     }
 
     const instance = new ParsedNgElement(
@@ -133,7 +126,7 @@ export class TemplateDefinition implements Visitor {
     });
     const instance = new TemplateDefinition(
       template.children,
-      this.templateGlobalContext
+      this.componentContext
     );
     instance.parentNode = templateInstance;
     this.templateDefinitionMap.set(template, instance);
@@ -148,8 +141,7 @@ export class TemplateDefinition implements Visitor {
     const instance = new ParsedNgContent(content, this.parentNode, nodeIndex);
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
-    }
-    if (!this.parentNode) {
+    } else {
       this.list.push(instance);
     }
   }
@@ -163,8 +155,7 @@ export class TemplateDefinition implements Visitor {
     const instance = new ParsedNgText(text, this.parentNode, nodeIndex);
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
-    }
-    if (!this.parentNode) {
+    } else {
       this.list.push(instance);
     }
   }
@@ -174,8 +165,7 @@ export class TemplateDefinition implements Visitor {
     const instance = new ParsedNgBoundText(text, this.parentNode, nodeIndex);
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
-    }
-    if (!this.parentNode) {
+    } else {
       this.list.push(instance);
     }
   }
@@ -193,24 +183,10 @@ export class TemplateDefinition implements Visitor {
     });
   }
 }
-export function visitAll<Result>(
-  visitor: Visitor<Result>,
-  nodes: Node[]
-): Result[] {
-  const result: Result[] = [];
-  if (visitor.visit) {
-    for (const node of nodes) {
-      const newNode = visitor.visit(node) || node.visit(visitor);
-    }
-  } else {
-    for (const node of nodes) {
-      const newNode = node.visit(visitor);
-      if (newNode) {
-        result.push(newNode);
-      }
-    }
+export function visitAll<Result>(visitor: Visitor<Result>, nodes: Node[]) {
+  for (const node of nodes) {
+    node.visit(visitor);
   }
-  return result;
 }
 class CustomAstVisitor implements AstVisitor {
   constructor(private pipeCallback: () => void) {}

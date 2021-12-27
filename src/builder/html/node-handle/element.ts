@@ -1,10 +1,5 @@
-import type { ASTWithSource, BindingType } from '@angular/compiler';
-import type {
-  BoundAttribute,
-  Element,
-} from '@angular/compiler/src/render3/r3_ast';
+import type { Element } from '@angular/compiler/src/render3/r3_ast';
 import { ComponentContext } from './component-context';
-import { TagEventMeta } from './event';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
 import type { MatchedComponent, MatchedDirective } from './type';
 
@@ -14,10 +9,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   attributeObject: Record<string, string> = {};
   kind = NgNodeKind.Element;
   inputs: string[] = [];
-  outputSet: TagEventMeta[] = [];
-  ngSwitch: BoundAttribute | undefined;
-  ngSwitchFirst = true;
-  ngSwitchIndex = 0;
+  outputs: string[] = [];
   singleClosedTag = false;
   constructor(
     private node: Element,
@@ -29,7 +21,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   private analysis() {
     this.getTagName();
     this.node.attributes
-      .filter((item) => item.name !== 'class')
+      .filter((item) => item.name !== 'class' && item.name !== 'style')
       .forEach((item) => {
         this.attributeObject[item.name] = item.value;
       });
@@ -40,17 +32,8 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       }
     });
     this.node.outputs.forEach((output) => {
-      this.outputSet.push(
-        new TagEventMeta(
-          output.target,
-          output.name,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (output.handler as ASTWithSource).source!
-        )
-      );
+      this.outputs.push(output.name);
     });
-
-    this.ngSwitch = this.node.inputs.find((item) => item.name === 'ngSwitch');
 
     if (!this.node.endSourceSpan) {
       this.singleClosedTag = true;
@@ -77,25 +60,12 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       tagName: this.tagName,
       children: this.children.map((child) => child.getNodeMeta(globalContext)),
       inputs: this.inputs,
-      outputs: this.outputSet,
+      outputs: this.outputs,
       attributes: this.attributeObject,
       singleClosedTag: this.singleClosedTag,
       componentMeta: this.componentMeta,
       index: this.index,
       directiveMeta: this.directiveMeta,
     };
-  }
-  getNgSwitch() {
-    if (this.ngSwitch) {
-      const first = this.ngSwitchFirst;
-      this.ngSwitchFirst = false;
-
-      return {
-        first: first,
-        ngSwitch: this.ngSwitch,
-        index: this.ngSwitchIndex++,
-      };
-    }
-    return undefined;
   }
 }

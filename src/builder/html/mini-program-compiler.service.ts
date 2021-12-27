@@ -4,7 +4,6 @@ import type {
   SelectorMatcher,
 } from '@angular/compiler';
 import type { NgtscProgram } from '@angular/compiler-cli';
-import type { ComponentResolutionData } from '@angular/compiler-cli/src/ngtsc/annotations/src/component';
 import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
 import type {
   ClassRecord,
@@ -20,11 +19,12 @@ import {
   LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX,
 } from '../const';
 import { BuildPlatform } from '../platform/platform';
-import { COMPONENT_META, DIRECTIVE_MATCHER } from '../token/component.token';
+import { COMPONENT_META } from '../token/component.token';
 import { angularCompilerPromise } from '../util/load_esm';
+import { stringConfigToObjectConfig } from '../util/string-config-to-object-config';
+import { ComponentCompiler } from './component-compiler';
 import { MetaCollection } from './meta-collection';
 import { ComponentContext } from './node-handle/component-context';
-import { ComponentCompiler } from './template-compiler';
 import {
   ComponentMetaFromLibrary,
   DirectiveMetaFromLibrary,
@@ -37,8 +37,6 @@ export class MiniProgramCompilerService {
   private ngCompiler!: NgCompiler;
   private componentMap = new Map<ClassDeclaration, R3ComponentMetadata>();
   private directiveMap = new Map<ClassDeclaration, R3DirectiveMetadata>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private ngModuleMap = new Map<ClassDeclaration, any>();
   private componentDataMap = {
     style: new Map<string, string[]>(),
     outputContent: new Map<string, string>(),
@@ -107,30 +105,18 @@ export class MiniProgramCompilerService {
           (trait as any).analysis?.meta
         );
       });
-      const ngModuleTraits = classRecord.traits.filter(
-        (trait) => trait.handler.name === 'NgModuleDecoratorHandler'
-      );
-
-      ngModuleTraits.forEach((trait) => {
-        const meta: R3ComponentMetadata = {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(trait as any).analysis?.meta,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(trait as any).resolution,
-        };
-        this.ngModuleMap.set(classDeclaration, meta);
-      });
     }
   }
 
   async exportComponentBuildMetaMap() {
+    const { SelectorMatcher, CssSelector } = await angularCompilerPromise;
     for (const [classDeclaration, meta] of this.componentMap) {
       const fileName = path.normalize(
         classDeclaration.getSourceFile().fileName
       );
       let directiveMatcher: SelectorMatcher | undefined;
       if (meta.directives.length > 0) {
-        const matcher = new (await angularCompilerPromise).SelectorMatcher();
+        const matcher = new SelectorMatcher();
         for (const directive of meta.directives) {
           const selector = directive.selector;
           const directiveClassDeclaration = ts.getOriginalNode(
@@ -156,15 +142,12 @@ export class MiniProgramCompilerService {
               (directive as any).ref.node
             );
           }
-          matcher.addSelectables(
-            (await angularCompilerPromise).CssSelector.parse(selector),
-            {
-              directive,
-              directiveMeta,
-              componentMeta,
-              libraryMeta,
-            }
-          );
+          matcher.addSelectables(CssSelector.parse(selector), {
+            directive,
+            directiveMeta,
+            componentMeta,
+            libraryMeta,
+          });
         }
         directiveMatcher = matcher;
       }
@@ -213,14 +196,13 @@ export class MiniProgramCompilerService {
 
   private buildComponentMeta(
     directiveMatcher: SelectorMatcher | undefined,
-    componentMeta: ComponentResolutionData
+    componentMeta: R3ComponentMetadata
   ) {
     const injector = Injector.create({
       parent: this.injector,
       providers: [
         { provide: ComponentCompiler },
         { provide: COMPONENT_META, useValue: componentMeta },
-        { provide: DIRECTIVE_MATCHER, useValue: directiveMatcher },
         {
           provide: ComponentContext,
           useFactory: () => {
@@ -230,7 +212,7 @@ export class MiniProgramCompilerService {
       ],
     });
     const instance = injector.get(ComponentCompiler);
-    return instance.transform();
+    return instance.compile();
   }
   private resolveStyleUrl(componentPath: string, styleUrl: string) {
     return path.normalize(path.resolve(path.dirname(componentPath), styleUrl));
@@ -251,15 +233,14 @@ export class MiniProgramCompilerService {
     const listenersNode = selector.queryOne(
       `VariableDeclaration[name=${directiveName}_${LIBRARY_DIRECTIVE_LISTENERS_SUFFIX}]`
     ) as ts.VariableDeclaration;
-
+    if (listenersNode) {
+      listeners = stringConfigToObjectConfig(listenersNode.type!.getText());
+    }
     const propertiesNode = selector.queryOne(
       `VariableDeclaration[name=${directiveName}_${LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX}]`
     ) as ts.VariableDeclaration;
-    if (listenersNode) {
-      listeners = JSON.parse(listenersNode.type!.getText());
-    }
     if (propertiesNode) {
-      properties = JSON.parse(propertiesNode.type!.getText());
+      properties = stringConfigToObjectConfig(propertiesNode.type!.getText());
     }
     return {
       isComponent: false,
@@ -280,7 +261,7 @@ export class MiniProgramCompilerService {
     }
     const exportPath = exportPathNode.type!.getText();
     return {
-      exportPath: JSON.parse(exportPath),
+      exportPath: stringConfigToObjectConfig(exportPath),
       ...this.getLibraryDirectiveMeta(classDeclaration)!,
       isComponent: true,
     };

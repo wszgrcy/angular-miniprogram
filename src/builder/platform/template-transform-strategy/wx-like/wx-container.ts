@@ -1,4 +1,3 @@
-import { strings } from '@angular-devkit/core';
 import { MetaCollection } from '../../../html/meta-collection';
 import type {
   NgBoundTextMeta,
@@ -26,9 +25,6 @@ export class WxContainer {
   private wxmlTemplate: string = '';
   private childContainer: WxContainer[] = [];
   private level: number = 0;
-  // todo 如果是全局模板,声明来自哪个,并且追加
-  // todo 声明位置默认先不加,如果有两用再追加
-  // todo 需要暴露组件
   fromTemplate!: string;
   defineTemplateName!: string;
   private metaCollection: MetaCollection = new MetaCollection();
@@ -166,7 +162,6 @@ export class WxContainer {
     propertyMap.set('class', `nodeList[${index}].class`);
     propertyMap.set('style', `nodeList[${index}].style`);
     Object.entries(node.attributes)
-      .filter(([key]) => key !== 'class' && key !== 'style')
       .filter(([key, value]) => value !== '')
       .forEach(([key, value]) => {
         attributeMap.set(key, value);
@@ -196,17 +191,13 @@ export class WxContainer {
       });
     // const eventMap = new Map();
     const eventList: string[] = [
-      ...node.outputs
-        .filter(
-          (item) =>
-            !(
-              node.componentMeta?.outputs.some(
-                (output) => output === item.name
-              ) ||
-              node.directiveMeta?.outputs.some((output) => output === item.name)
-            )
-        )
-        .map((item) => item.name),
+      ...node.outputs.filter(
+        (item) =>
+          !(
+            node.componentMeta?.outputs.some((output) => output === item) ||
+            node.directiveMeta?.outputs.some((output) => output === item)
+          )
+      ),
       ...(node.directiveMeta?.listeners || []),
       ...(node.componentMeta?.isComponent ? node.componentMeta?.listeners : []),
     ];

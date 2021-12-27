@@ -16,13 +16,7 @@ import type { MatchedDirective, MatchedMeta } from './type';
 
 @Injectable()
 export class ComponentContext {
-  private templateIndex = 0;
-
   constructor(private directiveMatcher: SelectorMatcher | undefined) {}
-
-  getBindIndex() {
-    return this.templateIndex++;
-  }
   matchDirective(node: Element | Template): MatchedMeta[] {
     if (!this.directiveMatcher) {
       return [];
@@ -54,10 +48,10 @@ export class ComponentContext {
         if (isComponent) {
           item = {
             isComponent,
-            outputs: (meta.directive as any).outputs,
+            outputs: meta.directive.outputs,
             filePath: ((meta.directive as any).importedFile as ts.SourceFile)
               .fileName,
-            selector: (meta.directive as any).selector,
+            selector: meta.directive.selector,
             className: (
               (meta.directive as any).ref.node as ts.ClassDeclaration
             ).name!.getText(),
