@@ -1,11 +1,10 @@
-import { ComponentContext } from './component-context';
 import type { MatchedComponent, MatchedDirective } from './type';
 
 export interface ParsedNode<T> {
   kind: NgNodeKind;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   parent: ParsedNode<any> | undefined;
-  getNodeMeta(globalContext: ComponentContext): T;
+  getNodeMeta(): T;
   index: number;
 }
 export enum NgNodeKind {

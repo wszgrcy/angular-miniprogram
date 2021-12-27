@@ -1,9 +1,4 @@
-import type {
-  BoundAttribute,
-  Template,
-  TextAttribute,
-} from '@angular/compiler/src/render3/r3_ast';
-import { ComponentContext } from './component-context';
+import type { Template } from '@angular/compiler/src/render3/r3_ast';
 import {
   NgNodeKind,
   NgNodeMeta,
@@ -32,13 +27,11 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
     }
   }
 
-  getNodeMeta(componentContext: ComponentContext): NgTemplateMeta {
+  getNodeMeta(): NgTemplateMeta {
     const directive = this.getTemplateName()!;
     const meta: NgTemplateMeta = {
       kind: NgNodeKind.Template,
-      children: this.children.map((child) =>
-        child.getNodeMeta(componentContext)
-      ),
+      children: this.children.map((child) => child.getNodeMeta()),
       index: this.index,
       defineTemplateName: directive,
     };

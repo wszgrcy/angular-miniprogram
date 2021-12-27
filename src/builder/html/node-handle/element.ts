@@ -52,13 +52,13 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   appendNgNodeChild(child: ParsedNode<NgNodeMeta>) {
     this.children.push(child);
   }
-  getNodeMeta(globalContext: ComponentContext): NgElementMeta {
+  getNodeMeta(): NgElementMeta {
     this.analysis();
 
     return {
       kind: NgNodeKind.Element,
       tagName: this.tagName,
-      children: this.children.map((child) => child.getNodeMeta(globalContext)),
+      children: this.children.map((child) => child.getNodeMeta()),
       inputs: this.inputs,
       outputs: this.outputs,
       attributes: this.attributeObject,

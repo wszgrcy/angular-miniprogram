@@ -2,9 +2,13 @@
 import type {
   R3ComponentMetadata,
   R3DirectiveMetadata,
+  R3UsedDirectiveMetadata,
   SelectorMatcher,
 } from '@angular/compiler';
-import type { R3UsedDirectiveMetadata } from '@angular/compiler/src/compiler_facade_interface';
+import type {
+  ImportedFile,
+  Reference,
+} from '@angular/compiler-cli/src/ngtsc/imports';
 import type { Element, Template } from '@angular/compiler/src/render3/r3_ast';
 import { Injectable } from 'static-injector';
 import ts from 'typescript';
@@ -37,24 +41,24 @@ export class ComponentContext {
       (
         selector,
         meta: {
-          directive: R3UsedDirectiveMetadata;
+          directive: R3UsedDirectiveMetadata & {
+            ref: Reference<ts.ClassDeclaration>;
+            importedFile: ImportedFile;
+          };
           componentMeta: R3ComponentMetadata;
           directiveMeta: R3DirectiveMetadata;
           libraryMeta: MetaFromLibrary;
         }
       ) => {
         let item: Partial<MatchedMeta>;
-        const isComponent: boolean = (meta.directive as any).isComponent;
+        const isComponent: boolean = !!meta.directive.isComponent;
         if (isComponent) {
           item = {
             isComponent,
             outputs: meta.directive.outputs,
-            filePath: ((meta.directive as any).importedFile as ts.SourceFile)
-              .fileName,
+            filePath: (meta.directive.importedFile as ts.SourceFile).fileName,
             selector: meta.directive.selector,
-            className: (
-              (meta.directive as any).ref.node as ts.ClassDeclaration
-            ).name!.getText(),
+            className: meta.directive.ref.node.name!.getText(),
             listeners:
               Object.keys(meta.componentMeta?.host?.listeners || {}) || [],
             inputs: meta.directive.inputs,
