@@ -10,7 +10,8 @@ import {
 } from '../browser/library-template-scope.service';
 import {
   ExportMiniProgramAssetsPluginSymbol,
-  LIBRARY_OUTPUT_PATH,
+  LIBRARY_COMPONENT_OUTPUT_PATH_SUFFIX,
+  LIBRARY_OUTPUT_ROOTDIR,
   LibrarySymbol,
   TemplateScopeSymbol,
 } from '../const';
@@ -46,7 +47,7 @@ export default async function (
       element.left as ts.PropertyAccessExpression
     ).expression.getText();
     const extraNode = selector.queryOne(
-      `VariableDeclaration[name="${componentName}_ExtraData"]`
+      `VariableDeclaration[name="${componentName}_${LIBRARY_COMPONENT_OUTPUT_PATH_SUFFIX}"]`
     ) as ts.VariableDeclaration;
     if (!extraNode) {
       continue;
@@ -76,7 +77,7 @@ export default async function (
       );
       const LIBRARY_SCOPE_ID = libraryTemplateScopeName(item.moduleId);
       const configPath = join(
-        normalize(LIBRARY_OUTPUT_PATH),
+        normalize(LIBRARY_OUTPUT_ROOTDIR),
         item.libraryPath + fileExtname.config
       );
       const list = scopeLibraryObj[LIBRARY_SCOPE_ID] || [];
@@ -91,7 +92,7 @@ export default async function (
 
       this.emitFile(
         join(
-          normalize(LIBRARY_OUTPUT_PATH),
+          normalize(LIBRARY_OUTPUT_ROOTDIR),
           item.libraryPath + fileExtname.content
         ),
         `<import  src="${globalTemplatePath}"/>` +
@@ -109,7 +110,7 @@ export default async function (
       if (item.contentTemplate) {
         this.emitFile(
           join(
-            normalize(LIBRARY_OUTPUT_PATH),
+            normalize(LIBRARY_OUTPUT_ROOTDIR),
             dirname(normalize(item.libraryPath)),
             'template' + fileExtname.contentTemplate
           ),
@@ -129,7 +130,7 @@ export default async function (
       if (item.style) {
         this.emitFile(
           join(
-            normalize(LIBRARY_OUTPUT_PATH),
+            normalize(LIBRARY_OUTPUT_ROOTDIR),
             item.libraryPath + fileExtname.style
           ),
           item.style

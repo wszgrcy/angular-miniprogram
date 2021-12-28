@@ -25,10 +25,6 @@ export class ComponentCompilerService {
   compile() {
     const nodeList = this.collectionNode();
     const result = this.buildPlatform.templateTransform.compile(nodeList);
-    const templateImport = result.template
-      ? `<import src="./template${this.buildPlatform.fileExtname.contentTemplate}"/>`
-      : '';
-    result.content = templateImport + result.content;
     return result;
   }
 }

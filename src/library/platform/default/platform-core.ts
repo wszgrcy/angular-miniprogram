@@ -9,7 +9,7 @@ import { ComponentFinderService } from './component-finder.service';
 import 'miniprogram-api-typings';
 import type {
   LView,
-  ComponentPath,
+  NodePath,
   MiniProgramComponentInstance,
   NgCompileComponent,
   AppOptions,
@@ -62,7 +62,7 @@ export class MiniProgramCoreFactory {
   }
   protected linkNgComponentWithPath(
     mpComponentInstance: MiniProgramComponentInstance,
-    list: ComponentPath
+    list: NodePath
   ) {
     mpComponentInstance.__isLink = true;
     let rootLView = getPageLView(this.getPageId(mpComponentInstance)) as LView;
@@ -100,8 +100,8 @@ export class MiniProgramCoreFactory {
         if (this.__lView) {
           let dataset = event.currentTarget?.dataset || event.target.dataset;
           let currentPath = [...(dataset.nodePath || []), dataset.nodeIndex];
-          let componentPath = this.__completePath || [];
-          let relativePath = currentPath.slice(componentPath.length);
+          let nodePath = this.__completePath || [];
+          let relativePath = currentPath.slice(nodePath.length);
           let el = findCurrentElement(this.__lView, relativePath) as AgentNode;
           if (!(el instanceof AgentNode)) {
             el = el[0];
@@ -216,11 +216,11 @@ export class MiniProgramCoreFactory {
   protected addNgComponentLinkLogic(config: any) {
     let self = this;
     config.properties = {
-      componentPath: {
+      nodePath: {
         type: null,
         observer: function (
           this: MiniProgramComponentInstance,
-          list: ComponentPath
+          list: NodePath
         ) {
           if (this.__isLink) {
             return;
@@ -228,9 +228,9 @@ export class MiniProgramCoreFactory {
           if (typeof list === 'string') {
             list = JSON.parse(list);
           }
-          this.__componentPath = list || [];
+          this.__nodePath = list || [];
           if (typeof this.__nodeIndex !== 'undefined') {
-            this.__completePath = [...this.__componentPath, this.__nodeIndex];
+            this.__completePath = [...this.__nodePath, this.__nodeIndex];
             self.linkNgComponentWithPath(this, this.__completePath);
           }
         },
@@ -245,8 +245,8 @@ export class MiniProgramCoreFactory {
             index = parseInt(index, 10);
           }
           this.__nodeIndex = index;
-          if (typeof this.__componentPath !== 'undefined') {
-            this.__completePath = [...this.__componentPath, this.__nodeIndex];
+          if (typeof this.__nodePath !== 'undefined') {
+            this.__completePath = [...this.__nodePath, this.__nodeIndex];
             self.linkNgComponentWithPath(this, this.__completePath);
           }
         },

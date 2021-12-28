@@ -3,7 +3,7 @@ import { join, normalize } from '@angular-devkit/core';
 import path from 'path';
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
-import { LIBRARY_OUTPUT_PATH, LibrarySymbol } from '../const';
+import { LIBRARY_OUTPUT_ROOTDIR, LibrarySymbol } from '../const';
 import { BuildPlatform } from '../platform/platform';
 import type { LibraryComponentEntryMeta, LibraryLoaderContext } from '../type';
 
@@ -57,10 +57,14 @@ export class DynamicLibraryComponentEntryPlugin {
               });
             }
 
+            if (this.libraryComponentMap.size === 0) {
+              callback(undefined);
+              return;
+            }
             let j = 0;
             this.libraryComponentMap.forEach((meta) => {
               const entry = join(
-                normalize(LIBRARY_OUTPUT_PATH),
+                normalize(LIBRARY_OUTPUT_ROOTDIR),
                 meta.libraryPath
               );
               const dep = webpack.EntryPlugin.createDependency(

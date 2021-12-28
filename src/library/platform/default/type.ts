@@ -1,6 +1,6 @@
 import { ComponentRef, Type } from '@angular/core';
 import type {
-  ComponentPath,
+  NodePath,
   MiniProgramComponentInstance,
   NgCompileComponent,
 } from 'angular-miniprogram/platform/type';
@@ -11,7 +11,7 @@ export abstract class MiniProgramCoreBase<T> {
   static pageStartup(module: Type<any>, component: Type<any>, options: any) {}
   static linkNgComponentWithPath(
     this: MiniProgramComponentInstance,
-    list: ComponentPath
+    list: NodePath
   ) {}
   static linkNgComponentWithPage(
     this: MiniProgramComponentInstance,

@@ -1,16 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import type {
+  R3ComponentMetadata,
+  R3DirectiveMetadata,
+} from '@angular/compiler';
 import { InjectionToken } from 'static-injector';
 import ts from 'typescript';
 
-export const RESOLVED_META_MAP = new InjectionToken('RESOLVED_META_MAP');
-export const LIBRARY_ENTRY_POINT = new InjectionToken<string>(
-  'LIBRARY_ENTRY_POINT'
+export const RESOLVED_DATA_GROUP_TOKEN = new InjectionToken(
+  'RESOLVED_DATA_GROUP_TOKEN'
 );
-export const DIRECTIVE_MAP = new InjectionToken<Map<ts.ClassDeclaration, any>>(
-  'DIRECTIVE_MAP'
-);
-export const COMPONENT_MAP = new InjectionToken<Map<ts.ClassDeclaration, any>>(
-  'COMPONENT_MAP'
+export const ENTRY_POINT_TOKEN = new InjectionToken<string>(
+  'ENTRY_POINT_TOKEN'
 );
 
 export const ENTRY_FILE_TOKEN = new InjectionToken<string>('ENTRY_FILE_TOKEN');

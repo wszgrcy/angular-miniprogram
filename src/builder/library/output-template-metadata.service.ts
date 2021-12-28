@@ -1,37 +1,32 @@
+import { join, normalize, resolve } from '@angular-devkit/core';
 import { Inject, Injectable } from 'static-injector';
 import ts from 'typescript';
-import { GLOBAL_TEMPLATE_SUFFIX } from '../const';
-import { MetaCollection } from '../mini-program-compiler';
+import { GLOBAL_TEMPLATE_SUFFIX, LIBRARY_OUTPUT_ROOTDIR } from '../const';
+import { MetaCollection, ResolvedDataGroup } from '../mini-program-compiler';
 import { getUseComponents } from './merge-using-component-path';
 import {
   ENTRY_FILE_TOKEN,
-  LIBRARY_ENTRY_POINT,
-  RESOLVED_META_MAP,
+  ENTRY_POINT_TOKEN,
+  RESOLVED_DATA_GROUP_TOKEN,
 } from './token';
 import { ExtraTemplateData } from './type';
 
 @Injectable()
-export class AddGlobalTemplateService {
+export class OutputTemplateMetadataService {
   private selfUseComponents!: Record<string, string>;
   private selfMetaCollection!: MetaCollection;
   constructor(
     @Inject(ENTRY_FILE_TOKEN) private entryFile: string,
-    @Inject(RESOLVED_META_MAP)
-    private resolvedMetaMap: {
-      otherMetaCollectionGroup: Record<string, MetaCollection>;
-    },
-    @Inject(LIBRARY_ENTRY_POINT) private libraryEntryPoint: string
+    @Inject(RESOLVED_DATA_GROUP_TOKEN)
+    private dataGroup: ResolvedDataGroup,
+    @Inject(ENTRY_POINT_TOKEN) private entryPoint: string
   ) {}
 
   run(fileName: string, data: string, sourceFile: ts.SourceFile) {
-    return `${data}\n;${[
-      this.getSelfTemplate(),
-      this.getLibraryTemplate(),
-    ].join(';')}`;
+    return `${data}\n${this.getSelfTemplate()};${this.getLibraryTemplate()}`;
   }
   private getSelfTemplate() {
-    const selfMetaCollection =
-      this.resolvedMetaMap.otherMetaCollectionGroup['$self'];
+    const selfMetaCollection = this.dataGroup.otherMetaCollectionGroup['$self'];
     if (!selfMetaCollection) {
       return '';
     }
@@ -42,28 +37,31 @@ export class AddGlobalTemplateService {
 
     const extraTemplateData: ExtraTemplateData = {
       template: templateStr,
-      moduleId: this.libraryEntryPoint,
+      outputPath: resolve(
+        normalize('/'),
+        join(normalize(LIBRARY_OUTPUT_ROOTDIR), this.entryPoint, 'self')
+      ),
     };
 
-    delete this.resolvedMetaMap.otherMetaCollectionGroup['$self'];
+    delete this.dataGroup.otherMetaCollectionGroup['$self'];
 
     return `let $self_${GLOBAL_TEMPLATE_SUFFIX}=${JSON.stringify(
       extraTemplateData
     )}`;
   }
   private getLibraryTemplate() {
-    if (!Object.keys(this.resolvedMetaMap.otherMetaCollectionGroup).length) {
+    if (!Object.keys(this.dataGroup.otherMetaCollectionGroup).length) {
       return '';
     }
-    const obj: Record<string, any> = {};
-    for (const key in this.resolvedMetaMap.otherMetaCollectionGroup) {
+    const obj: Record<string, ExtraTemplateData> = {};
+    for (const key in this.dataGroup.otherMetaCollectionGroup) {
       if (
         Object.prototype.hasOwnProperty.call(
-          this.resolvedMetaMap.otherMetaCollectionGroup,
+          this.dataGroup.otherMetaCollectionGroup,
           key
         )
       ) {
-        const element = this.resolvedMetaMap.otherMetaCollectionGroup[key];
+        const element = this.dataGroup.otherMetaCollectionGroup[key];
         const templateStr = element.templateList
           .map((item) => item.content)
           .join('');
@@ -71,7 +69,7 @@ export class AddGlobalTemplateService {
         const useComponents = getUseComponents(
           Array.from(element.libraryPath),
           Array.from(element.localPath),
-          this.libraryEntryPoint
+          this.entryPoint
         );
         const extraTemplateData: ExtraTemplateData = {
           template: templateStr,
@@ -85,16 +83,16 @@ export class AddGlobalTemplateService {
 
   getSelfUseComponents() {
     if (!this.selfUseComponents) {
-      const currentSelf =
+      const selfMetaCollection =
         this.selfMetaCollection ||
-        this.resolvedMetaMap.otherMetaCollectionGroup['$self'];
-      if (!currentSelf) {
+        this.dataGroup.otherMetaCollectionGroup['$self'];
+      if (!selfMetaCollection) {
         return {};
       }
       const useComponents = getUseComponents(
-        Array.from(currentSelf.libraryPath),
-        Array.from(currentSelf.localPath),
-        this.libraryEntryPoint
+        Array.from(selfMetaCollection.libraryPath),
+        Array.from(selfMetaCollection.localPath),
+        this.entryPoint
       );
       this.selfUseComponents = useComponents;
     }

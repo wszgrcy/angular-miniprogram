@@ -8,7 +8,7 @@ import { Inject, Injectable, Injector } from 'static-injector';
 import ts from 'typescript';
 import type { CompilerOptions } from 'typescript';
 import { Compilation, Compiler } from 'webpack';
-import { LIBRARY_OUTPUT_PATH } from '../const';
+import { LIBRARY_OUTPUT_ROOTDIR } from '../const';
 import { MiniProgramCompilerService } from '../mini-program-compiler';
 import { BuildPlatform } from '../platform/platform';
 import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
@@ -69,10 +69,7 @@ export class MiniProgramApplicationAnalysisService {
         value = `${importSelfTemplate}${value}`;
         metaMap.outputContent.set(key, value);
       });
-      metaMap.outputContentTemplate.forEach((value, key) => {
-        value = `${importSelfTemplate}${value}`;
-        metaMap.outputContentTemplate.set(key, value);
-      });
+
       metaMap.useComponentPath.forEach((value, key) => {
         value.libraryPath.push(...selfMetaCollection.libraryPath);
         value.localPath.push(...selfMetaCollection.localPath);
@@ -96,10 +93,7 @@ export class MiniProgramApplicationAnalysisService {
       const entryPattern = this.getComponentPagePattern(key);
       contentMap.set(entryPattern.outputFiles.content, value);
     });
-    metaMap.outputContentTemplate.forEach((value, key) => {
-      const entryPattern = this.getComponentPagePattern(key);
-      contentMap.set(entryPattern.outputFiles.contentTemplate, value);
-    });
+
     metaMap.style = styleMap;
     const config = new Map<
       string,
@@ -114,7 +108,7 @@ export class MiniProgramApplicationAnalysisService {
         ...value.libraryPath.map((item) => {
           item.path = resolve(
             normalize('/'),
-            join(normalize(LIBRARY_OUTPUT_PATH), item.path)
+            join(normalize(LIBRARY_OUTPUT_ROOTDIR), item.path)
           );
           return item;
         }),
@@ -146,7 +140,7 @@ export class MiniProgramApplicationAnalysisService {
         element.libraryPath.forEach((item) => {
           item.path = resolve(
             normalize('/'),
-            join(normalize(LIBRARY_OUTPUT_PATH), item.path)
+            join(normalize(LIBRARY_OUTPUT_ROOTDIR), item.path)
           );
         });
         element.localPath.forEach((item) => {

@@ -2,7 +2,7 @@ import {
   MiniProgramCoreFactory as BaseFactory,
   pageBindFactory,
 } from 'angular-miniprogram/platform/default';
-import { ComponentPath } from 'angular-miniprogram/platform/type';
+import { NodePath } from 'angular-miniprogram/platform/type';
 declare const my: any;
 
 class MiniProgramCoreFactory extends BaseFactory {
@@ -30,19 +30,19 @@ class MiniProgramCoreFactory extends BaseFactory {
   override addNgComponentLinkLogic(config: any) {
     let self = this;
     config.props = {
-      componentPath: undefined,
+      nodePath: undefined,
       nodeIndex: undefined,
     };
     config.didMount = function () {
-      let componentPath: ComponentPath = (this.props.componentPath || []).map(
-        (item: string) => (item === 'directive' ? item : parseInt(item, 10))
+      let nodePath: NodePath = (this.props.nodePath || []).map((item: string) =>
+        item === 'directive' ? item : parseInt(item, 10)
       );
       let nodeIndex = parseInt(this.props.nodeIndex, 10);
       if (this.__isLink) {
         return;
       }
 
-      self.linkNgComponentWithPath(this, [...componentPath, nodeIndex]);
+      self.linkNgComponentWithPath(this, [...nodePath, nodeIndex]);
     };
     return config;
   }

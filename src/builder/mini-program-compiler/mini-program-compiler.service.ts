@@ -14,7 +14,7 @@ import path from 'path';
 import { Injectable, Injector } from 'static-injector';
 import ts, { ClassDeclaration } from 'typescript';
 import {
-  LIBRARY_COMPONENT_EXPORT_PATH_SUFFIX,
+  LIBRARY_COMPONENT_OUTPUT_PATH_SUFFIX,
   LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
   LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX,
 } from '../const';
@@ -29,6 +29,7 @@ import {
   ComponentMetaFromLibrary,
   DirectiveMetaFromLibrary,
   MetaFromLibrary,
+  ResolvedDataGroup,
   UseComponent,
 } from './type';
 
@@ -37,10 +38,9 @@ export class MiniProgramCompilerService {
   private ngCompiler!: NgCompiler;
   private componentMap = new Map<ClassDeclaration, R3ComponentMetadata>();
   private directiveMap = new Map<ClassDeclaration, R3DirectiveMetadata>();
-  private componentDataMap = {
+  private resolvedDataGroup: ResolvedDataGroup = {
     style: new Map<string, string[]>(),
     outputContent: new Map<string, string>(),
-    outputContentTemplate: new Map<string, string>(),
     useComponentPath: new Map<
       string,
       {
@@ -48,7 +48,7 @@ export class MiniProgramCompilerService {
         libraryPath: UseComponent[];
       }
     >(),
-    otherMetaCollectionGroup: {} as Record<string, MetaCollection>,
+    otherMetaCollectionGroup: {},
   };
   constructor(
     private ngTscProgram: NgtscProgram,
@@ -80,7 +80,7 @@ export class MiniProgramCompilerService {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).resolution,
         };
-        this.componentDataMap.style.set(
+        this.resolvedDataGroup.style.set(
           path.normalize(fileName),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ((trait as any)?.analysis?.styleUrls || []).map(
@@ -155,18 +155,12 @@ export class MiniProgramCompilerService {
         directiveMatcher,
         meta
       );
-      this.componentDataMap.outputContent.set(
+      this.resolvedDataGroup.outputContent.set(
         path.normalize(fileName),
         componentBuildMeta.content
       );
 
-      if (componentBuildMeta.template) {
-        this.componentDataMap.outputContentTemplate.set(
-          path.normalize(fileName),
-          componentBuildMeta.template
-        );
-      }
-      this.componentDataMap.useComponentPath.set(
+      this.resolvedDataGroup.useComponentPath.set(
         path.normalize(fileName),
         componentBuildMeta.useComponentPath
       );
@@ -178,20 +172,20 @@ export class MiniProgramCompilerService {
           )
         ) {
           const element = componentBuildMeta.otherMetaGroup[key];
-          this.componentDataMap.otherMetaCollectionGroup[key] =
-            this.componentDataMap.otherMetaCollectionGroup[key] ||
+          this.resolvedDataGroup.otherMetaCollectionGroup[key] =
+            this.resolvedDataGroup.otherMetaCollectionGroup[key] ||
             new MetaCollection();
-          this.componentDataMap.otherMetaCollectionGroup[key].merge(element);
+          this.resolvedDataGroup.otherMetaCollectionGroup[key].merge(element);
         }
       }
     }
 
-    this.componentDataMap.useComponentPath.forEach((value, key) => {
+    this.resolvedDataGroup.useComponentPath.forEach((value, key) => {
       value.libraryPath = Array.from(new Set(value.libraryPath));
       value.localPath = Array.from(new Set(value.localPath));
     });
 
-    return this.componentDataMap;
+    return this.resolvedDataGroup;
   }
 
   private buildComponentMeta(
@@ -254,7 +248,7 @@ export class MiniProgramCompilerService {
     const directiveName = classDeclaration.name!.getText();
     const selector = createCssSelectorForTs(classDeclaration.getSourceFile());
     const exportPathNode = selector.queryOne(
-      `VariableDeclaration[name=${directiveName}_${LIBRARY_COMPONENT_EXPORT_PATH_SUFFIX}]`
+      `VariableDeclaration[name=${directiveName}_${LIBRARY_COMPONENT_OUTPUT_PATH_SUFFIX}]`
     ) as ts.VariableDeclaration;
     if (!exportPathNode) {
       return undefined;

@@ -1,5 +1,5 @@
 import * as webpack from 'webpack';
-import { changeComponent } from '../ts/change-component';
+import { changeComponent } from '../component-template-inject/change-component';
 
 export default async function (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -8,7 +8,6 @@ export default async function (
   map: string
 ) {
   const callback = this.async();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const changeData = changeComponent(data)!;
 
   if (typeof data === 'undefined' || typeof changeData === 'undefined') {

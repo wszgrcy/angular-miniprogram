@@ -4,7 +4,7 @@ import { LView } from 'angular-miniprogram/platform/type';
 import { AgentNode } from './renderer-node';
 import { PAGE_TOKEN } from './token';
 import type {
-  ComponentPath,
+  NodePath,
   MPElementData,
   MPTextData,
   MPView,
@@ -14,7 +14,7 @@ const start = 20;
 
 const initValueMap = new Map<LView, MPView>();
 const linkMap = new Map<LView, any>();
-const componentPathMap = new Map<LView, ComponentPath>();
+const nodePathMap = new Map<LView, NodePath>();
 const pageMap = new Map<string, LView>();
 const customDestroyMap = new Map<LView, Function[]>();
 export function propertyChange(context: any) {
@@ -23,7 +23,7 @@ export function propertyChange(context: any) {
   const nodeList = lViewToWXView(lView, lviewPath);
   const ctx: Partial<MPView> = {
     nodeList: nodeList,
-    componentPath: lviewPath || [],
+    nodePath: lviewPath || [],
     hasLoad: true,
   };
   if (linkMap.has(lView)) {
@@ -52,7 +52,7 @@ function findCurrentComponentLView(context: any) {
   }
   return lView;
 }
-function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
+function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
   const tView = lView[1];
   const end = tView.bindingStartIndex;
   const nodeList: MPView['nodeList'] = [];
@@ -64,8 +64,8 @@ function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
       const lContainerList: MPView[] = [];
       const viewRefList: any[] = item[8] || [];
       viewRefList.forEach((item, itemIndex) => {
-        const componentPath = [
-          ...parentComponentPath,
+        const nodePath = [
+          ...parentNodePath,
           'directive',
           index - start,
           itemIndex,
@@ -74,8 +74,8 @@ function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
           __templateName: item._lView[8]
             ? item._lView[8].__templateName
             : undefined,
-          nodeList: lViewToWXView(item._lView, componentPath),
-          componentPath: componentPath,
+          nodeList: lViewToWXView(item._lView, nodePath),
+          nodePath: nodePath,
           index: lContainerList.length,
         });
       });
@@ -88,16 +88,16 @@ function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
   return nodeList;
 }
 
-export function setLViewPath(lView: LView, componentPath: ComponentPath) {
-  componentPath = componentPath.slice();
-  componentPathMap.set(lView, componentPath);
+export function setLViewPath(lView: LView, nodePath: NodePath) {
+  nodePath = nodePath.slice();
+  nodePathMap.set(lView, nodePath);
 }
 function getLViewPath(lView: LView) {
-  return componentPathMap.get(lView);
+  return nodePathMap.get(lView);
 }
-export function updatePath(context: MPView, componentPath: ComponentPath) {
-  componentPath = componentPath.slice();
-  context.componentPath = componentPath;
+export function updatePath(context: MPView, nodePath: NodePath) {
+  nodePath = nodePath.slice();
+  context.nodePath = nodePath;
   const list: (MPView[] | MPElementData | MPTextData | MPView)[] = [
     ...context.nodeList,
   ];
@@ -109,8 +109,8 @@ export function updatePath(context: MPView, componentPath: ComponentPath) {
     if ((item as any).nodeList && (item as any).nodeList.length) {
       list.push(...(item as any).nodeList);
     }
-    if ((item as MPView).componentPath) {
-      ((item as MPView).componentPath as any[]).unshift(...componentPath);
+    if ((item as MPView).nodePath) {
+      ((item as MPView).nodePath as any[]).unshift(...nodePath);
     }
   }
   return context;
@@ -151,7 +151,7 @@ export function getPageLView(id: string): any {
   return pageMap.get(id)!;
 }
 
-export function findCurrentLView(lView: LView, list: ComponentPath): any {
+export function findCurrentLView(lView: LView, list: NodePath): any {
   list = list.slice();
   while (list.length) {
     const item = list.shift()!;
@@ -167,7 +167,7 @@ export function findCurrentLView(lView: LView, list: ComponentPath): any {
   }
   return lView;
 }
-export function findCurrentElement(lView: LView, list: ComponentPath = []) {
+export function findCurrentElement(lView: LView, list: NodePath = []) {
   list = [...list];
   while (list.length) {
     const item = list.shift()!;
@@ -195,7 +195,7 @@ export function cleanWhenDestroy(lView: LView) {
 }
 function cleanAll(lview: LView) {
   linkMap.delete(lview);
-  componentPathMap.delete(lview);
+  nodePathMap.delete(lview);
   customDestroyMap.get(lview)?.forEach((fn) => {
     fn();
   });

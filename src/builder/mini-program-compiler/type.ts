@@ -1,3 +1,5 @@
+import { MetaCollection } from './meta-collection';
+
 export interface ComponentMetaFromLibrary {
   isComponent: true;
   exportPath: string;
@@ -17,4 +19,16 @@ export interface UseComponent {
   selector: string;
   className: string;
   path: string;
+}
+export interface ResolvedDataGroup {
+  style: Map<string, string[]>;
+  outputContent: Map<string, string>;
+  useComponentPath: Map<
+    string,
+    {
+      localPath: UseComponent[];
+      libraryPath: UseComponent[];
+    }
+  >;
+  otherMetaCollectionGroup: Record<string, MetaCollection>;
 }

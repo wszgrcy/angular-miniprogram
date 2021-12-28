@@ -13,7 +13,7 @@ import {
 } from '../../test/util/file';
 import { runBuilder } from './browser';
 import { BuildPlatform, PlatformType } from './platform/platform';
-import { getBuildPlatformInjectConfig } from './platform/platform-info';
+import { getBuildPlatformInjectConfig } from './platform/platform-inject-config';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,

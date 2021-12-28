@@ -32,10 +32,11 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     const inlineMetaCollection = metaCollectionGroup.$inline;
     delete metaCollectionGroup.$inline;
     return {
-      content: `<block ${this.directivePrefix}${this.seq}if="{{hasLoad}}">${result.wxmlTemplate}</block> `,
-      template: inlineMetaCollection.templateList
+      content: `${inlineMetaCollection.templateList
         .map((item) => item.content)
-        .join(''),
+        .join('')}<block ${this.directivePrefix}${this.seq}if="{{hasLoad}}">${
+        result.wxmlTemplate
+      }</block>`,
       useComponentPath: {
         localPath: [...inlineMetaCollection.localPath],
         libraryPath: [...inlineMetaCollection.libraryPath],
@@ -62,23 +63,27 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     };
   }
   eventListConvert = (list: string[]) => {
-    const nodeEventGroup: Record<string, Record<string, string[]>> = {};
     const eventMap = new Map();
     list.forEach((eventName) => {
       const result = this.eventNameConvert(eventName);
       const prefix = strings.camelize(result.prefix);
-      if (nodeEventGroup[prefix] && nodeEventGroup[prefix][result.type]) {
+      const bindEventName = `${prefix}Event`;
+      if (eventMap.has(result.name)) {
+        if (eventMap.get(result.name) === bindEventName) {
+          return;
+        } else {
+          throw new Error(
+            `事件名[${result.name}]解析异常,原绑定${eventMap.get(
+              result.name
+            )},现绑定${bindEventName}`
+          );
+        }
       }
-      const eventList = [eventName];
-      nodeEventGroup[prefix] = nodeEventGroup[prefix] || {};
-      nodeEventGroup[prefix][result.type] = eventList;
-      eventMap.set(result.name, `${prefix}Event`);
+      eventMap.set(result.name, bindEventName);
     });
 
-    return [
-      ...Array.from(eventMap.entries()).map(
-        ([key, value]) => `${key}="${value}"`
-      ),
-    ].join(' ');
+    return Array.from(eventMap.entries())
+      .map(([key, value]) => `${key}="${value}"`)
+      .join(' ');
   };
 }

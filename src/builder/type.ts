@@ -12,7 +12,6 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
   src: string;
   outputFiles: {
     content: string;
-    contentTemplate: string;
     style: string;
     logic: string;
     path: string;

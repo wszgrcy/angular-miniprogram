@@ -1,16 +1,8 @@
-/* eslint-disable prefer-rest-params */
-import {
-  dirname,
-  join,
-  normalize,
-  resolve,
-  strings,
-} from '@angular-devkit/core';
+import { dirname, join, normalize } from '@angular-devkit/core';
 import type {
   CompilerOptions,
   ParsedConfiguration,
 } from '@angular/compiler-cli';
-import * as fs from 'fs';
 import { BuildGraph } from 'ng-packagr/lib/graph/build-graph';
 import {
   EntryPointNode,
@@ -30,23 +22,17 @@ import { ngCompilerCli } from 'ng-packagr/lib/utils/ng-compiler-cli';
 import path from 'path';
 import { Injector } from 'static-injector';
 import ts from 'typescript';
-import { LIBRARY_OUTPUT_PATH } from '../const';
 import { MiniProgramCompilerService } from '../mini-program-compiler';
 import { BuildPlatform, PlatformType } from '../platform/platform';
-import { getBuildPlatformInjectConfig } from '../platform/platform-info';
-import { changeComponent } from '../ts/change-component';
-import { ExportLibraryComponentMeta } from '../type';
-import { AddDeclareMetaService } from './add-declare-meta';
-import { AddGlobalTemplateService } from './add-global-template';
-import { getLibraryPath } from './get-library-path';
-import { getUseComponents } from './merge-using-component-path';
+import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
+import { AddDeclarationMetaDataService } from './add-declaration-metadata.service';
+import { OutputTemplateMetadataService } from './output-template-metadata.service';
+import { SetupComponentDataService } from './setup-component-data.service';
 import { CustomStyleSheetProcessor } from './stylesheet-processor';
 import {
-  COMPONENT_MAP,
-  DIRECTIVE_MAP,
   ENTRY_FILE_TOKEN,
-  LIBRARY_ENTRY_POINT,
-  RESOLVED_META_MAP,
+  ENTRY_POINT_TOKEN,
+  RESOLVED_DATA_GROUP_TOKEN,
 } from './token';
 
 export async function compileSourceFiles(
@@ -84,7 +70,8 @@ export async function compileSourceFiles(
     ngccProcessor!,
     moduleResolutionCache
   );
-  hookCompilerHost(tsCompilerHost);
+  // inject
+  augmentLibraryMetadata(tsCompilerHost);
   const cache = entryPoint.cache;
   const sourceFileCache = cache.sourcesFileCache;
 
@@ -95,34 +82,7 @@ export async function compileSourceFiles(
     tsCompilerHost,
     cache.oldNgtscProgram
   );
-  let injector = Injector.create({
-    providers: [
-      ...getBuildPlatformInjectConfig(PlatformType.library),
-      {
-        provide: MiniProgramCompilerService,
-        useFactory: (injector: Injector, buildPlatform: BuildPlatform) => {
-          return new MiniProgramCompilerService(
-            angularProgram,
-            injector,
-            buildPlatform
-          );
-        },
-        deps: [Injector, BuildPlatform],
-      },
-      {
-        provide: ENTRY_FILE_TOKEN,
-        useValue: join(
-          dirname(normalize(tsConfig.rootNames[0])),
-          normalize(tsConfigOptions.flatModuleOutFile!)
-        ),
-      },
-    ],
-  });
 
-  const miniProgramPlatformCompilerService = injector.get(
-    MiniProgramCompilerService
-  );
-  const buildPlatform = injector.get(BuildPlatform);
   const angularCompiler = angularProgram.compiler;
   const { ignoreForDiagnostics, ignoreForEmit } = angularCompiler;
 
@@ -194,31 +154,49 @@ export async function compileSourceFiles(
     ...builder.getOptionsDiagnostics(),
     ...builder.getGlobalDiagnostics(),
   ];
-
+  // inject
+  let injector = Injector.create({
+    providers: [
+      ...getBuildPlatformInjectConfig(PlatformType.library),
+      {
+        provide: MiniProgramCompilerService,
+        useFactory: (injector: Injector, buildPlatform: BuildPlatform) => {
+          return new MiniProgramCompilerService(
+            angularProgram,
+            injector,
+            buildPlatform
+          );
+        },
+        deps: [Injector, BuildPlatform],
+      },
+      {
+        provide: ENTRY_FILE_TOKEN,
+        useValue: join(
+          dirname(normalize(tsConfig.rootNames[0])),
+          normalize(tsConfigOptions.flatModuleOutFile!)
+        ),
+      },
+      {
+        provide: ENTRY_POINT_TOKEN,
+        useValue: entryPoint.data.entryPoint.moduleId,
+      },
+    ],
+  });
+  const miniProgramCompilerService = injector.get(MiniProgramCompilerService);
   // Required to support asynchronous resource loading
   // Must be done before creating transformers or getting template diagnostics
   await angularCompiler.analyzeAsync();
-  miniProgramPlatformCompilerService.init();
+  // inject
+  miniProgramCompilerService.init();
   const metaMap =
-    await miniProgramPlatformCompilerService.exportComponentBuildMetaMap();
+    await miniProgramCompilerService.exportComponentBuildMetaMap();
   injector = Injector.create({
     parent: injector,
     providers: [
-      {
-        provide: LIBRARY_ENTRY_POINT,
-        useValue: entryPoint.data.entryPoint.moduleId,
-      },
-      { provide: RESOLVED_META_MAP, useValue: metaMap },
-      {
-        provide: DIRECTIVE_MAP,
-        useValue: miniProgramPlatformCompilerService.getDirectiveMap(),
-      },
-      {
-        provide: COMPONENT_MAP,
-        useValue: miniProgramPlatformCompilerService.getComponentMap(),
-      },
-      { provide: AddDeclareMetaService },
-      { provide: AddGlobalTemplateService },
+      { provide: RESOLVED_DATA_GROUP_TOKEN, useValue: metaMap },
+      { provide: AddDeclarationMetaDataService },
+      { provide: OutputTemplateMetadataService },
+      { provide: SetupComponentDataService },
     ],
   });
   // Collect source file specific diagnostics
@@ -292,7 +270,7 @@ export async function compileSourceFiles(
       builder.emit(sourceFile, undefined, undefined, undefined, transformers);
     }
   }
-  function hookCompilerHost(compilerHost: ts.CompilerHost) {
+  function augmentLibraryMetadata(compilerHost: ts.CompilerHost) {
     const oldWriteFile = compilerHost.writeFile;
     compilerHost.writeFile = function (
       fileName: string,
@@ -303,12 +281,18 @@ export async function compileSourceFiles(
     ) {
       const entryFileName = injector.get(ENTRY_FILE_TOKEN);
       if (fileName.endsWith('.map')) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return oldWriteFile.apply(this, arguments as any);
+        return oldWriteFile.call(
+          this,
+          fileName,
+          data,
+          writeByteOrderMark,
+          onError,
+          sourceFiles
+        );
       }
       if (fileName.endsWith('.d.ts')) {
-        const service = injector.get(AddDeclareMetaService);
-        const result = service.run(fileName, data, sourceFiles![0]);
+        const service = injector.get(AddDeclarationMetaDataService);
+        const result = service.run(fileName, data);
         return oldWriteFile.call(
           this,
           fileName,
@@ -324,7 +308,7 @@ export async function compileSourceFiles(
           entryFileName ===
           normalize(sourceFile.fileName.replace(/\.ts$/, '.js'))
         ) {
-          const service = injector.get(AddGlobalTemplateService);
+          const service = injector.get(OutputTemplateMetadataService);
           const result = service.run(fileName, data, sourceFiles![0]);
           return oldWriteFile.call(
             this,
@@ -336,79 +320,31 @@ export async function compileSourceFiles(
           );
         }
         const originFileName = path.normalize(sourceFile.fileName);
-
-        const changeData = changeComponent(data);
-        if (!changeData) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          return oldWriteFile.apply(this, arguments as any);
-        }
-        const useComponentPath = metaMap.useComponentPath.get(originFileName)!;
-
-        const componentClassName = changeData.componentName;
-        const componentDirName = strings.dasherize(
-          strings.camelize(componentClassName)
+        const setupComponentDataService = injector.get(
+          SetupComponentDataService
         );
-        const libraryPath = getLibraryPath(
-          entryPoint.data.entryPoint.moduleId,
-          componentClassName
+        const result = setupComponentDataService.run(
+          data,
+          originFileName,
+          stylesheetProcessor! as CustomStyleSheetProcessor
         );
-        const customStyleSheetProcessor =
-          stylesheetProcessor as CustomStyleSheetProcessor;
-        const styleList = metaMap.style.get(originFileName);
-        const styleContentList: string[] = [];
-        styleList?.forEach((item) => {
-          styleContentList.push(customStyleSheetProcessor.styleMap.get(item)!);
-        });
-        const styleContent = styleContentList.join('\n');
-        const selfTemplate = metaMap.otherMetaCollectionGroup['$self']
-          ? `<import src="${resolve(
-              normalize('/'),
-              join(
-                normalize(LIBRARY_OUTPUT_PATH),
-                entryPoint.data.entryPoint.moduleId,
-                'self' + buildPlatform.fileExtname.contentTemplate
-              )
-            )}"/>`
-          : '';
-
-        const insertComponentData: ExportLibraryComponentMeta = {
-          id:
-            strings.classify(entryPoint.data.entryPoint.moduleId) +
-            strings.classify(strings.camelize(componentDirName)),
-          className: componentClassName,
-          content: selfTemplate + metaMap.outputContent.get(originFileName)!,
-          libraryPath: libraryPath,
-          useComponents: {
-            ...getUseComponents(
-              useComponentPath.libraryPath,
-              useComponentPath.localPath,
-              entryPoint.data.entryPoint.moduleId
-            ),
-            ...injector.get(AddGlobalTemplateService).getSelfUseComponents(),
-          },
-          moduleId: injector.get(LIBRARY_ENTRY_POINT),
-        };
-        if (styleContent) {
-          insertComponentData.style = styleContent;
-        }
-        const outputTemplate =
-          metaMap.outputContentTemplate.get(originFileName);
-        if (outputTemplate) {
-          insertComponentData.contentTemplate = selfTemplate + outputTemplate;
-        }
         return oldWriteFile.call(
           this,
           fileName,
-          `let ${componentClassName}_ExtraData=${JSON.stringify(
-            insertComponentData
-          )};${changeData.content}`,
+          result,
           writeByteOrderMark,
           onError,
           sourceFiles
         );
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return oldWriteFile.apply(this, arguments as any);
+      return oldWriteFile.call(
+        this,
+        fileName,
+        data,
+        writeByteOrderMark,
+        onError,
+        sourceFiles
+      );
     };
   }
 }

@@ -37,10 +37,10 @@ export interface MiniProgramComponentVariable {
   /** 小程序组件是否与lview链接成功 */
   __isLink: boolean;
   __lView: LView;
-  __componentPath: ComponentPath;
+  __nodePath: NodePath;
   __nodeIndex: number;
   __isDetachView: boolean;
-  __completePath: ComponentPath;
+  __completePath: NodePath;
 }
 export interface MiniProgramComponentMethod {
   __ngComponentDestroy: () => void;
@@ -67,7 +67,7 @@ export interface NgCompileComponent {
 export interface MPView {
   nodeList: (MPView[] | MPElementData | MPTextData)[];
   __templateName: string | undefined;
-  componentPath: ComponentPath;
+  nodePath: NodePath;
   index: number;
   hasLoad?: boolean;
 }
@@ -81,7 +81,7 @@ export interface MPTextData {
   value: string;
 }
 
-export type ComponentPath = ('directive' | number)[];
+export type NodePath = ('directive' | number)[];
 export interface MiniProgramComponentBuiltIn {
   getPageId(): string;
   setData(data: Partial<Record<string, any>>): void;

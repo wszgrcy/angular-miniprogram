@@ -12,7 +12,7 @@ import * as webpack from 'webpack';
 import { DefinePlugin } from 'webpack';
 import { BootstrapAssetsPlugin } from 'webpack-bootstrap-assets-plugin';
 import { LibraryTemplateScopeService } from './browser/library-template-scope.service';
-import { LIBRARY_OUTPUT_PATH } from './const';
+import { LIBRARY_OUTPUT_ROOTDIR } from './const';
 import { BuildPlatform } from './platform/platform';
 import type { PlatformType } from './platform/platform';
 import { DynamicLibraryComponentEntryPlugin } from './plugin/dynamic-library-entry.plugin';
@@ -143,7 +143,7 @@ export class WebpackConfigurationChange {
     ).chunks = (chunk) => {
       if (
         this.entryList.find((item) => item.entryName === chunk.name) ||
-        chunk.name.startsWith(`${LIBRARY_OUTPUT_PATH}/`)
+        chunk.name.startsWith(`${LIBRARY_OUTPUT_ROOTDIR}/`)
       ) {
         return true;
       }
@@ -173,7 +173,7 @@ export class WebpackConfigurationChange {
         [...chunk.files].some((file) =>
           file.endsWith(this.buildPlatform.fileExtname.style)
         ) ||
-        chunk.name.startsWith(`${LIBRARY_OUTPUT_PATH}/`)
+        chunk.name.startsWith(`${LIBRARY_OUTPUT_ROOTDIR}/`)
       ) {
         return true;
       }

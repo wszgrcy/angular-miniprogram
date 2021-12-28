@@ -7,7 +7,7 @@ import { TemplateScopeOutside } from '../browser/library-template-scope.service'
 import {
   GLOBAL_TEMPLATE_SUFFIX,
   InjectorSymbol,
-  LIBRARY_OUTPUT_PATH,
+  LIBRARY_OUTPUT_ROOTDIR,
   TemplateScopeSymbol,
 } from '../const';
 import { ExtraTemplateData } from '../library/type';
@@ -35,14 +35,7 @@ export default async function (
     const config: ExtraTemplateData = stringConfigToObjectConfig(content);
 
     this.emitFile(
-      resolve(
-        normalize('/'),
-        join(
-          normalize(LIBRARY_OUTPUT_PATH),
-          config.moduleId!,
-          'self' + buildPlatform.fileExtname.contentTemplate
-        )
-      ),
+      config.outputPath + buildPlatform.fileExtname.contentTemplate,
       libraryTemplateResolve(
         config.template,
         buildPlatform.templateTransform.getData().directivePrefix,

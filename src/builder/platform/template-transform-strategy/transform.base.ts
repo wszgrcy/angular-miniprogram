@@ -7,7 +7,6 @@ import { MetaCollection, UseComponent } from '../../mini-program-compiler';
 export abstract class TemplateTransformBase {
   abstract init(): any;
   abstract compile(nodes: NgNodeMeta[]): {
-    template: string;
     content: string;
     useComponentPath: {
       localPath: UseComponent[];

@@ -169,11 +169,6 @@ export class DynamicWatchEntryPlugin {
             object.outputFiles!.path + this.buildPlatform.fileExtname.style;
           object.outputFiles!.content =
             object.outputFiles!.path + this.buildPlatform.fileExtname.content;
-          // todo 准备废弃导出模板设置
-          object.outputFiles!.contentTemplate = path.join(
-            path.dirname(object.outputFiles!.logic),
-            `template${this.buildPlatform.fileExtname.contentTemplate}`
-          );
           object.outputFiles!.config =
             object.outputFiles!.path + this.buildPlatform.fileExtname.config;
           return object as PagePattern;
