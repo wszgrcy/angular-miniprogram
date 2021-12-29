@@ -231,6 +231,7 @@ export class WebpackConfigurationChangeService {
       performance: `${this.buildPlatform.globalVariablePrefix}.performance`,
       navigator: `${this.buildPlatform.globalVariablePrefix}.navigator`,
       wx: this.buildPlatform.globalObject,
+      miniProgramPlatform: `"${this.buildPlatform.globalObject}"`,
     };
     if (this.config.mode === 'development') {
       defineObject[
