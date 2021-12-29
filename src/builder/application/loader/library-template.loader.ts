@@ -1,19 +1,14 @@
-import { join, normalize, resolve } from '@angular-devkit/core';
 import { createCssSelectorForTs } from 'cyia-code-util';
 import { Injector } from 'static-injector';
 import { VariableDeclaration } from 'typescript';
 import * as webpack from 'webpack';
-import { TemplateScopeOutside } from '../browser/library-template-scope.service';
-import {
-  GLOBAL_TEMPLATE_SUFFIX,
-  InjectorSymbol,
-  LIBRARY_OUTPUT_ROOTDIR,
-  TemplateScopeSymbol,
-} from '../const';
-import { ExtraTemplateData } from '../library/type';
-import { BuildPlatform } from '../platform/platform';
-import { libraryTemplateResolve } from '../util/library-template-resolve';
-import { stringConfigToObjectConfig } from '../util/string-config-to-object-config';
+import { TemplateScopeOutside } from '../../application/library-template-scope.service';
+import { GLOBAL_TEMPLATE_SUFFIX } from '../../library';
+import { ExtraTemplateData } from '../../library/type';
+import { BuildPlatform } from '../../platform/platform';
+import { literalResolve } from '../../util';
+import { InjectorSymbol, TemplateScopeSymbol } from '../const';
+import { LibraryTemplateLiteralConvertOptions } from '../type';
 
 export default async function (
   this: webpack.LoaderContext<any>,
@@ -32,16 +27,20 @@ export default async function (
   ) as VariableDeclaration;
   if (selfTemplateNode) {
     const content = selfTemplateNode.initializer!.getText();
-    const config: ExtraTemplateData = stringConfigToObjectConfig(content);
+    const config: ExtraTemplateData = literalResolve(content);
 
     this.emitFile(
       config.outputPath + buildPlatform.fileExtname.contentTemplate,
-      libraryTemplateResolve(
-        config.template,
-        buildPlatform.templateTransform.getData().directivePrefix,
-        buildPlatform.templateTransform.eventListConvert,
-        buildPlatform.templateTransform.templateInterpolation,
-        buildPlatform.fileExtname
+      literalResolve<LibraryTemplateLiteralConvertOptions>(
+        `\`${config.template}\``,
+        {
+          directivePrefix:
+            buildPlatform.templateTransform.getData().directivePrefix,
+          eventListConvert: buildPlatform.templateTransform.eventListConvert,
+          templateInterpolation:
+            buildPlatform.templateTransform.templateInterpolation,
+          fileExtname: buildPlatform.fileExtname,
+        }
       )
     );
   }
@@ -50,8 +49,7 @@ export default async function (
   ) as VariableDeclaration;
   if (libraryTemplateNode) {
     const content = libraryTemplateNode.initializer!.getText();
-    const config: Record<string, ExtraTemplateData> =
-      stringConfigToObjectConfig(content);
+    const config: Record<string, ExtraTemplateData> = literalResolve(content);
 
     for (const key in config) {
       if (Object.prototype.hasOwnProperty.call(config, key)) {

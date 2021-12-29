@@ -18,3 +18,11 @@ export const ALL_COMPONENT_NAME_LIST = [
   `content`,
   `content-multi`,
 ];
+
+export const TEST_LIBRARY_COMPONENT_LIST = [
+  'global-self-template-component',
+  'test-library-component',
+  'lib-comp1-component',
+  'other-component',
+  'outside-template-component',
+];

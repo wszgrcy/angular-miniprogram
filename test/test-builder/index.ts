@@ -26,12 +26,12 @@ export function buildWebpackBrowserGenerate(
 }
 
 export const BROWSER_BUILDER_INFO = {
-  name: 'test-builder:browser',
+  name: 'test-builder:application',
   schemaPath: path.resolve(__dirname, 'schema.json'),
 };
 export const LIBRARY_BUILDER_INFO = {
   name: 'test-builder:library',
-  schemaPath: path.resolve(__dirname, 'schema.json'),
+  schemaPath: path.resolve(__dirname, 'schema.library.json'),
 };
 
 export const DEFAULT_ANGULAR_CONFIG = {

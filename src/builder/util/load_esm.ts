@@ -1,4 +1,4 @@
-export async function loadEsmModule<T>(modulePath: string): Promise<T> {
+async function loadEsmModule<T>(modulePath: string): Promise<T> {
   const namespaceObject = await new Function(
     'modulePath',
     `return import(modulePath);`

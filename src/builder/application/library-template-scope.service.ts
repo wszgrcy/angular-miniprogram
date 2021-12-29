@@ -1,6 +1,6 @@
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
-import { TemplateScopeSymbol } from '../const';
+import { TemplateScopeSymbol } from './const';
 
 export type TemplateScopeOutside = Omit<
   LibraryTemplateScopeService,

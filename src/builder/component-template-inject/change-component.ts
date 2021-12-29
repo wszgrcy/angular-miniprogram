@@ -5,7 +5,7 @@ import {
   createCssSelectorForTs,
 } from 'cyia-code-util';
 import * as ts from 'typescript';
-import { RawUpdater } from '../util/raw-updater';
+import { RawUpdater } from '../util';
 
 export function changeComponent(data: string) {
   const sf = ts.createSourceFile('', data, ts.ScriptTarget.Latest, true);

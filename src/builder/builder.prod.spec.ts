@@ -3,12 +3,12 @@ import { describeBuilder } from '../../test/plugin-describe-builder';
 import {
   BROWSER_BUILDER_INFO,
   DEFAULT_ANGULAR_CONFIG,
-} from '../../test/test-builder/browser';
+} from '../../test/test-builder';
 import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../test/util/file';
-import { runBuilder } from './browser';
+import { runBuilder } from './application';
 import { PlatformType } from './platform/platform';
 
 const angularConfig = {

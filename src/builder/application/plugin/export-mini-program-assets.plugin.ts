@@ -8,17 +8,23 @@ import { Inject, Injectable, Injector } from 'static-injector';
 import ts from 'typescript';
 import { sources } from 'webpack';
 import * as webpack from 'webpack';
-import { LibraryTemplateScopeService } from '../browser/library-template-scope.service';
-import { MiniProgramApplicationAnalysisService } from '../browser/mini-program-application-analysis.service';
+import { BuildPlatform } from '../../platform/platform';
+import { literalResolve } from '../../util';
 import { ExportMiniProgramAssetsPluginSymbol, InjectorSymbol } from '../const';
+import { LibraryTemplateScopeService } from '../library-template-scope.service';
 import type { ComponentTemplateLoaderContext } from '../loader/type';
-import { BuildPlatform } from '../platform/platform';
-import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
-import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
-import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
+import { MiniProgramApplicationAnalysisService } from '../mini-program-application-analysis.service';
+import {
+  OLD_BUILDER,
+  PAGE_PATTERN_TOKEN,
+  TS_CONFIG_TOKEN,
+  TS_SYSTEM,
+  WEBPACK_COMPILATION,
+  WEBPACK_COMPILER,
+} from '../token';
 import type { PagePattern } from '../type';
-import { libraryTemplateResolve } from '../util/library-template-resolve';
-import { setCompilationAsset } from '../util/set-compilation-asset';
+import { LibraryTemplateLiteralConvertOptions } from '../type';
+import { setCompilationAsset } from '../util';
 
 @Injectable()
 export class ExportMiniProgramAssetsPlugin {
@@ -197,14 +203,19 @@ export class ExportMiniProgramAssetsPlugin {
                   compilation,
                   key,
                   new sources.RawSource(
-                    libraryTemplateResolve(
-                      element,
-                      this.buildPlatform.templateTransform.getData()
-                        .directivePrefix,
-                      this.buildPlatform.templateTransform.eventListConvert,
-                      this.buildPlatform.templateTransform
-                        .templateInterpolation,
-                      this.buildPlatform.fileExtname
+                    literalResolve<LibraryTemplateLiteralConvertOptions>(
+                      `\`${element}\``,
+                      {
+                        directivePrefix:
+                          this.buildPlatform.templateTransform.getData()
+                            .directivePrefix,
+                        eventListConvert:
+                          this.buildPlatform.templateTransform.eventListConvert,
+                        templateInterpolation:
+                          this.buildPlatform.templateTransform
+                            .templateInterpolation,
+                        fileExtname: this.buildPlatform.fileExtname,
+                      }
                     )
                   )
                 );

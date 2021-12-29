@@ -1,5 +1,5 @@
-import { MetaCollection } from '../mini-program-compiler';
-import type { BuildPlatform } from '../platform/platform';
+import { MetaCollection } from '../../mini-program-compiler';
+import type { BuildPlatform } from '../../platform/platform';
 
 export interface ComponentTemplateLoaderContext {
   buildPlatform: BuildPlatform;

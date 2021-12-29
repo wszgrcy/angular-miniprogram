@@ -7,18 +7,20 @@ import * as webpack from 'webpack';
 import {
   ExtraTemplateData,
   TemplateScopeOutside,
-} from '../browser/library-template-scope.service';
+} from '../../application/library-template-scope.service';
 import {
-  ExportMiniProgramAssetsPluginSymbol,
   LIBRARY_COMPONENT_METADATA_SUFFIX,
   LIBRARY_OUTPUT_ROOTDIR,
+} from '../../library';
+import type { ExportLibraryComponentMeta } from '../../library';
+import { libraryTemplateScopeName, literalResolve } from '../../util';
+import {
+  ExportMiniProgramAssetsPluginSymbol,
   LibrarySymbol,
   TemplateScopeSymbol,
 } from '../const';
-import { ExportLibraryComponentMeta, LibraryLoaderContext } from '../type';
-import { libraryTemplateResolve } from '../util/library-template-resolve';
-import { libraryTemplateScopeName } from '../util/library-template-scope-name';
-import { stringConfigToObjectConfig } from '../util/string-config-to-object-config';
+import type { LibraryLoaderContext } from '../type';
+import { LibraryTemplateLiteralConvertOptions } from '../type';
 import { ComponentTemplateLoaderContext } from './type';
 
 export default async function (
@@ -53,8 +55,7 @@ export default async function (
       continue;
     }
     const content = extraNode.initializer!.getText();
-    const meta: ExportLibraryComponentMeta =
-      stringConfigToObjectConfig(content);
+    const meta: ExportLibraryComponentMeta = literalResolve(content);
     (this._compilation as any)[LibrarySymbol] =
       (this._compilation as any)[LibrarySymbol] || {};
     const libraryLoaderContext: LibraryLoaderContext = (
@@ -89,22 +90,28 @@ export default async function (
       });
 
       scopeLibraryObj[LIBRARY_SCOPE_ID] = list;
-
+      const libraryTemplateLiteralConvertOptions: LibraryTemplateLiteralConvertOptions =
+        {
+          directivePrefix:
+            libraryLoaderContext.buildPlatform.templateTransform.getData()
+              .directivePrefix,
+          eventListConvert:
+            libraryLoaderContext.buildPlatform.templateTransform
+              .eventListConvert,
+          templateInterpolation:
+            libraryLoaderContext.buildPlatform.templateTransform
+              .templateInterpolation,
+          fileExtname: libraryLoaderContext.buildPlatform.fileExtname,
+        };
       this.emitFile(
         join(
           normalize(LIBRARY_OUTPUT_ROOTDIR),
           item.libraryPath + fileExtname.content
         ),
-        `<import  src="${globalTemplatePath}"/>` +
-          libraryTemplateResolve(
-            item.content,
-            libraryLoaderContext.buildPlatform.templateTransform.getData()
-              .directivePrefix,
-            libraryLoaderContext.buildPlatform.templateTransform
-              .eventListConvert,
-            libraryLoaderContext.buildPlatform.templateTransform
-              .templateInterpolation,
-            libraryLoaderContext.buildPlatform.fileExtname
+        `<import src="${globalTemplatePath}"/>` +
+          literalResolve(
+            `\`${item.content}\``,
+            libraryTemplateLiteralConvertOptions
           )
       );
       if (item.contentTemplate) {
@@ -114,16 +121,10 @@ export default async function (
             dirname(normalize(item.libraryPath)),
             'template' + fileExtname.contentTemplate
           ),
-          `<import  src="${globalTemplatePath}"/>` +
-            libraryTemplateResolve(
-              item.contentTemplate,
-              libraryLoaderContext.buildPlatform.templateTransform.getData()
-                .directivePrefix,
-              libraryLoaderContext.buildPlatform.templateTransform
-                .eventListConvert,
-              libraryLoaderContext.buildPlatform.templateTransform
-                .templateInterpolation,
-              libraryLoaderContext.buildPlatform.fileExtname
+          `<import src="${globalTemplatePath}"/>` +
+            literalResolve(
+              `\`${item.contentTemplate}\``,
+              libraryTemplateLiteralConvertOptions
             )
         );
       }

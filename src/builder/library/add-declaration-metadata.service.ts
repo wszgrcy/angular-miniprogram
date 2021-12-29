@@ -5,12 +5,12 @@ import type {
 import { createCssSelectorForTs } from 'cyia-code-util';
 import { Inject, Injectable } from 'static-injector';
 import ts from 'typescript';
+import { MiniProgramCompilerService } from '../mini-program-compiler';
 import {
   LIBRARY_COMPONENT_OUTPUT_PATH_SUFFIX,
   LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
   LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX,
-} from '../const';
-import { MiniProgramCompilerService } from '../mini-program-compiler';
+} from './const';
 import { getComponentOutputPath } from './get-library-path';
 import { ENTRY_POINT_TOKEN } from './token';
 

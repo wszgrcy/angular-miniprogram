@@ -9,7 +9,7 @@ import { Injector } from 'static-injector';
 import * as webpack from 'webpack';
 import { PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
-import { WebpackConfigurationChange } from '../webpack-configuration-change';
+import { WebpackConfigurationChangeService } from './webpack-configuration-change.service';
 
 export default createBuilder(
   (
@@ -38,9 +38,9 @@ export function runBuilder(
         providers: [
           ...getBuildPlatformInjectConfig(angularOptions.platform),
           {
-            provide: WebpackConfigurationChange,
+            provide: WebpackConfigurationChangeService,
             useFactory: (injector: Injector) => {
-              return new WebpackConfigurationChange(
+              return new WebpackConfigurationChangeService(
                 angularOptions,
                 context,
                 options,
@@ -51,7 +51,7 @@ export function runBuilder(
           },
         ],
       });
-      const config = injector.get(WebpackConfigurationChange);
+      const config = injector.get(WebpackConfigurationChangeService);
       config.init();
       await config.change();
       return options;

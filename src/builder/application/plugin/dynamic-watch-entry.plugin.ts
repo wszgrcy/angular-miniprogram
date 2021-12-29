@@ -7,7 +7,7 @@ import * as path from 'path';
 import { BehaviorSubject } from 'rxjs';
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
-import { BuildPlatform } from '../platform/platform';
+import { BuildPlatform } from '../../platform/platform';
 import type { PagePattern } from '../type';
 
 function globAsync(pattern: string, options: glob.IOptions) {

@@ -1,13 +1,13 @@
 import { join, normalize, resolve, strings } from '@angular-devkit/core';
 import { Inject, Injectable } from 'static-injector';
 import { changeComponent } from '../component-template-inject/change-component';
+import type { ExportLibraryComponentMeta } from '../library';
+import { ResolvedDataGroup } from '../mini-program-compiler';
+import { BuildPlatform } from '../platform/platform';
 import {
   LIBRARY_COMPONENT_METADATA_SUFFIX,
   LIBRARY_OUTPUT_ROOTDIR,
-} from '../const';
-import { ResolvedDataGroup } from '../mini-program-compiler';
-import { BuildPlatform } from '../platform/platform';
-import { ExportLibraryComponentMeta } from '../type';
+} from './const';
 import { getComponentOutputPath } from './get-library-path';
 import { getUseComponents } from './merge-using-component-path';
 import { OutputTemplateMetadataService } from './output-template-metadata.service';

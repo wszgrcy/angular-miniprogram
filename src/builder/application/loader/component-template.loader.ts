@@ -1,5 +1,5 @@
 import * as webpack from 'webpack';
-import { changeComponent } from '../component-template-inject/change-component';
+import { changeComponent } from '../../component-template-inject/change-component';
 
 export default async function (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

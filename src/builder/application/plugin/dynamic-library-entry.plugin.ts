@@ -3,9 +3,11 @@ import { join, normalize } from '@angular-devkit/core';
 import path from 'path';
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
-import { LIBRARY_OUTPUT_ROOTDIR, LibrarySymbol } from '../const';
-import { BuildPlatform } from '../platform/platform';
-import type { LibraryComponentEntryMeta, LibraryLoaderContext } from '../type';
+import { LIBRARY_OUTPUT_ROOTDIR } from '../../library';
+import type { LibraryComponentEntryMeta } from '../../library';
+import { BuildPlatform } from '../../platform/platform';
+import { LibrarySymbol } from '../const';
+import type { LibraryLoaderContext } from '../type';
 
 const CUSTOM_URI = 'dynamic';
 const CUSTOM_URI_REG = /^dynamic:\/\/__license(?:\/|\\)(.*)\.ts$/;

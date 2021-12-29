@@ -17,11 +17,10 @@ import {
   LIBRARY_COMPONENT_OUTPUT_PATH_SUFFIX,
   LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
   LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX,
-} from '../const';
+} from '../library';
 import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
-import { angularCompilerPromise } from '../util/load_esm';
-import { stringConfigToObjectConfig } from '../util/string-config-to-object-config';
+import { angularCompilerPromise, literalResolve } from '../util';
 import { ComponentCompilerService } from './component-compiler.service';
 import { MetaCollection } from './meta-collection';
 import { ComponentContext } from './parse-node';
@@ -228,13 +227,13 @@ export class MiniProgramCompilerService {
       `VariableDeclaration[name=${directiveName}_${LIBRARY_DIRECTIVE_LISTENERS_SUFFIX}]`
     ) as ts.VariableDeclaration;
     if (listenersNode) {
-      listeners = stringConfigToObjectConfig(listenersNode.type!.getText());
+      listeners = literalResolve(listenersNode.type!.getText());
     }
     const propertiesNode = selector.queryOne(
       `VariableDeclaration[name=${directiveName}_${LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX}]`
     ) as ts.VariableDeclaration;
     if (propertiesNode) {
-      properties = stringConfigToObjectConfig(propertiesNode.type!.getText());
+      properties = literalResolve(propertiesNode.type!.getText());
     }
     return {
       isComponent: false,
@@ -255,7 +254,7 @@ export class MiniProgramCompilerService {
     }
     const exportPath = exportPathNode.type!.getText();
     return {
-      exportPath: stringConfigToObjectConfig(exportPath),
+      exportPath: literalResolve(exportPath),
       ...this.getLibraryDirectiveMeta(classDeclaration)!,
       isComponent: true,
     };

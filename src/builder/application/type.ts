@@ -1,5 +1,13 @@
 import type { AssetPattern } from '@angular-devkit/build-angular';
-import { BuildPlatform } from './platform/platform';
+import { LibraryComponentEntryMeta } from '../library';
+import { BuildPlatform, PlatformFileExtname } from '../platform';
+
+export interface LibraryTemplateLiteralConvertOptions {
+  directivePrefix: string;
+  eventListConvert: (name: string[]) => string;
+  templateInterpolation: [string, string];
+  fileExtname: PlatformFileExtname;
+}
 
 export interface PagePattern extends Exclude<AssetPattern, string> {
   /** 入口名 */
@@ -22,21 +30,6 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
   };
 }
 
-export interface ExportLibraryComponentMeta {
-  id: string;
-  content: string;
-  contentTemplate?: string;
-  style?: string;
-  className: string;
-  libraryPath: string;
-  useComponents: Record<string, string>;
-  moduleId: string;
-}
-export interface LibraryComponentEntryMeta extends ExportLibraryComponentMeta {
-  importPath: string;
-  context: string;
-  contextPath: string;
-}
 export interface LibraryLoaderContext {
   libraryMetaList: LibraryComponentEntryMeta[];
   buildPlatform: BuildPlatform;

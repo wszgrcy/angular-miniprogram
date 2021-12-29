@@ -1,8 +1,8 @@
 import { join, normalize, resolve } from '@angular-devkit/core';
 import { Inject, Injectable } from 'static-injector';
 import ts from 'typescript';
-import { GLOBAL_TEMPLATE_SUFFIX, LIBRARY_OUTPUT_ROOTDIR } from '../const';
 import { MetaCollection, ResolvedDataGroup } from '../mini-program-compiler';
+import { GLOBAL_TEMPLATE_SUFFIX, LIBRARY_OUTPUT_ROOTDIR } from './const';
 import { getUseComponents } from './merge-using-component-path';
 import {
   ENTRY_FILE_TOKEN,

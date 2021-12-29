@@ -3,22 +3,21 @@ import {
   AssetPattern,
   BrowserBuilderOptions,
 } from '@angular-devkit/build-angular';
-import type { Path } from '@angular-devkit/core';
-import { getSystemPath, normalize, resolve } from '@angular-devkit/core';
+import { normalize } from '@angular-devkit/core';
 import * as path from 'path';
 import { filter } from 'rxjs/operators';
 import { Injectable, Injector } from 'static-injector';
 import * as webpack from 'webpack';
 import { DefinePlugin } from 'webpack';
 import { BootstrapAssetsPlugin } from 'webpack-bootstrap-assets-plugin';
-import { LibraryTemplateScopeService } from './browser/library-template-scope.service';
-import { LIBRARY_OUTPUT_ROOTDIR } from './const';
-import { BuildPlatform } from './platform/platform';
-import type { PlatformType } from './platform/platform';
+import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
+import { BuildPlatform } from '../platform/platform';
+import type { PlatformType } from '../platform/platform';
+import { LibraryTemplateScopeService } from './library-template-scope.service';
 import { DynamicLibraryComponentEntryPlugin } from './plugin/dynamic-library-entry.plugin';
 import { DynamicWatchEntryPlugin } from './plugin/dynamic-watch-entry.plugin';
 import { ExportMiniProgramAssetsPlugin } from './plugin/export-mini-program-assets.plugin';
-import { TS_CONFIG_TOKEN } from './token/project.token';
+import { TS_CONFIG_TOKEN } from './token';
 import type { PagePattern } from './type';
 
 type OptimizationOptions = NonNullable<webpack.Configuration['optimization']>;
@@ -31,7 +30,7 @@ type OptimizationSplitChunksCacheGroup = Exclude<
   false | string | Function | RegExp
 >;
 @Injectable()
-export class WebpackConfigurationChange {
+export class WebpackConfigurationChangeService {
   exportMiniProgramAssetsPluginInstance!: ExportMiniProgramAssetsPlugin;
   private buildPlatform!: BuildPlatform;
   private entryList!: PagePattern[];

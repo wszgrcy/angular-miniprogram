@@ -1,5 +1,6 @@
 import { Injectable } from 'static-injector';
 import { TemplateTransformBase } from './template-transform-strategy/transform.base';
+import { PlatformFileExtname } from './type';
 
 export enum PlatformType {
   wx = 'wx',
@@ -17,13 +18,7 @@ export class BuildPlatform {
   packageName!: string;
   globalObject!: string;
   globalVariablePrefix!: string;
-  fileExtname!: {
-    style: string;
-    logic: string;
-    content: string;
-    contentTemplate: string;
-    config?: string;
-  };
+  fileExtname!: PlatformFileExtname;
   importTemplate!: string;
   constructor(public templateTransform: TemplateTransformBase) {
     this.templateTransform.init();

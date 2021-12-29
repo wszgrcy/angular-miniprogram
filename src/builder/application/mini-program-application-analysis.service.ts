@@ -8,14 +8,19 @@ import { Inject, Injectable, Injector } from 'static-injector';
 import ts from 'typescript';
 import type { CompilerOptions } from 'typescript';
 import { Compilation, Compiler } from 'webpack';
-import { LIBRARY_OUTPUT_ROOTDIR } from '../const';
+import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
 import { MiniProgramCompilerService } from '../mini-program-compiler';
 import { BuildPlatform } from '../platform/platform';
-import { PAGE_PATTERN_TOKEN, TS_CONFIG_TOKEN } from '../token/project.token';
-import { OLD_BUILDER, TS_SYSTEM } from '../token/ts-program.token';
-import { WEBPACK_COMPILATION, WEBPACK_COMPILER } from '../token/webpack.token';
-import { PagePattern } from '../type';
 import { angularCompilerCliPromise } from '../util/load_esm';
+import {
+  OLD_BUILDER,
+  PAGE_PATTERN_TOKEN,
+  TS_CONFIG_TOKEN,
+  TS_SYSTEM,
+  WEBPACK_COMPILATION,
+  WEBPACK_COMPILER,
+} from './token';
+import type { PagePattern } from './type';
 
 @Injectable()
 export class MiniProgramApplicationAnalysisService {
