@@ -34,9 +34,7 @@ import {
 import { AgentNode } from './renderer-node';
 
 export class MiniProgramCoreFactory {
-  public MINIPROGRAM_GLOBAL = (typeof wx === 'undefined'
-    ? undefined
-    : wx) as any as WechatMiniprogram.Wx;
+  public MINIPROGRAM_GLOBAL = wx;
   public loadApp = <T>(app: T) => {
     App(app || {});
     const appInstance = getApp();

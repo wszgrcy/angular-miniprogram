@@ -2,10 +2,8 @@ import {
   MiniProgramCoreFactory as BaseFactory,
   pageBindFactory,
 } from 'angular-miniprogram/platform/default';
-declare const qq: any;
 declare const getCurrentPages: Function;
 class MiniProgramCoreFactory extends BaseFactory {
-  override MINIPROGRAM_GLOBAL = qq;
   override getPageId(component: any) {
     return (
       component.route || getCurrentPages()[getCurrentPages().length - 1].route

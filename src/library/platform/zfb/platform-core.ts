@@ -3,13 +3,11 @@ import {
   pageBindFactory,
 } from 'angular-miniprogram/platform/default';
 import { NodePath } from 'angular-miniprogram/platform/type';
-declare const my: any;
 
 class MiniProgramCoreFactory extends BaseFactory {
   override getPageId(component: any) {
     return component.$page ? component.$page.$id : component.$id;
   }
-  override MINIPROGRAM_GLOBAL = my;
   override eventPrefixList = [
     { listener: 'on', prefix: 'on' },
     { listener: 'catch', prefix: 'catch' },
