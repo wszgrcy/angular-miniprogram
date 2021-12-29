@@ -10,7 +10,7 @@ import {
 } from '../browser/library-template-scope.service';
 import {
   ExportMiniProgramAssetsPluginSymbol,
-  LIBRARY_COMPONENT_OUTPUT_PATH_SUFFIX,
+  LIBRARY_COMPONENT_METADATA_SUFFIX,
   LIBRARY_OUTPUT_ROOTDIR,
   LibrarySymbol,
   TemplateScopeSymbol,
@@ -47,7 +47,7 @@ export default async function (
       element.left as ts.PropertyAccessExpression
     ).expression.getText();
     const extraNode = selector.queryOne(
-      `VariableDeclaration[name="${componentName}_${LIBRARY_COMPONENT_OUTPUT_PATH_SUFFIX}"]`
+      `VariableDeclaration[name="${componentName}_${LIBRARY_COMPONENT_METADATA_SUFFIX}"]`
     ) as ts.VariableDeclaration;
     if (!extraNode) {
       continue;
