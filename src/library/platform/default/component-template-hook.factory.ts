@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { InjectFlags, NgZone, ɵɵdirectiveInject } from '@angular/core';
 import { LView } from 'angular-miniprogram/platform/type';
-import { AgentNode } from './renderer-node';
-import { PAGE_TOKEN } from './token';
 import type {
-  NodePath,
   MPElementData,
   MPTextData,
   MPView,
+  NodePath,
 } from 'angular-miniprogram/platform/type';
+import { AgentNode } from './renderer-node';
+import { PAGE_TOKEN } from './token';
+
 export const LVIEW_CONTEXT = 8;
 const start = 20;
 
@@ -27,7 +28,7 @@ export function propertyChange(context: any) {
     hasLoad: true,
   };
   if (linkMap.has(lView)) {
-    let ngZone = getLViewInjector(lView)!.get(NgZone);
+    const ngZone = getLViewInjector(lView)!.get(NgZone);
     ngZone.runOutsideAngular(() => {
       linkMap.get(lView).setData(ctx);
     });
@@ -204,7 +205,7 @@ export function getLViewInjector(lView: LView) {
   return lView[9]!;
 }
 export function addDestroyFunction(lView: LView, fn: Function) {
-  let list = customDestroyMap.get(lView) || [];
+  const list = customDestroyMap.get(lView) || [];
   list.push(fn);
   customDestroyMap.set(lView, list);
 }
