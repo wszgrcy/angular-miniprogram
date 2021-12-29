@@ -12,4 +12,5 @@ commitlint.config.js
 script
 **/fixture
 *.xspec.ts
-src/library
+src/library/common
+src/libary/forms
