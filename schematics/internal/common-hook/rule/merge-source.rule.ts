@@ -22,6 +22,9 @@ export function mergeSourceRuleFactory(options: FormsHookOptions) {
         filter((path) => {
           return path.endsWith('.ts') && !path.startsWith('/test');
         }),
+        filter((path) => {
+          return !path.endsWith('.spec.ts');
+        }),
         // filter((path) => {
         //   return !path.includes('i18n/');
         // }),
