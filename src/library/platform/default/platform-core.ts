@@ -19,6 +19,7 @@ import 'miniprogram-api-typings';
 import {
   INJECTOR,
   LVIEW_CONTEXT,
+  cleanAll,
   cleanWhenDestroy,
   findCurrentElement,
   findCurrentLView,
@@ -150,10 +151,7 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.__ngComponentInstance = componentRef.instance;
     mpComponentInstance.__ngComponentInjector = componentRef.injector;
     mpComponentInstance.__ngZone = componentRef.injector.get(NgZone);
-    mpComponentInstance.__ngComponentDestroy = () => {
-      componentRef.destroy();
-      removePageLinkLView(this.getPageId(mpComponentInstance));
-    };
+
     mpComponentInstance.__ngComponentInjector
       .get(ChangeDetectorRef)
       .detectChanges();
@@ -162,7 +160,11 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.setData(initValue!);
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__lView = lView;
-    mpComponentInstance.__ngComponentInstance = lView[LVIEW_CONTEXT];
+    mpComponentInstance.__ngComponentDestroy = () => {
+      componentRef.destroy();
+      removePageLinkLView(this.getPageId(mpComponentInstance));
+      cleanAll(lView);
+    };
   }
 
   public pageStartup = (module: Type<unknown>, component: Type<unknown>) => {

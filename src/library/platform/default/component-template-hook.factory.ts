@@ -196,7 +196,7 @@ export function cleanWhenDestroy(lView: LView, fn: () => void) {
   list.push(() => cleanAll(lView));
   list.push(fn);
 }
-function cleanAll(lview: LView) {
+export function cleanAll(lview: LView) {
   linkMap.delete(lview);
   nodePathMap.delete(lview);
 }
