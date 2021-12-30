@@ -210,8 +210,22 @@ export class MiniProgramCoreFactory {
       },
     });
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected addNgComponentLinkLogic(config: any) {
+  protected addNgComponentLinkLogic(
+    config: WechatMiniprogram.Component.Options<{}, {}, {}>
+  ) {
+    const oldCreate = config.lifetimes?.created;
+    config.lifetimes = config.lifetimes || {};
+    config.lifetimes.created = function (this: MiniProgramComponentInstance) {
+      let resolveFunction!: () => void;
+      this.__waitLinkPromise = new Promise<void>((resolve) => {
+        resolveFunction = resolve;
+      });
+      this.__waitLinkResolve = resolveFunction;
+
+      if (oldCreate) {
+        oldCreate.bind(this)();
+      }
+    };
     const _this = this;
     config.properties = {
       nodePath: {
@@ -262,19 +276,7 @@ export class MiniProgramCoreFactory {
         ...this.listenerEvent(component),
       },
     };
-    const oldCreate = config.lifetimes?.created;
-    config.lifetimes = config.lifetimes || {};
-    config.lifetimes.created = function (this: MiniProgramComponentInstance) {
-      let resolveFunction!: () => void;
-      this.__waitLinkPromise = new Promise<void>((resolve) => {
-        resolveFunction = resolve;
-      });
-      this.__waitLinkResolve = resolveFunction;
 
-      if (oldCreate) {
-        oldCreate.bind(this)();
-      }
-    };
     config = this.addNgComponentLinkLogic(config);
     return Component(config);
   };
