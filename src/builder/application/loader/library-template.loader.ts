@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createCssSelectorForTs } from 'cyia-code-util';
 import { Injector } from 'static-injector';
 import { VariableDeclaration } from 'typescript';

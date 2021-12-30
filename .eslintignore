@@ -14,3 +14,5 @@ script
 *.xspec.ts
 src/library/common
 src/libary/forms
+test
+src/library/platform/http

@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   MiniProgramCoreFactory as BaseFactory,
   pageBindFactory,
 } from 'angular-miniprogram/platform/default';
+
 declare const getCurrentPages: Function;
 class MiniProgramCoreFactory extends BaseFactory {
   override getPageId(component: any) {

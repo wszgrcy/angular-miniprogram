@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export class DatasetBind {
   constructor(private data: any) {}
   toJSON() {

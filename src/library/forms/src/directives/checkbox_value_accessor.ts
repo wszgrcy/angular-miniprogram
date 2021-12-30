@@ -10,11 +10,11 @@ import {
   ContentChildren,
   Directive,
   ElementRef,
-  forwardRef,
   HostBinding,
   Input,
   QueryList,
   Renderer2,
+  forwardRef,
 } from '@angular/core';
 
 import {

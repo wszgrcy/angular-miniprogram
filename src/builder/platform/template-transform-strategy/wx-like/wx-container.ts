@@ -192,7 +192,7 @@ export class WxContainer {
           )
       ),
       ...(node.directiveMeta?.listeners || []),
-      ...(node.componentMeta?.isComponent ? node.componentMeta?.listeners : []),
+      ...(node.componentMeta?.isComponent ? node.componentMeta.listeners : []),
     ];
 
     const result = WxContainer.globalConfig.eventListConvert(eventList);

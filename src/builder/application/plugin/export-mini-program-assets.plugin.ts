@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable no-console */
 import { normalizePath } from '@ngtools/webpack/src/ivy/paths';
 import {
   InputFileSystemSync,

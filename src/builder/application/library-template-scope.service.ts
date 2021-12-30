@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
 import { TemplateScopeSymbol } from './const';
@@ -30,7 +31,10 @@ export class LibraryTemplateScopeService {
   }
 
   exportLibraryComponentConfig() {
-    const list: { filePath: string; content: Record<string, any> }[] = [];
+    const list: {
+      filePath: string;
+      content: { component: boolean; usingComponents: Record<string, string> };
+    }[] = [];
     this.scopeLibraryUseComponentsMap.forEach((obj, libraryScope) => {
       const extraData = this.scopeExtraUseComponentsMap.get(libraryScope) || {
         useComponents: {},
