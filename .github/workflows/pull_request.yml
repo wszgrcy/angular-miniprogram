@@ -23,6 +23,9 @@ jobs:
       - name: lint
         run: |
           yarn lint
+      - name: hook-code
+        run: |
+          yarn hook-code
       - name: test
         run: |
           yarn test:ci
