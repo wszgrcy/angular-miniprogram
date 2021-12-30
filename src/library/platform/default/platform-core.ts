@@ -299,7 +299,7 @@ export class MiniProgramCoreFactory {
     if (options) {
       const pageLifetimes = options.pageLifetimes;
       for (const key in pageLifetimes) {
-        if (Object.prototype.hasOwnProperty.call(options, key)) {
+        if (Object.prototype.hasOwnProperty.call(pageLifetimes, key)) {
           const element = pageLifetimes[key as PageLifetimesKey];
           if (element instanceof Function) {
             pageLifetimes[key as PageLifetimesKey] = function (
@@ -318,7 +318,7 @@ export class MiniProgramCoreFactory {
         keyof WechatMiniprogram.Component.Lifetimes['lifetimes'];
       const lifetimes = options.lifetimes;
       for (const key in lifetimes) {
-        if (Object.prototype.hasOwnProperty.call(options, key)) {
+        if (Object.prototype.hasOwnProperty.call(lifetimes, key)) {
           const element = lifetimes[key as LifetimesKey];
           if (element instanceof Function) {
             lifetimes[key as LifetimesKey] = function (
