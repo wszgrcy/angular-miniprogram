@@ -2,6 +2,7 @@ import {
   ApplicationRef,
   ChangeDetectorRef,
   ComponentRef,
+  NgModuleRef,
   NgZone,
   Type,
 } from '@angular/core';
@@ -123,8 +124,8 @@ export class MiniProgramCoreFactory {
   }
   protected pageStatus = {
     destroy: function (this: MiniProgramComponentInstance) {
-      if (this.__ngComponentDestroy) {
-        this.__ngComponentDestroy();
+      if (this.__ngDestroy) {
+        this.__ngDestroy();
       }
     },
     attachView: function (this: MiniProgramComponentInstance) {
@@ -144,7 +145,8 @@ export class MiniProgramCoreFactory {
   };
   protected linkNgComponentWithPage(
     mpComponentInstance: MiniProgramComponentInstance,
-    componentRef: ComponentRef<unknown>
+    componentRef: ComponentRef<unknown>,
+    ngModuleRef: NgModuleRef<unknown>
   ) {
     mpComponentInstance.__isLink = true;
     mpComponentInstance.__ngComponentHostView = componentRef.hostView;
@@ -160,7 +162,8 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.setData(initValue!);
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__lView = lView;
-    mpComponentInstance.__ngComponentDestroy = () => {
+    mpComponentInstance.__ngDestroy = () => {
+      ngModuleRef.destroy();
       componentRef.destroy();
       removePageLinkLView(this.getPageId(mpComponentInstance));
       cleanAll(lView);
@@ -176,12 +179,12 @@ export class MiniProgramCoreFactory {
       data: { hasLoad: false },
       onLoad: function (this: MiniProgramComponentInstance, query) {
         const app = getApp<AppOptions>();
-        const componentRef = app.__ngStartPage(
+        const { componentRef, ngModuleRef } = app.__ngStartPage(
           module,
           component,
           this
-        ).componentRef;
-        _this.linkNgComponentWithPage(this, componentRef);
+        );
+        _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
         if (options.onLoad) {
           return options.onLoad.bind(this)(query);
         }

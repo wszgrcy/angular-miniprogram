@@ -35,7 +35,7 @@ export interface MiniProgramComponentVariable {
   __completePath: NodePath;
 }
 export interface MiniProgramComponentMethod {
-  __ngComponentDestroy: () => void;
+  __ngDestroy: () => void;
 }
 
 export interface MPView {
