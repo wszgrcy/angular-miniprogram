@@ -7,7 +7,7 @@
       "description": "小程序构建builder"
     },
     "library": {
-      "implementation": "./library/builder.ts",
+      "implementation": "./library/builder",
       "schema": "./library/schema.json",
       "description": "小程序构建library"
     }
