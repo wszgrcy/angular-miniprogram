@@ -4,9 +4,10 @@ on:
   pull_request:
     branches:
       - master
+      - alpha
 env:
 jobs:
-  build:
+  pr-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,7 +25,7 @@ jobs:
           yarn lint
       - name: test
         run: |
-          yarn test
+          yarn test:ci
       - name: build
         run: |
           yarn build
