@@ -7,7 +7,7 @@ on:
       - alpha
 env:
 jobs:
-  build:
+  pr-test:
     runs-on: ubuntu-latest
 
     steps:
