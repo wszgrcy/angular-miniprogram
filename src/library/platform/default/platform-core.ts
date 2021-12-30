@@ -75,6 +75,7 @@ export class MiniProgramCoreFactory {
     });
     setLViewPath(currentLView, list);
     lViewLinkToMPComponentRef(mpComponentInstance, currentLView);
+    mpComponentInstance.__waitLinkResolve();
     const initValue = getInitValue(currentLView);
     if (initValue) {
       mpComponentInstance.setData(updatePath(initValue, list));
@@ -261,7 +262,19 @@ export class MiniProgramCoreFactory {
         ...this.listenerEvent(component),
       },
     };
+    const oldCreate = config.lifetimes?.created;
+    config.lifetimes = config.lifetimes || {};
+    config.lifetimes.created = function (this: MiniProgramComponentInstance) {
+      let resolveFunction!: () => void;
+      this.__waitLinkPromise = new Promise<void>((resolve) => {
+        resolveFunction = resolve;
+      });
+      this.__waitLinkResolve = resolveFunction;
 
+      if (oldCreate) {
+        oldCreate.bind(this)();
+      }
+    };
     config = this.addNgComponentLinkLogic(config);
     return Component(config);
   };
@@ -306,9 +319,17 @@ export class MiniProgramCoreFactory {
               this: MiniProgramComponentInstance,
               ...args: unknown[]
             ) {
-              return (element as Function).bind(this.__ngComponentInstance)(
-                ...args
-              );
+              if (this.__isLink) {
+                return (element as Function).bind(this.__ngComponentInstance)(
+                  ...args
+                );
+              } else {
+                return this.__waitLinkPromise.then(() => {
+                  (element as Function).bind(this.__ngComponentInstance)(
+                    ...args
+                  );
+                });
+              }
             };
           }
         }
@@ -325,9 +346,17 @@ export class MiniProgramCoreFactory {
               this: MiniProgramComponentInstance,
               ...args: unknown[]
             ) {
-              return (element as Function).bind(this.__ngComponentInstance)(
-                ...args
-              );
+              if (this.__isLink) {
+                return (element as Function).bind(this.__ngComponentInstance)(
+                  ...args
+                );
+              } else {
+                return this.__waitLinkPromise.then(() => {
+                  (element as Function).bind(this.__ngComponentInstance)(
+                    ...args
+                  );
+                });
+              }
             };
           }
         }

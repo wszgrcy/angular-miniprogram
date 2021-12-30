@@ -33,6 +33,8 @@ export interface MiniProgramComponentVariable {
   __nodeIndex: number;
   __isDetachView: boolean;
   __completePath: NodePath;
+  __waitLinkPromise: Promise<void>;
+  __waitLinkResolve: () => void;
 }
 export interface MiniProgramComponentMethod {
   __ngDestroy: () => void;
