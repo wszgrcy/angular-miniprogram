@@ -10,16 +10,17 @@ import type {
 import { AgentNode } from './agent-node';
 import { PAGE_TOKEN } from './token';
 
+const CLEANUP = 7;
 export const LVIEW_CONTEXT = 8;
+export const INJECTOR = 9;
 const start = 20;
 
 const initValueMap = new Map<LView, MPView>();
 const linkMap = new Map<LView, any>();
 const nodePathMap = new Map<LView, NodePath>();
 const pageMap = new Map<string, LView>();
-const customDestroyMap = new Map<LView, Function[]>();
 export function propertyChange(context: any) {
-  const lView = findCurrentComponentLView(context);
+  const lView: LView = findCurrentComponentLView(context);
   const lviewPath = getLViewPath(lView);
   const nodeList = lViewToWXView(lView, lviewPath);
   const ctx: Partial<MPView> = {
@@ -28,7 +29,7 @@ export function propertyChange(context: any) {
     hasLoad: true,
   };
   if (linkMap.has(lView)) {
-    const ngZone = getLViewInjector(lView)!.get(NgZone);
+    const ngZone = lView[INJECTOR]!.get(NgZone);
     ngZone.runOutsideAngular(() => {
       linkMap.get(lView).setData(ctx);
     });
@@ -190,25 +191,16 @@ export function lViewLinkToMPComponentRef(ref: any, lView: LView) {
   linkMap.set(lView, ref);
 }
 
-export function cleanWhenDestroy(lView: LView) {
-  const list: Function[] = (lView[7] = lView[7] || []);
-  list.push((lview: LView) => cleanAll(lview));
+export function cleanWhenDestroy(lView: LView, fn: () => void) {
+  const list: Function[] = (lView[CLEANUP] = lView[CLEANUP] || []);
+  list.push(() => cleanAll(lView));
+  list.push(fn);
 }
 function cleanAll(lview: LView) {
   linkMap.delete(lview);
   nodePathMap.delete(lview);
-  customDestroyMap.get(lview)?.forEach((fn) => {
-    fn();
-  });
 }
-export function getLViewInjector(lView: LView) {
-  return lView[9]!;
-}
-export function addDestroyFunction(lView: LView, fn: Function) {
-  const list = customDestroyMap.get(lView) || [];
-  list.push(fn);
-  customDestroyMap.set(lView, list);
-}
+
 export function removePageLinkLView(id: string) {
   pageMap.delete(id);
 }

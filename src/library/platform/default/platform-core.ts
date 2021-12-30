@@ -17,13 +17,12 @@ import { AgentNode } from './agent-node';
 import { ComponentFinderService } from './component-finder.service';
 import 'miniprogram-api-typings';
 import {
+  INJECTOR,
   LVIEW_CONTEXT,
-  addDestroyFunction,
   cleanWhenDestroy,
   findCurrentElement,
   findCurrentLView,
   getInitValue,
-  getLViewInjector,
   getPageLView,
   lViewLinkToMPComponentRef,
   removePageLinkLView,
@@ -59,16 +58,9 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.__isLink = true;
     const rootLView: LView = getPageLView(this.getPageId(mpComponentInstance));
     const currentLView: LView = findCurrentLView(rootLView, list);
-    cleanWhenDestroy(currentLView);
-    setLViewPath(currentLView, list);
-    const initValue = getInitValue(currentLView);
-    if (initValue) {
-      mpComponentInstance.setData(updatePath(initValue, list));
-    }
-    lViewLinkToMPComponentRef(mpComponentInstance, currentLView);
+    const injector = currentLView[INJECTOR]!;
     mpComponentInstance.__lView = currentLView;
     mpComponentInstance.__ngComponentInstance = currentLView[LVIEW_CONTEXT];
-    const injector = getLViewInjector(currentLView);
     mpComponentInstance.__ngComponentInjector = injector;
     mpComponentInstance.__ngZone = injector.get(NgZone);
     const componentFinderService = injector.get(ComponentFinderService);
@@ -76,9 +68,15 @@ export class MiniProgramCoreFactory {
       mpComponentInstance.__ngComponentInstance,
       mpComponentInstance
     );
-    addDestroyFunction(currentLView, () => {
+    cleanWhenDestroy(currentLView, () => {
       componentFinderService.remove(mpComponentInstance.__ngComponentInstance);
     });
+    setLViewPath(currentLView, list);
+    lViewLinkToMPComponentRef(mpComponentInstance, currentLView);
+    const initValue = getInitValue(currentLView);
+    if (initValue) {
+      mpComponentInstance.setData(updatePath(initValue, list));
+    }
   }
 
   protected listenerEvent(component: Type<unknown>) {
