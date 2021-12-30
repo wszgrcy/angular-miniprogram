@@ -184,24 +184,24 @@ export class MiniProgramCoreFactory {
         ).componentRef;
         _this.linkNgComponentWithPage(this, componentRef);
         if (options.onLoad) {
-          return options.onLoad(query);
+          return options.onLoad.bind(this)(query);
         }
       },
       onHide: async function (this: MiniProgramComponentInstance) {
         if (options.onHide) {
-          await options.onHide();
+          await options.onHide.bind(this)();
         }
         _this.pageStatus.detachView.bind(this)();
       },
       onUnload: async function (this: MiniProgramComponentInstance) {
         if (options.onUnload) {
-          await options.onUnload();
+          await options.onUnload.bind(this)();
         }
         _this.pageStatus.destroy.bind(this)();
       },
       onShow: async function (this: MiniProgramComponentInstance) {
         if (options.onShow) {
-          await options.onShow();
+          await options.onShow.bind(this)();
         }
         _this.pageStatus.attachView.bind(this)();
       },
