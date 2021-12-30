@@ -1,48 +1,87 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   MiniProgramCoreFactory as BaseFactory,
   pageBindFactory,
 } from 'angular-miniprogram/platform/default';
-import { ComponentPath } from 'angular-miniprogram/platform/type';
-declare const my: any;
+import type {
+  MiniProgramComponentInstance,
+  NodePath,
+} from 'angular-miniprogram/platform/type';
 
 class MiniProgramCoreFactory extends BaseFactory {
-  override getPageId(component: any) {
-    return component.$page ? component.$page.$id : component.$id;
+  override getPageId(pageOrComponent: any) {
+    return pageOrComponent.$page
+      ? pageOrComponent.$page.$id
+      : pageOrComponent.$id;
   }
-  override MINIPROGRAM_GLOBAL = my;
   override eventPrefixList = [
     { listener: 'on', prefix: 'on' },
     { listener: 'catch', prefix: 'catch' },
   ];
   override getListenerEventMapping(prefix: string, name: string) {
-    let upperName = name[0].toLocaleUpperCase() + name.substr(1);
-    let isOn = prefix === 'on';
-
+    const upperName = name[0].toLocaleUpperCase() + name.substr(1);
+    const isOn = prefix === 'on';
     return [
       name,
       prefix + name,
       prefix + upperName,
       ...(isOn
-        ? ['mut-bind' + name, 'capture-bind' + name, 'bind' + name]
-        : ['capture-catch' + name]),
+        ? [
+            'mut-bind' + name,
+            'capture-bind' + name,
+            'bind' + name,
+            'mut-bind' + upperName,
+            'capture-bind' + upperName,
+            'bind' + upperName,
+          ]
+        : ['capture-catch' + name, 'capture-catch' + upperName]),
     ];
   }
   override addNgComponentLinkLogic(config: any) {
-    let self = this;
+    const _this = this;
     config.props = {
-      componentPath: undefined,
+      nodePath: undefined,
       nodeIndex: undefined,
     };
-    config.didMount = function () {
-      let componentPath: ComponentPath = (this.props.componentPath || []).map(
+    let addWait = false;
+    const oldOnInit = config.onInit;
+    config.onInit = function (
+      this: Record<string, any> & MiniProgramComponentInstance
+    ) {
+      let resolveFunction!: () => void;
+      this.__waitLinkPromise = new Promise<void>(
+        (resolve) => (resolveFunction = resolve)
+      );
+      this.__waitLinkResolve = resolveFunction;
+      addWait = true;
+      if (oldOnInit) {
+        oldOnInit.bind(this)();
+      }
+    };
+    const oldDidMount = config.didMount;
+    config.didMount = function (
+      this: Record<string, any> & MiniProgramComponentInstance
+    ) {
+      if (!addWait) {
+        addWait = true;
+        let resolveFunction!: () => void;
+        this.__waitLinkPromise = new Promise<void>(
+          (resolve) => (resolveFunction = resolve)
+        );
+        this.__waitLinkResolve = resolveFunction;
+      }
+      const nodePath: NodePath = (this.props.nodePath || []).map(
         (item: string) => (item === 'directive' ? item : parseInt(item, 10))
       );
-      let nodeIndex = parseInt(this.props.nodeIndex, 10);
+      const nodeIndex = parseInt(this.props.nodeIndex, 10);
       if (this.__isLink) {
         return;
       }
-
-      self.linkNgComponentWithPath(this, [...componentPath, nodeIndex]);
+      this.__completePath = [...nodePath, nodeIndex];
+      _this.linkNgComponentWithPath(this, this.__completePath);
+      if (oldDidMount) {
+        oldDidMount.bind(this)();
+      }
     };
     return config;
   }

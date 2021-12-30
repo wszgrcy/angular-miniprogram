@@ -68,11 +68,11 @@ export class PickerValueAccessor
   writeValue(value: number | any[] | string): void {
     const normalizedValue = value == null ? undefined : value;
     if (typeof normalizedValue !== 'undefined') {
-      this.value = normalizedValue;
+      this.setProperty('value', normalizedValue);
     }
   }
   valueChange(value: any) {
-    this.value = value;
+    this.setProperty('value', value);
     this.onChange(value);
   }
 }

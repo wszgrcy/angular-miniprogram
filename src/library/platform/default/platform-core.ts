@@ -2,41 +2,38 @@ import {
   ApplicationRef,
   ChangeDetectorRef,
   ComponentRef,
+  NgModuleRef,
   NgZone,
   Type,
 } from '@angular/core';
+import type {
+  AppOptions,
+  LView,
+  MiniProgramComponentInstance,
+  MiniProgramComponentOptions,
+  MiniProgramPageOptions,
+  NodePath,
+} from 'angular-miniprogram/platform/type';
+import { AgentNode } from './agent-node';
 import { ComponentFinderService } from './component-finder.service';
 import 'miniprogram-api-typings';
-import type {
-  LView,
-  ComponentPath,
-  MiniProgramComponentInstance,
-  NgCompileComponent,
-  AppOptions,
-  MiniProgramPageOptions,
-  MiniProgramComponentOptions,
-} from 'angular-miniprogram/platform/type';
-
 import {
-  addDestroyFunction,
+  INJECTOR,
+  LVIEW_CONTEXT,
+  cleanAll,
   cleanWhenDestroy,
   findCurrentElement,
   findCurrentLView,
   getInitValue,
-  getLViewInjector,
   getPageLView,
   lViewLinkToMPComponentRef,
-  LVIEW_CONTEXT,
   removePageLinkLView,
   setLViewPath,
   updatePath,
 } from './component-template-hook.factory';
-import { AgentNode } from './renderer-node';
 
 export class MiniProgramCoreFactory {
-  public MINIPROGRAM_GLOBAL = (typeof wx === 'undefined'
-    ? undefined
-    : wx) as any as WechatMiniprogram.Wx;
+  public MINIPROGRAM_GLOBAL = wx;
   public loadApp = <T>(app: T) => {
     App(app || {});
     const appInstance = getApp();
@@ -55,53 +52,51 @@ export class MiniProgramCoreFactory {
   protected getListenerEventMapping(prefix: string, name: string) {
     return [name, prefix + name];
   }
-  protected setComponentInstancePageId(
-    component: MiniProgramComponentInstance
-  ) {
-    component.__getPageId = () => this.getPageId(component);
-  }
+
   protected linkNgComponentWithPath(
     mpComponentInstance: MiniProgramComponentInstance,
-    list: ComponentPath
+    list: NodePath
   ) {
     mpComponentInstance.__isLink = true;
-    let rootLView = getPageLView(this.getPageId(mpComponentInstance)) as LView;
-    let currentLView = findCurrentLView(rootLView, list);
-    cleanWhenDestroy(currentLView);
-    setLViewPath(currentLView, list);
-    const initValue = getInitValue(currentLView);
-    if (initValue) {
-      mpComponentInstance.setData(updatePath(initValue, list));
-    }
-    lViewLinkToMPComponentRef(mpComponentInstance, currentLView);
+    const rootLView: LView = getPageLView(this.getPageId(mpComponentInstance));
+    const currentLView: LView = findCurrentLView(rootLView, list);
+    const injector = currentLView[INJECTOR]!;
     mpComponentInstance.__lView = currentLView;
     mpComponentInstance.__ngComponentInstance = currentLView[LVIEW_CONTEXT];
-    let injector = getLViewInjector(currentLView);
     mpComponentInstance.__ngComponentInjector = injector;
     mpComponentInstance.__ngZone = injector.get(NgZone);
-    let componentFinderService = injector.get(ComponentFinderService);
+    const componentFinderService = injector.get(ComponentFinderService);
     componentFinderService.set(
       mpComponentInstance.__ngComponentInstance,
       mpComponentInstance
     );
-    addDestroyFunction(currentLView, () => {
+    cleanWhenDestroy(currentLView, () => {
       componentFinderService.remove(mpComponentInstance.__ngComponentInstance);
     });
-    this.setComponentInstancePageId(mpComponentInstance);
+    setLViewPath(currentLView, list);
+    lViewLinkToMPComponentRef(mpComponentInstance, currentLView);
+    mpComponentInstance.__waitLinkResolve();
+    const initValue = getInitValue(currentLView);
+    if (initValue) {
+      mpComponentInstance.setData(updatePath(initValue, list));
+    }
   }
 
-  protected listenerEvent(component: NgCompileComponent) {
-    let self = this;
+  protected listenerEvent(component: Type<unknown>) {
+    const _this = this;
     return this.eventPrefixList.reduce((pre: Record<string, Function>, cur) => {
       pre[cur.listener + 'Event'] = function (
         this: MiniProgramComponentInstance,
-        event: any
+        event: WechatMiniprogram.BaseEvent
       ) {
         if (this.__lView) {
-          let dataset = event.currentTarget?.dataset || event.target.dataset;
-          let currentPath = [...(dataset.nodePath || []), dataset.nodeIndex];
-          let componentPath = this.__completePath || [];
-          let relativePath = currentPath.slice(componentPath.length);
+          const dataset = event.currentTarget?.dataset || event.target.dataset;
+          const currentPath: NodePath = [
+            ...(dataset.nodePath || []),
+            dataset.nodeIndex,
+          ];
+          const nodePath = this.__completePath || [];
+          const relativePath = currentPath.slice(nodePath.length);
           let el = findCurrentElement(this.__lView, relativePath) as AgentNode;
           if (!(el instanceof AgentNode)) {
             el = el[0];
@@ -110,8 +105,8 @@ export class MiniProgramCoreFactory {
             }
           }
 
-          let eventName = event.type;
-          self
+          const eventName = event.type;
+          _this
             .getListenerEventMapping(cur.prefix, eventName)
             .forEach((name) => {
               this.__ngZone.run(() => {
@@ -130,13 +125,13 @@ export class MiniProgramCoreFactory {
   }
   protected pageStatus = {
     destroy: function (this: MiniProgramComponentInstance) {
-      if (this.__ngComponentDestroy) {
-        this.__ngComponentDestroy();
+      if (this.__ngDestroy) {
+        this.__ngDestroy();
       }
     },
     attachView: function (this: MiniProgramComponentInstance) {
       if (this.__ngComponentInjector && this.__isDetachView) {
-        let applicationRef = this.__ngComponentInjector.get(ApplicationRef);
+        const applicationRef = this.__ngComponentInjector.get(ApplicationRef);
         applicationRef.attachView(this.__ngComponentHostView);
         this.__isDetachView = false;
       }
@@ -144,24 +139,22 @@ export class MiniProgramCoreFactory {
     detachView: function (this: MiniProgramComponentInstance) {
       if (this.__ngComponentInjector) {
         this.__isDetachView = true;
-        let applicationRef = this.__ngComponentInjector.get(ApplicationRef);
+        const applicationRef = this.__ngComponentInjector.get(ApplicationRef);
         applicationRef.detachView(this.__ngComponentHostView);
       }
     },
   };
   protected linkNgComponentWithPage(
     mpComponentInstance: MiniProgramComponentInstance,
-    componentRef: ComponentRef<any>
+    componentRef: ComponentRef<unknown>,
+    ngModuleRef: NgModuleRef<unknown>
   ) {
     mpComponentInstance.__isLink = true;
     mpComponentInstance.__ngComponentHostView = componentRef.hostView;
     mpComponentInstance.__ngComponentInstance = componentRef.instance;
     mpComponentInstance.__ngComponentInjector = componentRef.injector;
     mpComponentInstance.__ngZone = componentRef.injector.get(NgZone);
-    mpComponentInstance.__ngComponentDestroy = () => {
-      componentRef.destroy();
-      removePageLinkLView(this.getPageId(mpComponentInstance));
-    };
+
     mpComponentInstance.__ngComponentInjector
       .get(ChangeDetectorRef)
       .detectChanges();
@@ -170,57 +163,76 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.setData(initValue!);
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__lView = lView;
-    mpComponentInstance.__ngComponentInstance = lView[LVIEW_CONTEXT];
-    this.setComponentInstancePageId(mpComponentInstance);
+    mpComponentInstance.__ngDestroy = () => {
+      ngModuleRef.destroy();
+      componentRef.destroy();
+      removePageLinkLView(this.getPageId(mpComponentInstance));
+      cleanAll(lView);
+    };
   }
 
-  public pageStartup = (module: Type<any>, component: Type<any>) => {
-    let self = this;
-    let options = this.getPageOptions(component) || {};
+  public pageStartup = (module: Type<unknown>, component: Type<unknown>) => {
+    const _this = this;
+    const options = this.getPageOptions(component) || {};
     return Page({
       ...options,
-      ...this.listenerEvent(component as any as NgCompileComponent),
+      ...this.listenerEvent(component),
       data: { hasLoad: false },
       onLoad: function (this: MiniProgramComponentInstance, query) {
         const app = getApp<AppOptions>();
-        let componentRef = app.__ngStartPage(
+        const { componentRef, ngModuleRef } = app.__ngStartPage(
           module,
           component,
           this
-        ).componentRef;
-        self.linkNgComponentWithPage(this, componentRef);
+        );
+        _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
         if (options.onLoad) {
-          options.onLoad.bind(this.__ngComponentInstance)(query);
+          return options.onLoad.bind(this)(query);
         }
       },
       onHide: async function (this: MiniProgramComponentInstance) {
         if (options.onHide) {
-          await options.onHide.bind(this.__ngComponentInstance)();
+          await options.onHide.bind(this)();
         }
-        self.pageStatus.detachView.bind(this)();
+        _this.pageStatus.detachView.bind(this)();
       },
       onUnload: async function (this: MiniProgramComponentInstance) {
         if (options.onUnload) {
-          await options.onUnload.bind(this.__ngComponentInstance)();
+          await options.onUnload.bind(this)();
         }
-        self.pageStatus.destroy.bind(this)();
+        _this.pageStatus.destroy.bind(this)();
       },
       onShow: async function (this: MiniProgramComponentInstance) {
         if (options.onShow) {
-          await options.onShow.bind(this.__ngComponentInstance)();
+          await options.onShow.bind(this)();
         }
-        self.pageStatus.attachView.bind(this)();
+        _this.pageStatus.attachView.bind(this)();
       },
     });
   };
-  protected addNgComponentLinkLogic(config: any) {
-    let self = this;
+  protected addNgComponentLinkLogic(
+    config: WechatMiniprogram.Component.Options<{}, {}, {}>
+  ) {
+    const oldCreate = config.lifetimes?.created;
+    config.lifetimes = config.lifetimes || {};
+    config.lifetimes.created = function (this: MiniProgramComponentInstance) {
+      let resolveFunction!: () => void;
+      this.__waitLinkPromise = new Promise<void>((resolve) => {
+        resolveFunction = resolve;
+      });
+      this.__waitLinkResolve = resolveFunction;
+
+      if (oldCreate) {
+        oldCreate.bind(this)();
+      }
+    };
+    const _this = this;
     config.properties = {
-      componentPath: {
+      nodePath: {
         type: null,
         observer: function (
           this: MiniProgramComponentInstance,
-          list: ComponentPath
+          list: NodePath
         ) {
           if (this.__isLink) {
             return;
@@ -228,10 +240,10 @@ export class MiniProgramCoreFactory {
           if (typeof list === 'string') {
             list = JSON.parse(list);
           }
-          this.__componentPath = list || [];
+          this.__nodePath = list || [];
           if (typeof this.__nodeIndex !== 'undefined') {
-            this.__completePath = [...this.__componentPath, this.__nodeIndex];
-            self.linkNgComponentWithPath(this, this.__completePath);
+            this.__completePath = [...this.__nodePath, this.__nodeIndex];
+            _this.linkNgComponentWithPath(this, this.__completePath);
           }
         },
       },
@@ -245,24 +257,23 @@ export class MiniProgramCoreFactory {
             index = parseInt(index, 10);
           }
           this.__nodeIndex = index;
-          if (typeof this.__componentPath !== 'undefined') {
-            this.__completePath = [...this.__componentPath, this.__nodeIndex];
-            self.linkNgComponentWithPath(this, this.__completePath);
+          if (typeof this.__nodePath !== 'undefined') {
+            this.__completePath = [...this.__nodePath, this.__nodeIndex];
+            _this.linkNgComponentWithPath(this, this.__completePath);
           }
         },
       },
     };
     return config;
   }
-  public componentRegistry = (component: Type<any>) => {
-    let options = this.getComponentOptions(component) || {};
+  public componentRegistry = (component: Type<unknown>) => {
+    const options = this.getComponentOptions(component) || {};
     let config: WechatMiniprogram.Component.Options<{}, {}, {}> = {
       ...options,
       data: { hasLoad: false },
       options: { ...options?.options, multipleSlots: true },
       methods: {
-        ...options?.methods,
-        ...this.listenerEvent(component as any as NgCompileComponent),
+        ...this.listenerEvent(component),
       },
     };
 
@@ -270,9 +281,9 @@ export class MiniProgramCoreFactory {
     return Component(config);
   };
 
-  protected getPageOptions(component: Type<any> & MiniProgramPageOptions) {
+  protected getPageOptions(component: Type<unknown> & MiniProgramPageOptions) {
     type OptionsKey = keyof WechatMiniprogram.Page.Options<{}, {}>;
-    let options: WechatMiniprogram.Page.Options<{}, {}> =
+    const options: WechatMiniprogram.Page.Options<{}, {}> =
       component.mpPageOptions;
     if (options) {
       for (const key in options) {
@@ -280,10 +291,11 @@ export class MiniProgramCoreFactory {
           const element = options[key as OptionsKey];
           if (element instanceof Function) {
             options[key as OptionsKey] = function (
-              this: MiniProgramComponentInstance
+              this: MiniProgramComponentInstance,
+              ...args: unknown[]
             ) {
               return (element as Function).bind(this.__ngComponentInstance)(
-                ...arguments
+                ...args
               );
             };
           }
@@ -293,24 +305,33 @@ export class MiniProgramCoreFactory {
     return options;
   }
   protected getComponentOptions(
-    component: Type<any> & MiniProgramComponentOptions
+    component: Type<unknown> & MiniProgramComponentOptions
   ) {
     type PageLifetimesKey = keyof WechatMiniprogram.Component.PageLifetimes;
 
-    let options: WechatMiniprogram.Component.Options<{}, {}, {}> =
+    const options: WechatMiniprogram.Component.Options<{}, {}, {}> =
       component.mpComponentOptions;
     if (options) {
-      let pageLifetimes = options.pageLifetimes;
+      const pageLifetimes = options.pageLifetimes;
       for (const key in pageLifetimes) {
-        if (Object.prototype.hasOwnProperty.call(options, key)) {
+        if (Object.prototype.hasOwnProperty.call(pageLifetimes, key)) {
           const element = pageLifetimes[key as PageLifetimesKey];
           if (element instanceof Function) {
             pageLifetimes[key as PageLifetimesKey] = function (
-              this: MiniProgramComponentInstance
+              this: MiniProgramComponentInstance,
+              ...args: unknown[]
             ) {
-              return (element as Function).bind(this.__ngComponentInstance)(
-                ...arguments
-              );
+              if (this.__isLink) {
+                return (element as Function).bind(this.__ngComponentInstance)(
+                  ...args
+                );
+              } else {
+                return this.__waitLinkPromise.then(() => {
+                  (element as Function).bind(this.__ngComponentInstance)(
+                    ...args
+                  );
+                });
+              }
             };
           }
         }
@@ -318,17 +339,26 @@ export class MiniProgramCoreFactory {
 
       type LifetimesKey =
         keyof WechatMiniprogram.Component.Lifetimes['lifetimes'];
-      let lifetimes = options.lifetimes;
+      const lifetimes = options.lifetimes;
       for (const key in lifetimes) {
-        if (Object.prototype.hasOwnProperty.call(options, key)) {
+        if (Object.prototype.hasOwnProperty.call(lifetimes, key)) {
           const element = lifetimes[key as LifetimesKey];
           if (element instanceof Function) {
             lifetimes[key as LifetimesKey] = function (
-              this: MiniProgramComponentInstance
+              this: MiniProgramComponentInstance,
+              ...args: unknown[]
             ) {
-              return (element as Function).bind(this.__ngComponentInstance)(
-                ...arguments
-              );
+              if (this.__isLink) {
+                return (element as Function).bind(this.__ngComponentInstance)(
+                  ...args
+                );
+              } else {
+                return this.__waitLinkPromise.then(() => {
+                  (element as Function).bind(this.__ngComponentInstance)(
+                    ...args
+                  );
+                });
+              }
             };
           }
         }

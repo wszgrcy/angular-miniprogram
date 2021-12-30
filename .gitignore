@@ -6,3 +6,4 @@ __test-app
 coverage-builder
 script/startup-jasmine.js
 .temp-git
+.nyc_output

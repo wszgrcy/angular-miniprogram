@@ -1,11 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   MiniProgramCoreFactory as BaseFactory,
   pageBindFactory,
 } from 'angular-miniprogram/platform/default';
-declare const swan: any;
 
 class MiniProgramCoreFactory extends BaseFactory {
-  override MINIPROGRAM_GLOBAL = swan;
   override getPageId(component: any) {
     return component.pageinstance ? component.pageinstance.uri : component.uri;
   }

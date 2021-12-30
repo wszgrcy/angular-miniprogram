@@ -1,5 +1,3 @@
-import { strings } from '@angular-devkit/core';
-import { MetaCollection } from '../../../html/meta-collection';
 import type {
   NgBoundTextMeta,
   NgContentMeta,
@@ -7,7 +5,8 @@ import type {
   NgNodeMeta,
   NgTemplateMeta,
   NgTextMeta,
-} from '../../../html/node-handle/interface';
+} from '../../../mini-program-compiler';
+import { MetaCollection } from '../../../mini-program-compiler';
 import {
   isNgBoundTextMeta,
   isNgContentMeta,
@@ -23,19 +22,12 @@ export interface WxContainerGlobalConfig {
   templateInterpolation: [string, string];
 }
 export class WxContainer {
-  private wxmlTemplate: string = '';
-  private childContainer: WxContainer[] = [];
-  private level: number = 0;
-  // todo 如果是全局模板,声明来自哪个,并且追加
-  // todo 声明位置默认先不加,如果有两用再追加
-  // todo 需要暴露组件
+  private templateStr: string = '';
+  private childContainerList: WxContainer[] = [];
   fromTemplate!: string;
   defineTemplateName!: string;
   private metaCollection: MetaCollection = new MetaCollection();
-  constructor(
-    private containerName = 'container',
-    private parent?: WxContainer
-  ) {}
+  constructor(private parent?: WxContainer) {}
 
   private _compileTemplate(node: NgNodeMeta): string {
     if (isNgElementMeta(node)) {
@@ -54,7 +46,7 @@ export class WxContainer {
   }
 
   compileNode(node: NgNodeMeta) {
-    this.wxmlTemplate += this._compileTemplate(node);
+    this.templateStr += this._compileTemplate(node);
   }
 
   private ngElementTransform(node: NgElementMeta): string {
@@ -95,32 +87,29 @@ export class WxContainer {
   private ngTemplateTransform(node: NgTemplateMeta): string {
     let content = '';
     const defineTemplateName = node.defineTemplateName;
-    // todo这里追加
-    const container = new WxContainer(
-      `${this.containerName}_${this.level++}`,
-      this
-    );
+    const childContainer = new WxContainer(this);
     const globalTemplate = this.isGlobalTemplate(node.defineTemplateName);
     if (globalTemplate) {
       if (this.fromTemplate && this.fromTemplate !== globalTemplate) {
-        console.error('全局ng-template中不可包含其他位置的ng-template');
-        throw new Error('全局ng-template中不可包含其他位置的ng-template');
+        throw new Error(
+          `全局ng-template中不可包含其他位置的ng-template,当前为${this.fromTemplate},包含${globalTemplate}`
+        );
       } else if (globalTemplate) {
-        container.fromTemplate = globalTemplate;
-        container.defineTemplateName = defineTemplateName;
+        childContainer.fromTemplate = globalTemplate;
+        childContainer.defineTemplateName = defineTemplateName;
       }
     } else {
-      container.fromTemplate = this.fromTemplate;
-      container.defineTemplateName = defineTemplateName;
+      childContainer.fromTemplate = this.fromTemplate;
+      childContainer.defineTemplateName = defineTemplateName;
     }
-    this.childContainer.push(container);
+    this.childContainerList.push(childContainer);
     node.children.forEach((childNode) => {
-      container.compileNode(childNode);
+      childContainer.compileNode(childNode);
     });
-    if (this.fromTemplate === container.fromTemplate) {
+    if (this.fromTemplate === childContainer.fromTemplate) {
       this.metaCollection.templateList.push({
         name: defineTemplateName,
-        content: `<template name="${defineTemplateName}">${container.wxmlTemplate}</template>`,
+        content: `<template name="${defineTemplateName}">${childContainer.templateStr}</template>`,
       });
     }
 
@@ -138,7 +127,7 @@ export class WxContainer {
     return content;
   }
   private ngTextTransform(node: NgTextMeta): string {
-    return `{{nodeList[${node.index}].value}}`;
+    return `${node.value}`;
   }
 
   private getTemplateDataStr(directiveIndex: number, indexName: string) {
@@ -147,7 +136,7 @@ export class WxContainer {
 
   export(): { wxmlTemplate: string } {
     return {
-      wxmlTemplate: this.wxmlTemplate,
+      wxmlTemplate: this.templateStr,
     };
   }
 
@@ -156,7 +145,7 @@ export class WxContainer {
     nodeIndex: number | undefined
   ) {
     if (isComponent) {
-      return `componentPath="{{componentPath}}" nodeIndex="${nodeIndex}"`;
+      return `nodePath="{{nodePath}}" nodeIndex="${nodeIndex}"`;
     }
     return ``;
   }
@@ -167,7 +156,6 @@ export class WxContainer {
     propertyMap.set('class', `nodeList[${index}].class`);
     propertyMap.set('style', `nodeList[${index}].style`);
     Object.entries(node.attributes)
-      .filter(([key]) => key !== 'class' && key !== 'style')
       .filter(([key, value]) => value !== '')
       .forEach(([key, value]) => {
         attributeMap.set(key, value);
@@ -176,8 +164,12 @@ export class WxContainer {
       .filter(
         (property) =>
           !(
-            node.componentMeta?.inputs.some((input) => input === property) ||
-            node.directiveMeta?.inputs.some((input) => input === property)
+            (node.componentMeta?.inputs?.includes(property) ||
+              node.directiveMeta?.inputs?.includes(property)) &&
+            !(
+              node.directiveMeta?.properties?.includes(property) ||
+              node.componentMeta?.properties?.includes(property)
+            )
           )
       )
       .forEach((key) => {
@@ -191,26 +183,21 @@ export class WxContainer {
       .forEach((key) => {
         propertyMap.set(key, `nodeList[${index!}].property.${key}`);
       });
-    // const eventMap = new Map();
     const eventList: string[] = [
-      ...node.outputs
-        .filter(
-          (item) =>
-            !(
-              node.componentMeta?.outputs.some(
-                (output) => output === item.name
-              ) ||
-              node.directiveMeta?.outputs.some((output) => output === item.name)
-            )
-        )
-        .map((item) => item.name),
+      ...node.outputs.filter(
+        (item) =>
+          !(
+            node.componentMeta?.outputs.some((output) => output === item) ||
+            node.directiveMeta?.outputs.some((output) => output === item)
+          )
+      ),
       ...(node.directiveMeta?.listeners || []),
-      ...(node.componentMeta?.isComponent ? node.componentMeta?.listeners : []),
+      ...(node.componentMeta?.isComponent ? node.componentMeta.listeners : []),
     ];
 
     const result = WxContainer.globalConfig.eventListConvert(eventList);
     if (result) {
-      propertyMap.set(`data-node-path`, `componentPath`);
+      propertyMap.set(`data-node-path`, `nodePath`);
       propertyMap.set(`data-node-index`, `${index}`);
     }
     return [
@@ -244,17 +231,17 @@ export class WxContainer {
       obj.$self.merge(this.metaCollection);
       obj.$self.templateList.push({
         name: this.defineTemplateName,
-        content: `<template name="${this.defineTemplateName}">${this.wxmlTemplate}</template>`,
+        content: `<template name="${this.defineTemplateName}">${this.templateStr}</template>`,
       });
     } else {
       obj[this.fromTemplate] = obj[this.fromTemplate] || new MetaCollection();
       obj[this.fromTemplate].merge(this.metaCollection);
       obj[this.fromTemplate].templateList.push({
         name: this.defineTemplateName,
-        content: `<template name="${this.defineTemplateName}">${this.wxmlTemplate}</template>`,
+        content: `<template name="${this.defineTemplateName}">${this.templateStr}</template>`,
       });
     }
-    this.childContainer.forEach((container) => {
+    this.childContainerList.forEach((container) => {
       const result = container.exportMetaCollectionGroup();
       for (const key in result) {
         if (Object.prototype.hasOwnProperty.call(result, key)) {

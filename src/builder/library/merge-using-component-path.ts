@@ -1,7 +1,7 @@
 import { join, normalize, resolve } from '@angular-devkit/core';
-import { LIBRARY_OUTPUT_PATH } from '../const';
-import { UseComponent } from '../html/type';
-import { getLibraryPath } from './get-library-path';
+import { UseComponent } from '../mini-program-compiler';
+import { LIBRARY_OUTPUT_ROOTDIR } from './const';
+import { getComponentOutputPath } from './get-library-path';
 
 export function getUseComponents(
   libraryPath: UseComponent[],
@@ -11,14 +11,14 @@ export function getUseComponents(
   const list = [...libraryPath];
   list.push(
     ...localPath.map((item) => {
-      item.path = getLibraryPath(moduleId, item.className);
+      item.path = getComponentOutputPath(moduleId, item.className);
       return item;
     })
   );
   return list.reduce((pre, cur) => {
     pre[cur.selector] = resolve(
       normalize('/'),
-      join(normalize(LIBRARY_OUTPUT_PATH), cur.path)
+      join(normalize(LIBRARY_OUTPUT_ROOTDIR), cur.path)
     );
     return pre;
   }, {} as Record<string, string>);

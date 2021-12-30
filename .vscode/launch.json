@@ -39,57 +39,6 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run-script", "test", "watch"],
       "port": 7899
-    },
-    {
-      "name": "测试",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceRoot}",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run-script", "test", "--", "-t", "builder-dev"],
-      "port": 9229
-    },
-    {
-      "name": "测试-watch-dev",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceRoot}",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run-script", "test", "--", "-t", "builder-watch-dev"],
-      "port": 5858
-    },
-    {
-      "name": "测试template-compiler",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceRoot}",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run-script", "test", "--", "-t", "template-compiler"],
-      "port": 5858
-    },
-    {
-      "name": "测试ts",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceRoot}",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run-script", "test", "--", "-t", "ng-class-resolver"],
-      "port": 9229
-    },
-    {
-      "name": "测试load_ems",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceRoot}",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run-script", "test"],
-      "port": 9229
-    },
-    {
-      "name": "附加当前",
-      "type": "node",
-      "request": "attach",
-      "port": 9229
     }
   ]
 }

@@ -22,7 +22,7 @@ function merge(origin: string, additional: string, output: string) {
 function main() {
   merge(
     '@angular-devkit/build-angular/src/browser/schema.json',
-    '../src/builder/browser/schema.base.json',
+    '../src/builder/application/schema.base.json',
     './schema.json'
   );
 }

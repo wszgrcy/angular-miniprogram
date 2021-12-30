@@ -1,15 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { join, normalize } from '@angular-devkit/core';
 import * as fs from 'fs-extra';
 import path from 'path';
 import { describeBuilder } from '../../../test/plugin-describe-builder';
 import {
   DEFAULT_ANGULAR_LIBRARY_CONFIG,
   LIBRARY_BUILDER_INFO,
-} from '../../../test/test-builder/browser';
-import { execute } from './index';
+} from '../../../test/test-builder';
+import { execute } from './builder';
+import { LIBRARY_COMPONENT_METADATA_SUFFIX } from './const';
 
 describeBuilder(execute, LIBRARY_BUILDER_INFO, (harness) => {
-  describe('', () => {
+  describe('test-library', () => {
     it('运行', async () => {
       harness.useTarget('library', DEFAULT_ANGULAR_LIBRARY_CONFIG);
       const result = await harness.executeOnce();
@@ -17,10 +19,28 @@ describeBuilder(execute, LIBRARY_BUILDER_INFO, (harness) => {
       expect(result.result).toBeTruthy();
       expect(result.result.success).toBeTruthy();
       if (!result.result.success) {
-        console.error(result.result.error)
+        console.error(result.result.error);
       }
       const workspaceRoot: string = (result.result as any).workspaceRoot;
-      const output = path.join(workspaceRoot, 'dist/test-library');
+      const outputPath = normalize(`dist/test-library`);
+      const output = path.join(workspaceRoot, outputPath);
+      const entryFile = harness.expectFile(
+        join(outputPath, 'esm2020', 'test-library.mjs')
+      );
+      entryFile.toExist();
+      entryFile.content.toContain(`$self_Global_Template`);
+      const globalSelfTemplate = harness.expectFile(
+        join(
+          outputPath,
+          'esm2020',
+          'global-self-template',
+          'global-self-template.component.mjs'
+        )
+      );
+      globalSelfTemplate.toExist();
+      globalSelfTemplate.content.toContain(
+        `GlobalSelfTemplateComponent_${LIBRARY_COMPONENT_METADATA_SUFFIX}`
+      );
       fs.copySync(
         output,
         path.resolve(

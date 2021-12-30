@@ -7,7 +7,6 @@
  */
 
 import type * as t from '@angular/compiler/src/render3/r3_ast';
-import { isTemplate } from '../html/type-protection';
 
 /**
  * Extract a map of properties to values for a given element or template node, which can be used
@@ -18,29 +17,23 @@ import { isTemplate } from '../html/type-protection';
  * object maps a property name to its (static) value. For any bindings, this map simply maps the
  * property name to an empty string.
  */
-export function getAttrsForDirectiveMatching(elOrTpl: t.Element | t.Template): {
+export function getAttrsForDirectiveMatching(elOrTpl: t.Element): {
   [name: string]: string;
 } {
   const attributesMap: { [name: string]: string } = {};
 
-  if (isTemplate(elOrTpl) && elOrTpl.tagName !== 'ng-template') {
-    elOrTpl.templateAttrs.forEach(
-      (a: { name: string | number }) => (attributesMap[a.name] = '')
-    );
-  } else {
-    elOrTpl.attributes.forEach((a: { name: string; value: string }) => {
-      if (!isI18nAttribute(a.name)) {
-        attributesMap[a.name] = a.value;
-      }
-    });
+  elOrTpl.attributes.forEach((a: { name: string; value: string }) => {
+    if (!isI18nAttribute(a.name)) {
+      attributesMap[a.name] = a.value;
+    }
+  });
 
-    elOrTpl.inputs.forEach((i: { name: string | number }) => {
-      attributesMap[i.name] = '';
-    });
-    elOrTpl.outputs.forEach((o: { name: string | number }) => {
-      attributesMap[o.name] = '';
-    });
-  }
+  elOrTpl.inputs.forEach((i: { name: string | number }) => {
+    attributesMap[i.name] = '';
+  });
+  elOrTpl.outputs.forEach((o: { name: string | number }) => {
+    attributesMap[o.name] = '';
+  });
 
   return attributesMap;
 }
