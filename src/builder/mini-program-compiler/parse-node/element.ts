@@ -35,7 +35,11 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       this.outputs.push(output.name);
     });
 
-    if (!this.node.endSourceSpan) {
+    if (
+      !this.node.endSourceSpan ||
+      this.node.startSourceSpan.end.offset ===
+        this.node.endSourceSpan.end.offset
+    ) {
       this.singleClosedTag = true;
     }
   }
