@@ -1,5 +1,5 @@
 import { Renderer2, RendererStyleFlags2 } from '@angular/core';
-import { AgentNode } from './renderer-node';
+import { AgentNode } from './agent-node';
 
 export class MiniProgramRenderer implements Renderer2 {
   root!: AgentNode;

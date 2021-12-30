@@ -13,9 +13,9 @@ import type {
   MiniProgramPageOptions,
   NodePath,
 } from 'angular-miniprogram/platform/type';
+import { AgentNode } from './agent-node';
 import { ComponentFinderService } from './component-finder.service';
 import 'miniprogram-api-typings';
-
 import {
   LVIEW_CONTEXT,
   addDestroyFunction,
@@ -30,7 +30,6 @@ import {
   setLViewPath,
   updatePath,
 } from './component-template-hook.factory';
-import { AgentNode } from './renderer-node';
 
 export class MiniProgramCoreFactory {
   public MINIPROGRAM_GLOBAL = wx;

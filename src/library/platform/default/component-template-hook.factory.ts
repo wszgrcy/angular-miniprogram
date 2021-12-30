@@ -7,7 +7,7 @@ import type {
   MPView,
   NodePath,
 } from 'angular-miniprogram/platform/type';
-import { AgentNode } from './renderer-node';
+import { AgentNode } from './agent-node';
 import { PAGE_TOKEN } from './token';
 
 export const LVIEW_CONTEXT = 8;

@@ -4,8 +4,8 @@ import {
   RendererFactory2,
   RendererType2,
 } from '@angular/core';
+import { AgentNode } from './agent-node';
 import { MiniProgramRenderer } from './mini-program.renderer';
-import { AgentNode } from './renderer-node';
 
 @Injectable()
 export class MiniProgramRendererFactory implements RendererFactory2 {

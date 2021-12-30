@@ -6,7 +6,7 @@ import type {
 export class AgentNode {
   selector!: string | unknown;
   name!: string;
-  parent!: AgentNode;
+  parent!: AgentNode | undefined;
   nextSibling!: AgentNode | undefined;
   attribute: Record<string, string> = {};
   style: Record<string, string> = {};
@@ -16,12 +16,12 @@ export class AgentNode {
   children: AgentNode[] = [];
   listener: Record<string, Function> = {};
   constructor(public type: 'element' | 'comment' | 'text') {}
-  addChild(child: AgentNode) {
-    const preChildIndex = this.children.length - 1;
-    const pos = this.children.push(child);
+  appendChild(child: AgentNode) {
+    const lastChildIndex = this.children.length - 1;
+    this.children.push(child);
     child.parent = this;
-    if (preChildIndex > -1) {
-      this.children[pos].nextSibling = child;
+    if (lastChildIndex > -1) {
+      this.children[lastChildIndex].nextSibling = child;
     }
   }
   setParent(parent: AgentNode) {
@@ -33,7 +33,7 @@ export class AgentNode {
       }
       oldParent.children.splice(index, 1);
     }
-    parent.addChild(this);
+    parent.appendChild(this);
   }
   insertBefore(newChild: AgentNode, refChild: AgentNode) {
     const refIndex = this.children.findIndex((item) => item === refChild);
@@ -52,15 +52,16 @@ export class AgentNode {
   removeChild(child: AgentNode) {
     const index = this.children.findIndex((item) => item === child);
     if (index === 0) {
-      child.nextSibling = undefined;
+      this.children.shift();
     } else if (index + 1 === this.children.length) {
-      child.nextSibling = undefined;
       this.children[index - 1].nextSibling = undefined;
+      this.children.pop();
     } else {
-      child.nextSibling = undefined;
       this.children[index - 1].nextSibling = this.children[index + 1];
+      this.children.splice(index, 1);
     }
-    this.children.splice(index, 1);
+    child.nextSibling = undefined;
+    child.parent = undefined;
   }
   toView(): MPTextData | MPElementData {
     if (this.type === 'text') {
@@ -69,12 +70,14 @@ export class AgentNode {
       return {
         class:
           Array.from(this.classList).join(' ') +
-          ' ' +
-          (this.attribute.class || ''),
+          (this.attribute.class ? ' ' + this.attribute.class : ''),
+
         style:
           Object.entries(this.style)
             .map(([style, value]) => `${style}:${value}`)
-            .join(';') + (this.attribute.style || ''),
+            .join(';') +
+          (this.attribute.style ? ';' + this.attribute.style : ''),
+
         property: this.property,
       };
     }
