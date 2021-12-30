@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - alpha
-env:
+
 jobs:
   pr-test:
     runs-on: ubuntu-latest
