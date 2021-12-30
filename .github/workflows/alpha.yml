@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - alpha
+env:
+  REPOSITORY_PATH: https://${{secrets.ACCESS_TOKEN}}@github.com/
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: init
+        run: |
+          git config --global user.name "${GITHUB_ACTOR}"
+          git config --global user.email "${GITHUB_ACTOR}@gmail.com"
+      - name: pull-code
+        uses: actions/checkout@v2
+      - name: install-node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+      - name: install-dependencies
+        run: |
+          yarn
+      - name: lint
+        run: |
+          yarn lint
+      - name: test
+        run: |
+          yarn test:ci
+      - name: build
+        run: |
+          yarn build
+      - id: publish
+        name: publish
+        uses: JS-DevTools/npm-publish@v1
+        if: ${{ github.repository_owner	== 'wszgrcy' }}
+        with:
+          token: ${{ secrets.NPM_PUBLISH_TOKEN }}
+          package: ./dist/package.json
+          tag: alpha
+      - if: ${{ github.repository_owner	== 'wszgrcy' && steps.publish.outputs.type != 'none' }}
+        run: |
+          echo "[${{ steps.publish.outputs.type }}]版本已变更: ${{ steps.publish.outputs.old-version }} => ${{ steps.publish.outputs.version }}"
+          git tag v${{steps.publish.outputs.version}}
+          git push origin v${{steps.publish.outputs.version}}
