@@ -10,12 +10,11 @@ import { MiniProgramRenderer } from './mini-program.renderer';
 @Injectable()
 export class MiniProgramRendererFactory implements RendererFactory2 {
   defaultRenderer!: MiniProgramRenderer;
-  constructor() {}
+  constructor() {
+    this.defaultRenderer = new MiniProgramRenderer();
+  }
 
   createRenderer(element: AgentNode, type: RendererType2 | null): Renderer2 {
-    if (!this.defaultRenderer) {
-      this.defaultRenderer = new MiniProgramRenderer(element, type);
-    }
     return this.defaultRenderer;
   }
   begin() {}

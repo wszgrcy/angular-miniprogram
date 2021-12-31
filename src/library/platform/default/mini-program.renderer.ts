@@ -3,8 +3,7 @@ import { AgentNode } from './agent-node';
 
 export class MiniProgramRenderer implements Renderer2 {
   root!: AgentNode;
-  inputRoot = this.element;
-  constructor(private element: AgentNode | undefined, private def: unknown) {}
+  constructor() {}
   data = Object.create(null);
   destroy() {}
   createElement(name: string, namespace?: string | null) {
@@ -36,13 +35,17 @@ export class MiniProgramRenderer implements Renderer2 {
     if (isMove) {
       // todo 应该没用
     }
-    parent.insertBefore(newChild, refChild);
+    if (parent) {
+      parent.insertBefore(newChild, refChild);
+    }
   }
   removeChild(parent: AgentNode, oldChild: AgentNode, isHostElement?: boolean) {
     if (isHostElement) {
       // todo 应该没用
     }
-    parent.removeChild(oldChild);
+    if (parent) {
+      parent.removeChild(oldChild);
+    }
   }
   selectRootElement(
     selectorOrNode: string | unknown,
