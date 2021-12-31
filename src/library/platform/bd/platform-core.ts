@@ -1,16 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  MiniProgramCoreFactory as BaseFactory,
-  pageBindFactory,
-} from 'angular-miniprogram/platform/default';
+import { MiniProgramCoreFactory as BaseFactory } from 'angular-miniprogram/platform/default';
 
-class MiniProgramCoreFactory extends BaseFactory {
-  override getPageId(component: any) {
-    return component.pageinstance ? component.pageinstance.uri : component.uri;
-  }
-}
+class MiniProgramCoreFactory extends BaseFactory {}
 export const MiniProgramCore = new MiniProgramCoreFactory();
-export const pageBind = pageBindFactory(MiniProgramCore.getPageId);
 
 export {
   PAGE_TOKEN,
@@ -18,4 +10,5 @@ export {
   MiniProgramRendererFactory,
   ComponentFinderService,
   propertyChange,
+  pageBind,
 } from 'angular-miniprogram/platform/default';

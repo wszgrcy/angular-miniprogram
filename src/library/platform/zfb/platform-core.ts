@@ -1,19 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  MiniProgramCoreFactory as BaseFactory,
-  pageBindFactory,
-} from 'angular-miniprogram/platform/default';
+import { MiniProgramCoreFactory as BaseFactory } from 'angular-miniprogram/platform/default';
 import type {
   MiniProgramComponentInstance,
   NodePath,
 } from 'angular-miniprogram/platform/type';
 
 class MiniProgramCoreFactory extends BaseFactory {
-  override getPageId(pageOrComponent: any) {
-    return pageOrComponent.$page
-      ? pageOrComponent.$page.$id
-      : pageOrComponent.$id;
-  }
   override eventPrefixList = [
     { listener: 'on', prefix: 'on' },
     { listener: 'catch', prefix: 'catch' },
@@ -87,11 +79,11 @@ class MiniProgramCoreFactory extends BaseFactory {
   }
 }
 export const MiniProgramCore = new MiniProgramCoreFactory();
-export const pageBind = pageBindFactory(MiniProgramCore.getPageId);
 export {
   PAGE_TOKEN,
   MiniProgramRenderer,
   MiniProgramRendererFactory,
   ComponentFinderService,
   propertyChange,
+  pageBind,
 } from 'angular-miniprogram/platform/default';

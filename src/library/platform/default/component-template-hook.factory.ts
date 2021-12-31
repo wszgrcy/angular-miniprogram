@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { InjectFlags, NgZone, ɵɵdirectiveInject } from '@angular/core';
+import { ComponentRef, NgZone } from '@angular/core';
 import { LView } from 'angular-miniprogram/platform/type';
 import type {
   MPElementData,
@@ -8,7 +8,6 @@ import type {
   NodePath,
 } from 'angular-miniprogram/platform/type';
 import { AgentNode } from './agent-node';
-import { PAGE_TOKEN } from './token';
 
 const CLEANUP = 7;
 export const LVIEW_CONTEXT = 8;
@@ -18,7 +17,9 @@ const start = 20;
 const initValueMap = new Map<LView, MPView>();
 const linkMap = new Map<LView, any>();
 const nodePathMap = new Map<LView, NodePath>();
-const pageMap = new Map<string, LView>();
+let index = 0;
+const lViewRegistryMap = new WeakMap<LView, number>();
+const pageRegistryMap = new Map<number, LView>();
 export function propertyChange(context: any) {
   const lView: LView = findCurrentComponentLView(context);
   const lviewPath = getLViewPath(lView);
@@ -37,13 +38,13 @@ export function propertyChange(context: any) {
     initValueMap.set(lView, ctx as Required<MPView>);
   }
 }
-function findCurrentComponentLView(context: any) {
+function findCurrentComponentLView(context: any): LView {
   let lView = context['__ngContext__'];
-  if (lView[8] === context) {
+  if (lView[LVIEW_CONTEXT] === context) {
     return lView;
   }
   lView = lView[13];
-  while (lView[8] !== context) {
+  while (lView[LVIEW_CONTEXT] !== context) {
     lView = lView[4];
     if (lView[1] === true) {
       throw new Error('这是LContainer?');
@@ -124,37 +125,10 @@ export function getInitValue(lView: LView) {
   }
   return result;
 }
-export function pageBindFactory(getPageId: (component: any) => string) {
-  return function (context: any) {
-    const lView = findCurrentComponentLView(context);
-    const wxComponentInstance = ɵɵdirectiveInject(
-      PAGE_TOKEN,
-      InjectFlags.Optional
-    );
 
-    if (!wxComponentInstance) {
-      return;
-    }
-    const ngZone = ɵɵdirectiveInject(NgZone, InjectFlags.Optional);
-    if (!ngZone) {
-      throw new Error('没有查询到NgZone');
-    }
-    ngZone.runOutsideAngular(() => {
-      const pageId = getPageId(wxComponentInstance);
-      if (pageMap.has(pageId)) {
-        return;
-      }
-      pageMap.set(pageId, lView);
-    });
-  };
-}
-export const pageBind = pageBindFactory((component) => component.getPageId());
-export function getPageLView(id: string): any {
-  return pageMap.get(id)!;
-}
-
-export function findCurrentLView(lView: LView, list: NodePath): any {
+export function resolveNodePath(list: NodePath): any {
   list = list.slice();
+  let lView = pageRegistryMap.get(list.shift() as number)!;
   while (list.length) {
     const item = list.shift()!;
     if (item === 'directive') {
@@ -201,6 +175,29 @@ export function cleanAll(lview: LView) {
   nodePathMap.delete(lview);
 }
 
-export function removePageLinkLView(id: string) {
-  pageMap.delete(id);
+export function pageBind(context: any) {
+  const lView = findCurrentComponentLView(context);
+  const wxComponentInstance = lView[LVIEW_CONTEXT];
+
+  if (!wxComponentInstance) {
+    return;
+  }
+  const ngZone = lView[INJECTOR]!.get(NgZone);
+  if (!ngZone) {
+    throw new Error('没有查询到NgZone');
+  }
+  ngZone.runOutsideAngular(() => {
+    lViewRegistryMap.set(lView, index++);
+  });
+}
+
+export function findPageLView(componentRef: ComponentRef<unknown>) {
+  const lView = findCurrentComponentLView(componentRef.instance);
+  const id = lViewRegistryMap.get(lView)!;
+  lViewRegistryMap.delete(lView);
+  pageRegistryMap.set(id, lView);
+  return { lView: lView as any, id: id };
+}
+export function removePageLViewLink(id: number) {
+  pageRegistryMap.delete(id);
 }

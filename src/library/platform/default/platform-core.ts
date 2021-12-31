@@ -23,11 +23,11 @@ import {
   cleanAll,
   cleanWhenDestroy,
   findCurrentElement,
-  findCurrentLView,
+  findPageLView,
   getInitValue,
-  getPageLView,
   lViewLinkToMPComponentRef,
-  removePageLinkLView,
+  removePageLViewLink,
+  resolveNodePath,
   setLViewPath,
   updatePath,
 } from './component-template-hook.factory';
@@ -39,9 +39,7 @@ export class MiniProgramCoreFactory {
     const appInstance = getApp();
     return appInstance;
   };
-  public getPageId(component: MiniProgramComponentInstance) {
-    return component.getPageId();
-  }
+
   protected eventPrefixList = [
     { listener: 'bind', prefix: 'bind' },
     { listener: 'catch', prefix: 'catch' },
@@ -58,8 +56,7 @@ export class MiniProgramCoreFactory {
     list: NodePath
   ) {
     mpComponentInstance.__isLink = true;
-    const rootLView: LView = getPageLView(this.getPageId(mpComponentInstance));
-    const currentLView: LView = findCurrentLView(rootLView, list);
+    const currentLView: LView = resolveNodePath(list);
     const injector = currentLView[INJECTOR]!;
     mpComponentInstance.__lView = currentLView;
     mpComponentInstance.__ngComponentInstance = currentLView[LVIEW_CONTEXT];
@@ -154,19 +151,18 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.__ngComponentInstance = componentRef.instance;
     mpComponentInstance.__ngComponentInjector = componentRef.injector;
     mpComponentInstance.__ngZone = componentRef.injector.get(NgZone);
-
-    mpComponentInstance.__ngComponentInjector
-      .get(ChangeDetectorRef)
-      .detectChanges();
-    const lView = getPageLView(this.getPageId(mpComponentInstance)) as LView;
-    const initValue = getInitValue(lView);
-    mpComponentInstance.setData(initValue!);
+    const { lView, id }: { lView: LView; id: number } =
+      findPageLView(componentRef);
+    setLViewPath(lView, [id]);
+    mpComponentInstance.__completePath = [id];
+    const initValue = getInitValue(lView)!;
+    mpComponentInstance.setData(updatePath(initValue, [id]));
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__lView = lView;
     mpComponentInstance.__ngDestroy = () => {
       ngModuleRef.destroy();
       componentRef.destroy();
-      removePageLinkLView(this.getPageId(mpComponentInstance));
+      removePageLViewLink(id);
       cleanAll(lView);
     };
   }
