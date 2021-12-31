@@ -202,12 +202,12 @@ export class MiniProgramCoreFactory {
             },
           },
         };
-      const oldCreated = config.lifetimes?.created;
       config.lifetimes = config.lifetimes || {};
+      const oldCreated = config.lifetimes?.created;
       let componentRef: ComponentRef<unknown>,
         ngModuleRef: NgModuleRef<unknown>;
+      let resolveFunction!: () => void;
       config.lifetimes.created = function (this: MiniProgramComponentInstance) {
-        let resolveFunction!: () => void;
         this.__waitLinkPromise = new Promise<void>((resolve) => {
           resolveFunction = resolve;
         });
@@ -225,6 +225,7 @@ export class MiniProgramCoreFactory {
         this: MiniProgramComponentInstance
       ) {
         _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
+        resolveFunction();
         if (oldAttached) {
           oldAttached.bind(this)();
         }
