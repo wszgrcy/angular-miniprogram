@@ -27,10 +27,13 @@ let waitingRefreshLViewList: (() => void)[] = [];
 export function propertyChange(context: any) {
   const lView: LView = findCurrentComponentLView(context);
   if (linkMap.has(lView)) {
-    const instance = linkMap.get(lView);
     const ngZone = lView[INJECTOR]!.get(NgZone);
     waitingRefreshLViewList.push(() => {
       ngZone.runOutsideAngular(() => {
+        const instance = linkMap.get(lView);
+        if (!instance) {
+          return;
+        }
         instance.setData(getPageRefreshContext(lView));
       });
     });
