@@ -10,6 +10,7 @@ export const ALL_PAGE_NAME_LIST = [
   `ng-content`,
   `base-forms`,
   `component-use-template`,
+  `base-http`,
 ];
 export const ALL_COMPONENT_NAME_LIST = [
   `component1`,
