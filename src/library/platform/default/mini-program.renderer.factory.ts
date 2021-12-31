@@ -5,6 +5,7 @@ import {
   RendererType2,
 } from '@angular/core';
 import { AgentNode } from './agent-node';
+import { endRender } from './component-template-hook.factory';
 import { MiniProgramRenderer } from './mini-program.renderer';
 
 @Injectable()
@@ -18,5 +19,7 @@ export class MiniProgramRendererFactory implements RendererFactory2 {
     return this.defaultRenderer;
   }
   begin() {}
-  end() {}
+  end() {
+    endRender();
+  }
 }

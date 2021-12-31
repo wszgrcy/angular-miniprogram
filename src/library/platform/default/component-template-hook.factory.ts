@@ -23,8 +23,27 @@ const nodePathMap = new Map<LView, NodePath>();
 let index = 0;
 const lViewRegistryMap = new WeakMap<LView, number>();
 const pageRegistryMap = new Map<number, LView>();
+let waitingRefreshLViewList: (() => void)[] = [];
 export function propertyChange(context: any) {
   const lView: LView = findCurrentComponentLView(context);
+  if (linkMap.has(lView)) {
+    const ngZone = lView[INJECTOR]!.get(NgZone);
+    waitingRefreshLViewList.push(() => {
+      ngZone.runOutsideAngular(() => {
+        linkMap.get(lView).setData(getPageRefreshContext(lView));
+      });
+    });
+  } else {
+    initValueMap.set(lView, getPageRefreshContext(lView) as Required<MPView>);
+  }
+}
+export function endRender() {
+  for (const fn of waitingRefreshLViewList) {
+    fn();
+  }
+  waitingRefreshLViewList = [];
+}
+function getPageRefreshContext(lView: LView) {
   const lviewPath = getLViewPath(lView);
   const nodeList = lViewToWXView(lView, lviewPath);
   const ctx: Partial<MPView> = {
@@ -32,14 +51,7 @@ export function propertyChange(context: any) {
     nodePath: lviewPath || [],
     hasLoad: true,
   };
-  if (linkMap.has(lView)) {
-    const ngZone = lView[INJECTOR]!.get(NgZone);
-    ngZone.runOutsideAngular(() => {
-      linkMap.get(lView).setData(ctx);
-    });
-  } else {
-    initValueMap.set(lView, ctx as Required<MPView>);
-  }
+  return ctx;
 }
 function findCurrentComponentLView(context: any): LView {
   let lView = context['__ngContext__'];
