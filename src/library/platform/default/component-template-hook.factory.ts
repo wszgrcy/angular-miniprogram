@@ -30,7 +30,11 @@ export function propertyChange(context: any) {
     const ngZone = lView[INJECTOR]!.get(NgZone);
     waitingRefreshLViewList.push(() => {
       ngZone.runOutsideAngular(() => {
-        linkMap.get(lView).setData(getPageRefreshContext(lView));
+        const instance = linkMap.get(lView);
+        if (!instance) {
+          return;
+        }
+        instance.setData(getPageRefreshContext(lView));
       });
     });
   } else {
