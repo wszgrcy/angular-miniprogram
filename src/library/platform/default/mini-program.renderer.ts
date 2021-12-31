@@ -25,8 +25,7 @@ export class MiniProgramRenderer implements Renderer2 {
   }
   destroyNode() {}
   appendChild(parent: AgentNode, newChild: AgentNode) {
-    parent.children.push(newChild);
-    newChild.parent = parent;
+    parent.appendChild(newChild);
   }
   insertBefore(
     parent: AgentNode,
