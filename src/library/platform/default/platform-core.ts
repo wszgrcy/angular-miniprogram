@@ -171,8 +171,70 @@ export class MiniProgramCoreFactory {
     };
   }
 
-  public pageStartup = (module: Type<unknown>, component: Type<unknown>) => {
+  public pageStartup = (
+    module: Type<unknown>,
+    component: Type<unknown>,
+    pageOptions?: { useComponent: boolean }
+  ) => {
     const _this = this;
+    if (pageOptions?.useComponent) {
+      const options = this.getComponentOptions<true>(component) || {};
+      const config: WechatMiniprogram.Component.Options<{}, {}, {}, {}, true> =
+        {
+          ...options,
+          data: { hasLoad: false },
+          options: { ...options?.options, multipleSlots: true },
+          methods: {
+            ...this.listenerEvent(component),
+            onHide: async function (this: MiniProgramComponentInstance) {
+              if (options.methods?.onHide) {
+                await options.methods.onHide.bind(this)();
+              }
+              _this.pageStatus.detachView.bind(this)();
+            },
+            onUnload: async function (this: MiniProgramComponentInstance) {
+              if (options.methods?.onUnload) {
+                await options.methods.onUnload.bind(this)();
+              }
+              _this.pageStatus.destroy.bind(this)();
+            },
+            onShow: async function (this: MiniProgramComponentInstance) {
+              if (options.methods?.onShow) {
+                await options.methods.onShow.bind(this)();
+              }
+              _this.pageStatus.attachView.bind(this)();
+            },
+          },
+        };
+      const oldCreated = config.lifetimes?.created;
+      config.lifetimes = config.lifetimes || {};
+      let componentRef: ComponentRef<unknown>,
+        ngModuleRef: NgModuleRef<unknown>;
+      config.lifetimes.created = function (this: MiniProgramComponentInstance) {
+        let resolveFunction!: () => void;
+        this.__waitLinkPromise = new Promise<void>((resolve) => {
+          resolveFunction = resolve;
+        });
+        this.__waitLinkResolve = resolveFunction;
+        const app = getApp<AppOptions>();
+        const result = app.__ngStartPage(module, component, this);
+        componentRef = result.componentRef;
+        ngModuleRef = result.ngModuleRef;
+        if (oldCreated) {
+          oldCreated.bind(this)();
+        }
+      };
+      const oldAttached = config.lifetimes.attached;
+      config.lifetimes.attached = function (
+        this: MiniProgramComponentInstance
+      ) {
+        _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
+        if (oldAttached) {
+          oldAttached.bind(this)();
+        }
+      };
+      return Component(config);
+    }
     const options = this.getPageOptions(component) || {};
     return Page({
       ...options,
@@ -304,12 +366,12 @@ export class MiniProgramCoreFactory {
     }
     return options;
   }
-  protected getComponentOptions(
+  protected getComponentOptions<T extends boolean = false>(
     component: Type<unknown> & MiniProgramComponentOptions
   ) {
     type PageLifetimesKey = keyof WechatMiniprogram.Component.PageLifetimes;
 
-    const options: WechatMiniprogram.Component.Options<{}, {}, {}> =
+    const options: WechatMiniprogram.Component.Options<{}, {}, {}, {}, T> =
       component.mpComponentOptions;
     if (options) {
       const pageLifetimes = options.pageLifetimes;
