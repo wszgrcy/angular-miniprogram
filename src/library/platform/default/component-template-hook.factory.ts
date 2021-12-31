@@ -12,6 +12,9 @@ import { AgentNode } from './agent-node';
 const CLEANUP = 7;
 export const LVIEW_CONTEXT = 8;
 export const INJECTOR = 9;
+const NEXT = 4;
+const CHILD_HEAD = 13;
+const VIEW_REFS = 8;
 const start = 20;
 
 const initValueMap = new Map<LView, MPView>();
@@ -43,12 +46,9 @@ function findCurrentComponentLView(context: any): LView {
   if (lView[LVIEW_CONTEXT] === context) {
     return lView;
   }
-  lView = lView[13];
+  lView = lView[CHILD_HEAD];
   while (lView[LVIEW_CONTEXT] !== context) {
-    lView = lView[4];
-    if (lView[1] === true) {
-      throw new Error('这是LContainer?');
-    }
+    lView = lView[NEXT];
   }
   if (!lView) {
     throw new Error('没有找到LView');
@@ -65,7 +65,7 @@ function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
       nodeList[index - start] = item.toView();
     } else if (item && item[1] === true) {
       const lContainerList: MPView[] = [];
-      const viewRefList: any[] = item[8] || [];
+      const viewRefList: any[] = item[VIEW_REFS] || [];
       viewRefList.forEach((item, itemIndex) => {
         const nodePath = [
           ...parentNodePath,
@@ -74,8 +74,8 @@ function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
           itemIndex,
         ];
         lContainerList.push({
-          __templateName: item._lView[8]
-            ? item._lView[8].__templateName
+          __templateName: item._lView[LVIEW_CONTEXT]
+            ? item._lView[LVIEW_CONTEXT].__templateName
             : undefined,
           nodeList: lViewToWXView(item._lView, nodePath),
           nodePath: nodePath,
@@ -135,7 +135,7 @@ export function resolveNodePath(list: NodePath): any {
       const index = list.shift()! as number;
       const lContainer = lView[index + start];
       const child = list.shift() as number;
-      const viewRef = lContainer[8][child];
+      const viewRef = lContainer[VIEW_REFS][child];
       lView = viewRef['_lView'];
     } else {
       lView = lView[start + item];
@@ -151,7 +151,7 @@ export function findCurrentElement(lView: LView, list: NodePath = []) {
       const index = list.shift() as number;
       const lContainer = lView[index + start];
       const child = list.shift() as number;
-      const viewRef = lContainer[8][child];
+      const viewRef = lContainer[VIEW_REFS][child];
       lView = viewRef['_lView'];
     } else {
       lView = lView[item + start];
