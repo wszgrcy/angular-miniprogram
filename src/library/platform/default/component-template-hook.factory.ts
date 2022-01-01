@@ -17,7 +17,6 @@ const CHILD_HEAD = 13;
 const VIEW_REFS = 8;
 const start = 20;
 
-const initValueMap = new Map<LView, MPView>();
 const linkMap = new Map<LView, any>();
 const nodePathMap = new Map<LView, NodePath>();
 let index = 0;
@@ -37,8 +36,6 @@ export function propertyChange(context: any) {
         instance.setData(getPageRefreshContext(lView));
       });
     });
-  } else {
-    initValueMap.set(lView, getPageRefreshContext(lView) as Required<MPView>);
   }
 }
 export function endRender() {
@@ -47,7 +44,8 @@ export function endRender() {
   }
   waitingRefreshLViewList = [];
 }
-function getPageRefreshContext(lView: LView) {
+
+export function getPageRefreshContext(lView: LView) {
   const lviewPath = getLViewPath(lView);
   const nodeList = lViewToWXView(lView, lviewPath);
   const ctx: Partial<MPView> = {
@@ -133,13 +131,6 @@ export function updatePath(context: MPView, nodePath: NodePath) {
     }
   }
   return context;
-}
-export function getInitValue(lView: LView) {
-  const result = initValueMap.get(lView);
-  if (result) {
-    initValueMap.delete(lView);
-  }
-  return result;
 }
 
 export function resolveNodePath(list: NodePath): any {

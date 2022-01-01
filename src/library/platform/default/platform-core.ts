@@ -24,7 +24,7 @@ import {
   cleanWhenDestroy,
   findCurrentElement,
   findPageLView,
-  getInitValue,
+  getPageRefreshContext,
   lViewLinkToMPComponentRef,
   removePageLViewLink,
   resolveNodePath,
@@ -56,27 +56,28 @@ export class MiniProgramCoreFactory {
     list: NodePath
   ) {
     mpComponentInstance.__isLink = true;
-    const currentLView: LView = resolveNodePath(list);
-    const injector = currentLView[INJECTOR]!;
-    mpComponentInstance.__lView = currentLView;
-    mpComponentInstance.__ngComponentInstance = currentLView[LVIEW_CONTEXT];
+    const lView: LView = resolveNodePath(list);
+    const injector = lView[INJECTOR]!;
+    mpComponentInstance.__lView = lView;
+    mpComponentInstance.__ngComponentInstance = lView[LVIEW_CONTEXT];
     mpComponentInstance.__ngComponentInjector = injector;
-    mpComponentInstance.__ngZone = injector.get(NgZone);
+    const ngZone = injector.get(NgZone);
+    mpComponentInstance.__ngZone = ngZone;
     const componentFinderService = injector.get(ComponentFinderService);
     componentFinderService.set(
       mpComponentInstance.__ngComponentInstance,
       mpComponentInstance
     );
-    cleanWhenDestroy(currentLView, () => {
+    cleanWhenDestroy(lView, () => {
       componentFinderService.remove(mpComponentInstance.__ngComponentInstance);
     });
-    setLViewPath(currentLView, list);
-    lViewLinkToMPComponentRef(mpComponentInstance, currentLView);
+    setLViewPath(lView, list);
+    lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__waitLinkResolve();
-    const initValue = getInitValue(currentLView);
-    if (initValue) {
-      mpComponentInstance.setData(updatePath(initValue, list));
-    }
+    ngZone.runOutsideAngular(() => {
+      const initValue = getPageRefreshContext(lView);
+      mpComponentInstance.setData(initValue);
+    });
   }
 
   protected listenerEvent(component: Type<unknown>) {
@@ -150,13 +151,16 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.__ngComponentHostView = componentRef.hostView;
     mpComponentInstance.__ngComponentInstance = componentRef.instance;
     mpComponentInstance.__ngComponentInjector = componentRef.injector;
-    mpComponentInstance.__ngZone = componentRef.injector.get(NgZone);
+    const ngZone = componentRef.injector.get(NgZone);
+    mpComponentInstance.__ngZone = ngZone;
     const { lView, id }: { lView: LView; id: number } =
       findPageLView(componentRef);
     setLViewPath(lView, [id]);
     mpComponentInstance.__completePath = [id];
-    const initValue = getInitValue(lView)!;
-    mpComponentInstance.setData(updatePath(initValue, [id]));
+    ngZone.runOutsideAngular(() => {
+      const initValue = getPageRefreshContext(lView);
+      mpComponentInstance.setData(initValue);
+    });
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__lView = lView;
     mpComponentInstance.__ngDestroy = () => {
