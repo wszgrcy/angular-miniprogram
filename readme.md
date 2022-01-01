@@ -21,6 +21,9 @@
 - 带前缀的事件,如`bind`,`mut-bind`等,去掉冒号直接写,如事件`bind:tap`=>`bindtap`
   > `:`在 ng 中为分割命名空间(`(window/document等)`)使用
 - 元素属性赋值操作可能无法响应变更检测,使用`detectChanges`即可
+- 使用`angular-miniprogram/common`代替`@angular/common`,
+- 使用`angular-miniprogram/forms`代替`@angular/forms`
+- 使用`import { HttpClientModule } from 'angular-miniprogram';`代替`import { HttpClientModule } from '@angular/common/http'`
 
 #### 模板
 
