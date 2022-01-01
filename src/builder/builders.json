@@ -1,13 +1,13 @@
 {
   "$schema": "../../node_modules/@angular-devkit/architect/src/builders-schema.json",
   "builders": {
-    "browser": {
-      "implementation": "./browser",
-      "schema": "./browser/schema.json",
+    "application": {
+      "implementation": "./application",
+      "schema": "./application/schema.json",
       "description": "小程序构建builder"
     },
     "library": {
-      "implementation": "./library",
+      "implementation": "./library/builder",
       "schema": "./library/schema.json",
       "description": "小程序构建library"
     }

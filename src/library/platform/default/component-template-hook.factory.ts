@@ -1,58 +1,75 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { InjectFlags, NgZone, ɵɵdirectiveInject } from '@angular/core';
+import { ComponentRef, NgZone } from '@angular/core';
 import { LView } from 'angular-miniprogram/platform/type';
-import { AgentNode } from './renderer-node';
-import { PAGE_TOKEN } from './token';
 import type {
-  ComponentPath,
   MPElementData,
   MPTextData,
   MPView,
+  NodePath,
 } from 'angular-miniprogram/platform/type';
+import { AgentNode } from './agent-node';
+
+const CLEANUP = 7;
 export const LVIEW_CONTEXT = 8;
+export const INJECTOR = 9;
+const NEXT = 4;
+const CHILD_HEAD = 13;
+const VIEW_REFS = 8;
 const start = 20;
 
-const initValueMap = new Map<LView, MPView>();
 const linkMap = new Map<LView, any>();
-const componentPathMap = new Map<LView, ComponentPath>();
-const pageMap = new Map<string, LView>();
-const customDestroyMap = new Map<LView, Function[]>();
+const nodePathMap = new Map<LView, NodePath>();
+let index = 0;
+const lViewRegistryMap = new WeakMap<LView, number>();
+const pageRegistryMap = new Map<number, LView>();
+let waitingRefreshLViewList: (() => void)[] = [];
 export function propertyChange(context: any) {
-  const lView = findCurrentComponentLView(context);
+  const lView: LView = findCurrentComponentLView(context);
+  if (linkMap.has(lView)) {
+    const ngZone = lView[INJECTOR]!.get(NgZone);
+    waitingRefreshLViewList.push(() => {
+      ngZone.runOutsideAngular(() => {
+        const instance = linkMap.get(lView);
+        if (!instance) {
+          return;
+        }
+        instance.setData(getPageRefreshContext(lView));
+      });
+    });
+  }
+}
+export function endRender() {
+  for (const fn of waitingRefreshLViewList) {
+    fn();
+  }
+  waitingRefreshLViewList = [];
+}
+
+export function getPageRefreshContext(lView: LView) {
   const lviewPath = getLViewPath(lView);
   const nodeList = lViewToWXView(lView, lviewPath);
   const ctx: Partial<MPView> = {
     nodeList: nodeList,
-    componentPath: lviewPath || [],
+    nodePath: lviewPath || [],
     hasLoad: true,
   };
-  if (linkMap.has(lView)) {
-    let ngZone = getLViewInjector(lView)!.get(NgZone);
-    ngZone.runOutsideAngular(() => {
-      linkMap.get(lView).setData(ctx);
-    });
-  } else {
-    initValueMap.set(lView, ctx as Required<MPView>);
-  }
+  return ctx;
 }
-function findCurrentComponentLView(context: any) {
+function findCurrentComponentLView(context: any): LView {
   let lView = context['__ngContext__'];
-  if (lView[8] === context) {
+  if (lView[LVIEW_CONTEXT] === context) {
     return lView;
   }
-  lView = lView[13];
-  while (lView[8] !== context) {
-    lView = lView[4];
-    if (lView[1] === true) {
-      throw new Error('这是LContainer?');
-    }
+  lView = lView[CHILD_HEAD];
+  while (lView[LVIEW_CONTEXT] !== context) {
+    lView = lView[NEXT];
   }
   if (!lView) {
     throw new Error('没有找到LView');
   }
   return lView;
 }
-function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
+function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
   const tView = lView[1];
   const end = tView.bindingStartIndex;
   const nodeList: MPView['nodeList'] = [];
@@ -62,20 +79,20 @@ function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
       nodeList[index - start] = item.toView();
     } else if (item && item[1] === true) {
       const lContainerList: MPView[] = [];
-      const viewRefList: any[] = item[8] || [];
+      const viewRefList: any[] = item[VIEW_REFS] || [];
       viewRefList.forEach((item, itemIndex) => {
-        const componentPath = [
-          ...parentComponentPath,
+        const nodePath = [
+          ...parentNodePath,
           'directive',
           index - start,
           itemIndex,
         ];
         lContainerList.push({
-          __templateName: item._lView[8]
-            ? item._lView[8].__templateName
+          __templateName: item._lView[LVIEW_CONTEXT]
+            ? item._lView[LVIEW_CONTEXT].__templateName
             : undefined,
-          nodeList: lViewToWXView(item._lView, componentPath),
-          componentPath: componentPath,
+          nodeList: lViewToWXView(item._lView, nodePath),
+          nodePath: nodePath,
           index: lContainerList.length,
         });
       });
@@ -88,16 +105,16 @@ function lViewToWXView(lView: LView, parentComponentPath: any[] = []) {
   return nodeList;
 }
 
-export function setLViewPath(lView: LView, componentPath: ComponentPath) {
-  componentPath = componentPath.slice();
-  componentPathMap.set(lView, componentPath);
+export function setLViewPath(lView: LView, nodePath: NodePath) {
+  nodePath = nodePath.slice();
+  nodePathMap.set(lView, nodePath);
 }
 function getLViewPath(lView: LView) {
-  return componentPathMap.get(lView);
+  return nodePathMap.get(lView);
 }
-export function updatePath(context: MPView, componentPath: ComponentPath) {
-  componentPath = componentPath.slice();
-  context.componentPath = componentPath;
+export function updatePath(context: MPView, nodePath: NodePath) {
+  nodePath = nodePath.slice();
+  context.nodePath = nodePath;
   const list: (MPView[] | MPElementData | MPTextData | MPView)[] = [
     ...context.nodeList,
   ];
@@ -109,57 +126,23 @@ export function updatePath(context: MPView, componentPath: ComponentPath) {
     if ((item as any).nodeList && (item as any).nodeList.length) {
       list.push(...(item as any).nodeList);
     }
-    if ((item as MPView).componentPath) {
-      ((item as MPView).componentPath as any[]).unshift(...componentPath);
+    if ((item as MPView).nodePath) {
+      ((item as MPView).nodePath as any[]).unshift(...nodePath);
     }
   }
   return context;
 }
-export function getInitValue(lView: LView) {
-  const result = initValueMap.get(lView);
-  if (result) {
-    initValueMap.delete(lView);
-  }
-  return result;
-}
-export function pageBindFactory(getPageId: (component: any) => string) {
-  return function (context: any) {
-    const lView = findCurrentComponentLView(context);
-    const wxComponentInstance = ɵɵdirectiveInject(
-      PAGE_TOKEN,
-      InjectFlags.Optional
-    );
 
-    if (!wxComponentInstance) {
-      return;
-    }
-    const ngZone = ɵɵdirectiveInject(NgZone, InjectFlags.Optional);
-    if (!ngZone) {
-      throw new Error('没有查询到NgZone');
-    }
-    ngZone.runOutsideAngular(() => {
-      const pageId = getPageId(wxComponentInstance);
-      if (pageMap.has(pageId)) {
-        return;
-      }
-      pageMap.set(pageId, lView);
-    });
-  };
-}
-export const pageBind = pageBindFactory((component) => component.getPageId());
-export function getPageLView(id: string): any {
-  return pageMap.get(id)!;
-}
-
-export function findCurrentLView(lView: LView, list: ComponentPath): any {
+export function resolveNodePath(list: NodePath): any {
   list = list.slice();
+  let lView = pageRegistryMap.get(list.shift() as number)!;
   while (list.length) {
     const item = list.shift()!;
     if (item === 'directive') {
       const index = list.shift()! as number;
       const lContainer = lView[index + start];
       const child = list.shift() as number;
-      const viewRef = lContainer[8][child];
+      const viewRef = lContainer[VIEW_REFS][child];
       lView = viewRef['_lView'];
     } else {
       lView = lView[start + item];
@@ -167,7 +150,7 @@ export function findCurrentLView(lView: LView, list: ComponentPath): any {
   }
   return lView;
 }
-export function findCurrentElement(lView: LView, list: ComponentPath = []) {
+export function findCurrentElement(lView: LView, list: NodePath = []) {
   list = [...list];
   while (list.length) {
     const item = list.shift()!;
@@ -175,7 +158,7 @@ export function findCurrentElement(lView: LView, list: ComponentPath = []) {
       const index = list.shift() as number;
       const lContainer = lView[index + start];
       const child = list.shift() as number;
-      const viewRef = lContainer[8][child];
+      const viewRef = lContainer[VIEW_REFS][child];
       lView = viewRef['_lView'];
     } else {
       lView = lView[item + start];
@@ -189,25 +172,39 @@ export function lViewLinkToMPComponentRef(ref: any, lView: LView) {
   linkMap.set(lView, ref);
 }
 
-export function cleanWhenDestroy(lView: LView) {
-  const list: Function[] = (lView[7] = lView[7] || []);
-  list.push((lview: LView) => cleanAll(lview));
+export function cleanWhenDestroy(lView: LView, fn: () => void) {
+  const list: Function[] = (lView[CLEANUP] = lView[CLEANUP] || []);
+  list.push(() => cleanAll(lView));
+  list.push(fn);
 }
-function cleanAll(lview: LView) {
+export function cleanAll(lview: LView) {
   linkMap.delete(lview);
-  componentPathMap.delete(lview);
-  customDestroyMap.get(lview)?.forEach((fn) => {
-    fn();
+  nodePathMap.delete(lview);
+}
+
+export function pageBind(context: any) {
+  const lView = findCurrentComponentLView(context);
+  const wxComponentInstance = lView[LVIEW_CONTEXT];
+
+  if (!wxComponentInstance) {
+    return;
+  }
+  const ngZone = lView[INJECTOR]!.get(NgZone);
+  if (!ngZone) {
+    throw new Error('没有查询到NgZone');
+  }
+  ngZone.runOutsideAngular(() => {
+    lViewRegistryMap.set(lView, index++);
   });
 }
-export function getLViewInjector(lView: LView) {
-  return lView[9]!;
+
+export function findPageLView(componentRef: ComponentRef<unknown>) {
+  const lView = findCurrentComponentLView(componentRef.instance);
+  const id = lViewRegistryMap.get(lView)!;
+  lViewRegistryMap.delete(lView);
+  pageRegistryMap.set(id, lView);
+  return { lView: lView as any, id: id };
 }
-export function addDestroyFunction(lView: LView, fn: Function) {
-  let list = customDestroyMap.get(lView) || [];
-  list.push(fn);
-  customDestroyMap.set(lView, list);
-}
-export function removePageLinkLView(id: string) {
-  pageMap.delete(id);
+export function removePageLViewLink(id: number) {
+  pageRegistryMap.delete(id);
 }

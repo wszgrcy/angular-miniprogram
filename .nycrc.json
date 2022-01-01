@@ -1,0 +1,13 @@
+{
+  "extension": [".ts"],
+  "exclude": [
+    "**/*.d.ts",
+    "**/*.js",
+    "**/*.spec.ts",
+    "startup-jasmine.js",
+    "test/**/*",
+    "src/builder/angular-internal/**/*"
+  ],
+  "reporter": ["html", "text"],
+  "all": false
+}

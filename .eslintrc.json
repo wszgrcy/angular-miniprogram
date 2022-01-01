@@ -1,4 +1,9 @@
 {
+  "ignorePatterns": [
+    "src/library/forms/**/*",
+    "src/library/common/**/*",
+    "*.d.ts"
+  ],
   "root": true,
   "env": {
     "es6": true,
@@ -112,6 +117,7 @@
     "@typescript-eslint/restrict-plus-operands": "off",
     "@typescript-eslint/restrict-template-expressions": "off",
     "@typescript-eslint/unbound-method": "off",
+    "@typescript-eslint/no-unsafe-argument": "off",
     "prefer-const": "warn",
     "prefer-rest-params": "warn",
     "prefer-spread": "warn",
@@ -132,7 +138,7 @@
   },
   "overrides": [
     {
-      "files": ["**/*.spec.ts", "./test/**/*.ts"],
+      "files": ["**/*.spec.ts"],
       "parserOptions": {
         "project": "tsconfig.spec.json"
       },
@@ -166,7 +172,10 @@
         "./src/**/*.template.ts",
         "./src/**/*.d.ts",
         "**/*.spec.ts",
-        "test"
+        "test",
+        "./src/library/forms/**/*",
+        "./src/library/common/**/*",
+        "./src/library/platform/http/**/*"
       ],
       "parserOptions": {
         "project": "tsconfig.library.json"

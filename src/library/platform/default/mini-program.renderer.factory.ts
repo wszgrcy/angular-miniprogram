@@ -4,24 +4,22 @@ import {
   RendererFactory2,
   RendererType2,
 } from '@angular/core';
+import { AgentNode } from './agent-node';
+import { endRender } from './component-template-hook.factory';
 import { MiniProgramRenderer } from './mini-program.renderer';
-import { AgentNode } from './renderer-node';
 
 @Injectable()
 export class MiniProgramRendererFactory implements RendererFactory2 {
-  private defaultRenderer!: Renderer2;
-  debugIndex = 0;
-
-  constructor() {}
+  defaultRenderer!: MiniProgramRenderer;
+  constructor() {
+    this.defaultRenderer = new MiniProgramRenderer();
+  }
 
   createRenderer(element: AgentNode, type: RendererType2 | null): Renderer2 {
-    // console.log('--创建渲染器--', element, type);
-    return new MiniProgramRenderer(element, type, this.debugIndex++);
+    return this.defaultRenderer;
   }
-  begin() {
-    // console.log('-->开始<---');
-  }
+  begin() {}
   end() {
-    // console.log('-->结束<---');
+    endRender();
   }
 }

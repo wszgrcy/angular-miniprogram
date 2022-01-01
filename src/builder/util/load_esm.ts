@@ -1,4 +1,4 @@
-export async function loadEsmModule<T>(modulePath: string): Promise<T> {
+async function loadEsmModule<T>(modulePath: string): Promise<T> {
   const namespaceObject = await new Function(
     'modulePath',
     `return import(modulePath);`
@@ -13,10 +13,8 @@ export async function loadEsmModule<T>(modulePath: string): Promise<T> {
   }
 }
 
-function getAngularCompiler() {
-  return loadEsmModule<typeof import('@angular/compiler')>('@angular/compiler');
-}
-export const angularCompilerPromise = getAngularCompiler();
+export const angularCompilerPromise =
+  loadEsmModule<typeof import('@angular/compiler')>('@angular/compiler');
 export const angularCompilerCliPromise = loadEsmModule<
   typeof import('@angular/compiler-cli')
 >('@angular/compiler-cli');

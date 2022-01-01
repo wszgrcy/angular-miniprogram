@@ -1,21 +1,20 @@
 import {
   ApplicationRef,
-  Compiler,
   Inject,
   Injectable,
   Injector,
   NgZone,
   Type,
+  createNgModuleRef,
 } from '@angular/core';
 import { AppOptions } from 'angular-miniprogram/platform/type';
-import { APP_TOKEN } from './token';
 import { PAGE_TOKEN } from 'angular-miniprogram/platform/wx';
+import { APP_TOKEN } from './token';
 
 @Injectable()
 export class PageService {
   constructor(
     private injector: Injector,
-    private compiler: Compiler,
     private applicationRef: ApplicationRef,
     @Inject(APP_TOKEN) private app: AppOptions,
     private ngZone: NgZone
@@ -25,18 +24,16 @@ export class PageService {
     this.app.__ngStartPage = <M, C>(
       module: Type<M>,
       component: Type<C>,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      miniProgramComponentInstance: any
+      miniProgramComponentInstance: unknown
     ) => {
       return this.ngZone.run(() => {
-        const moduleFactory = this.compiler.compileModuleSync(module);
         const injector = Injector.create({
           providers: [
             { provide: PAGE_TOKEN, useValue: miniProgramComponentInstance },
           ],
           parent: this.injector,
         });
-        const ngModuleRef = moduleFactory.create(injector);
+        const ngModuleRef = createNgModuleRef(module, injector);
         const componentFactory =
           ngModuleRef.componentFactoryResolver.resolveComponentFactory(
             component

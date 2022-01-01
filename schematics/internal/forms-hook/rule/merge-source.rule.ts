@@ -32,6 +32,9 @@ export function mergeSourceRuleFactory(options: FormsHookOptions) {
         filter((path) => {
           return path.endsWith('.ts') && !path.startsWith('/test');
         }),
+        filter((path) => {
+          return !path.endsWith('.spec.ts');
+        }),
         move(SCHEMATICS_FORMS_LIBRARY_PATH),
       ]
     );

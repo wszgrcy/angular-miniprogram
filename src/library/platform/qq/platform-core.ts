@@ -1,19 +1,9 @@
-import {
-  MiniProgramCoreFactory as BaseFactory,
-  pageBindFactory,
-} from 'angular-miniprogram/platform/default';
-declare const qq: any;
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { MiniProgramCoreFactory as BaseFactory } from 'angular-miniprogram/platform/default';
+
 declare const getCurrentPages: Function;
-class MiniProgramCoreFactory extends BaseFactory {
-  override MINIPROGRAM_GLOBAL = qq;
-  override getPageId(component: any) {
-    return (
-      component.route || getCurrentPages()[getCurrentPages().length - 1].route
-    );
-  }
-}
+class MiniProgramCoreFactory extends BaseFactory {}
 export const MiniProgramCore = new MiniProgramCoreFactory();
-export const pageBind = pageBindFactory(MiniProgramCore.getPageId);
 
 export {
   PAGE_TOKEN,
@@ -21,4 +11,5 @@ export {
   MiniProgramRendererFactory,
   ComponentFinderService,
   propertyChange,
+  pageBind,
 } from 'angular-miniprogram/platform/default';

@@ -56,4 +56,9 @@ export class RootComponent implements OnInit {
       url: '/pages/component-use-template/component-use-template-entry',
     });
   }
+  baseHttp() {
+    this.global.navigateTo({
+      url: '/pages/base-http/base-http-entry',
+    });
+  }
 }
