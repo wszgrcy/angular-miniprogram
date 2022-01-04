@@ -23,6 +23,7 @@ let index = 0;
 const lViewRegistryMap = new WeakMap<LView, number>();
 const pageRegistryMap = new Map<number, LView>();
 let waitingRefreshLViewList: (() => void)[] = [];
+/** @internal */
 export function propertyChange(context: any) {
   const lView: LView = findCurrentComponentLView(context);
   if (linkMap.has(lView)) {
@@ -181,7 +182,7 @@ export function cleanAll(lview: LView) {
   linkMap.delete(lview);
   nodePathMap.delete(lview);
 }
-
+/** @internal */
 export function pageBind(context: any) {
   const lView = findCurrentComponentLView(context);
   const wxComponentInstance = lView[LVIEW_CONTEXT];

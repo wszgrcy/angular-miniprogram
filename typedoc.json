@@ -1,0 +1,6 @@
+{
+  "entryPoints": ["./src/library/platform/index.ts"],
+  "out": "docs",
+  "tsconfig": "tsconfig.doc.json",
+  "excludePrivate": true
+}
