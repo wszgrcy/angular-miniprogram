@@ -1,6 +1,6 @@
 <h1 align="center">angular-miniprogram - 使用 Angular 开发小程序 </h1>
 
-<p align="center">angular-miniprogram 尽可能使用Angular已有生态,降低跨平台时所需成本</p>
+<p align="center">尽可能使用Angular已有生态,降低跨平台时所需成本</p>
 
 <p align="center">
   <a href="https://gitter.im/angular-miniprogram/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge">
