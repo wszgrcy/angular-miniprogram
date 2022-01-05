@@ -9,7 +9,7 @@
     <a href="https://www.npmjs.com/package/angular-miniprogram">
     <img src="https://img.shields.io/npm/v/angular-miniprogram.svg?logo=npm&logoColor=fff&label=NPM+package&color=limegreen" alt="angular-miniprogram on npm" />
   </a>&nbsp;
-    <a href="https://wszgrcy.github.io/angular-miniprogram/coverage">
+    <a href="https://wszgrcy.github.io/angular-miniprogram/coverage/index.html">
     <img src="https://wszgrcy.github.io/angular-miniprogram/badge.svg" alt="coverage" />
   </a>
 
