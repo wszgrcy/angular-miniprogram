@@ -24,6 +24,9 @@ jobs:
       - name: install-dependencies
         run: |
           yarn
+      - name: hook-code
+        run: |
+          yarn hook-code
       - name: build-docs
         continue-on-error: true
         run: |
