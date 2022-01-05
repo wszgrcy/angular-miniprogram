@@ -13,10 +13,12 @@ export class ComponentFinderService<T = unknown> {
       take(1)
     );
   }
+  /** @internal */
   set(component: unknown, instance: T) {
     this.subject.next([component, instance]);
     return this.map.set(component, instance);
   }
+  /** @internal */
   remove(component: unknown) {
     return this.map.delete(component);
   }

@@ -7,10 +7,10 @@
     <img src="https://badges.gitter.im/angular-miniprogram/community.svg" alt="gitter" />
   </a>&nbsp;
     <a href="https://www.npmjs.com/package/angular-miniprogram">
-    <img src="https://img.shields.io/npm/v/angular-miniprogram.svg?logo=npm&logoColor=fff&label=NPM+package&color=limegreen" alt="Angular on npm" />
+    <img src="https://img.shields.io/npm/v/angular-miniprogram.svg?logo=npm&logoColor=fff&label=NPM+package&color=limegreen" alt="angular-miniprogram on npm" />
   </a>&nbsp;
-  <a href="https://github.com/wszgrcy/angular-miniprogram/actions/workflows/default.yml">
-    <img src="https://github.com/wszgrcy/angular-miniprogram/actions/workflows/default.yml/badge.svg" alt="ci" />
+    <a href="https://wszgrcy.github.io/angular-miniprogram/coverage">
+    <img src="https://wszgrcy.github.io/angular-miniprogram/badge.svg" alt="coverage" />
   </a>
 
 </p>

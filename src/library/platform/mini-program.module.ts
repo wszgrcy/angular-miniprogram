@@ -12,7 +12,7 @@ import {
 } from 'angular-miniprogram/platform/wx';
 import { PageService } from './page.service';
 
-export function errorHandler(): ErrorHandler {
+function errorHandler(): ErrorHandler {
   return new ErrorHandler();
 }
 

@@ -17,7 +17,10 @@
     "lint": "eslint --max-warnings 0 \"./**/*.ts\"",
     "forms-hook": "ts-node ./script/run-forms-hook.ts",
     "common-hook": "ts-node ./script/run-common-hook.ts",
-    "coverage": "nyc npm run test"
+    "coverage": "nyc npm run test",
+    "typedoc": "typedoc",
+    "deploy": "npm run coverage-badge -- init && npm run typedoc && npm run coverage && npm run coverage-badge -- success",
+    "coverage-badge": "ts-node ./script/coverage-badge.ts"
   },
   "private": true,
   "author": "wszgrcy",
@@ -58,6 +61,7 @@
     "rxjs": "6.6.7",
     "static-injector": "^1.0.9",
     "ts-node": "^10.4.0",
+    "typedoc": "^0.22.10",
     "typescript": "~4.4.2",
     "webpack": "5.60.0",
     "zone.js": "^0.11.4"

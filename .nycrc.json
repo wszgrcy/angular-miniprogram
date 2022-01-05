@@ -8,6 +8,7 @@
     "test/**/*",
     "src/builder/angular-internal/**/*"
   ],
-  "reporter": ["html", "text"],
-  "all": false
+  "reporter": ["html", "text", "json-summary", "json"],
+  "all": false,
+  "report-dir": "./docs/coverage"
 }
