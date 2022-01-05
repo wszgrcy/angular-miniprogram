@@ -1,5 +1,4 @@
 node_modules*
-coverage
 test-project-host-hello-world-app-*
 dist
 __test-app
