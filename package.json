@@ -19,7 +19,8 @@
     "common-hook": "ts-node ./script/run-common-hook.ts",
     "coverage": "nyc npm run test",
     "typedoc": "typedoc",
-    "deploy": "npm run typedoc"
+    "deploy": "npm run coverage-badge -- init && npm run typedoc && npm run coverage && npm run coverage-badge -- success",
+    "coverage-badge": "ts-node ./script/coverage-badge.ts"
   },
   "private": true,
   "author": "wszgrcy",
