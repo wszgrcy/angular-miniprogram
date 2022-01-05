@@ -1,6 +1,6 @@
 <h1 align="center">angular-miniprogram - 使用 Angular 开发小程序 </h1>
 
-<p align="center">尽可能使用Angular已有生态,降低跨平台时所需成本</p>
+<p align="center">尽可能使用 Angular 已有生态,降低跨平台时所需成本</p>
 
 <p align="center">
   <a href="https://gitter.im/angular-miniprogram/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge">
@@ -21,6 +21,7 @@
 - [快速启动](https://github.com/wszgrcy/angular-miniprogram/blob/master/quick-start.md)
 - [注意事项](https://github.com/wszgrcy/angular-miniprogram/blob/master/attention.md)
 - [小程序特性](https://github.com/wszgrcy/angular-miniprogram/blob/master/miniprogram-feature.md)
+- [API](https://wszgrcy.github.io/angular-miniprogram)
 
 ## 开发环境
 
@@ -47,15 +48,12 @@
 
 ## 支持平台
 
-| 平台名           | 注释                                                                                                              |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------- |
-| 微信             | 已实现                                                                                                            |
-| 字节跳动         | 已实现                                                                                                            |
-| 京东             | 未回应                                                                                                            |
-| 百度智能         | 已实现                                                                                                            |
-| 支付宝           | 不能使用 Prod,问题[参见](https://forum.alipay.com/mini-app/post/65101060);不能使用基础库 2.0 编译,slot 有部分问题 |
-| qq 小程序        | 已实现(非微信变种),但是事件有未知报错?但是好像也不影响                                                            |
-| 钉钉小程序       | 支付宝变种                                                                                                        |
-| 企业微信         | 微信变种                                                                                                          |
-| 支付宝小程序 iot | 支付宝变种                                                                                                        |
-| 飞书             | 字节                                                                                                              |
+| 平台名    | 是否实现 | 关联               | 注释                                                                                                              |
+| --------- | -------- | ------------------ | ----------------------------------------------------------------------------------------------------------------- | --- |
+| 微信      | 已实现   | 企业微信           |                                                                                                                   |
+| 字节跳动  | 已实现   |                    |                                                                                                                   |
+| 京东      | 未实现   |                    | 没有账号                                                                                                          |     |
+| 百度智能  | 已实现   |                    |                                                                                                                   |
+| 支付宝    | 已实现   | 钉钉,支付宝 IoT 等 | 不能使用 Prod,问题[参见](https://forum.alipay.com/mini-app/post/65101060);不能使用基础库 2.0 编译,slot 有部分问题 |
+| qq 小程序 | 已实现   |                    | (非微信变种),但是事件有未知报错?但是好像也不影响                                                                  |
+| 飞书      | 未实现   |                    | 与字节跳动类似,但是编译有点问题                                                                                   |
