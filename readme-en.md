@@ -42,7 +42,7 @@ English | [简体中文](readme.md)
 
 ### Quickstart
 
-- [Quickstart](https://github.com/wszgrcy/angular-miniprogram/blob/master/quick-start.md)
+- [Quickstart](https://github.com/wszgrcy/angular-miniprogram/blob/master/quick-start-en.md)
 
 ## Ecosystem
 
