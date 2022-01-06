@@ -1,6 +1,6 @@
-## 设置页面匹配
+## set Page pattern
 
-- 在`angular.json`中设置要匹配的页面范围,匹配规则与 assets 相同
+- Set output Page pattern in `angular.json`, same with `assets` field
 
 ```json
 "pages": [
@@ -12,11 +12,11 @@
 ]
 ```
 
-- 上述配置为,在 src/pages 文件夹中,匹配`*.entry.ts`文件,并且编译完成导出在`[输出文件夹]/pages`文件夹中
+- This config is, in `src/pages` dir match `*.entry.ts` file, and output in`[outputDir]/pages` Dir
 
-## 添加一个页面
+## add a Page
 
-- 建立如下结构的代码
+- Create code with the following structure
 
 ```tree
 ├── page1.component.html
@@ -27,7 +27,7 @@
 └── page1.module.ts
 ```
 
-- 新建一个`page1.entry.ts`,输入如下
+- Create a `page1.entry.ts` file, add code as follow
 
 ```ts
 import { pageStartup } from 'angular-miniprogram';
@@ -37,9 +37,9 @@ import { Page1Module } from './page1.module';
 pageStartup(Page1Module, Page1Component);
 ```
 
-## 设置组件匹配
+## set Component pattern
 
-- 在`angular.json`中设置要匹配的组件范围,匹配规则与 assets 相同
+- Set output Component pattern in `angular.json`, same with `assets` field
 
 ```json
 "components":[
@@ -51,9 +51,9 @@ pageStartup(Page1Module, Page1Component);
        ]
 ```
 
-## 添加一个组件
+## add a Component
 
-- 建立如下结构的代码
+- Create code with the following structure
 
 ```tree
 ├── component1.component.html
@@ -64,7 +64,7 @@ pageStartup(Page1Module, Page1Component);
 └── component1.module.ts
 ```
 
-- 新建一个`component1.entry.ts`,输入如下
+- Create a `component1.entry.ts` file, add code as follow
 
 ```ts
 import { componentRegistry } from 'angular-miniprogram';
@@ -73,5 +73,5 @@ import { Component1Component } from './component1.component';
 componentRegistry(Component1Component);
 ```
 
-- 上述代码为注册为将一个普通组件注册为小程序组件
-- 由于该组件的使用为自动初始化,所以使用了`注册`
+- This code is registry Component as a miniprogram Component
+- because of auto init, so use `Registry`
