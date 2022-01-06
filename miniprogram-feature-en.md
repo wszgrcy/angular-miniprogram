@@ -21,4 +21,4 @@
 
 ## Global Variable
 
-- `miniProgramPlatform`: string, hint miniprogram platform(`wx`,`zfb`,`zj`,`bdzn`,`qq`,`dd`等)
+- `miniProgramPlatform`: string, hint miniprogram platform(`wx`,`zfb`,`zj`,`bdzn`,`qq`,`dd`,etc)
