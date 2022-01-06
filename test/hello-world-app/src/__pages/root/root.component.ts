@@ -61,4 +61,9 @@ export class RootComponent implements OnInit {
       url: '/pages/base-http/base-http-entry',
     });
   }
+  selfComponent() {
+    this.global.navigateTo({
+      url: '/pages/self-component/self-component-entry',
+    });
+  }
 }

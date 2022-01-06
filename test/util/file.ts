@@ -11,6 +11,7 @@ export const ALL_PAGE_NAME_LIST = [
   `base-forms`,
   `component-use-template`,
   `base-http`,
+  `self-component`,
 ];
 export const ALL_COMPONENT_NAME_LIST = [
   `component1`,
@@ -18,6 +19,7 @@ export const ALL_COMPONENT_NAME_LIST = [
   `component3`,
   `content`,
   `content-multi`,
+  `component-need-template`,
 ];
 
 export const TEST_LIBRARY_COMPONENT_LIST = [
