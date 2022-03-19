@@ -3,9 +3,12 @@ import {
   BrowserBuilderOptions,
   ExecutionTransformer,
   executeBrowserBuilder,
+  AssetPattern,
+  KarmaBuilderOptions,
 } from '@angular-devkit/build-angular';
 import * as path from 'path';
 import * as webpack from 'webpack';
+import { PlatformType } from '../../src/builder/platform';
 
 export type CustomWebpackBrowserSchema = BrowserBuilderOptions;
 
@@ -32,6 +35,10 @@ export const BROWSER_BUILDER_INFO = {
 export const LIBRARY_BUILDER_INFO = {
   name: 'test-builder:library',
   schemaPath: path.resolve(__dirname, 'schema.library.json'),
+};
+export const KARMA_BUILDER_INFO = {
+  name: 'test-builder:karma',
+  schemaPath: path.resolve(__dirname, 'schema.karma.json'),
 };
 
 export const DEFAULT_ANGULAR_CONFIG = {
@@ -67,7 +74,42 @@ export const DEFAULT_ANGULAR_CONFIG = {
   scripts: [],
   aot: true,
 };
+export const DEFAULT_ANGULAR_KARMA_CONFIG: KarmaBuilderOptions & {
+  pages: AssetPattern[];
 
+  components: AssetPattern[];
+  platform: PlatformType;
+} = {
+  karmaConfig: 'karma.conf.js',
+  main: 'src/test.ts',
+  tsConfig: 'src/tsconfig.spec.json',
+  watch: false,
+  components: [
+    { glob: '**/*.entry.ts', input: './src/components', output: 'components' },
+  ],
+  styles: [
+    {
+      input: 'src/styles.css',
+      bundleName: 'app1',
+      inject: false,
+    },
+  ],
+  assets: [
+    {
+      glob: 'project.config.json',
+      input: './src',
+      output: './',
+    },
+    {
+      glob: 'app.json',
+      input: './src',
+      output: './',
+    },
+  ],
+  platform: PlatformType.wx,
+  sourceMap: false,
+  pages: [{ glob: '**/*.entry.spec.ts', input: './src/spec', output: 'spec' }],
+};
 export const DEFAULT_ANGULAR_LIBRARY_CONFIG = {
   project: 'projects/test-library/ng-package.json',
   tsConfig: 'projects/test-library/tsconfig.lib.json',

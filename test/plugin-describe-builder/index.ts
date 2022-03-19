@@ -91,6 +91,17 @@ export class MyTestProjectHost extends TestProjectHost {
       stringToFileBuffer(JSON.stringify(json))
     ).toPromise();
   }
+  async addSpecEntry(list: string[]) {
+    const configPath = join(normalize(this.root()), 'src', 'app.json');
+    const file = await this.read(configPath).toPromise();
+    const json = JSON.parse(fileBufferToString(file));
+    const entryList = list.map((item) => `spec/${item}/${item}-entry-spec`);
+    json.pages = entryList;
+    await this.write(
+      configPath,
+      stringToFileBuffer(JSON.stringify(json))
+    ).toPromise();
+  }
 }
 export const workspaceRoot = join(normalize(__dirname), `../hello-world-app/`);
 export const host = new MyTestProjectHost(workspaceRoot);
@@ -110,7 +121,7 @@ export function describeBuilder<T>(
   specDefinitions: (harness: JasmineBuilderHarness<T>) => void
 ): void {
   errorAndExitHook();
-  jasmine.DEFAULT_TIMEOUT_INTERVAL = 50 * 1000;
+  jasmine.DEFAULT_TIMEOUT_INTERVAL = 500 * 1000;
   let optionSchema = optionSchemaCache.get(options.schemaPath);
   if (optionSchema === undefined) {
     optionSchema = JSON.parse(
