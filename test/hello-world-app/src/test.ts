@@ -28,7 +28,9 @@ describe('describe1', () => {
 });
 platformMiniProgram()
   .bootstrapModule(MainTestModule)
-  .then((e) => {
-    console.log(e);
-  });
+  .then((e) => {});
+// Then we find all the tests.
+const context = (require as any).context('./', true, /\.spec\.ts$/);
+// And load the modules.
+context.keys().map(context);
 startupTest();

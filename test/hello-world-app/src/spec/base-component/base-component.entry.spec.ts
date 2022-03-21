@@ -1,12 +1,13 @@
-import { pageStartup } from 'angular-miniprogram';
 import { BaseComponentComponent } from './base-component.component';
-import { BaseComponentModule } from './base-component.module';
 
-pageStartup(BaseComponentModule, BaseComponentComponent);
-
-describe('测试', () => {
-  it('测试', () => {
-    console.log('组件部分测试完成');
-    expect(true).toBe(true);
+describe('BaseComponent', () => {
+  beforeEach(async () => {
+    await wx.reLaunch({ url: `/spec/base-component/base-component-entry` });
+  });
+  it('run', () => {
+    let pages = getCurrentPages();
+    expect(
+      pages[0].__ngComponentInstance instanceof BaseComponentComponent
+    ).toBe(true);
   });
 });

@@ -9,7 +9,8 @@
   "files": ["test.ts"],
   "include": [
     "**/*.d.ts",
-    "spec/**/*.entry.spec.ts",
+    "spec/**/*.entry.ts",
+    "spec/**/*.spec.ts",
     "components/**/*.entry.ts"
   ]
 }

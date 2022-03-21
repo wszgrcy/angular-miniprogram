@@ -108,7 +108,7 @@ export const DEFAULT_ANGULAR_KARMA_CONFIG: KarmaBuilderOptions & {
   ],
   platform: PlatformType.wx,
   sourceMap: false,
-  pages: [{ glob: '**/*.entry.spec.ts', input: './src/spec', output: 'spec' }],
+  pages: [{ glob: '**/*.entry.ts', input: './src/spec', output: 'spec' }],
 };
 export const DEFAULT_ANGULAR_LIBRARY_CONFIG = {
   project: 'projects/test-library/ng-package.json',

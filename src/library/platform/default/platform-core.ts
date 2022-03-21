@@ -1,3 +1,4 @@
+/// <reference types="miniprogram-api-typings"/>
 import {
   ApplicationRef,
   ChangeDetectorRef,
@@ -16,7 +17,6 @@ import type {
 } from 'angular-miniprogram/platform/type';
 import { AgentNode } from './agent-node';
 import { ComponentFinderService } from './component-finder.service';
-import 'miniprogram-api-typings';
 import {
   INJECTOR,
   LVIEW_CONTEXT,

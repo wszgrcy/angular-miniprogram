@@ -95,7 +95,7 @@ export class MyTestProjectHost extends TestProjectHost {
     const configPath = join(normalize(this.root()), 'src', 'app.json');
     const file = await this.read(configPath).toPromise();
     const json = JSON.parse(fileBufferToString(file));
-    const entryList = list.map((item) => `spec/${item}/${item}-entry-spec`);
+    const entryList = list.map((item) => `spec/${item}/${item}-entry`);
     json.pages = entryList;
     await this.write(
       configPath,

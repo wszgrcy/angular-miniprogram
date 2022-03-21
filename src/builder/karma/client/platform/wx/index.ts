@@ -3,11 +3,11 @@
 import type { Socket } from 'socket.io-client';
 
 let io = require('weapp.socket.io/lib/weapp.socket.io');
+declare const KARMA_PORT: number;
 export class IO {
   instance: Socket;
   constructor() {
-    // todo 需要动态获取端口
-    this.instance = io('http://localhost:9876');
+    this.instance = io(`http://localhost:${KARMA_PORT}`);
   }
   on(data: string, callback: (...args: any[]) => void) {
     this.instance.on(data, (...args) => {

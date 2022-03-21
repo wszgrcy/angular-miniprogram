@@ -59,9 +59,26 @@ export function runBuilder(
       options.plugins!.push(
         new webpack.DefinePlugin({
           describe: `${buildPlatform.globalVariablePrefix}.describe`,
+          xdescribe: `${buildPlatform.globalVariablePrefix}.xdescribe`,
+          fdescribe: `${buildPlatform.globalVariablePrefix}.fdescribe`,
           it: `${buildPlatform.globalVariablePrefix}.it`,
-          jasmine: `${buildPlatform.globalVariablePrefix}.jasmine`,
+          xit: `${buildPlatform.globalVariablePrefix}.xit`,
+          fit: `${buildPlatform.globalVariablePrefix}.fit`,
+          beforeEach: `${buildPlatform.globalVariablePrefix}.beforeEach`,
+          afterEach: `${buildPlatform.globalVariablePrefix}.afterEach`,
+          beforeAll: `${buildPlatform.globalVariablePrefix}.beforeAll`,
+          afterAll: `${buildPlatform.globalVariablePrefix}.afterAll`,
+          setSpecProperty: `${buildPlatform.globalVariablePrefix}.setSpecProperty`,
+          setSuiteProperty: `${buildPlatform.globalVariablePrefix}.setSuiteProperty`,
           expect: `${buildPlatform.globalVariablePrefix}.expect`,
+          expectAsync: `${buildPlatform.globalVariablePrefix}.expectAsync`,
+          pending: `${buildPlatform.globalVariablePrefix}.pending`,
+          fail: `${buildPlatform.globalVariablePrefix}.fail`,
+          spyOn: `${buildPlatform.globalVariablePrefix}.spyOn`,
+          spyOnProperty: `${buildPlatform.globalVariablePrefix}.spyOnProperty`,
+          spyOnAllFunctions: `${buildPlatform.globalVariablePrefix}.spyOnAllFunctions`,
+          jsApiReporter: `${buildPlatform.globalVariablePrefix}.jsApiReporter`,
+          jasmine: `${buildPlatform.globalVariablePrefix}.jasmine`,
         })
       );
       options.output!.path += '/dist';

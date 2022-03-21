@@ -46,7 +46,7 @@ const init: any = (config: any, emitter: any) => {
   if (config.singleRun) {
     // There's no option to turn off file watching in webpack-dev-server, but
     // we can override the file watcher instead.
-    webpackConfig.plugins.unshift({
+    (webpackConfig.plugins as any[]).unshift({
       apply: (compiler: any) => {
         compiler.hooks.afterEnvironment.tap('karma', () => {
           compiler.watchFileSystem = { watch: () => {} };
@@ -54,6 +54,12 @@ const init: any = (config: any, emitter: any) => {
       },
     });
   }
+  webpackConfig.plugins!.push(
+    new webpack.DefinePlugin({
+      KARMA_CLIENT_CONFIG: JSON.stringify(config.client),
+      KARMA_PORT: config.port,
+    })
+  );
   // Files need to be served from a custom path for Karma.
   const compiler = webpack.webpack(webpackConfig, (error, stats) => {
     if (error) {
