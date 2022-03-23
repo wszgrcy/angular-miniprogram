@@ -1,10 +1,10 @@
+import { join, normalize } from '@angular-devkit/core';
 import { describeBuilder } from '../../../test/plugin-describe-builder';
 import {
   DEFAULT_ANGULAR_KARMA_CONFIG,
   KARMA_BUILDER_INFO,
 } from '../../../test/test-builder';
 import { runBuilder } from './index';
-import { join, normalize } from '@angular-devkit/core';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_KARMA_CONFIG,
@@ -13,7 +13,7 @@ describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
   describe('karma', () => {
     it('运行', async () => {
       const root = harness.host.root();
-      let list: string[] = [];
+      const list: string[] = [];
 
       list.push(
         ...(await harness.host.getFileList(

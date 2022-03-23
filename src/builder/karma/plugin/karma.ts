@@ -1,9 +1,9 @@
-import * as webpack from 'webpack';
-import { createConsoleLogger } from '@angular-devkit/core/node';
+import { statsErrorsToString } from '@angular-devkit/build-angular/src/webpack/utils/stats';
 import { logging } from '@angular-devkit/core';
+import { createConsoleLogger } from '@angular-devkit/core/node';
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { statsErrorsToString } from '@angular-devkit/build-angular/src/webpack/utils/stats';
+import * as webpack from 'webpack';
 
 let blocked: any[] = [];
 let isBlocked = false;

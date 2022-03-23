@@ -2,7 +2,7 @@ import { KarmaClient } from './karma';
 
 // Save link to native Date object
 // before it might be mocked by the user
-var _Date = Date;
+const _Date = Date;
 
 /**
  * Decision maker for whether a stack entry is considered external to jasmine and karma.
@@ -25,10 +25,10 @@ function isExternalStackEntry(entry: string) {
  * @return {Array}        A list of relevant stack entries.
  */
 function getRelevantStackFrom(stack: string[]): string[] {
-  var filteredStack: string[] = [];
-  var relevantStack: string[] = [];
+  let filteredStack: string[] = [];
+  const relevantStack: string[] = [];
 
-  for (var i = 0; i < stack.length; i += 1) {
+  for (let i = 0; i < stack.length; i += 1) {
     if (isExternalStackEntry(stack[i])) {
       filteredStack.push(stack[i]);
     }
@@ -40,7 +40,7 @@ function getRelevantStackFrom(stack: string[]): string[] {
     filteredStack = stack;
   }
 
-  for (i = 0; i < filteredStack.length; i += 1) {
+  for (let i = 0; i < filteredStack.length; i += 1) {
     if (filteredStack[i]) {
       relevantStack.push(filteredStack[i]);
     }
@@ -62,15 +62,15 @@ function getRelevantStackFrom(stack: string[]): string[] {
  * @return {String}      Formatted step.
  */
 function formatFailedStep(step: Record<string, any>): string {
-  var relevantMessage: string[] = [];
-  var relevantStack: string[] = [];
+  const relevantMessage: string[] = [];
+  const relevantStack: string[] = [];
 
   // Safari/Firefox seems to have no stack trace,
   // so we just return the error message and if available
   // construct a stacktrace out of filename and lineno:
   if (!step.stack) {
     if (step.filename) {
-      var stackframe: string = step.filename;
+      let stackframe: string = step.filename;
       if (step.lineno) {
         stackframe = stackframe + ':' + step.lineno;
       }
@@ -82,14 +82,14 @@ function formatFailedStep(step: Record<string, any>): string {
 
   // Remove the message prior to processing the stack to prevent issues like
   // https://github.com/karma-runner/karma-jasmine/issues/79
-  var stackframes = step.stack.split('\n');
-  var messageOnStack = null;
+  const stackframes = step.stack.split('\n');
+  let messageOnStack = null;
   if (stackframes[0].indexOf(step.message) !== -1) {
     // Remove the message if it is in the stack string (eg Chrome)
     messageOnStack = stackframes.shift();
   }
   // Filter frames
-  var relevantStackFrames = getRelevantStackFrom(stackframes);
+  const relevantStackFrames = getRelevantStackFrom(stackframes);
   if (messageOnStack) {
     // Put the message back if we removed it.
     relevantStackFrames.unshift(messageOnStack);
@@ -107,17 +107,17 @@ class SuiteNode {
   children: any[] = [];
 
   addChild(name: string) {
-    var suite = new SuiteNode(name, this);
+    const suite = new SuiteNode(name, this);
     this.children.push(suite);
     return suite;
   }
 }
 
 function processSuite(suite: SuiteNode, pointer: Record<string, any>) {
-  var child;
-  var childPointer;
+  let child;
+  let childPointer;
 
-  for (var i = 0; i < suite.children.length; i++) {
+  for (let i = 0; i < suite.children.length; i++) {
     child = suite.children[i];
 
     if (child.children) {
@@ -133,7 +133,7 @@ function processSuite(suite: SuiteNode, pointer: Record<string, any>) {
 }
 
 function getAllSpecNames(topSuite: SuiteNode) {
-  var specNames = {};
+  const specNames = {};
 
   processSuite(topSuite, specNames);
 
@@ -151,9 +151,9 @@ class KarmaReporter implements jasmine.CustomReporter {
   constructor(private tc: KarmaClient, private jasmineEnv: jasmine.Env) {}
   handleGlobalErrors(result: Record<string, any>) {
     if (result.failedExpectations && result.failedExpectations.length) {
-      var message: string = 'An error was thrown in afterAll';
-      var steps = result.failedExpectations;
-      for (var i = 0, l = steps.length; i < l; i++) {
+      let message: string = 'An error was thrown in afterAll';
+      const steps = result.failedExpectations;
+      for (let i = 0, l = steps.length; i < l; i++) {
         message += '\n' + formatFailedStep(steps[i]);
       }
 
@@ -189,12 +189,12 @@ class KarmaReporter implements jasmine.CustomReporter {
 
     // Remove functions from called back results to avoid IPC errors in Electron
     // https://github.com/twolfson/karma-electron/issues/47
-    var cleanedOrder!: Record<string, any>;
+    let cleanedOrder!: Record<string, any>;
     if (result.order) {
       cleanedOrder = {};
-      var orderKeys = Object.getOwnPropertyNames(result.order);
-      for (var i = 0; i < orderKeys.length; i++) {
-        var orderKey = orderKeys[i];
+      const orderKeys = Object.getOwnPropertyNames(result.order);
+      for (let i = 0; i < orderKeys.length; i++) {
+        const orderKey = orderKeys[i];
         if (typeof result.order[orderKey] !== 'function') {
           cleanedOrder[orderKey] = result.order[orderKey];
         }
@@ -239,11 +239,11 @@ class KarmaReporter implements jasmine.CustomReporter {
   }
 
   specDone(specResult: Record<string, any>) {
-    var skipped =
+    const skipped =
       specResult.status === 'disabled' ||
       specResult.status === 'pending' ||
       specResult.status === 'excluded';
-    var result = {
+    const result = {
       fullName: specResult.fullName,
       description: specResult.description,
       id: specResult.id,
@@ -263,19 +263,19 @@ class KarmaReporter implements jasmine.CustomReporter {
     };
 
     // generate ordered list of (nested) suite names
-    var suitePointer = this.currentSuite;
+    let suitePointer = this.currentSuite;
     while (suitePointer.parent) {
       result.suite.unshift(suitePointer.name!);
       suitePointer = suitePointer.parent;
     }
 
     if (!result.success) {
-      var steps = specResult.failedExpectations;
-      for (var i = 0, l = steps.length; i < l; i++) {
+      const steps = specResult.failedExpectations;
+      for (let i = 0, l = steps.length; i < l; i++) {
         result.log.push(formatFailedStep(steps[i]));
       }
 
-      //todo 永远不可能赋值当前
+      // todo 永远不可能赋值当前
       // Report the name of fhe failing spec so the reporter can emit a debug url.
       // (result as any).debug_url = debugUrl(specResult.fullName);
     }
@@ -299,11 +299,11 @@ class KarmaReporter implements jasmine.CustomReporter {
  * @param {[Array|string]} clientArguments The karma client arguments
  * @return {string} The value of grep option by default empty string
  */
-var getGrepOption = function (clientArguments: any[] | string) {
-  var grepRegex = /^--grep=(.*)$/;
+const getGrepOption = function (clientArguments: any[] | string) {
+  const grepRegex = /^--grep=(.*)$/;
 
   if (Object.prototype.toString.call(clientArguments) === '[object Array]') {
-    var indexOfGrep = indexOf(clientArguments as any[], '--grep');
+    const indexOfGrep = indexOf(clientArguments as any[], '--grep');
 
     if (indexOfGrep !== -1) {
       return clientArguments[indexOfGrep + 1];
@@ -320,34 +320,34 @@ var getGrepOption = function (clientArguments: any[] | string) {
       )[0] || ''
     );
   } else if (typeof clientArguments === 'string') {
-    var match = /--grep=([^=]+)/.exec(clientArguments);
+    const match = /--grep=([^=]+)/.exec(clientArguments);
 
     return match ? match[1] : '';
   }
 };
 
-var createRegExp = function (filter: string) {
+const createRegExp = function (filter: string) {
   filter = filter || '';
   if (filter === '') {
     return new RegExp(''); // to match all
   }
 
-  var regExp = /^[/](.*)[/]([gmixXsuUAJD]*)$/; // pattern to check whether the string is RegExp pattern
+  const regExp = /^[/](.*)[/]([gmixXsuUAJD]*)$/; // pattern to check whether the string is RegExp pattern
 
-  var parts = regExp.exec(filter);
+  const parts = regExp.exec(filter);
   if (parts === null) {
     return new RegExp(filter.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')); // escape functional symbols
   }
 
-  var patternExpression = parts[1];
-  var patternSwitches = parts[2];
+  const patternExpression = parts[1];
+  const patternSwitches = parts[2];
   return new RegExp(patternExpression, patternSwitches);
 };
 
 function getGrepSpecsToRun(clientConfig: Record<string, any>, specs: any[]) {
-  var grepOption = getGrepOption(clientConfig.args);
+  const grepOption = getGrepOption(clientConfig.args);
   if (grepOption) {
-    var regExp = createRegExp(grepOption);
+    const regExp = createRegExp(grepOption);
     return filter(specs, function specFilter(spec: any) {
       return regExp.test(spec.getFullName());
     });
@@ -355,11 +355,11 @@ function getGrepSpecsToRun(clientConfig: Record<string, any>, specs: any[]) {
 }
 
 function parseQueryParams(location: Record<string, any>) {
-  var params: Record<string, any> = {};
+  const params: Record<string, any> = {};
   if (location && Object.prototype.hasOwnProperty.call(location, 'search')) {
-    var pairs = location.search.substr(1).split('&');
-    for (var i = 0; i < pairs.length; i++) {
-      var keyValue = pairs[i].split('=');
+    const pairs = location.search.substr(1).split('&');
+    for (let i = 0; i < pairs.length; i++) {
+      const keyValue = pairs[i].split('=');
       params[decodeURIComponent(keyValue[0])] = decodeURIComponent(keyValue[1]);
     }
   }
@@ -381,8 +381,8 @@ function getSpecsByName(specs: any[], name: string) {
 }
 
 function getDebugSpecToRun(location: Record<string, any>, specs: any[]) {
-  var queryParams: Record<string, any> = parseQueryParams(location);
-  var spec = queryParams.spec;
+  const queryParams: Record<string, any> = parseQueryParams(location);
+  const spec = queryParams.spec;
   if (spec) {
     // A single spec has been requested by name for debugging.
     return getSpecsByName(specs, spec);
@@ -402,14 +402,14 @@ function getSpecsToRunForCurrentShard(
 
   // Just do a simple sharding strategy of dividing the number of specs
   // equally.
-  var firstSpec = Math.floor((specs.length * shardIndex) / totalShards);
-  var lastSpec = Math.floor((specs.length * (shardIndex + 1)) / totalShards);
+  const firstSpec = Math.floor((specs.length * shardIndex) / totalShards);
+  const lastSpec = Math.floor((specs.length * (shardIndex + 1)) / totalShards);
   return specs.slice(firstSpec, lastSpec);
 }
 
 function getShardedSpecsToRun(specs: any[], clientConfig: Record<string, any>) {
-  var shardIndex = clientConfig.shardIndex;
-  var totalShards = clientConfig.totalShards;
+  const shardIndex = clientConfig.shardIndex;
+  const totalShards = clientConfig.totalShards;
   if (shardIndex != null && totalShards != null) {
     // Sharded mode - Run only the subset of the specs corresponding to the
     // current shard.
@@ -437,9 +437,9 @@ class KarmaSpecFilter {
    * @return {!Array<string>} All possible tests.
    */
   getAllSpecs(jasmineEnv: jasmine.Env) {
-    var specs: (jasmine.Suite | jasmine.Spec)[] = [];
-    var stack = [jasmineEnv.topSuite()];
-    var currentNode: jasmine.Suite;
+    const specs: (jasmine.Suite | jasmine.Spec)[] = [];
+    let stack = [jasmineEnv.topSuite()];
+    let currentNode: jasmine.Suite;
     while ((currentNode = stack.pop()!)) {
       if (currentNode.children) {
         // jasmine.Suite
@@ -465,7 +465,7 @@ class KarmaSpecFilter {
     clientConfig: Record<string, any>,
     jasmineEnv: jasmine.Env
   ) {
-    var specs = this.getAllSpecs(jasmineEnv).map(function (spec) {
+    const specs = this.getAllSpecs(jasmineEnv).map(function (spec) {
       (spec as any).name = spec.getFullName();
       return spec;
     });
@@ -502,13 +502,13 @@ class KarmaSpecFilter {
  * @param {Object} config The karma config
  * @param {Object} jasmineEnv jasmine environment object
  */
-var createSpecFilter = function (
+const createSpecFilter = function (
   config: Record<string, any>,
   jasmineEnv: jasmine.Env
 ) {
-  var karmaSpecFilter = new KarmaSpecFilter(config, jasmineEnv);
+  const karmaSpecFilter = new KarmaSpecFilter(config, jasmineEnv);
 
-  var specFilter = function (spec: jasmine.Suite) {
+  const specFilter = function (spec: jasmine.Suite) {
     return karmaSpecFilter.matches(spec);
   };
 
@@ -528,7 +528,7 @@ var createSpecFilter = function (
 export function createStartFn(karma: KarmaClient, jasmineEnv: jasmine.Env) {
   // This function will be assigned to `window.__karma__.start`:
   return function () {
-    var clientConfig = {
+    const clientConfig = {
       args: [],
       useIframe: true,
       runInParent: false,
@@ -537,7 +537,7 @@ export function createStartFn(karma: KarmaClient, jasmineEnv: jasmine.Env) {
       jasmine: {},
       originalArgs: [],
     };
-    var jasmineConfig = clientConfig.jasmine || {};
+    const jasmineConfig = clientConfig.jasmine || {};
 
     jasmineEnv = jasmineEnv || jasmine.getEnv();
 
@@ -570,7 +570,7 @@ function indexOf(collection: any[], find: any, i?: number /* opt */) {
   if (i < 0) {
     i = 0;
   }
-  for (var n = collection.length; i < n; i++) {
+  for (let n = collection.length; i < n; i++) {
     if (i in collection && collection[i] === find) {
       return i;
     }
@@ -583,9 +583,9 @@ function filter(collection: any[], filter: any, that?: any /* opt */) {
     return collection.filter(filter, that);
   }
 
-  var other: any[] = [];
-  var v: any;
-  for (var i = 0, n = collection.length; i < n; i++) {
+  const other: any[] = [];
+  let v: any;
+  for (let i = 0, n = collection.length; i < n; i++) {
     if (
       i in collection &&
       filter.call(that, (v = collection[i]), i, collection)
@@ -605,8 +605,8 @@ function map(
     return collection.map(mapper, that);
   }
 
-  var other = new Array(collection.length);
-  for (var i = 0, n = collection.length; i < n; i++) {
+  const other = new Array(collection.length);
+  for (let i = 0, n = collection.length; i < n; i++) {
     if (i in collection) {
       other[i] = mapper.call(that, collection[i], i, collection);
     }

@@ -7,11 +7,12 @@ import { Injector } from 'static-injector';
 import * as webpack from 'webpack';
 import { WebpackConfigurationChangeService } from '../application/webpack-configuration-change.service';
 import {
+  BuildPlatform,
   PlatformType,
   getBuildPlatformInjectConfig,
-  BuildPlatform,
 } from '../platform';
 import { execute } from './index.origin';
+
 export default createBuilder(
   (
     angularOptions: KarmaBuilderOptions & {
@@ -55,7 +56,7 @@ export function runBuilder(
       const config = injector.get(WebpackConfigurationChangeService);
       config.init();
       await config.change();
-      let buildPlatform = injector.get(BuildPlatform);
+      const buildPlatform = injector.get(BuildPlatform);
       options.plugins!.push(
         new webpack.DefinePlugin({
           describe: `${buildPlatform.globalVariablePrefix}.describe`,

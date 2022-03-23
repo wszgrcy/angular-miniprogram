@@ -163,7 +163,7 @@ export class KarmaClient {
       }
     }
   }
-  /**可以直接使用 */
+  /** 可以直接使用 */
   info(info: any) {
     // TODO(vojta): introduce special API for this
     if (!this.startEmitted && info.total) {

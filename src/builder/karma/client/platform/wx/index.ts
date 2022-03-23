@@ -2,7 +2,8 @@
 
 import type { Socket } from 'socket.io-client';
 
-let io = require('weapp.socket.io/lib/weapp.socket.io');
+const io = require('weapp.socket.io/lib/weapp.socket.io');
+
 declare const KARMA_PORT: number;
 export class IO {
   instance: Socket;

@@ -1,15 +1,16 @@
+import { createStartFn } from './adapter';
 import { KarmaClient } from './karma';
 import { IO } from './platform';
 import { StatusUpdater } from './updater';
-import { createStartFn } from './adapter';
+
 declare const KARMA_CLIENT_CONFIG: any;
 export function startupTest() {
   const socket = new IO();
   const updater = new StatusUpdater(socket);
-  let karmaClient = new KarmaClient(updater, socket);
+  const karmaClient = new KarmaClient(updater, socket);
   if (KARMA_CLIENT_CONFIG.captureConsole) {
     // patch the console
-    var localConsole = console || {
+    const localConsole = console || {
       log: function () {},
       info: function () {},
       warn: function () {},
@@ -23,8 +24,8 @@ export function startupTest() {
       'error',
       'debug',
     ];
-    var patchConsoleMethod = function (method: keyof Console) {
-      var orig = localConsole[method];
+    const patchConsoleMethod = function (method: keyof Console) {
+      const orig = localConsole[method];
       if (!orig) {
         return;
       }
@@ -39,7 +40,7 @@ export function startupTest() {
         }
       } as any;
     };
-    for (var i = 0; i < logMethods.length; i++) {
+    for (let i = 0; i < logMethods.length; i++) {
       patchConsoleMethod(logMethods[i]);
     }
   }

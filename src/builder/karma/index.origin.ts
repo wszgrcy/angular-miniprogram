@@ -11,13 +11,15 @@ import {
   BuilderOutput,
   createBuilder,
 } from '@angular-devkit/architect';
-import { getSystemPath, join, normalize } from '@angular-devkit/core';
-import { Config, ConfigOptions } from 'karma';
-import { dirname, resolve } from 'path';
-import { Observable, from } from 'rxjs';
-import { defaultIfEmpty, switchMap } from 'rxjs/operators';
-import type { Configuration } from 'webpack';
-import type { ExecutionTransformer } from '@angular-devkit/build-angular';
+import {
+  BrowserBuilderOptions,
+  OutputHashing,
+} from '@angular-devkit/build-angular';
+import type {
+  ExecutionTransformer,
+  KarmaBuilderOptions,
+} from '@angular-devkit/build-angular';
+import { findTests } from '@angular-devkit/build-angular/src/builders/karma/find-tests';
 import { assertCompatibleAngularVersion } from '@angular-devkit/build-angular/src/utils/version';
 import { generateBrowserWebpackConfigFromContext } from '@angular-devkit/build-angular/src/utils/webpack-browser-config';
 import {
@@ -27,12 +29,12 @@ import {
   getTypeScriptConfig,
 } from '@angular-devkit/build-angular/src/webpack/configs';
 import { SingleTestTransformLoader } from '@angular-devkit/build-angular/src/webpack/plugins/single-test-transform';
-import {
-  BrowserBuilderOptions,
-  OutputHashing,
-} from '@angular-devkit/build-angular';
-import { findTests } from '@angular-devkit/build-angular/src/builders/karma/find-tests';
-import type { KarmaBuilderOptions } from '@angular-devkit/build-angular';
+import { getSystemPath, join, normalize } from '@angular-devkit/core';
+import { Config, ConfigOptions } from 'karma';
+import { dirname, resolve } from 'path';
+import { Observable, from } from 'rxjs';
+import { defaultIfEmpty, switchMap } from 'rxjs/operators';
+import type { Configuration } from 'webpack';
 
 export type KarmaConfigOptions = ConfigOptions & {
   buildWebpack?: unknown;
