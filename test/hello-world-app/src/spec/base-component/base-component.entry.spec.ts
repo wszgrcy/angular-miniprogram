@@ -2,12 +2,23 @@ import { BaseComponentComponent } from './base-component.component';
 
 describe('BaseComponent', () => {
   beforeEach(async () => {
-    await wx.reLaunch({ url: `/spec/base-component/base-component-entry` });
+    try {
+      await new Promise((res, rej) =>
+        wx.reLaunch({
+          url: `/spec/base-component/base-component-entry`,
+          fail: rej,
+          success: res,
+        })
+      );
+    } catch (error) {
+      throw new Error(error);
+    }
   });
   it('run', () => {
     let pages = getCurrentPages();
-    expect(
-      pages[0].__ngComponentInstance instanceof BaseComponentComponent
-    ).toBe(true);
+    let page = pages[0];
+    expect(page.__ngComponentInstance instanceof BaseComponentComponent).toBe(
+      true
+    );
   });
 });

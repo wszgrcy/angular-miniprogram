@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -192,12 +193,13 @@ export function execute(
           // Pass onto Karma to emit BuildEvents.
           karmaConfig.buildWebpack ??= {};
           if (typeof karmaConfig.buildWebpack === 'object') {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (karmaConfig.buildWebpack as any).failureCb ??= () =>
               subscriber.next({ success: false });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (karmaConfig.buildWebpack as any).successCb ??= () =>
               subscriber.next({ success: true });
+            (karmaConfig.buildWebpack as any).testContext = (
+              context as any
+            ).testContext;
           }
 
           // Complete the observable once the Karma server returns.

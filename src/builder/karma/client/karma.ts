@@ -11,7 +11,7 @@ export class KarmaClient {
   private resultsBufferLimit = 50;
   private resultsBuffer: any[] = [];
   private returnUrl!: string;
-  readonly id: string = Math.random().toString(36).slice(2);
+  readonly id: string = 'miniprogram';
   constructor(private updater: StatusUpdater, private socket: IO) {
     socket.on('execute', (cfg) => {
       this.updater.updateTestStatus('execute');

@@ -6,9 +6,7 @@ const miniProgram = function (
   baseBrowserDecorator(this);
   const self = this;
   this.name = 'miniprogram';
-  this._start = function (url: string) {
-    self.window = true;
-  };
+  this._start = function (url: string) {};
   this.on('kill', function (done: any) {
     self.emit('done');
     process.nextTick(done);

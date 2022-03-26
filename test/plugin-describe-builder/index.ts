@@ -37,6 +37,11 @@ import {
   mergeMap,
   shareReplay,
 } from 'rxjs/operators';
+import type { Configuration } from 'webpack';
+
+export interface TestContext {
+  buildSuccess: (webpackConfig: Configuration) => void;
+}
 
 export class MyTestProjectHost extends TestProjectHost {
   async getFileList(dirPath: Path): Promise<string[]> {
@@ -321,7 +326,8 @@ export class BuilderHarness<T> {
       this.builderInfo,
       getSystemPath(this.host.root()),
       contextHost,
-      useNativeFileWatching ? undefined : this.watcherNotifier
+      useNativeFileWatching ? undefined : this.watcherNotifier,
+      options.testContext
     );
     if (this.targetName !== undefined) {
       context.target = {
@@ -481,6 +487,7 @@ export interface BuilderHarnessExecutionOptions {
   outputLogsOnFailure: boolean;
   outputLogsOnException: boolean;
   useNativeFileWatching: boolean;
+  testContext?: TestContext;
 }
 export interface BuilderHarnessExecutionResult<
   T extends BuilderOutput = BuilderOutput
@@ -520,7 +527,8 @@ class HarnessBuilderContext implements BuilderContext {
     public builder: BuilderInfo,
     basePath: string,
     private readonly contextHost: ContextHost,
-    public readonly watcherFactory: BuilderWatcherFactory | undefined
+    public readonly watcherFactory: BuilderWatcherFactory | undefined,
+    public readonly testContext: TestContext | undefined
   ) {
     this.workspaceRoot = this.currentDirectory = basePath;
   }
@@ -585,7 +593,8 @@ class HarnessBuilderContext implements BuilderContext {
       info,
       this.workspaceRoot,
       this.contextHost,
-      this.watcherFactory
+      this.watcherFactory,
+      undefined
     );
     context.target = target;
     context.logger = scheduleOptions?.logger || this.logger.createChild('');

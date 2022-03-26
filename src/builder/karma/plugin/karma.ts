@@ -1,16 +1,31 @@
 import { statsErrorsToString } from '@angular-devkit/build-angular/src/webpack/utils/stats';
 import { logging } from '@angular-devkit/core';
 import { createConsoleLogger } from '@angular-devkit/core/node';
-import * as fs from 'fs-extra';
-import * as path from 'path';
+import { ConfigOptions, launcher } from 'karma';
 import * as webpack from 'webpack';
 
+launcher.Launcher.generateId = () => {
+  return 'miniprogram';
+};
 let blocked: any[] = [];
 let isBlocked = false;
 let successCb: () => void;
 let failureCb: () => void;
 
-const init: any = (config: any, emitter: any) => {
+function init(
+  config: ConfigOptions & {
+    buildWebpack?: {
+      logger;
+      failureCb: () => void;
+      successCb: () => void;
+      testContext: { buildSuccess: (arg) => void };
+      webpackConfig: webpack.Configuration;
+    };
+    configFile?: string;
+    webpack?: webpack.Configuration;
+  },
+  emitter: any
+) {
   if (!config.buildWebpack) {
     throw new Error(
       `The '@angular-devkit/build-angular/plugins/karma' karma plugin is meant to` +
@@ -89,10 +104,10 @@ const init: any = (config: any, emitter: any) => {
       failureCb();
       return;
     }
-    const realTestPath: string = webpackConfig.output!.path as string;
-    const appTestPath = path.resolve(process.cwd(), '__test-app');
-    fs.removeSync(appTestPath);
-    fs.copySync(realTestPath, appTestPath);
+    // 仅测试时使用
+    if (config.buildWebpack.testContext) {
+      config.buildWebpack.testContext.buildSuccess(webpackConfig);
+    }
   });
 
   function handler(callback?: () => void): void {
@@ -129,7 +144,7 @@ const init: any = (config: any, emitter: any) => {
   emitter.on('exit', (done: any) => {
     done();
   });
-};
+}
 
 init.$inject = ['config', 'emitter'];
 
