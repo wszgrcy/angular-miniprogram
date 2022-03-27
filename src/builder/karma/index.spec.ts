@@ -12,7 +12,8 @@ const angularConfig = {
   ...DEFAULT_ANGULAR_KARMA_CONFIG,
 };
 describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
-  describe('karma', () => {
+  // 此测试仅能本地使用,并且只能一个测试用例单独开启
+  xdescribe('karma', () => {
     it('运行', async () => {
       const root = harness.host.root();
       const list: string[] = [];
