@@ -14,11 +14,11 @@ let failureCb: () => void;
 
 function init(
   config: ConfigOptions & {
-    buildWebpack?: {
-      logger;
+    buildWebpack: {
+      logger: logging.Logger;
       failureCb: () => void;
       successCb: () => void;
-      testContext: { buildSuccess: (arg) => void };
+      testContext: { buildSuccess: (arg: webpack.Configuration) => void };
       webpackConfig: webpack.Configuration;
     };
     configFile?: string;
@@ -38,7 +38,7 @@ function init(
   successCb = config.buildWebpack.successCb;
   failureCb = config.buildWebpack.failureCb;
 
-  config.reporters.unshift('@angular-devkit/build-angular--event-reporter');
+  config.reporters?.unshift('@angular-devkit/build-angular--event-reporter');
   // todo 可能用不上,因为时本地
   // When using code-coverage, auto-add karma-coverage.
   // if (
@@ -203,7 +203,7 @@ eventReporter.$inject = ['baseReporterDecorator', 'config'];
 
 // When a request is not found in the karma server, try looking for it from the webpack server root.
 
-module.exports = {
+export default {
   'framework:@angular-devkit/build-angular': ['factory', init],
   'reporter:@angular-devkit/build-angular--event-reporter': [
     'type',

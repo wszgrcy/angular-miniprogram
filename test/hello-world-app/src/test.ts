@@ -1,5 +1,5 @@
 import { platformMiniProgram } from 'angular-miniprogram';
-import { startupTest } from 'angular-miniprogram/karma/test';
+import { startupTest } from 'angular-miniprogram/karma/client';
 import { MainTestModule } from './main-test.module';
 import 'zone.js';
 

@@ -10,6 +10,11 @@
       "implementation": "./library/builder",
       "schema": "./library/schema.json",
       "description": "小程序构建library"
+    },
+    "karma": {
+      "implementation": "./karma",
+      "schema": "./karma/schema.json",
+      "description": "小程序测试"
     }
   }
 }

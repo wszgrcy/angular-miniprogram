@@ -25,7 +25,7 @@
       "angular-miniprogram/forms": ["../../dist/forms"],
       "angular-miniprogram/common": ["../../dist/common"],
       "angular-miniprogram/common/http": ["../../dist/common/http"],
-      "angular-miniprogram/karma/test": ["../../src/builder/karma/client"]
+      "angular-miniprogram/karma/client": ["../../src/builder/karma/client"]
     }
   }
 }

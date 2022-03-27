@@ -15,6 +15,6 @@ const miniProgram = function (
 
 miniProgram.$inject = ['baseBrowserDecorator', 'config.jsdomLauncher'];
 
-module.exports = {
+export default {
   'launcher:miniprogram': ['type', miniProgram],
 };
