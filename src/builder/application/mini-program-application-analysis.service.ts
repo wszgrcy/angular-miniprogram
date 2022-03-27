@@ -199,7 +199,7 @@ export class MiniProgramApplicationAnalysisService {
     let maybeEntryPath: PagePattern | undefined;
 
     while (findList.length) {
-      const module = findList.pop();
+      const module = findList.shift();
       const moduleList = this.dependencyUseModule.get(path.normalize(module!));
       if (moduleList && moduleList.length) {
         findList.push(...moduleList);
