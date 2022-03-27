@@ -25,7 +25,8 @@
   },
   "peerDependencies": {
     "ng-packagr": "13.0.6",
-    "@angular/core": "13.0.2"
+    "@angular/core": "13.0.2",
+    "jasmine-core": "^4.0.1"
   },
   "builders": "./builder/builders.json"
 }

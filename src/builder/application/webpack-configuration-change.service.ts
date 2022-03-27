@@ -2,6 +2,7 @@ import type { BuilderContext } from '@angular-devkit/architect';
 import {
   AssetPattern,
   BrowserBuilderOptions,
+  KarmaBuilderOptions,
 } from '@angular-devkit/build-angular';
 import { normalize } from '@angular-devkit/core';
 import * as path from 'path';
@@ -35,7 +36,7 @@ export class WebpackConfigurationChangeService {
   private buildPlatform!: BuildPlatform;
   private entryList!: PagePattern[];
   constructor(
-    private options: BrowserBuilderOptions & {
+    private options: (BrowserBuilderOptions | KarmaBuilderOptions) & {
       pages: AssetPattern[];
       components: AssetPattern[];
       platform: PlatformType;

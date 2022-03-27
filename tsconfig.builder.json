@@ -12,6 +12,8 @@
     "./**/*.template.ts",
     "./**/*.d.ts",
     "**/*.spec.ts",
-    "**/*.xspec.ts"
+    "**/*.xspec.ts",
+    "**/*/karma/plugin/**/*",
+    "**/*/karma/client/**/*"
   ]
 }

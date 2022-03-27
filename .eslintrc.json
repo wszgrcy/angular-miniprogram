@@ -2,7 +2,9 @@
   "ignorePatterns": [
     "src/library/forms/**/*",
     "src/library/common/**/*",
-    "*.d.ts"
+    "*.d.ts",
+    "src/builder/karma/client/**/*",
+    "src/builder/karma/plugin/**/*"
   ],
   "root": true,
   "env": {

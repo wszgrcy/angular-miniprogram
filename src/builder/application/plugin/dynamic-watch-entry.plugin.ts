@@ -93,8 +93,10 @@ export class DynamicWatchEntryPlugin {
       'DynamicWatchEntryPlugin',
       async (compilation) => {
         this.entryPattern$.next({
-          pageList: await this.generateModuleInfo(this.options.pages),
-          componentList: await this.generateModuleInfo(this.options.components),
+          pageList: await this.generateModuleInfo(this.options.pages || []),
+          componentList: await this.generateModuleInfo(
+            this.options.components || []
+          ),
         });
       }
     );
@@ -104,7 +106,7 @@ export class DynamicWatchEntryPlugin {
         if (this.first) {
           this.first = false;
           const patternList = normalizeAssetPatterns(
-            [...this.options.pages, ...this.options.components],
+            [...(this.options.pages || []), ...(this.options.components || [])],
             this.options.workspaceRoot,
             this.absoluteProjectRoot,
             this.absoluteProjectSourceRoot
