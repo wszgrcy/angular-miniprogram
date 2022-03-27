@@ -4,5 +4,5 @@ require('ts-node').register({
   cwd: __dirname,
 });
 let obj = require('./launcher');
-obj = { ...obj, ...require('./karma') };
+obj = { ...obj.default, ...require('./karma').default };
 module.exports = obj;
