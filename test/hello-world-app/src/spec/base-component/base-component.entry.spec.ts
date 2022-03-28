@@ -1,5 +1,13 @@
+import { Observable } from 'rxjs';
+import { filter, take } from 'rxjs/operators';
 import { BaseComponentComponent } from './base-component.component';
-
+function waitLoad() {
+  return new Observable<any>((ob) => {
+    (wx as any).onAppRoute((result) => {
+      ob.next(result);
+    });
+  });
+}
 describe('BaseComponent', () => {
   beforeEach(async () => {
     try {
@@ -13,6 +21,12 @@ describe('BaseComponent', () => {
     } catch (error) {
       throw new Error(error);
     }
+    await waitLoad()
+      .pipe(
+        filter((item) => item.openType === 'reLaunch'),
+        take(1)
+      )
+      .toPromise();
   });
   it('run', () => {
     let pages = getCurrentPages();
