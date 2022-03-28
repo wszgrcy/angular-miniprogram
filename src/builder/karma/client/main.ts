@@ -30,7 +30,6 @@ export function startupTest() {
         return;
       }
       localConsole[method] = function () {
-        karmaClient.log(method, Array.from(arguments));
         try {
           return Function.prototype.apply.call(orig, localConsole, arguments);
         } catch (error) {
@@ -38,6 +37,7 @@ export function startupTest() {
             'Console method ' + method + ' threw: ' + error,
           ]);
         }
+        karmaClient.log(method, Array.from(arguments));
       } as any;
     };
     for (let i = 0; i < logMethods.length; i++) {
