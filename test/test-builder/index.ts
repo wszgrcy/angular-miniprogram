@@ -85,7 +85,11 @@ export const DEFAULT_ANGULAR_KARMA_CONFIG: KarmaBuilderOptions & {
   tsConfig: 'src/tsconfig.spec.json',
   watch: false,
   components: [
-    { glob: '**/*.entry.ts', input: './src/components', output: 'components' },
+    {
+      glob: '**/*.entry.ts',
+      input: './src/spec-component',
+      output: 'spec-component',
+    },
   ],
   styles: [
     {

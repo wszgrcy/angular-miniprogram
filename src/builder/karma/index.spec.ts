@@ -14,29 +14,19 @@ import { runBuilder } from './index';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_KARMA_CONFIG,
+  watch: true,
 };
 describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
   // 此测试仅能本地使用,并且只能一个测试用例单独开启
-  xdescribe('karma', () => {
+  describe('karma', () => {
     it('运行', async () => {
       const root = harness.host.root();
-      const list: string[] = [];
 
-      list.push(
-        ...(await harness.host.getFileList(
-          normalize(join(root, 'src', '__components'))
-        )),
-        ...(await harness.host.getFileList(
-          normalize(join(root, 'src', 'spec'))
-        ))
-      );
-      await harness.host.importPathRename(list);
-      await harness.host.moveDir(
-        ['component1', 'component2'],
-        '__components',
-        'components'
-      );
-      await harness.host.addSpecEntry(['base-component']);
+      await harness.host.addSpecEntry([
+        'empty',
+        'tag-view-convert-spec',
+        'style-class-spec',
+      ]);
       harness.useTarget('build', angularConfig);
       let appTestPath: string;
       const result = new Promise<BuilderHarnessExecutionResult<BuilderOutput>>(
@@ -66,7 +56,7 @@ describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
       fs.removeSync(appTestPath);
     });
 
-    it('watch', async () => {
+    xit('watch', async () => {
       const root = harness.host.root();
       const list: string[] = [];
 
