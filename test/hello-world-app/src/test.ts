@@ -20,12 +20,8 @@ for (const key in obj) {
     (wx as any).__global[key] = obj[key];
   }
 }
-describe('describe1', () => {
-  it('it1', () => {
-    console.log('main');
-    expect(true).toBe(true);
-  });
-});
+jasmine.DEFAULT_TIMEOUT_INTERVAL = 10 * 1000;
+
 platformMiniProgram()
   .bootstrapModule(MainTestModule)
   .then((e) => {});
