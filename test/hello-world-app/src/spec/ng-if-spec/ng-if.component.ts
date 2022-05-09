@@ -1,5 +1,6 @@
 import { Component, ViewChild } from '@angular/core';
 import { ComponentFinderService } from 'angular-miniprogram';
+import { MiniProgramComponentInstance } from 'angular-miniprogram/platform/type';
 import { BehaviorSubject } from 'rxjs';
 import { NgIfComponent } from '../../spec-component/ng-if/ng-if.component';
 import { nodeExist } from '../util';
@@ -11,21 +12,22 @@ import { nodeExist } from '../util';
 export class NgIfSPecComponent {
   testFinish$$ = new BehaviorSubject(undefined);
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
-    onReady: function (this: NgIfSPecComponent) {
-      this.componentFinderService
-        .get(this.instance)
+    onReady: function (
+      this: WechatMiniprogram.Page.Instance<{}, {}> &
+        MiniProgramComponentInstance<NgIfSPecComponent>
+    ) {
+      this.__ngComponentInstance.componentFinderService
+        .get(this.__ngComponentInstance.instance)
         .subscribe(
           async (
-            item: WechatMiniprogram.Page.Instance<
-              WechatMiniprogram.IAnyObject,
-              WechatMiniprogram.IAnyObject
-            >
+            item: WechatMiniprogram.Page.Instance<{}, {}> &
+              MiniProgramComponentInstance<NgIfSPecComponent>
           ) => {
             let query = item.createSelectorQuery();
 
             expect(await nodeExist(query, '.true-1')).toBe(true);
             expect(await nodeExist(query, '.false-1')).toBe(false);
-            this.testFinish$$.complete();
+            this.__ngComponentInstance.testFinish$$.complete();
           }
         );
     },

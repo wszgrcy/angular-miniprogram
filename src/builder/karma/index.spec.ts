@@ -26,6 +26,15 @@ describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
         'empty',
         'tag-view-convert-spec',
         'style-class-spec',
+        'life-time-spec',
+        'ng-if-spec',
+        'http-spec',
+        'ng-content-spec',
+        'ng-for-spec',
+        'ng-library-import-spec',
+        'ng-switch-spec',
+        'ng-template-outlet-spec',
+        'self-template-spec',
       ]);
       harness.useTarget('build', angularConfig);
       let appTestPath: string;

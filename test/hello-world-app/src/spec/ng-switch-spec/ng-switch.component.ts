@@ -1,5 +1,6 @@
 import { Component, ViewChild } from '@angular/core';
 import { ComponentFinderService } from 'angular-miniprogram';
+import { MiniProgramComponentInstance } from 'angular-miniprogram/platform/type';
 import { BehaviorSubject } from 'rxjs';
 import { NgSwitchComponent } from '../../spec-component/ng-switch/ng-switch.component';
 import { nodeExist } from '../util';
@@ -11,9 +12,12 @@ import { nodeExist } from '../util';
 export class NgSwitchSPecComponent {
   testFinish$$ = new BehaviorSubject(undefined);
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
-    onReady: function (this: NgSwitchSPecComponent) {
-      this.componentFinderService
-        .get(this.instance)
+    onReady: function (
+      this: WechatMiniprogram.Page.Instance<{}, {}> &
+        MiniProgramComponentInstance<NgSwitchSPecComponent>
+    ) {
+      this.__ngComponentInstance.componentFinderService
+        .get(this.__ngComponentInstance.instance)
         .subscribe(
           async (
             item: WechatMiniprogram.Page.Instance<
@@ -26,7 +30,7 @@ export class NgSwitchSPecComponent {
             expect(await nodeExist(query, '.switch-case1')).toBe(true);
             expect(await nodeExist(query, '.switch-case2')).toBe(false);
             expect(await nodeExist(query, '.switch-default')).toBe(false);
-            this.testFinish$$.complete();
+            this.__ngComponentInstance.testFinish$$.complete();
           }
         );
     },

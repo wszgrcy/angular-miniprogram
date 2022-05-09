@@ -1,5 +1,6 @@
 import { Component, ViewChild } from '@angular/core';
 import { ComponentFinderService } from 'angular-miniprogram';
+import { MiniProgramComponentInstance } from 'angular-miniprogram/platform/type';
 import { BehaviorSubject } from 'rxjs';
 import { NgTemplateOutletComponent } from '../../spec-component/ng-template-outlet/ng-template-outlet.component';
 import { nodeExist } from '../util';
@@ -11,9 +12,12 @@ import { nodeExist } from '../util';
 export class NgTemplateOutletSPecComponent {
   testFinish$$ = new BehaviorSubject(undefined);
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
-    onReady: function (this: NgTemplateOutletSPecComponent) {
-      this.componentFinderService
-        .get(this.instance)
+    onReady: function (
+      this: WechatMiniprogram.Page.Instance<{}, {}> &
+        MiniProgramComponentInstance<NgTemplateOutletSPecComponent>
+    ) {
+      this.__ngComponentInstance.componentFinderService
+        .get(this.__ngComponentInstance.instance)
         .subscribe(
           async (
             item: WechatMiniprogram.Page.Instance<
@@ -25,7 +29,7 @@ export class NgTemplateOutletSPecComponent {
 
             expect(await nodeExist(query, '.template-content-1')).toBe(true);
             expect(await nodeExist(query, '.template-content-2')).toBe(false);
-            this.testFinish$$.complete();
+            this.__ngComponentInstance.testFinish$$.complete();
           }
         );
     },

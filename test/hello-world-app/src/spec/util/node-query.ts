@@ -15,6 +15,23 @@ export function nodeExist(
     }
   });
 }
+export function nodeNotEmpty(
+  query: WechatMiniprogram.SelectorQuery,
+  selector: string
+) {
+  return new Promise<boolean>((res, rej) => {
+    try {
+      query
+        .select(selector)
+        .boundingClientRect((data) => {
+          res(!!data.height);
+        })
+        .exec();
+    } catch (error) {
+      rej(error);
+    }
+  });
+}
 
 export function fields(
   query: WechatMiniprogram.SelectorQuery,

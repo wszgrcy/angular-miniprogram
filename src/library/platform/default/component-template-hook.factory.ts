@@ -194,9 +194,7 @@ export function pageBind(context: any) {
   if (!ngZone) {
     throw new Error('没有查询到NgZone');
   }
-  ngZone.runOutsideAngular(() => {
-    lViewRegistryMap.set(lView, index++);
-  });
+  lViewRegistryMap.set(lView, index++);
 }
 
 export function findPageLView(componentRef: ComponentRef<unknown>) {

@@ -1,5 +1,5 @@
 import { NgModule } from '@angular/core';
-import { NgContentModule } from 'src/spec-component/ng-content/ng-content.module';
+import { NgContentModule } from '../../spec-component/ng-content/ng-content.module';
 import { NgContentSpecComponent } from './ng-content.component';
 
 @NgModule({

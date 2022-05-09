@@ -1,5 +1,6 @@
 import { Component, ViewChild } from '@angular/core';
 import { ComponentFinderService } from 'angular-miniprogram';
+import { MiniProgramComponentInstance } from 'angular-miniprogram/platform/type';
 import { BehaviorSubject } from 'rxjs';
 import { TagViewConvertComponent } from '../../spec-component/tag-view-convert/tag-view-convert.component';
 import { nodeExist } from '../util';
@@ -11,9 +12,12 @@ import { nodeExist } from '../util';
 export class TagViewConvertSpecComponent {
   testFinish$$ = new BehaviorSubject(undefined);
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
-    onReady: function (this: TagViewConvertSpecComponent) {
-      this.componentFinderService
-        .get(this.instance)
+    onReady: function (
+      this: WechatMiniprogram.Page.Instance<{}, {}> &
+        MiniProgramComponentInstance<TagViewConvertSpecComponent>
+    ) {
+      this.__ngComponentInstance.componentFinderService
+        .get(this.__ngComponentInstance.instance)
         .subscribe(
           async (
             item: WechatMiniprogram.Page.Instance<
@@ -25,7 +29,7 @@ export class TagViewConvertSpecComponent {
             expect(await nodeExist(query, '.tag-name-div')).toBe(true);
             expect(await nodeExist(query, '.tag-name-span')).toBe(true);
 
-            this.testFinish$$.complete();
+            this.__ngComponentInstance.testFinish$$.complete();
           }
         );
     },

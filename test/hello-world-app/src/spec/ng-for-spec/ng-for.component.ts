@@ -1,5 +1,6 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { ComponentFinderService } from 'angular-miniprogram';
+import { MiniProgramComponentInstance } from 'angular-miniprogram/platform/type';
 import { BehaviorSubject } from 'rxjs';
 import { NgForComponent } from '../../spec-component/ng-for/ng-for.component';
 import { nodeExist } from '../util';
@@ -12,9 +13,12 @@ export class NgForSPecComponent {
   list = ['item1', 'item2', 'item3'];
   testFinish$$ = new BehaviorSubject(undefined);
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
-    onReady: function (this: NgForSPecComponent) {
-      this.componentFinderService
-        .get(this.instance)
+    onReady: function (
+      this: WechatMiniprogram.Page.Instance<{}, {}> &
+        MiniProgramComponentInstance<NgForSPecComponent>
+    ) {
+      this.__ngComponentInstance.componentFinderService
+        .get(this.__ngComponentInstance.instance)
         .subscribe(
           async (
             item: WechatMiniprogram.Page.Instance<
@@ -23,11 +27,11 @@ export class NgForSPecComponent {
             >
           ) => {
             let query = item.createSelectorQuery();
-            for (let i = 0; i < this.list.length; i++) {
+            for (let i = 0; i < this.__ngComponentInstance.list.length; i++) {
               expect(await nodeExist(query, `.ng-for-${i}`)).toBe(true);
             }
 
-            this.testFinish$$.complete();
+            this.__ngComponentInstance.testFinish$$.complete();
           }
         );
     },

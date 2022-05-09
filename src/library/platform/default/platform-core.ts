@@ -207,15 +207,10 @@ export class MiniProgramCoreFactory {
           },
         };
       config.lifetimes = config.lifetimes || {};
-      const oldCreated = config.lifetimes?.created;
+      const oldCreated = config.lifetimes.created;
       let componentRef: ComponentRef<unknown>,
         ngModuleRef: NgModuleRef<unknown>;
-      let resolveFunction!: () => void;
       config.lifetimes.created = function (this: MiniProgramComponentInstance) {
-        this.__waitLinkPromise = new Promise<void>((resolve) => {
-          resolveFunction = resolve;
-        });
-        this.__waitLinkResolve = resolveFunction;
         const app = getApp<AppOptions>();
         const result = app.__ngStartPage(module, component, this);
         componentRef = result.componentRef;
@@ -229,7 +224,6 @@ export class MiniProgramCoreFactory {
         this: MiniProgramComponentInstance
       ) {
         _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
-        resolveFunction();
         if (oldAttached) {
           oldAttached.bind(this)();
         }
@@ -276,14 +270,12 @@ export class MiniProgramCoreFactory {
   protected addNgComponentLinkLogic(
     config: WechatMiniprogram.Component.Options<{}, {}, {}>
   ) {
-    const oldCreate = config.lifetimes?.created;
     config.lifetimes = config.lifetimes || {};
+    const oldCreate = config.lifetimes.created;
     config.lifetimes.created = function (this: MiniProgramComponentInstance) {
-      let resolveFunction!: () => void;
       this.__waitLinkPromise = new Promise<void>((resolve) => {
-        resolveFunction = resolve;
+        this.__waitLinkResolve = resolve;
       });
-      this.__waitLinkResolve = resolveFunction;
 
       if (oldCreate) {
         oldCreate.bind(this)();
@@ -345,89 +337,18 @@ export class MiniProgramCoreFactory {
   };
 
   protected getPageOptions(component: Type<unknown> & MiniProgramPageOptions) {
-    type OptionsKey = keyof WechatMiniprogram.Page.Options<{}, {}>;
-    const options: WechatMiniprogram.Page.Options<{}, {}> =
-      component.mpPageOptions;
-    if (options) {
-      for (const key in options) {
-        if (Object.prototype.hasOwnProperty.call(options, key)) {
-          const element = options[key as OptionsKey];
-          if (element instanceof Function) {
-            options[key as OptionsKey] = function (
-              this: MiniProgramComponentInstance,
-              ...args: unknown[]
-            ) {
-              return (element as Function).bind(this.__ngComponentInstance)(
-                ...args
-              );
-            };
-          }
-        }
-      }
-    }
-    return options;
+    return component.mpPageOptions as WechatMiniprogram.Page.Options<{}, {}>;
   }
   protected getComponentOptions<T extends boolean = false>(
     component: Type<unknown> & MiniProgramComponentOptions
   ) {
-    type PageLifetimesKey = keyof WechatMiniprogram.Component.PageLifetimes;
-
-    const options: WechatMiniprogram.Component.Options<{}, {}, {}, {}, T> =
-      component.mpComponentOptions;
-    if (options) {
-      const pageLifetimes = options.pageLifetimes;
-      for (const key in pageLifetimes) {
-        if (Object.prototype.hasOwnProperty.call(pageLifetimes, key)) {
-          const element = pageLifetimes[key as PageLifetimesKey];
-          if (element instanceof Function) {
-            pageLifetimes[key as PageLifetimesKey] = function (
-              this: MiniProgramComponentInstance,
-              ...args: unknown[]
-            ) {
-              if (this.__isLink) {
-                return (element as Function).bind(this.__ngComponentInstance)(
-                  ...args
-                );
-              } else {
-                return this.__waitLinkPromise.then(() => {
-                  (element as Function).bind(this.__ngComponentInstance)(
-                    ...args
-                  );
-                });
-              }
-            };
-          }
-        }
-      }
-
-      type LifetimesKey =
-        keyof WechatMiniprogram.Component.Lifetimes['lifetimes'];
-      const lifetimes = options.lifetimes;
-      for (const key in lifetimes) {
-        if (Object.prototype.hasOwnProperty.call(lifetimes, key)) {
-          const element = lifetimes[key as LifetimesKey];
-          if (element instanceof Function) {
-            lifetimes[key as LifetimesKey] = function (
-              this: MiniProgramComponentInstance,
-              ...args: unknown[]
-            ) {
-              if (this.__isLink) {
-                return (element as Function).bind(this.__ngComponentInstance)(
-                  ...args
-                );
-              } else {
-                return this.__waitLinkPromise.then(() => {
-                  (element as Function).bind(this.__ngComponentInstance)(
-                    ...args
-                  );
-                });
-              }
-            };
-          }
-        }
-      }
-    }
-    return options;
+    return component.mpComponentOptions as WechatMiniprogram.Component.Options<
+      {},
+      {},
+      {},
+      {},
+      T
+    >;
   }
 }
 

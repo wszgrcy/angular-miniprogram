@@ -1,5 +1,6 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { ComponentFinderService } from 'angular-miniprogram';
+import { MiniProgramComponentInstance } from 'angular-miniprogram/platform/type';
 import { BehaviorSubject } from 'rxjs';
 import { StyleClassComponent } from '../../spec-component/style-class/style-class.component';
 import { fields, nodeExist } from '../util';
@@ -11,9 +12,12 @@ import { fields, nodeExist } from '../util';
 export class StyleClassSpecComponent {
   testFinish$$ = new BehaviorSubject(undefined);
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
-    onReady: function (this: StyleClassSpecComponent) {
-      this.componentFinderService
-        .get(this.instance)
+    onReady: function (
+      this: WechatMiniprogram.Page.Instance<{}, {}> &
+        MiniProgramComponentInstance<StyleClassSpecComponent>
+    ) {
+      this.__ngComponentInstance.componentFinderService
+        .get(this.__ngComponentInstance.instance)
         .subscribe(
           async (
             item: WechatMiniprogram.Page.Instance<
@@ -29,7 +33,7 @@ export class StyleClassSpecComponent {
               computedStyle: ['backgroundColor'],
             });
             expect(result).toEqual({ backgroundColor: 'rgb(255, 0, 0)' });
-            this.testFinish$$.complete();
+            this.__ngComponentInstance.testFinish$$.complete();
           }
         );
     },

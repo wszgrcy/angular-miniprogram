@@ -7,7 +7,10 @@ import {
   Type,
   createNgModuleRef,
 } from '@angular/core';
-import { AppOptions } from 'angular-miniprogram/platform/type';
+import {
+  AppOptions,
+  MiniProgramComponentInstance,
+} from 'angular-miniprogram/platform/type';
 import { PAGE_TOKEN } from 'angular-miniprogram/platform/wx';
 import { APP_TOKEN } from './token';
 
@@ -24,7 +27,7 @@ export class PageService {
     this.app.__ngStartPage = <M, C>(
       module: Type<M>,
       component: Type<C>,
-      miniProgramComponentInstance: unknown
+      miniProgramComponentInstance: MiniProgramComponentInstance
     ) => {
       return this.ngZone.run(() => {
         const injector = Injector.create({

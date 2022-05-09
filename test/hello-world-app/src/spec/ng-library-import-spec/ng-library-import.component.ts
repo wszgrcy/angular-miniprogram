@@ -1,5 +1,6 @@
 import { Component, ViewChild } from '@angular/core';
 import { ComponentFinderService } from 'angular-miniprogram';
+import { MiniProgramComponentInstance } from 'angular-miniprogram/platform/type';
 import { BehaviorSubject } from 'rxjs';
 import { NgLibraryImportComponent } from '../../spec-component/ng-library-import/ng-library-import.component';
 import { nodeExist } from '../util';
@@ -11,9 +12,12 @@ import { nodeExist } from '../util';
 export class NgLibraryImportSPecComponent {
   testFinish$$ = new BehaviorSubject(undefined);
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
-    onReady: function (this: NgLibraryImportSPecComponent) {
-      this.componentFinderService
-        .get(this.instance.libComp1)
+    onReady: function (
+      this: WechatMiniprogram.Page.Instance<{}, {}> &
+        MiniProgramComponentInstance<NgLibraryImportSPecComponent>
+    ) {
+      this.__ngComponentInstance.componentFinderService
+        .get(this.__ngComponentInstance.instance.libComp1)
         .subscribe(
           async (
             item: WechatMiniprogram.Page.Instance<
@@ -25,7 +29,7 @@ export class NgLibraryImportSPecComponent {
 
             expect(await nodeExist(query, '.lib-comp1-content')).toBe(true);
 
-            this.testFinish$$.complete();
+            this.__ngComponentInstance.testFinish$$.complete();
           }
         );
     },
