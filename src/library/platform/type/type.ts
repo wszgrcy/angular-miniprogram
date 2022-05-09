@@ -7,7 +7,7 @@ import type {
   Type,
   ViewRef,
 } from '@angular/core';
-import { LView } from './internal-type';
+import type { LView } from './internal-type';
 
 export interface AppOptions {
   __ngStartPage<M, C>(
@@ -20,8 +20,9 @@ export interface AppOptions {
   };
 }
 
-export interface MiniProgramComponentVariable {
-  __ngComponentInstance: unknown;
+export interface MiniProgramComponentVariable<NG_COMPONENT_INSTANCE = unknown> {
+  /** @public */
+  __ngComponentInstance: NG_COMPONENT_INSTANCE;
   /** page使用 */
   __ngComponentHostView: ViewRef;
   __ngComponentInjector: Injector;
@@ -33,7 +34,9 @@ export interface MiniProgramComponentVariable {
   __nodeIndex: number;
   __isDetachView: boolean;
   __completePath: NodePath;
+  /** @public 等待链接完成,用于Component组件的created周期使用等待,其他的直接使用__ngComponentInstance获得实例 */
   __waitLinkPromise: Promise<void>;
+  /** @private */
   __waitLinkResolve: () => void;
 }
 export interface MiniProgramComponentMethod {
@@ -62,11 +65,12 @@ export interface MiniProgramComponentBuiltIn {
   getPageId(): string;
   setData(data: Partial<Record<string, any>>): void;
 }
-export type MiniProgramComponentInstance = MiniProgramComponentVariable &
-  MiniProgramComponentMethod &
-  MiniProgramComponentBuiltIn &
-  MiniProgramPageOptions &
-  MiniProgramComponentOptions;
+export type MiniProgramComponentInstance<NG_COMPONENT_INSTANCE = unknown> =
+  MiniProgramComponentVariable<NG_COMPONENT_INSTANCE> &
+    MiniProgramComponentMethod &
+    MiniProgramComponentBuiltIn &
+    MiniProgramPageOptions &
+    MiniProgramComponentOptions;
 
 export interface MiniProgramPageOptions {
   mpPageOptions?: any;

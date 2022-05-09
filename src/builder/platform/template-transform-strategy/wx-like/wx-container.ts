@@ -172,6 +172,7 @@ export class WxContainer {
             )
           )
       )
+      .filter((key) => !/^(class\.?|style\.?)/.test(key))
       .forEach((key) => {
         propertyMap.set(key, `nodeList[${index!}].property.${key}`);
       });
@@ -179,7 +180,7 @@ export class WxContainer {
       ...(node.directiveMeta?.properties || []),
       ...(node.componentMeta?.properties || []),
     ]
-      .filter((key) => !/^(class\.|style\.)/.test(key))
+      .filter((key) => !/^(class\.?|style\.?)/.test(key))
       .forEach((key) => {
         propertyMap.set(key, `nodeList[${index!}].property.${key}`);
       });
