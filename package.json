@@ -20,7 +20,7 @@
     "common-hook": "ts-node ./script/run-common-hook.ts",
     "coverage": "nyc npm run test",
     "typedoc": "typedoc",
-    "deploy": "npm run typedoc && npm run build:library && npm run test:jasmine library && npm run coverage-badge -- init && npm run coverage && npm run coverage-badge -- success && cpx ./deploy/doc/**/* ./docs && cpx ./deploy/api-doc/**/* ./docs/api-doc",
+    "deploy": "npm run typedoc && npm run build:library && npm run test:jasmine library && npm run coverage-badge -- init && cpx \"./deploy/doc/**/*\" ./docs && cpx \"./deploy/api-doc/**/*\" ./docs/api-doc && npm run coverage && npm run coverage-badge -- success",
     "coverage-badge": "ts-node ./script/coverage-badge.ts"
   },
   "private": true,
