@@ -18,7 +18,7 @@ const angularConfig = {
 };
 describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
   // 此测试仅能本地使用,并且只能一个测试用例单独开启
-  describe('karma', () => {
+  xdescribe('karma', () => {
     it('运行', async () => {
       const root = harness.host.root();
 

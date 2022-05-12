@@ -6,7 +6,14 @@ enum Status {
 }
 function main() {
   let status = process.argv[2];
-  let outputPath = path.join(process.cwd(), 'docs', 'badge.svg');
+  let outputPath = path.join(
+    process.cwd(),
+    'deploy',
+    'doc',
+    'assets',
+    'img',
+    'badge.svg'
+  );
   let content: string;
   if (status === Status.init) {
     content = svgFailedGenerate();
@@ -20,7 +27,9 @@ function main() {
     console.log(json.total.lines.pct);
     content = svgGenerate(json.total.lines.pct + '%');
   }
-
+  if (!fs.existsSync(path.dirname(outputPath))) {
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  }
   fs.writeFileSync(outputPath, content);
 }
 function svgGenerate(percent: any) {

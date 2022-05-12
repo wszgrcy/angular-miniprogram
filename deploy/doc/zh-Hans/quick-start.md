@@ -1,3 +1,6 @@
+---
+layout: post
+---
 ## 设置页面匹配
 
 - 在`angular.json`中设置要匹配的页面范围,匹配规则与 assets 相同

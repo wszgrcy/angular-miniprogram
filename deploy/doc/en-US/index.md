@@ -1,4 +1,8 @@
-<h1 align="center">angular-miniprogram - Develop MiniProgram using Angular </h1>
+---
+title: 'angular-miniprogram'
+layout: home
+---
+<h1 align="center">Develop MiniProgram using Angular </h1>
 
 <p align="center"> Use Angular Ecosystem as possible, 
 reduce cross-platform costs</p>
@@ -11,21 +15,20 @@ reduce cross-platform costs</p>
     <img src="https://img.shields.io/npm/v/angular-miniprogram.svg?logo=npm&logoColor=fff&label=NPM+package&color=limegreen" alt="angular-miniprogram on npm" />
   </a>&nbsp;
     <a href="https://wszgrcy.github.io/angular-miniprogram/coverage/index.html">
-    <img src="https://wszgrcy.github.io/angular-miniprogram/badge.svg" alt="coverage" />
+    <img src="../assets/img/badge.svg" alt="coverage" />
   </a>
 
 </p>
 
-English | [简体中文](readme.md)
 
 <hr>
 
 ## document
 
-- [Quickstart](https://github.com/wszgrcy/angular-miniprogram/blob/master/quick-start-en.md)
-- [Attention](https://github.com/wszgrcy/angular-miniprogram/blob/master/attention-en.md)
-- [MiniProgramFeature](https://github.com/wszgrcy/angular-miniprogram/blob/master/miniprogram-feature-en.md)
-- [API](https://wszgrcy.github.io/angular-miniprogram)
+- [Quickstart](quick-start)
+- [Attention](attention)
+- [MiniProgramFeature](miniprogram-feature)
+- [API](../api-doc)
 
 ## Development Environment
 

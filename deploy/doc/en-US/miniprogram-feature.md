@@ -1,3 +1,6 @@
+---
+layout: post
+---
 ## Service
 
 - `ComponentFinderService`: get MiniProgram Component corresponding to Angular Component

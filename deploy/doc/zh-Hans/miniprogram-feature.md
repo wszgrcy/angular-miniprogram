@@ -1,3 +1,6 @@
+---
+layout: post
+---
 ## 服务
 
 - 通过`ComponentFinderService`服务来查询当前 ng 组件实例对应的小程序组件

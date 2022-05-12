@@ -1,6 +1,7 @@
 {
   "entryPoints": ["./src/library/platform/index.ts"],
-  "out": "docs",
+  "out": "deploy/api-doc",
   "tsconfig": "tsconfig.doc.json",
-  "excludePrivate": true
+  "excludePrivate": true,
+  "readme": "none"
 }

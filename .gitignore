@@ -7,3 +7,4 @@ script/startup-jasmine.js
 .temp-git
 .nyc_output
 docs
+deploy/api-doc

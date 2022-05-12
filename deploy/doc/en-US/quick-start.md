@@ -1,3 +1,6 @@
+---
+layout: post
+---
 ## set Page pattern
 
 - Set output Page pattern in `angular.json`, same with `assets` field

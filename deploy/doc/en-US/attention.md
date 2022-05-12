@@ -1,3 +1,6 @@
+---
+layout: post
+---
 ## Forbidden
 
 - All Dom operation
