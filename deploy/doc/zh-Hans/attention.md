@@ -5,7 +5,7 @@ layout: post
 
 - 一切 dom 行为
 - 带前缀的事件,如`bind`,`mut-bind`等,去掉冒号直接写,如事件`bind:tap`=>`bindtap`
-  > 前缀在 Angualr 被解析为 target(window/document/body)
+  > 前缀在 Angular 被解析为 target(window/document/body)
 
 ## 引入变更
 
