@@ -146,7 +146,7 @@ export class ExportMiniProgramAssetsPlugin {
               } else {
                 config = {};
               }
-              config.component = value.component;
+              config.component ??= value.component;
               config.usingComponents = config.usingComponents || {};
               config.usingComponents = {
                 ...config.usingComponents,
