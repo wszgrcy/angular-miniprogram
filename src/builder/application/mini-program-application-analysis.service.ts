@@ -103,6 +103,7 @@ export class MiniProgramApplicationAnalysisService {
     const config = new Map<
       string,
       {
+        component: true | undefined;
         usingComponents: { selector: string; path: string }[];
         existConfig: string;
       }
@@ -129,6 +130,7 @@ export class MiniProgramApplicationAnalysisService {
         }))
       );
       config.set(entryPattern.outputFiles.config, {
+        component: entryPattern.type === 'component' || undefined,
         usingComponents: list,
         existConfig: entryPattern.inputFiles.config,
       });
