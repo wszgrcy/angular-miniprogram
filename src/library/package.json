@@ -1,6 +1,6 @@
 {
   "name": "angular-miniprogram",
-  "version": "1.2.0-alpha.0",
+  "version": "1.2.0-alpha.1",
   "description": "使用Angular开发小程序",
   "keywords": [
     "Angular",
@@ -19,13 +19,13 @@
   },
   "homepage": "https://github.com/wszgrcy/angular-miniprogram#readme",
   "dependencies": {
-    "cyia-code-util": "1.3.7",
-    "webpack-bootstrap-assets-plugin": "^2.0.2",
-    "static-injector": "1.0.9"
+    "cyia-code-util": "1.3.9",
+    "webpack-bootstrap-assets-plugin": "2.0.3",
+    "static-injector": "1.0.10"
   },
   "peerDependencies": {
-    "ng-packagr": "13.0.6",
-    "@angular/core": "13.0.2",
+    "ng-packagr": "14.0.3",
+    "@angular/core": "14.0.5",
     "jasmine-core": "^4.0.1"
   },
   "exports": {
