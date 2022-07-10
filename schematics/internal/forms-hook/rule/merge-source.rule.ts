@@ -23,7 +23,7 @@ export function mergeSourceRuleFactory(options: FormsHookOptions) {
     for (let i = 0; i < SCHEMATICS_FORMS_LIBRARY_HOOK_FILE_LIST.length; i++) {
       const filePath = SCHEMATICS_FORMS_LIBRARY_HOOK_FILE_LIST[i];
       if (tree.exists(filePath)) {
-        localSourceMap.set(filePath, tree.read(filePath));
+        localSourceMap.set(filePath, tree.read(filePath)!);
       }
     }
     const angularFormsSource = apply(

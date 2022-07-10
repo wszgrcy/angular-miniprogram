@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import type * as t from '@angular/compiler/src/render3/r3_ast';
+import type * as t from './ast.type';
 
 /**
  * Extract a map of properties to values for a given element or template node, which can be used

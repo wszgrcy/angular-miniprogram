@@ -4,6 +4,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import {
   BuilderHarnessExecutionResult,
+  MyTestProjectHost,
   describeBuilder,
 } from '../../../test/plugin-describe-builder';
 import {
@@ -21,8 +22,8 @@ describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
   xdescribe('karma', () => {
     it('运行', async () => {
       const root = harness.host.root();
-
-      await harness.host.addSpecEntry([
+      const myTestProjectHost = new MyTestProjectHost(harness.host);
+      await myTestProjectHost.addSpecEntry([
         'empty',
         'tag-view-convert-spec',
         'style-class-spec',
@@ -67,23 +68,24 @@ describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
 
     xit('watch', async () => {
       const root = harness.host.root();
+      const myTestProjectHost = new MyTestProjectHost(harness.host);
       const list: string[] = [];
 
       list.push(
-        ...(await harness.host.getFileList(
+        ...(await myTestProjectHost.getFileList(
           normalize(join(root, 'src', '__components'))
         )),
-        ...(await harness.host.getFileList(
+        ...(await myTestProjectHost.getFileList(
           normalize(join(root, 'src', 'spec'))
         ))
       );
-      await harness.host.importPathRename(list);
-      await harness.host.moveDir(
+      await myTestProjectHost.importPathRename(list);
+      await myTestProjectHost.moveDir(
         ['component1', 'component2'],
         '__components',
         'components'
       );
-      await harness.host.addSpecEntry(['base-component']);
+      await myTestProjectHost.addSpecEntry(['base-component']);
       harness.useTarget('build', { ...angularConfig, watch: true });
       let appTestPath: string;
       const result = new Promise<BuilderHarnessExecutionResult<BuilderOutput>>(

@@ -6,7 +6,7 @@ export function createTsSelector(filePath: string) {
   return (tree: Tree) => {
     const sf = ts.createSourceFile(
       filePath,
-      tree.read(filePath).toString(),
+      tree.read(filePath)!.toString(),
       ts.ScriptTarget.Latest,
       true
     );

@@ -13,7 +13,7 @@ const DEFAULT_WORKFLOW_OPTIONS = {
 };
 export function runSchematics<T extends keyof SchematicsType>(
   schematicName: T,
-  options: SchematicsType[T],
+  options: Omit<SchematicsType[T], 'schematicPath'>,
   workflowOptions?: NodeWorkflowOptions
 ) {
   workflowOptions = { ...DEFAULT_WORKFLOW_OPTIONS, ...workflowOptions };

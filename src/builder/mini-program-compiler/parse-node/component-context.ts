@@ -1,17 +1,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type {
   R3ComponentMetadata,
+  R3DirectiveDependencyMetadata,
   R3DirectiveMetadata,
-  R3UsedDirectiveMetadata,
   SelectorMatcher,
 } from '@angular/compiler';
+
 import type {
   ImportedFile,
   Reference,
 } from '@angular/compiler-cli/src/ngtsc/imports';
-import type { Element } from '@angular/compiler/src/render3/r3_ast';
 import { Injectable } from 'static-injector';
 import ts from 'typescript';
+import * as t from '../../angular-internal/ast.type';
 import { createCssSelector } from '../../angular-internal/template';
 import { getAttrsForDirectiveMatching } from '../../angular-internal/util';
 import type { DirectiveMetaFromLibrary, MetaFromLibrary } from '../type';
@@ -20,7 +21,7 @@ import type { MatchedDirective, MatchedMeta } from './type';
 @Injectable()
 export class ComponentContext {
   constructor(private directiveMatcher: SelectorMatcher | undefined) {}
-  matchDirective(node: Element): MatchedMeta[] {
+  matchDirective(node: t.Element): MatchedMeta[] {
     if (!this.directiveMatcher) {
       return [];
     }
@@ -35,11 +36,11 @@ export class ComponentContext {
       (
         selector,
         meta: {
-          directive: R3UsedDirectiveMetadata & {
+          directive: R3DirectiveDependencyMetadata & {
             ref: Reference<ts.ClassDeclaration>;
             importedFile: ImportedFile;
           };
-          componentMeta: R3ComponentMetadata;
+          componentMeta: R3ComponentMetadata<any>;
           directiveMeta: R3DirectiveMetadata;
           libraryMeta: MetaFromLibrary;
         }

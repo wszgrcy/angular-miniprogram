@@ -18,7 +18,7 @@ export class NgTemplateOutletSPecComponent {
     ) {
       this.__ngComponentInstance.componentFinderService
         .get(this.__ngComponentInstance.instance)
-        .subscribe(
+        .then(
           async (
             item: WechatMiniprogram.Page.Instance<
               WechatMiniprogram.IAnyObject,

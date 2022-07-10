@@ -1,4 +1,4 @@
-import type { Element } from '@angular/compiler/src/render3/r3_ast';
+import type { Element } from '../../angular-internal/ast.type';
 import { ComponentContext } from './component-context';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
 import type { MatchedComponent, MatchedDirective } from './type';

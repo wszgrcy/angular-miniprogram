@@ -12,20 +12,17 @@ import { AgentNode } from './agent-node';
 const CLEANUP = 7;
 export const LVIEW_CONTEXT = 8;
 export const INJECTOR = 9;
-const NEXT = 4;
-const CHILD_HEAD = 13;
 const VIEW_REFS = 8;
-const start = 20;
+// HEADER_OFFSET
+const start = 22;
 
 const linkMap = new Map<LView, any>();
 const nodePathMap = new Map<LView, NodePath>();
 let index = 0;
-const lViewRegistryMap = new WeakMap<LView, number>();
 const pageRegistryMap = new Map<number, LView>();
 let waitingRefreshLViewList: (() => void)[] = [];
 /** @internal */
-export function propertyChange(context: any) {
-  const lView: LView = findCurrentComponentLView(context);
+export function propertyChange(lView: LView) {
   if (linkMap.has(lView)) {
     const ngZone = lView[INJECTOR]!.get(NgZone);
     waitingRefreshLViewList.push(() => {
@@ -56,20 +53,7 @@ export function getPageRefreshContext(lView: LView) {
   };
   return ctx;
 }
-function findCurrentComponentLView(context: any): LView {
-  let lView = context['__ngContext__'];
-  if (lView[LVIEW_CONTEXT] === context) {
-    return lView;
-  }
-  lView = lView[CHILD_HEAD];
-  while (lView[LVIEW_CONTEXT] !== context) {
-    lView = lView[NEXT];
-  }
-  if (!lView) {
-    throw new Error('没有找到LView');
-  }
-  return lView;
-}
+
 function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
   const tView = lView[1];
   const end = tView.bindingStartIndex;
@@ -182,27 +166,13 @@ export function cleanAll(lview: LView) {
   linkMap.delete(lview);
   nodePathMap.delete(lview);
 }
-/** @internal */
-export function pageBind(context: any) {
-  const lView = findCurrentComponentLView(context);
-  const wxComponentInstance = lView[LVIEW_CONTEXT];
-
-  if (!wxComponentInstance) {
-    return;
-  }
-  const ngZone = lView[INJECTOR]!.get(NgZone);
-  if (!ngZone) {
-    throw new Error('没有查询到NgZone');
-  }
-  lViewRegistryMap.set(lView, index++);
-}
 
 export function findPageLView(componentRef: ComponentRef<unknown>) {
-  const lView = findCurrentComponentLView(componentRef.instance);
-  const id = lViewRegistryMap.get(lView)!;
-  lViewRegistryMap.delete(lView);
-  pageRegistryMap.set(id, lView);
-  return { lView: lView as any, id: id };
+  const lView = (componentRef as any)._rootLView[start];
+
+  index++;
+  pageRegistryMap.set(index, lView);
+  return { lView: lView as any, id: index };
 }
 export function removePageLViewLink(id: number) {
   pageRegistryMap.delete(id);

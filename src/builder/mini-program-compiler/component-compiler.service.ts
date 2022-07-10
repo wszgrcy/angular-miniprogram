@@ -8,7 +8,7 @@ import { ComponentContext, TemplateDefinition } from './parse-node';
 export class ComponentCompilerService {
   constructor(
     private buildPlatform: BuildPlatform,
-    @Inject(COMPONENT_META) private componentMeta: R3ComponentMetadata,
+    @Inject(COMPONENT_META) private componentMeta: R3ComponentMetadata<any>,
     private componentContext: ComponentContext
   ) {}
 

@@ -1,5 +1,5 @@
 import { Tree } from '@angular-devkit/schematics';
-import { CssSelectorForTs, DeleteChange } from 'cyia-code-util';
+import { Change, CssSelectorForTs, DeleteChange } from 'cyia-code-util';
 import ts from 'typescript';
 import { createTsSelector } from '../../util/create-selector';
 import { updateFile } from '../../util/update-file';
@@ -25,7 +25,7 @@ function removeInCommon(selector: CssSelectorForTs) {
   const ngComponentOutletExport = selector.queryOne(
     `ExportSpecifier[name=NgComponentOutlet]`
   ) as ts.ExportSpecifier;
-  const list = [];
+  const list: Change[] = [];
   list.push(
     new DeleteChange(
       ngTemplateOutletExport.end,
@@ -40,7 +40,7 @@ function removeInIndex(selector: CssSelectorForTs) {
   const exportNgComponentOutletNode = selector.queryOne(
     `ExportSpecifier[name=NgComponentOutlet]`
   );
-  const list = [];
+  const list: Change[] = [];
   list.push(
     new DeleteChange(
       exportNgClassNode.end,

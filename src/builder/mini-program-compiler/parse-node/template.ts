@@ -1,4 +1,4 @@
-import type { Template } from '@angular/compiler/src/render3/r3_ast';
+import type { Template } from '../../angular-internal/ast.type';
 import {
   NgNodeKind,
   NgNodeMeta,

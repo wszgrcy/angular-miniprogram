@@ -1,4 +1,4 @@
-import type { Content } from '@angular/compiler/src/render3/r3_ast';
+import type { Content } from '../../angular-internal/ast.type';
 import { NgContentMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
 
 const SELECT_NAME_VALUE_REGEXP = /^\[slot=["']?([^"']*)["']?\]$/;
