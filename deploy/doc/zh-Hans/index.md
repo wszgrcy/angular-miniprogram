@@ -35,7 +35,7 @@ layout: home
 ### 前提条件
 
 - `Node.js` 版本大于 14
-- `@angular/cli` 版本为 13
+- `@angular/cli` 版本为 14
 - `yarn`
 
 ### hello-world

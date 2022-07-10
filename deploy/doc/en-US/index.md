@@ -35,7 +35,7 @@ reduce cross-platform costs</p>
 ### Prerequisites
 
 - `Node.js` greater than 14
-- `@angular/cli` 13
+- `@angular/cli` 14
 - `yarn`
 
 ### hello-world
