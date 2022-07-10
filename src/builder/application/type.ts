@@ -28,6 +28,7 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
   inputFiles: {
     config: string;
   };
+  type: 'component' | 'page';
 }
 
 export interface LibraryLoaderContext {

@@ -85,5 +85,4 @@ export {
   MiniProgramRendererFactory,
   ComponentFinderService,
   propertyChange,
-  pageBind,
 } from 'angular-miniprogram/platform/default';

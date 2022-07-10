@@ -1,22 +1,29 @@
 import { Injectable } from '@angular/core';
-import { Subject, from, merge } from 'rxjs';
-import { filter, map, take } from 'rxjs/operators';
 
 @Injectable()
 export class ComponentFinderService<T = unknown> {
   private map = new Map<unknown, T>();
-  private subject = new Subject<[unknown, T]>();
-  get(component: unknown) {
-    return merge(from(this.map), this.subject).pipe(
-      filter((item) => item[0] === component),
-      map((item) => item[1]),
-      take(1)
-    );
+  private mapPromise = new Map<unknown, Function>();
+  async get(component: unknown) {
+    if (this.map.has(component)) {
+      return this.map.get(component);
+    }
+    let fn: Function;
+    const promise = new Promise((res) => {
+      fn = res;
+    });
+    this.mapPromise.set(component, fn!);
+    return promise.then((result) => {
+      this.mapPromise.delete(component);
+      return result;
+    });
   }
   /** @internal */
-  set(component: unknown, instance: T) {
-    this.subject.next([component, instance]);
-    return this.map.set(component, instance);
+  set(component: unknown, instance: T): void {
+    if (this.mapPromise.has(component)) {
+      this.mapPromise.get(component)!();
+    }
+    this.map.set(component, instance);
   }
   /** @internal */
   remove(component: unknown) {

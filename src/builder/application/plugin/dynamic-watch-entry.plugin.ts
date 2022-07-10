@@ -93,9 +93,13 @@ export class DynamicWatchEntryPlugin {
       'DynamicWatchEntryPlugin',
       async (compilation) => {
         this.entryPattern$.next({
-          pageList: await this.generateModuleInfo(this.options.pages || []),
+          pageList: await this.generateModuleInfo(
+            this.options.pages || [],
+            'page'
+          ),
           componentList: await this.generateModuleInfo(
-            this.options.components || []
+            this.options.components || [],
+            'component'
           ),
         });
       }
@@ -122,7 +126,10 @@ export class DynamicWatchEntryPlugin {
       }
     );
   }
-  private async generateModuleInfo(list: AssetPattern[]) {
+  private async generateModuleInfo(
+    list: AssetPattern[],
+    type: 'page' | 'component'
+  ) {
     const patternList = normalizeAssetPatterns(
       list,
       this.options.workspaceRoot,
@@ -173,6 +180,7 @@ export class DynamicWatchEntryPlugin {
             object.outputFiles!.path + this.buildPlatform.fileExtname.content;
           object.outputFiles!.config =
             object.outputFiles!.path + this.buildPlatform.fileExtname.config;
+          object.type = type;
           return object as PagePattern;
         })
       );

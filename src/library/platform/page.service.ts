@@ -46,5 +46,6 @@ export class PageService {
         return { componentRef, ngModuleRef };
       });
     };
+    this.app.__ngStartPageResolve();
   }
 }

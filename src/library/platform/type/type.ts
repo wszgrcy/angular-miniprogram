@@ -18,6 +18,8 @@ export interface AppOptions {
     componentRef: ComponentRef<C>;
     ngModuleRef: NgModuleRef<M>;
   };
+  __ngStartPageResolve: Function;
+  __ngStartPagePromise: Promise<void>;
 }
 
 export interface MiniProgramComponentVariable<NG_COMPONENT_INSTANCE = unknown> {

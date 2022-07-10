@@ -5,7 +5,6 @@ export * from './mini-program.module';
 export * from './platform-miniprogram';
 export {
   propertyChange,
-  pageBind,
   ComponentFinderService,
 } from 'angular-miniprogram/platform/wx';
 export const pageStartup = MiniProgramCore.pageStartup;

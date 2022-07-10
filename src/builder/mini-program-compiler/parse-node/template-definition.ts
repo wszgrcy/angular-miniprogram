@@ -17,25 +17,16 @@ import type {
   PrefixNot,
   PropertyRead,
   PropertyWrite,
-  Quote,
+  SafeCall,
   SafeKeyedRead,
   SafePropertyRead,
-} from '@angular/compiler';
-import type {
-  BoundAttribute,
-  BoundEvent,
-  BoundText,
-  Content,
-  Element,
-  Icu,
-  Node,
-  Reference,
-  Template,
   Text,
-  TextAttribute,
-  Variable,
+  TmplAstNode,
+  TmplAstRecursiveVisitor,
   Visitor,
-} from '@angular/compiler/src/render3/r3_ast';
+} from '@angular/compiler';
+
+import * as t from '../../angular-internal/ast.type';
 import { ParsedNgBoundText } from './bound-text';
 import { ComponentContext } from './component-context';
 import { ParsedNgContent } from './content';
@@ -45,8 +36,8 @@ import { ParsedNgTemplate } from './template';
 import { ParsedNgText } from './text';
 import { MatchedComponent, MatchedDirective } from './type';
 
-export class TemplateDefinition implements Visitor {
-  private templateDefinitionMap = new Map<Template, TemplateDefinition>();
+export class TemplateDefinition implements TmplAstRecursiveVisitor {
+  private templateDefinitionMap = new Map<t.Template, TemplateDefinition>();
   private parentNode: ParsedNgElement | ParsedNgTemplate | undefined;
   list: ParsedNode<NgNodeMeta>[] = [];
   private declIndex = 0;
@@ -55,12 +46,12 @@ export class TemplateDefinition implements Visitor {
     this.declIndex++;
   });
   constructor(
-    private nodes: Node[],
+    private nodes: t.Node[],
     private componentContext: ComponentContext
   ) {}
   init() {}
-  visit?(node: Node) {}
-  visitElement(element: Element) {
+  visit?(node: t.Node) {}
+  visitElement(element: t.Element) {
     const nodeIndex = this.declIndex++;
     let componentMeta: MatchedComponent | undefined;
     let directiveMeta: MatchedDirective | undefined;
@@ -105,7 +96,7 @@ export class TemplateDefinition implements Visitor {
     }
   }
 
-  visitTemplate(template: Template) {
+  visitTemplate(template: t.Template) {
     const nodeIndex = this.declIndex++;
     const templateInstance = new ParsedNgTemplate(
       template,
@@ -136,7 +127,7 @@ export class TemplateDefinition implements Visitor {
       this.list.push(templateInstance);
     }
   }
-  visitContent(content: Content) {
+  visitContent(content: t.Content) {
     const nodeIndex = this.declIndex++;
     const instance = new ParsedNgContent(content, this.parentNode, nodeIndex);
     if (this.parentNode) {
@@ -145,12 +136,12 @@ export class TemplateDefinition implements Visitor {
       this.list.push(instance);
     }
   }
-  visitVariable(variable: Variable) {}
-  visitReference(reference: Reference) {}
-  visitTextAttribute(attribute: TextAttribute) {}
-  visitBoundAttribute(attribute: BoundAttribute) {}
-  visitBoundEvent(attribute: BoundEvent) {}
-  visitText(text: Text) {
+  visitVariable(variable: t.Variable) {}
+  visitReference(reference: t.Reference) {}
+  visitTextAttribute(attribute: t.TextAttribute) {}
+  visitBoundAttribute(attribute: t.BoundAttribute) {}
+  visitBoundEvent(attribute: t.BoundEvent) {}
+  visitText(text: t.Text) {
     const nodeIndex = this.declIndex++;
     const instance = new ParsedNgText(text, this.parentNode, nodeIndex);
     if (this.parentNode) {
@@ -159,7 +150,7 @@ export class TemplateDefinition implements Visitor {
       this.list.push(instance);
     }
   }
-  visitBoundText(text: BoundText) {
+  visitBoundText(text: t.BoundText) {
     const nodeIndex = this.declIndex++;
     text.value.visit(this.astVisitor);
     const instance = new ParsedNgBoundText(text, this.parentNode, nodeIndex);
@@ -169,12 +160,12 @@ export class TemplateDefinition implements Visitor {
       this.list.push(instance);
     }
   }
-  visitIcu(icu: Icu) {}
+  visitIcu(icu: t.Icu) {}
   run() {
     visitAll(this, this.nodes);
     return this.list;
   }
-  prepareRefsArray(refs: Reference[]) {
+  prepareRefsArray(refs: t.Reference[]) {
     if (!refs || !refs.length) {
       return;
     }
@@ -183,7 +174,7 @@ export class TemplateDefinition implements Visitor {
     });
   }
 }
-export function visitAll<Result>(visitor: Visitor<Result>, nodes: Node[]) {
+export function visitAll(visitor: TemplateDefinition, nodes: TmplAstNode[]) {
   for (const node of nodes) {
     node.visit(visitor);
   }
@@ -191,6 +182,10 @@ export function visitAll<Result>(visitor: Visitor<Result>, nodes: Node[]) {
 class CustomAstVisitor implements AstVisitor {
   constructor(private pipeCallback: () => void) {}
   visitCall(ast: Call) {
+    ast.receiver.visit(this);
+    this.visitAll(ast.args);
+  }
+  visitSafeCall(ast: SafeCall) {
     ast.receiver.visit(this);
     this.visitAll(ast.args);
   }
@@ -231,7 +226,7 @@ class CustomAstVisitor implements AstVisitor {
     ast.receiver.visit(this);
   }
   visitPropertyWrite(ast: PropertyWrite) {}
-  visitQuote(ast: Quote) {}
+
   visitSafePropertyRead(ast: SafePropertyRead) {}
   visitBinary(ast: Binary) {
     ast.left.visit(this);

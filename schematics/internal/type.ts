@@ -10,6 +10,6 @@ export interface HookOptions {
   source: string;
   savePath: string;
   sourceInSchematicsPath: string;
-  schematicPath?: string;
+  schematicPath: string;
   subDir: string;
 }

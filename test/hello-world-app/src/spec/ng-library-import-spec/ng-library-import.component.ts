@@ -18,7 +18,7 @@ export class NgLibraryImportSPecComponent {
     ) {
       this.__ngComponentInstance.componentFinderService
         .get(this.__ngComponentInstance.instance.libComp1)
-        .subscribe(
+        .then(
           async (
             item: WechatMiniprogram.Page.Instance<
               WechatMiniprogram.IAnyObject,

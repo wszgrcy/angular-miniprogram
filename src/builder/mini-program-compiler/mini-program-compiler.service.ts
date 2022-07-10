@@ -35,7 +35,8 @@ import {
 @Injectable()
 export class MiniProgramCompilerService {
   private ngCompiler!: NgCompiler;
-  private componentMap = new Map<ClassDeclaration, R3ComponentMetadata>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private componentMap = new Map<ClassDeclaration, R3ComponentMetadata<any>>();
   private directiveMap = new Map<ClassDeclaration, R3DirectiveMetadata>();
   private resolvedDataGroup: ResolvedDataGroup = {
     style: new Map<string, string[]>(),
@@ -73,7 +74,8 @@ export class MiniProgramCompilerService {
         throw new Error('组件装饰器异常');
       }
       componentTraits.forEach((trait) => {
-        const meta: R3ComponentMetadata = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const meta: R3ComponentMetadata<any> = {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).analysis?.meta,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -114,9 +116,10 @@ export class MiniProgramCompilerService {
         classDeclaration.getSourceFile().fileName
       );
       let directiveMatcher: SelectorMatcher | undefined;
-      if (meta.directives.length > 0) {
+      // todo 这里断点
+      if (meta.declarations.length > 0) {
         const matcher = new SelectorMatcher();
-        for (const directive of meta.directives) {
+        for (const directive of meta.declarations) {
           const selector = directive.selector;
           const directiveClassDeclaration = ts.getOriginalNode(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -189,7 +192,8 @@ export class MiniProgramCompilerService {
 
   private buildComponentMeta(
     directiveMatcher: SelectorMatcher | undefined,
-    componentMeta: R3ComponentMetadata
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    componentMeta: R3ComponentMetadata<any>
   ) {
     const injector = Injector.create({
       parent: this.injector,
