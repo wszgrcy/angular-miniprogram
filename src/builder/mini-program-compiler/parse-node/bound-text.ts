@@ -1,4 +1,4 @@
-import type { BoundText } from '@angular/compiler/src/render3/r3_ast';
+import type { BoundText } from '../../angular-internal/ast.type';
 import {
   NgBoundTextMeta,
   NgNodeKind,

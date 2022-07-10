@@ -1,5 +1,10 @@
 import { Tree } from '@angular-devkit/schematics';
-import { CssSelectorForTs, InsertChange, ReplaceChange } from 'cyia-code-util';
+import {
+  Change,
+  CssSelectorForTs,
+  InsertChange,
+  ReplaceChange,
+} from 'cyia-code-util';
 import ts from 'typescript';
 import { createTsSelector } from '../../util/create-selector';
 import { updateFile } from '../../util/update-file';
@@ -31,17 +36,17 @@ function getTemplateNameExpressionStr(templateRefName: string) {
   return `(${templateRefName} as any)._declarationTContainer.localNames?(${templateRefName} as any)._declarationTContainer.localNames[0]:undefined`;
 }
 function changeNgForOf(selector: CssSelectorForTs) {
-  const list = [];
+  const list: Change[] = [];
   const newExpression = selector.queryOne(
     'NewExpression[expression=NgForOfContext]'
   ) as ts.NewExpression;
-  if (newExpression.arguments.length !== 4) {
+  if (newExpression.arguments!.length !== 4) {
     throw new Error(
       `new NgForOfContext的参数数量不为4[${newExpression.getText()}]`
     );
   }
 
-  const lastExpression = newExpression.arguments[3];
+  const lastExpression = newExpression.arguments![3];
   if (!ts.isPrefixUnaryExpression(lastExpression)) {
     throw new Error(
       `new NgForOfContext最后一个参数类型错误[${
@@ -67,7 +72,7 @@ function changeNgForOf(selector: CssSelectorForTs) {
 }
 
 function changeNgIf(selector: CssSelectorForTs) {
-  const list = [];
+  const list: Change[] = [];
   const callExpressionList = selector.queryAll(
     `CallExpression[expression="this._viewContainer.createEmbeddedView"]`
   ) as ts.CallExpression[];
@@ -78,7 +83,7 @@ function changeNgIf(selector: CssSelectorForTs) {
         node.pos,
         node.end - node.pos,
         `{...this._context,${templateName}:${getTemplateNameExpressionStr(
-          i ? 'this._thenTemplateRef' : 'this._elseTemplateRef'
+          i === 0 ? 'this._thenTemplateRef' : 'this._elseTemplateRef'
         )}}`
       )
     );
@@ -92,7 +97,7 @@ function changeNgIf(selector: CssSelectorForTs) {
   return list;
 }
 function changeNgSwitch(selector: CssSelectorForTs) {
-  const list = [];
+  const list: Change[] = [];
   const callExpression = selector.queryOne(
     `CallExpression[expression="this._viewContainerRef.createEmbeddedView"]`
   ) as ts.CallExpression;
@@ -107,7 +112,7 @@ function changeNgSwitch(selector: CssSelectorForTs) {
   return list;
 }
 function changeNgTemplateOutlet(selector: CssSelectorForTs) {
-  const list = [];
+  const list: Change[] = [];
   const callExpression = selector.queryOne(
     `CallExpression[expression="viewContainerRef.createEmbeddedView"]`
   ) as ts.CallExpression;

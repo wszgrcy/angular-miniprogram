@@ -1,5 +1,9 @@
 import { join, normalize } from '@angular-devkit/core';
-import { describeBuilder } from '../../test/plugin-describe-builder';
+import {
+  MyTestProjectHost,
+  describeBuilder,
+  setWorkspaceRoot,
+} from '../../test/plugin-describe-builder';
 import {
   BROWSER_BUILDER_INFO,
   DEFAULT_ANGULAR_CONFIG,
@@ -23,22 +27,24 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('builder-prod', () => {
     it('运行', async () => {
       const root = harness.host.root();
-      const list = await harness.host.getFileList(
+      const myTestProjectHost = new MyTestProjectHost(harness.host);
+
+      const list = await myTestProjectHost.getFileList(
         normalize(join(root, 'src', '__pages'))
       );
       list.push(
-        ...(await harness.host.getFileList(
+        ...(await myTestProjectHost.getFileList(
           normalize(join(root, 'src', '__components'))
         ))
       );
-      await harness.host.importPathRename(list);
-      await harness.host.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
-      await harness.host.moveDir(
+      await myTestProjectHost.importPathRename(list);
+      await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
+      await myTestProjectHost.moveDir(
         ALL_COMPONENT_NAME_LIST,
         '__components',
         'components'
       );
-      await harness.host.addPageEntry(ALL_PAGE_NAME_LIST);
+      await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
       harness.useTarget('build', angularConfig);
       const result = await harness.executeOnce();
       expect(result).toBeTruthy();

@@ -45,15 +45,20 @@ export { RangeValueAccessor } from './directives/range_value_accessor';
 export { FormControlDirective } from './directives/reactive_directives/form_control_directive';
 export { FormControlName } from './directives/reactive_directives/form_control_name';
 export { FormGroupDirective } from './directives/reactive_directives/form_group_directive';
-export { FormArrayName } from './directives/reactive_directives/form_group_name';
-export { FormGroupName } from './directives/reactive_directives/form_group_name';
+export {
+  FormArrayName,
+  FormGroupName,
+} from './directives/reactive_directives/form_group_name';
 export {
   NgSelectOption,
   SelectControlValueAccessor,
 } from './directives/select_control_value_accessor';
-export { SelectMultipleControlValueAccessor } from './directives/select_multiple_control_value_accessor';
 export { SwitchValueAccessor } from './directives/switch_value_accessor';
 export { SliderValueAccessor } from './directives/slider_value_accessor';
+export {
+  SelectMultipleControlValueAccessor,
+  ɵNgSelectMultipleOption,
+} from './directives/select_multiple_control_value_accessor';
 export {
   RadioGroupValueAccessor,
   RadioControl,
@@ -61,7 +66,6 @@ export {
 export { PickerViewValueAccessor } from './directives/picker_view_value_accessor';
 export { PickerValueAccessor } from './directives/picker_value_accessor';
 export { CheckBoxGroupValueAccessor } from './directives/checkbox_value_accessor';
-export { ɵNgSelectMultipleOption } from './directives/select_multiple_control_value_accessor';
 export {
   AsyncValidator,
   AsyncValidatorFn,
@@ -77,14 +81,46 @@ export {
   Validator,
   ValidatorFn,
 } from './directives/validators';
-export { FormBuilder } from './form_builder';
+export {
+  FormBuilder,
+  NonNullableFormBuilder,
+  UntypedFormBuilder,
+  ɵElement,
+} from './form_builder';
 export {
   AbstractControl,
   AbstractControlOptions,
+  FormControlStatus,
+  ɵCoerceStrArrToNumArr,
+  ɵGetProperty,
+  ɵNavigate,
+  ɵRawValue,
+  ɵTokenize,
+  ɵTypedOrUntyped,
+  ɵValue,
+  ɵWriteable,
+} from './model/abstract_model';
+export {
   FormArray,
+  UntypedFormArray,
+  ɵFormArrayRawValue,
+  ɵFormArrayValue,
+} from './model/form_array';
+export {
   FormControl,
+  FormControlOptions,
+  FormControlState,
+  UntypedFormControl,
+  ɵFormControlCtor,
+} from './model/form_control';
+export {
   FormGroup,
-} from './model';
+  FormRecord,
+  UntypedFormGroup,
+  ɵFormGroupRawValue,
+  ɵFormGroupValue,
+  ɵOptionalKeys,
+} from './model/form_group';
 export { NG_ASYNC_VALIDATORS, NG_VALIDATORS, Validators } from './validators';
 export { VERSION } from './version';
 

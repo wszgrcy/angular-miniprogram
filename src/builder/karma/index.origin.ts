@@ -24,10 +24,8 @@ import { findTests } from '@angular-devkit/build-angular/src/builders/karma/find
 import { assertCompatibleAngularVersion } from '@angular-devkit/build-angular/src/utils/version';
 import { generateBrowserWebpackConfigFromContext } from '@angular-devkit/build-angular/src/utils/webpack-browser-config';
 import {
-  getBrowserConfig,
   getCommonConfig,
   getStylesConfig,
-  getTypeScriptConfig,
 } from '@angular-devkit/build-angular/src/webpack/configs';
 import { SingleTestTransformLoader } from '@angular-devkit/build-angular/src/webpack/plugins/single-test-transform';
 import { getSystemPath, join, normalize } from '@angular-devkit/core';
@@ -71,9 +69,9 @@ async function initialize(
     context,
     (wco) => [
       getCommonConfig(wco),
-      getBrowserConfig(wco),
+      // getBrowserConfig(wco),
       getStylesConfig(wco),
-      getTypeScriptConfig(wco),
+      // getTypeScriptConfig(wco),
     ]
   );
 
@@ -136,7 +134,7 @@ export function execute(
         const mainFilePath = getSystemPath(
           join(normalize(context.workspaceRoot), options.main)
         );
-        const files = findTests(
+        const files = await findTests(
           options.include,
           dirname(mainFilePath),
           context.workspaceRoot

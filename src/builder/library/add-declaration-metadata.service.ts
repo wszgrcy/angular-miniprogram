@@ -17,7 +17,7 @@ import { ENTRY_POINT_TOKEN } from './token';
 @Injectable()
 export class AddDeclarationMetaDataService {
   private directiveMap: Map<ts.ClassDeclaration, R3DirectiveMetadata>;
-  private componentMap: Map<ts.ClassDeclaration, R3ComponentMetadata>;
+  private componentMap: Map<ts.ClassDeclaration, R3ComponentMetadata<any>>;
 
   constructor(
     @Inject(ENTRY_POINT_TOKEN) private entryPoint: string,

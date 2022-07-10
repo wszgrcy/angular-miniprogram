@@ -1,4 +1,4 @@
-import type { Text } from '@angular/compiler/src/render3/r3_ast';
+import type { Text } from '../../angular-internal/ast.type';
 import { NgNodeKind, NgNodeMeta, NgTextMeta, ParsedNode } from './interface';
 
 export class ParsedNgText implements ParsedNode<NgTextMeta> {

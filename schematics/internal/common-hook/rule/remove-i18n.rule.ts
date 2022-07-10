@@ -1,5 +1,5 @@
 import { Tree } from '@angular-devkit/schematics';
-import { CssSelectorForTs, DeleteChange } from 'cyia-code-util';
+import { Change, CssSelectorForTs, DeleteChange } from 'cyia-code-util';
 import ts from 'typescript';
 import { createTsSelector } from '../../util/create-selector';
 import { removeExportNamed } from '../../util/remove-export-named';
@@ -19,7 +19,7 @@ export function removeI18nRuleFactory() {
 }
 
 function removeInCommon(selector: CssSelectorForTs) {
-  const changeList = [];
+  const changeList: Change[] = [];
   const exportList = selector.queryAll(
     `ExportDeclaration[moduleSpecifier*="i18n"]`
   ) as ts.ExportDeclaration[];
@@ -38,7 +38,7 @@ function removeInCommon(selector: CssSelectorForTs) {
   return changeList;
 }
 function removeInPipe(selector: CssSelectorForTs) {
-  const changeList = [];
+  const changeList: Change[] = [];
   changeList.push(
     removeExportNamed(
       selector,
