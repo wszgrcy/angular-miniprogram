@@ -36,7 +36,11 @@ export class MiniProgramCoreFactory {
   public MINIPROGRAM_GLOBAL = wx;
   public loadApp = <T>(app: T) => {
     App(app || {});
-    const appInstance = getApp();
+    const appInstance = getApp() as unknown as AppOptions;
+    console.log('载入app');
+    appInstance.__ngStartPagePromise = new Promise((resolve) => {
+      appInstance.__ngStartPageResolve = resolve;
+    });
     return appInstance;
   };
 
@@ -237,15 +241,18 @@ export class MiniProgramCoreFactory {
       data: { hasLoad: false },
       onLoad: function (this: MiniProgramComponentInstance, query) {
         const app = getApp<AppOptions>();
-        const { componentRef, ngModuleRef } = app.__ngStartPage(
-          module,
-          component,
-          this
-        );
-        _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
-        if (options.onLoad) {
-          return options.onLoad.bind(this)(query);
-        }
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        app.__ngStartPagePromise.then(() => {
+          const { componentRef, ngModuleRef } = app.__ngStartPage(
+            module,
+            component,
+            this
+          );
+          _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
+          if (options.onLoad) {
+            return options.onLoad.bind(this)(query);
+          }
+        });
       },
       onHide: async function (this: MiniProgramComponentInstance) {
         if (options.onHide) {

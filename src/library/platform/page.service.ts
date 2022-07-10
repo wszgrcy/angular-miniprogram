@@ -24,6 +24,7 @@ export class PageService {
   ) {}
 
   register() {
+    console.log('注册__ngStartPage');
     this.app.__ngStartPage = <M, C>(
       module: Type<M>,
       component: Type<C>,
@@ -46,5 +47,6 @@ export class PageService {
         return { componentRef, ngModuleRef };
       });
     };
+    this.app.__ngStartPageResolve();
   }
 }
