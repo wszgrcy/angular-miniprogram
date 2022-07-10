@@ -35,6 +35,7 @@ import {
 @Injectable()
 export class MiniProgramCompilerService {
   private ngCompiler!: NgCompiler;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private componentMap = new Map<ClassDeclaration, R3ComponentMetadata<any>>();
   private directiveMap = new Map<ClassDeclaration, R3DirectiveMetadata>();
   private resolvedDataGroup: ResolvedDataGroup = {
@@ -73,6 +74,7 @@ export class MiniProgramCompilerService {
         throw new Error('组件装饰器异常');
       }
       componentTraits.forEach((trait) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const meta: R3ComponentMetadata<any> = {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).analysis?.meta,
@@ -190,6 +192,7 @@ export class MiniProgramCompilerService {
 
   private buildComponentMeta(
     directiveMatcher: SelectorMatcher | undefined,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     componentMeta: R3ComponentMetadata<any>
   ) {
     const injector = Injector.create({

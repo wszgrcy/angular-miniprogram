@@ -8,6 +8,7 @@ import { ComponentContext, TemplateDefinition } from './parse-node';
 export class ComponentCompilerService {
   constructor(
     private buildPlatform: BuildPlatform,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     @Inject(COMPONENT_META) private componentMeta: R3ComponentMetadata<any>,
     private componentContext: ComponentContext
   ) {}
