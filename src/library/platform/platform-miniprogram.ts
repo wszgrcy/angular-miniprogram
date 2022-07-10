@@ -10,8 +10,6 @@ export function platformMiniProgram<T>(
   extraProviders: StaticProvider[] = [],
   app?: T
 ) {
-  // eslint-disable-next-line no-console
-  console.log('平台进入');
   return createPlatformFactory(platformCore, 'miniProgram', [
     { provide: APP_TOKEN, useValue: MiniProgramCore.loadApp(app || {}) },
     {

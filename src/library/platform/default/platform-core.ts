@@ -37,8 +37,7 @@ export class MiniProgramCoreFactory {
   public loadApp = <T>(app: T) => {
     App(app || {});
     const appInstance = getApp() as unknown as AppOptions;
-    // eslint-disable-next-line no-console
-    console.log('载入app');
+
     appInstance.__ngStartPagePromise = new Promise((resolve) => {
       appInstance.__ngStartPageResolve = resolve;
     });
@@ -217,21 +216,27 @@ export class MiniProgramCoreFactory {
         ngModuleRef: NgModuleRef<unknown>;
       config.lifetimes.created = function (this: MiniProgramComponentInstance) {
         const app = getApp<AppOptions>();
-        const result = app.__ngStartPage(module, component, this);
-        componentRef = result.componentRef;
-        ngModuleRef = result.ngModuleRef;
-        if (oldCreated) {
-          oldCreated.bind(this)();
-        }
+        return app.__ngStartPagePromise.then(() => {
+          const result = app.__ngStartPage(module, component, this);
+          componentRef = result.componentRef;
+          ngModuleRef = result.ngModuleRef;
+          if (oldCreated) {
+            oldCreated.bind(this)();
+          }
+        });
       };
       const oldAttached = config.lifetimes.attached;
       config.lifetimes.attached = function (
         this: MiniProgramComponentInstance
       ) {
-        _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
-        if (oldAttached) {
-          oldAttached.bind(this)();
-        }
+        const app = getApp<AppOptions>();
+
+        return app.__ngStartPagePromise.then(() => {
+          _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
+          if (oldAttached) {
+            oldAttached.bind(this)();
+          }
+        });
       };
       return Component(config);
     }
