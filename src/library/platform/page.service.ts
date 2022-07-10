@@ -24,6 +24,7 @@ export class PageService {
   ) {}
 
   register() {
+    // eslint-disable-next-line no-console
     console.log('注册__ngStartPage');
     this.app.__ngStartPage = <M, C>(
       module: Type<M>,

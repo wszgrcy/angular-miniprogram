@@ -37,6 +37,7 @@ export class MiniProgramCoreFactory {
   public loadApp = <T>(app: T) => {
     App(app || {});
     const appInstance = getApp() as unknown as AppOptions;
+    // eslint-disable-next-line no-console
     console.log('载入app');
     appInstance.__ngStartPagePromise = new Promise((resolve) => {
       appInstance.__ngStartPageResolve = resolve;
