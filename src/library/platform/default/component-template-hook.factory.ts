@@ -8,6 +8,7 @@ import type {
   NodePath,
 } from 'angular-miniprogram/platform/type';
 import { AgentNode } from './agent-node';
+import { diffNodeData } from './diff-node-data';
 
 const CLEANUP = 7;
 export const LVIEW_CONTEXT = 8;
@@ -20,6 +21,7 @@ const linkMap = new Map<LView, any>();
 const nodePathMap = new Map<LView, NodePath>();
 let index = 0;
 const pageRegistryMap = new Map<number, LView>();
+const lViewLastDataMap = new Map<LView, Record<string, any>>();
 let waitingRefreshLViewList: (() => void)[] = [];
 /** @internal */
 export function propertyChange(lView: LView) {
@@ -31,7 +33,11 @@ export function propertyChange(lView: LView) {
         if (!instance) {
           return;
         }
-        instance.setData(getPageRefreshContext(lView));
+        const currentData = getPageRefreshContext(lView);
+        const diffData = getDiffData(lView, currentData);
+        if (Object.keys(diffData).length) {
+          instance.setData(diffData);
+        }
       });
     });
   }
@@ -162,9 +168,10 @@ export function cleanWhenDestroy(lView: LView, fn: () => void) {
   list.push(() => cleanAll(lView));
   list.push(fn);
 }
-export function cleanAll(lview: LView) {
-  linkMap.delete(lview);
-  nodePathMap.delete(lview);
+export function cleanAll(lView: LView) {
+  linkMap.delete(lView);
+  nodePathMap.delete(lView);
+  lViewLastDataMap.delete(lView);
 }
 
 export function findPageLView(componentRef: ComponentRef<unknown>) {
@@ -175,5 +182,17 @@ export function findPageLView(componentRef: ComponentRef<unknown>) {
   return { lView: lView as any, id: index };
 }
 export function removePageLViewLink(id: number) {
+  const lView = pageRegistryMap.get(id)!;
+  lViewLastDataMap.delete(lView);
   pageRegistryMap.delete(id);
+}
+export function getDiffData(lView: LView, currentData: Record<string, any>) {
+  const lastData = lViewLastDataMap.get(lView);
+  if (!lastData) {
+    lViewLastDataMap.set(lView, currentData);
+    return currentData;
+  }
+  const diff = diffNodeData(lastData, currentData);
+  lViewLastDataMap.set(lView, currentData);
+  return diff;
 }

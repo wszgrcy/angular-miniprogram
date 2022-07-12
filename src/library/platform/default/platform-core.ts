@@ -24,6 +24,7 @@ import {
   cleanWhenDestroy,
   findCurrentElement,
   findPageLView,
+  getDiffData,
   getPageRefreshContext,
   lViewLinkToMPComponentRef,
   removePageLViewLink,
@@ -80,7 +81,10 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.__waitLinkResolve();
     ngZone.runOutsideAngular(() => {
       const initValue = getPageRefreshContext(lView);
-      mpComponentInstance.setData(initValue);
+      const diffData = getDiffData(lView, initValue);
+      if (Object.keys(diffData).length) {
+        mpComponentInstance.setData(diffData);
+      }
     });
   }
 
@@ -163,7 +167,10 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.__completePath = [id];
     ngZone.runOutsideAngular(() => {
       const initValue = getPageRefreshContext(lView);
-      mpComponentInstance.setData(initValue);
+      const diffData = getDiffData(lView, initValue);
+      if (Object.keys(diffData).length) {
+        mpComponentInstance.setData(diffData);
+      }
     });
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__lView = lView;
