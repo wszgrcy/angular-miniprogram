@@ -78,7 +78,7 @@ export class AgentNode {
             .join(';') +
           (this.attribute.style ? ';' + this.attribute.style : ''),
 
-        property: this.property,
+        property: { ...this.property },
       };
     }
   }

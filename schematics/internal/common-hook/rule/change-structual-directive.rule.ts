@@ -33,7 +33,7 @@ export function changeStructuralDirectiveRuleFactory(options) {
 }
 
 function getTemplateNameExpressionStr(templateRefName: string) {
-  return `(${templateRefName} as any)._declarationTContainer.localNames?(${templateRefName} as any)._declarationTContainer.localNames[0]:undefined`;
+  return `(${templateRefName} as any)._declarationTContainer.localNames?(${templateRefName} as any)._declarationTContainer.localNames[0]:null`;
 }
 function changeNgForOf(selector: CssSelectorForTs) {
   const list: Change[] = [];

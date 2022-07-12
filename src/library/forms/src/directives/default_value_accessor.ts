@@ -107,7 +107,6 @@ export class DefaultValueAccessor
     }
   }
   valueChange(value: string) {
-    this.setProperty('value', value);
     this.onChange(value);
   }
 }
