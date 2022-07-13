@@ -280,6 +280,16 @@ export class MiniProgramCoreFactory {
         _this.pageStatus.destroy.bind(this)();
       },
       onShow: async function (this: MiniProgramComponentInstance) {
+        if (this.__ngComponentInstance === undefined) {
+          const app = getApp<AppOptions>();
+          await app.__ngStartPagePromise;
+          const { componentRef, ngModuleRef } = app.__ngStartPage(
+            module,
+            component,
+            this
+          );
+          _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
+        }
         if (options.onShow) {
           await options.onShow.bind(this)();
         }
