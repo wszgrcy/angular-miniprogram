@@ -12,12 +12,6 @@ const obj = {
     function (id) {
       return clearInterval(id);
     },
-  setImmediate: typeof setImmediate !== 'undefined' && setImmediate,
-  clearImmediate:
-    typeof clearImmediate !== 'undefined' &&
-    function (id) {
-      return clearImmediate(id);
-    },
   Promise: typeof Promise !== 'undefined' && Promise,
   Reflect: typeof Reflect !== 'undefined' && Reflect,
   requestAnimationFrame:
