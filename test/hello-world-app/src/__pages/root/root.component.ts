@@ -66,4 +66,14 @@ export class RootComponent implements OnInit {
       url: '/pages/self-component/self-component-entry',
     });
   }
+  lifeTime() {
+    this.global.navigateTo({
+      url: '/pages/life-time-page/life-time-page-entry',
+    });
+  }
+  lifeTimeUseComponent() {
+    this.global.navigateTo({
+      url: '/pages/life-time-page-use-component/life-time-page-use-component-entry',
+    });
+  }
 }
