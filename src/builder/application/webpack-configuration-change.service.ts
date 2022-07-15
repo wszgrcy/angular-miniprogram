@@ -223,8 +223,6 @@ export class WebpackConfigurationChangeService {
       clearTimeout: `${this.buildPlatform.globalVariablePrefix}.clearTimeout`,
       setInterval: `${this.buildPlatform.globalVariablePrefix}.setInterval`,
       clearInterval: `${this.buildPlatform.globalVariablePrefix}.clearInterval`,
-      setImmediate: `${this.buildPlatform.globalVariablePrefix}.setImmediate`,
-      clearImmediate: `${this.buildPlatform.globalVariablePrefix}.clearImmediate`,
       Promise: `${this.buildPlatform.globalVariablePrefix}.Promise`,
       Reflect: `${this.buildPlatform.globalVariablePrefix}.Reflect`,
       requestAnimationFrame: `${this.buildPlatform.globalVariablePrefix}.requestAnimationFrame`,

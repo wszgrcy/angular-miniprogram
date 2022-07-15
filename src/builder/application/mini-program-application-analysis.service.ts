@@ -3,6 +3,7 @@ import type { NgtscProgram, ParsedConfiguration } from '@angular/compiler-cli';
 import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
 import { externalizePath } from '@ngtools/webpack/src/ivy/paths';
 import { createHash } from 'crypto';
+import { createCssSelectorForTs } from 'cyia-code-util';
 import * as path from 'path';
 import { Inject, Injectable, Injector } from 'static-injector';
 import ts from 'typescript';
@@ -30,7 +31,7 @@ export class MiniProgramApplicationAnalysisService {
   private ngTscProgram!: NgtscProgram;
   private tsProgram!: ts.Program;
   private ngCompiler!: NgCompiler;
-
+  private typeChecker!: ts.TypeChecker;
   constructor(
     private injector: Injector,
     @Inject(WEBPACK_COMPILATION) private compilation: Compilation,
@@ -183,6 +184,7 @@ export class MiniProgramApplicationAnalysisService {
       host
     );
     this.tsProgram = this.ngTscProgram.getTsProgram();
+    this.typeChecker = this.tsProgram.getTypeChecker();
     this.augmentProgramWithVersioning(this.tsProgram);
     if (this.compiler.watchMode) {
       this.builder = this.oldBuilder =
@@ -196,6 +198,7 @@ export class MiniProgramApplicationAnalysisService {
     }
     this.ngCompiler = this.ngTscProgram.compiler;
   }
+  /** 获得组件/页面的入口 */
   private getComponentPagePattern(fileName: string) {
     const findList = [fileName];
     let maybeEntryPath: PagePattern | undefined;
@@ -210,7 +213,38 @@ export class MiniProgramApplicationAnalysisService {
           (item) => path.normalize(item.src) === path.normalize(module!)
         );
         if (maybeEntryPath) {
-          break;
+          const sourceFile = this.tsProgram.getSourceFile(maybeEntryPath.src)!;
+          const selector = createCssSelectorForTs(sourceFile);
+          let importComponent: ts.Expression;
+          if (maybeEntryPath.type === 'page') {
+            const node = selector.queryOne(
+              `CallExpression[expression=pageStartup]`
+            ) as ts.CallExpression;
+            importComponent = node.arguments[1];
+          } else {
+            const node = selector.queryOne(
+              `CallExpression[expression=componentRegistry]`
+            ) as ts.CallExpression;
+            importComponent = node.arguments[0];
+          }
+          const symbol = this.typeChecker.getSymbolAtLocation(importComponent);
+          const node = symbol?.getDeclarations()?.[0];
+          const importDeclaration = node?.parent.parent
+            .parent as ts.ImportDeclaration;
+          const relativeImportComponentPath = importDeclaration.moduleSpecifier
+            .getText()
+            .slice(1, -1);
+
+          const importComponentPath =
+            path.resolve(
+              path.dirname(maybeEntryPath.src),
+              path.normalize(relativeImportComponentPath)
+            ) + '.ts';
+          if (importComponentPath === path.normalize(fileName)) {
+            break;
+          }
+
+          maybeEntryPath = undefined;
         }
       }
     }

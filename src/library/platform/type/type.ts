@@ -40,6 +40,11 @@ export interface MiniProgramComponentVariable<NG_COMPONENT_INSTANCE = unknown> {
   __waitLinkPromise: Promise<void>;
   /** @private */
   __waitLinkResolve: () => void;
+  /** @private */
+  __lifeTimePromiseObject: Record<
+    'onLoad' | 'onShow' | 'created',
+    Promise<void>
+  >;
 }
 export interface MiniProgramComponentMethod {
   __ngDestroy: () => void;
