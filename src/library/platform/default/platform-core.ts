@@ -210,45 +210,44 @@ export class MiniProgramCoreFactory {
               }
               _this.pageStatus.destroy.bind(this)();
             },
-            onLoad: function (this: MiniProgramComponentInstance, query) {
-              const app = getApp<AppOptions>();
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              this.__lifeTimePromiseObject = {} as any;
-              return (this.__lifeTimePromiseObject['onLoad'] =
-                app.__ngStartPagePromise.then(() => {
-                  const { componentRef, ngModuleRef } = app.__ngStartPage(
-                    module,
-                    component,
-                    this
-                  );
-                  _this.linkNgComponentWithPage(
-                    this,
-                    componentRef,
-                    ngModuleRef
-                  );
-                  if (options.methods?.onLoad) {
-                    return options.methods.onLoad.bind(this)(query);
-                  }
-                }));
-            },
+
             onShow: async function (this: MiniProgramComponentInstance) {
-              return (this.__lifeTimePromiseObject['onShow'] =
-                this.__lifeTimePromiseObject['onLoad'].then(async () => {
-                  if (options.methods?.onShow) {
-                    await options.methods.onShow.bind(this)();
-                  }
-                  return _this.pageStatus.attachView.bind(this)();
-                }));
-            },
-            onReady: function (this: MiniProgramComponentInstance) {
-              return this.__lifeTimePromiseObject.onShow.then(() => {
-                if (options.methods?.onReady) {
-                  return options.methods.onReady.bind(this)();
-                }
-              });
+              if (options.methods?.onShow) {
+                await options.methods.onShow.bind(this)();
+              }
+              return _this.pageStatus.attachView.bind(this)();
             },
           },
         };
+      config.lifetimes = config.lifetimes || {};
+      const oldCreated = config.lifetimes.created;
+      let componentRef: ComponentRef<unknown>,
+        ngModuleRef: NgModuleRef<unknown>;
+      config.lifetimes.created = function (this: MiniProgramComponentInstance) {
+        const app = getApp<AppOptions>();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        this.__lifeTimePromiseObject = {} as any;
+        return (this.__lifeTimePromiseObject['created'] =
+          app.__ngStartPagePromise.then(() => {
+            const result = app.__ngStartPage(module, component, this);
+            componentRef = result.componentRef;
+            ngModuleRef = result.ngModuleRef;
+            if (oldCreated) {
+              oldCreated.bind(this)();
+            }
+          }));
+      };
+      const oldAttached = config.lifetimes.attached;
+      config.lifetimes.attached = function (
+        this: MiniProgramComponentInstance
+      ) {
+        return this.__lifeTimePromiseObject['created'].then(() => {
+          _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
+          if (oldAttached) {
+            oldAttached.bind(this)();
+          }
+        });
+      };
       return Component(config);
     }
     const options = this.getPageOptions(component) || {};
