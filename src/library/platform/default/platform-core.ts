@@ -87,8 +87,8 @@ export class MiniProgramCoreFactory {
       }
     });
   }
-
-  protected listenerEvent(component: Type<unknown>) {
+  /** 监听事件 */
+  protected listenerEvent() {
     const _this = this;
     return this.eventPrefixList.reduce((pre: Record<string, Function>, cur) => {
       pre[cur.listener + 'Event'] = function (
@@ -196,7 +196,8 @@ export class MiniProgramCoreFactory {
           data: { hasLoad: false },
           options: { ...options?.options, multipleSlots: true },
           methods: {
-            ...this.listenerEvent(component),
+            ...options.methods,
+            ...this.listenerEvent(),
             onHide: async function (this: MiniProgramComponentInstance) {
               if (options.methods?.onHide) {
                 await options.methods.onHide.bind(this)();
@@ -209,64 +210,53 @@ export class MiniProgramCoreFactory {
               }
               _this.pageStatus.destroy.bind(this)();
             },
+            onLoad: function (this: MiniProgramComponentInstance, query) {
+              const app = getApp<AppOptions>();
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              this.__lifeTimePromiseObject = {} as any;
+              return (this.__lifeTimePromiseObject['onLoad'] =
+                app.__ngStartPagePromise.then(() => {
+                  const { componentRef, ngModuleRef } = app.__ngStartPage(
+                    module,
+                    component,
+                    this
+                  );
+                  _this.linkNgComponentWithPage(
+                    this,
+                    componentRef,
+                    ngModuleRef
+                  );
+                  if (options.methods?.onLoad) {
+                    return options.methods.onLoad.bind(this)(query);
+                  }
+                }));
+            },
             onShow: async function (this: MiniProgramComponentInstance) {
-              if (options.methods?.onShow) {
-                await options.methods.onShow.bind(this)();
-              }
-              _this.pageStatus.attachView.bind(this)();
+              return (this.__lifeTimePromiseObject['onShow'] =
+                this.__lifeTimePromiseObject['onLoad'].then(async () => {
+                  if (options.methods?.onShow) {
+                    await options.methods.onShow.bind(this)();
+                  }
+                  return _this.pageStatus.attachView.bind(this)();
+                }));
+            },
+            onReady: function (this: MiniProgramComponentInstance) {
+              return this.__lifeTimePromiseObject.onShow.then(() => {
+                if (options.methods?.onReady) {
+                  return options.methods.onReady.bind(this)();
+                }
+              });
             },
           },
         };
-      config.lifetimes = config.lifetimes || {};
-      const oldCreated = config.lifetimes.created;
-      let componentRef: ComponentRef<unknown>,
-        ngModuleRef: NgModuleRef<unknown>;
-      config.lifetimes.created = function (this: MiniProgramComponentInstance) {
-        const app = getApp<AppOptions>();
-        return app.__ngStartPagePromise.then(() => {
-          const result = app.__ngStartPage(module, component, this);
-          componentRef = result.componentRef;
-          ngModuleRef = result.ngModuleRef;
-          if (oldCreated) {
-            oldCreated.bind(this)();
-          }
-        });
-      };
-      const oldAttached = config.lifetimes.attached;
-      config.lifetimes.attached = function (
-        this: MiniProgramComponentInstance
-      ) {
-        const app = getApp<AppOptions>();
-
-        return app.__ngStartPagePromise.then(() => {
-          _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
-          if (oldAttached) {
-            oldAttached.bind(this)();
-          }
-        });
-      };
       return Component(config);
     }
     const options = this.getPageOptions(component) || {};
     return Page({
       ...options,
-      ...this.listenerEvent(component),
+      ...this.listenerEvent(),
       data: { hasLoad: false },
-      onLoad: function (this: MiniProgramComponentInstance, query) {
-        const app = getApp<AppOptions>();
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        app.__ngStartPagePromise.then(() => {
-          const { componentRef, ngModuleRef } = app.__ngStartPage(
-            module,
-            component,
-            this
-          );
-          _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
-          if (options.onLoad) {
-            return options.onLoad.bind(this)(query);
-          }
-        });
-      },
+
       onHide: async function (this: MiniProgramComponentInstance) {
         if (options.onHide) {
           await options.onHide.bind(this)();
@@ -279,11 +269,38 @@ export class MiniProgramCoreFactory {
         }
         _this.pageStatus.destroy.bind(this)();
       },
-      onShow: async function (this: MiniProgramComponentInstance) {
-        if (options.onShow) {
-          await options.onShow.bind(this)();
-        }
-        _this.pageStatus.attachView.bind(this)();
+      onLoad: function (this: MiniProgramComponentInstance, query) {
+        const app = getApp<AppOptions>();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        this.__lifeTimePromiseObject = {} as any;
+        return (this.__lifeTimePromiseObject['onLoad'] =
+          app.__ngStartPagePromise.then(() => {
+            const { componentRef, ngModuleRef } = app.__ngStartPage(
+              module,
+              component,
+              this
+            );
+            _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
+            if (options.onLoad) {
+              return options.onLoad.bind(this)(query);
+            }
+          }));
+      },
+      onShow: function (this: MiniProgramComponentInstance) {
+        return (this.__lifeTimePromiseObject['onShow'] =
+          this.__lifeTimePromiseObject['onLoad'].then(async () => {
+            if (options.onShow) {
+              await options.onShow.bind(this)();
+            }
+            return _this.pageStatus.attachView.bind(this)();
+          }));
+      },
+      onReady: function (this: MiniProgramComponentInstance) {
+        return this.__lifeTimePromiseObject.onShow.then(() => {
+          if (options.onReady) {
+            return options.onReady.bind(this)();
+          }
+        });
       },
     });
   };
@@ -348,7 +365,7 @@ export class MiniProgramCoreFactory {
       data: { hasLoad: false },
       options: { ...options?.options, multipleSlots: true },
       methods: {
-        ...this.listenerEvent(component),
+        ...this.listenerEvent(),
       },
     };
 

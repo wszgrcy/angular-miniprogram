@@ -12,6 +12,8 @@ export const ALL_PAGE_NAME_LIST = [
   `component-use-template`,
   `base-http`,
   `self-component`,
+  `life-time-page`,
+  `life-time-page-use-component`,
 ];
 export const ALL_COMPONENT_NAME_LIST = [
   `component1`,
@@ -20,6 +22,7 @@ export const ALL_COMPONENT_NAME_LIST = [
   `content`,
   `content-multi`,
   `component-need-template`,
+  `life-time`,
 ];
 
 export const TEST_LIBRARY_COMPONENT_LIST = [
