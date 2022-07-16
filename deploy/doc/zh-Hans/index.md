@@ -29,7 +29,7 @@ layout: home
 - [注意事项](attention)
 - [小程序特性](miniprogram-feature)
 - [API](../api-doc)
-
+- [生命周期](life-time)
 ## 开发环境
 
 ### 前提条件

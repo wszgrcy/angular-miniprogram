@@ -29,7 +29,7 @@ reduce cross-platform costs</p>
 - [Attention](attention)
 - [MiniProgramFeature](miniprogram-feature)
 - [API](../api-doc)
-
+- [life-time](life-time)
 ## Development Environment
 
 ### Prerequisites
