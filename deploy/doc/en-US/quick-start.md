@@ -1,5 +1,6 @@
 ---
 layout: post
+title: Quick Start
 ---
 ## set Page pattern
 

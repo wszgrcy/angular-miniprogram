@@ -1,5 +1,6 @@
 ---
 layout: post
+title: Attention
 ---
 ## Forbidden
 
@@ -28,6 +29,22 @@ layout: post
 - this name can be find in a private variable: `(this.templateRef as any)._declarationTContainer.localNames[0]`
 - only first `template variable` name can be use
 
+```ts
+@Directive({
+  selector: '[appStructural1]',
+})
+export class Structural1Directive {
+  @Input() appStructural1: TemplateRef<any>;
+  @Input() appStructural1Name: string;
+  constructor(private viewContainerRef: ViewContainerRef) {}
+  ngOnInit(): void {
+    this.viewContainerRef.createEmbeddedView(this.appStructural1, {
+      __templateName: this.appStructural1Name,
+    });
+  }
+}
+
+```
 ### Template Rename
 
 - `ng-template` name can't repeat in one Component, if exist, you can use mulit `template variable`
@@ -40,6 +57,14 @@ layout: post
 
   > `same application`or`same library` is same project
 
+
+```html
+<ng-template #$$mp$$__self__$$self1> content </ng-template>
+<app-component-need-template
+  [templateRef]="$$mp$$__self__$$self1"
+></app-component-need-template>
+
+```
 - transfer `TemplateRef` to Other library Component, template name should follow this format`$$mp$$TemplateScopeName$$xxx`, `TemplateScopeName`rule as follow:
 
 ```ts
@@ -51,3 +76,14 @@ export function libraryTemplateScopeName(library: string) {
 ```
 
 - for example: `test-library`=>`TestLibrary`,`@my/library`=>`MyLibrary`
+
+
+```html
+<ng-template #$$mp$$TestLibrary$$first>
+  <app-component1></app-component1>
+</ng-template>
+
+<app-outside-template
+  [template]="$$mp$$TestLibrary$$first"
+></app-outside-template>
+```

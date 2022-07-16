@@ -1,5 +1,6 @@
 ---
 layout: post
+title: 注意事项
 ---
 ## 禁止使用
 
@@ -25,8 +26,24 @@ layout: post
 
 - `createEmbeddedView`方法只能在结构型指令,或非结构型指令但是为模板引用`TemplateRef`中使用
 - 当使用`createEmbeddedView`进行插入时,需要在上下文中的对象传递`__templateName`属性,这个属性为小程序的实际对应模板名
-- 此模板名可以访问`TemplateRef`实例的私有变量获得`(this.templateRef as any)._declarationTContainer.localNames[0]`
+- 此模板名也可以访问`TemplateRef`实例的私有变量获得`(this.templateRef as any)._declarationTContainer.localNames[0]`
 
+```ts
+@Directive({
+  selector: '[appStructural1]',
+})
+export class Structural1Directive {
+  @Input() appStructural1: TemplateRef<any>;
+  @Input() appStructural1Name: string;
+  constructor(private viewContainerRef: ViewContainerRef) {}
+  ngOnInit(): void {
+    this.viewContainerRef.createEmbeddedView(this.appStructural1, {
+      __templateName: this.appStructural1Name,
+    });
+  }
+}
+
+```
 ### 模板重命名
 
 - 模板会在编译时编译为静态模板,所以可能存在重命名的情况,`如果`存在这种情况,可以使用多模板引用变量的方式实现
@@ -37,6 +54,14 @@ layout: post
 
 - 在同一项目下,让其他组件接收到模板时,模板名定义需为`$$mp$$__self$$xxx`,这样就可以在同一项目下传递
   > `同一application`或`同一library`下,都叫同一项目
+
+```html
+<ng-template #$$mp$$__self__$$self1> content </ng-template>
+<app-component-need-template
+  [templateRef]="$$mp$$__self__$$self1"
+></app-component-need-template>
+
+```
 - 当需要给 library 组件中传入模板时,需要将模板名定义为`$$mp$$TemplateScopeName$$xxx`, `TemplateScopeName`生成规则如下
 
 ```ts
@@ -48,3 +73,13 @@ export function libraryTemplateScopeName(library: string) {
 ```
 
 - 如`test-library`库为`TestLibrary`,`@my/library`库为`MyLibrary`
+
+```html
+<ng-template #$$mp$$TestLibrary$$first>
+  <app-component1></app-component1>
+</ng-template>
+
+<app-outside-template
+  [template]="$$mp$$TestLibrary$$first"
+></app-outside-template>
+```

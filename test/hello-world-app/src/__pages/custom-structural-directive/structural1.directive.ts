@@ -6,9 +6,9 @@ import { Directive, Input, TemplateRef, ViewContainerRef } from '@angular/core';
 export class Structural1Directive {
   @Input() appStructural1: TemplateRef<any>;
   @Input() appStructural1Name: string;
-  constructor(private viewContaienrRef: ViewContainerRef) {}
+  constructor(private viewContainerRef: ViewContainerRef) {}
   ngOnInit(): void {
-    this.viewContaienrRef.createEmbeddedView(this.appStructural1, {
+    this.viewContainerRef.createEmbeddedView(this.appStructural1, {
       __templateName: this.appStructural1Name,
     });
   }

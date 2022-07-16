@@ -1,3 +1,7 @@
+---
+layout: post
+title: Life Time
+---
 # Component(Component)
 
 - created

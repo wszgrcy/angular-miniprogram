@@ -1,3 +1,7 @@
+---
+layout: post
+title: 生命周期
+---
 # 组件(Component)
 
 - created
