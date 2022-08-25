@@ -16,6 +16,9 @@ layout: home
   </a>&nbsp;
     <a href="https://wszgrcy.github.io/angular-miniprogram/coverage/index.html">
     <img src="../assets/img/badge.svg" alt="coverage" />
+  </a>&nbsp;
+    <a href="javascript: void(0);">
+    <img src="https://img.shields.io/badge/QQ%E7%BE%A4-287566685-brightgreen" alt="coverage" />
   </a>
 
 </p>
