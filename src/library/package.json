@@ -1,13 +1,13 @@
 {
   "name": "angular-miniprogram",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "使用Angular开发小程序",
   "keywords": [
     "Angular",
     "miniprogram",
     "wechat",
     "weixin",
-    "Angular 14"
+    "Angular 15"
   ],
   "repository": {
     "type": "git",
@@ -20,14 +20,14 @@
   },
   "homepage": "https://github.com/wszgrcy/angular-miniprogram#readme",
   "dependencies": {
-    "cyia-code-util": "1.3.9",
+    "cyia-code-util": "1.4.0",
     "webpack-bootstrap-assets-plugin": "2.0.3",
-    "static-injector": "1.0.10"
+    "static-injector": "2.0.0"
   },
   "peerDependencies": {
-    "ng-packagr": "14.0.3",
-    "@angular/core": "14.0.5",
-    "jasmine-core": "^4.0.1"
+    "ng-packagr": "15.0.1",
+    "@angular/core": "15.0.1",
+    "jasmine-core": "4.0.1"
   },
   "exports": {
     "./karma/client": {
