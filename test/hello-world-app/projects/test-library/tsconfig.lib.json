@@ -6,7 +6,8 @@
     "declaration": true,
     "declarationMap": true,
     "inlineSources": true,
-    "types": []
+    "types": [],
+    "target": "es2022"
   },
   "exclude": ["src/test.ts", "**/*.spec.ts"]
 }

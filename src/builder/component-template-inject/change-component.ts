@@ -16,15 +16,21 @@ export function changeComponent(data: string) {
       selector.queryOne(item, `PropertyDeclaration[name=ɵcmp]`)
     ) as ts.ClassDeclaration[];
 
-  if (!componentNodeList.length) {
+  const ɵcmpNodeList = selector.queryAll(
+    `BinaryExpression[left$=ɵcmp]`
+  ) as ts.BinaryExpression[];
+  if (!componentNodeList.length && !ɵcmpNodeList.length) {
     return undefined;
   }
+  const isLibrary = ɵcmpNodeList.length > 0 && componentNodeList.length === 0;
   const changeList: Change[] = [];
-  for (const componentNode of componentNodeList) {
-    const ɵcmpNode = selector.queryOne(
-      componentNode,
-      `PropertyDeclaration[name=ɵcmp]`
-    ) as ts.BinaryExpression;
+  for (const componentNode of isLibrary ? ɵcmpNodeList : componentNodeList) {
+    const ɵcmpNode = isLibrary
+      ? (componentNode as ts.BinaryExpression)
+      : (selector.queryOne(
+          componentNode,
+          `PropertyDeclaration[name=ɵcmp]`
+        ) as ts.BinaryExpression);
     const templateNode = selector.queryOne(
       ɵcmpNode,
       `CallExpression ObjectLiteralExpression PropertyAssignment[name=template]`
@@ -69,6 +75,10 @@ export function changeComponent(data: string) {
   return {
     content: RawUpdater.update(data, changeList),
     // todo library可否支持同文件多组件
-    componentName: componentNodeList[0].name!.getText(),
+    componentName: isLibrary
+      ? (
+          ɵcmpNodeList[0].left as ts.PropertyAccessExpression
+        ).expression.getText()
+      : componentNodeList[0].name!.getText(),
   };
 }
