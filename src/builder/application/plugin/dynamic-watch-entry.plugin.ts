@@ -5,6 +5,7 @@ import { Path, getSystemPath, normalize, resolve } from '@angular-devkit/core';
 import * as glob from 'glob';
 import * as path from 'path';
 import { BehaviorSubject } from 'rxjs';
+import { filter, take } from 'rxjs/operators';
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
 import { BuildPlatform } from '../../platform/platform';
@@ -66,32 +67,16 @@ export class DynamicWatchEntryPlugin {
         getSystemPath(absoluteSourceRootPath!)
       )!;
     }
-
-    const originEntryConfig = this.options.config.entry as webpack.EntryObject;
-    this.options.config.entry = async () => {
-      const entryPattern = this.entryPattern$.value;
-      if (!entryPattern) {
-        throw new Error('未匹配入口');
-      }
-      const list = [...entryPattern.pageList, ...entryPattern.componentList];
-      if (originEntryConfig['app']) {
-        throw new Error(
-          '资源文件不能指定为app文件名或bundleName,请重新修改(不影响导出)'
-        );
-      }
-      return {
-        ...originEntryConfig,
-        ...list.reduce((pre, cur) => {
-          pre[cur.entryName] = [cur.src];
-          return pre;
-        }, {} as webpack.EntryObject),
-      };
-    };
   }
   apply(compiler: webpack.Compiler) {
+    let rootCompilation: boolean = false;
     compiler.hooks.beforeCompile.tapPromise(
       'DynamicWatchEntryPlugin',
-      async (compilation) => {
+      async (compilationParams) => {
+        if (rootCompilation) {
+          return;
+        }
+
         this.entryPattern$.next({
           pageList: await this.generateModuleInfo(
             this.options.pages || [],
@@ -107,6 +92,7 @@ export class DynamicWatchEntryPlugin {
     compiler.hooks.thisCompilation.tap(
       'DynamicWatchEntryPlugin',
       (compilation) => {
+        rootCompilation = true;
         if (this.first) {
           this.first = false;
           const patternList = normalizeAssetPatterns(
@@ -125,6 +111,33 @@ export class DynamicWatchEntryPlugin {
         }
       }
     );
+    // 因为监听更新的时候beforeCompile会拦截所有的,所以这么实现(因为还有一次性构建不触发watchRun,所以不能代替)
+    compiler.hooks.watchRun.tap('DynamicWatchEntryPlugin', async () => {
+      rootCompilation = false;
+    });
+    // 入口移动到这里是因为ng新增了一个插件也同时修改了入口,
+    const originEntryConfig = compiler.options.entry;
+    compiler.options.entry = async () => {
+      await this.entryPattern$.pipe(filter(Boolean), take(1)).toPromise();
+      const entryPattern = this.entryPattern$.value!;
+
+      const list = [...entryPattern.pageList, ...entryPattern.componentList];
+      const result = (await (typeof originEntryConfig === 'function'
+        ? originEntryConfig()
+        : originEntryConfig))!;
+      if (result['app']) {
+        throw new Error(
+          '资源文件不能指定为app文件名或bundleName,请重新修改(不影响导出)'
+        );
+      }
+      return {
+        ...result,
+        ...list.reduce((pre, cur) => {
+          pre[cur.entryName] = { import: [cur.src] };
+          return pre;
+        }, {} as Record<string, Exclude<webpack.EntryNormalized, Function>[string]>),
+      };
+    };
   }
   private async generateModuleInfo(
     list: AssetPattern[],

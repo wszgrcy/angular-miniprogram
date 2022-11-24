@@ -20,16 +20,17 @@ import type {
   ExecutionTransformer,
   KarmaBuilderOptions,
 } from '@angular-devkit/build-angular';
-import { findTests } from '@angular-devkit/build-angular/src/builders/karma/find-tests';
+import { FindTestsPlugin } from '@angular-devkit/build-angular/src/builders/karma/find-tests-plugin';
+import { purgeStaleBuildCache } from '@angular-devkit/build-angular/src/utils/purge-cache';
 import { assertCompatibleAngularVersion } from '@angular-devkit/build-angular/src/utils/version';
 import { generateBrowserWebpackConfigFromContext } from '@angular-devkit/build-angular/src/utils/webpack-browser-config';
 import {
   getCommonConfig,
   getStylesConfig,
 } from '@angular-devkit/build-angular/src/webpack/configs';
-import { SingleTestTransformLoader } from '@angular-devkit/build-angular/src/webpack/plugins/single-test-transform';
-import { getSystemPath, join, normalize } from '@angular-devkit/core';
+
 import { Config, ConfigOptions } from 'karma';
+import * as path from 'path';
 import { dirname, resolve } from 'path';
 import { Observable, from } from 'rxjs';
 import { defaultIfEmpty, switchMap } from 'rxjs/operators';
@@ -45,6 +46,8 @@ async function initialize(
   context: BuilderContext,
   webpackConfigurationTransformer?: ExecutionTransformer<Configuration>
 ): Promise<[typeof import('karma'), Configuration]> {
+  // Purge old build disk cache.
+  await purgeStaleBuildCache(context);
   const { config } = await generateBrowserWebpackConfigFromContext(
     // only two properties are missing:
     // * `outputPath` which is fixed for tests
@@ -129,46 +132,23 @@ export function execute(
         }
       }
 
-      // prepend special webpack loader that will transform test.ts
-      if (options.include && options.include.length > 0) {
-        const mainFilePath = getSystemPath(
-          join(normalize(context.workspaceRoot), options.main)
-        );
-        const files = await findTests(
-          options.include,
-          dirname(mainFilePath),
-          context.workspaceRoot
-        );
-        // early exit, no reason to start karma
-        if (!files.length) {
-          throw new Error(
-            `Specified patterns: "${options.include.join(
-              ', '
-            )}" did not match any spec files.`
-          );
-        }
-
-        // Get the rules and ensure the Webpack configuration is setup properly
-        const rules = webpackConfig.module?.rules || [];
-        if (!webpackConfig.module) {
-          webpackConfig.module = { rules };
-        } else if (!webpackConfig.module.rules) {
-          webpackConfig.module.rules = rules;
-        }
-
-        rules.unshift({
-          test: mainFilePath,
-          use: {
-            // cannot be a simple path as it differs between environments
-            loader: SingleTestTransformLoader,
-            options: {
-              files,
-              logger: context.logger,
-            },
-          },
-        });
+      const projectName = context.target?.project;
+      if (!projectName) {
+        throw new Error('The builder requires a target.');
       }
+      const projectMetadata = await context.getProjectMetadata(projectName);
+      const sourceRoot = (projectMetadata.sourceRoot ??
+        projectMetadata.root ??
+        '') as string;
 
+      webpackConfig.plugins ??= [];
+      webpackConfig.plugins.push(
+        new FindTestsPlugin({
+          // include: options.include,
+          workspaceRoot: context.workspaceRoot,
+          projectSourceRoot: path.join(context.workspaceRoot, sourceRoot),
+        })
+      );
       karmaOptions.buildWebpack = {
         options,
         webpackConfig,
@@ -176,7 +156,7 @@ export function execute(
       };
 
       const config = await karma.config.parseConfig(
-        resolve(context.workspaceRoot, options.karmaConfig),
+        resolve(context.workspaceRoot, options.karmaConfig!),
         transforms.karmaOptions
           ? transforms.karmaOptions(karmaOptions)
           : karmaOptions,

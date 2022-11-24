@@ -10,14 +10,21 @@ import { RawUpdater } from '../util';
 export function changeComponent(data: string) {
   const sf = ts.createSourceFile('', data, ts.ScriptTarget.Latest, true);
   const selector = createCssSelectorForTs(sf);
-  const ɵcmpNodeList = selector.queryAll(
-    `BinaryExpression[left$=ɵcmp]`
-  ) as ts.BinaryExpression[];
-  if (!ɵcmpNodeList.length) {
+  const componentNodeList = selector
+    .queryAll(`ClassDeclaration`)
+    .filter((item) =>
+      selector.queryOne(item, `PropertyDeclaration[name=ɵcmp]`)
+    ) as ts.ClassDeclaration[];
+
+  if (!componentNodeList.length) {
     return undefined;
   }
   const changeList: Change[] = [];
-  for (const ɵcmpNode of ɵcmpNodeList) {
+  for (const componentNode of componentNodeList) {
+    const ɵcmpNode = selector.queryOne(
+      componentNode,
+      `PropertyDeclaration[name=ɵcmp]`
+    ) as ts.BinaryExpression;
     const templateNode = selector.queryOne(
       ɵcmpNode,
       `CallExpression ObjectLiteralExpression PropertyAssignment[name=template]`
@@ -62,8 +69,6 @@ export function changeComponent(data: string) {
   return {
     content: RawUpdater.update(data, changeList),
     // todo library可否支持同文件多组件
-    componentName: (
-      ɵcmpNodeList[0].left as ts.PropertyAccessExpression
-    ).expression.getText(),
+    componentName: componentNodeList[0].name!.getText(),
   };
 }

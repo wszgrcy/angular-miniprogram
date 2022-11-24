@@ -69,23 +69,20 @@ describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
     xit('watch', async () => {
       const root = harness.host.root();
       const myTestProjectHost = new MyTestProjectHost(harness.host);
-      const list: string[] = [];
-
-      list.push(
-        ...(await myTestProjectHost.getFileList(
-          normalize(join(root, 'src', '__components'))
-        )),
-        ...(await myTestProjectHost.getFileList(
-          normalize(join(root, 'src', 'spec'))
-        ))
-      );
-      await myTestProjectHost.importPathRename(list);
-      await myTestProjectHost.moveDir(
-        ['component1', 'component2'],
-        '__components',
-        'components'
-      );
-      await myTestProjectHost.addSpecEntry(['base-component']);
+      await myTestProjectHost.addSpecEntry([
+        'empty',
+        'tag-view-convert-spec',
+        'style-class-spec',
+        'life-time-spec',
+        'ng-if-spec',
+        'http-spec',
+        'ng-content-spec',
+        'ng-for-spec',
+        'ng-library-import-spec',
+        'ng-switch-spec',
+        'ng-template-outlet-spec',
+        'self-template-spec',
+      ]);
       harness.useTarget('build', { ...angularConfig, watch: true });
       let appTestPath: string;
       const result = new Promise<BuilderHarnessExecutionResult<BuilderOutput>>(
@@ -125,12 +122,10 @@ describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
   });
 
   function writeFile() {
-    const fileContent = harness.readFile(
-      'src/spec/base-component/base-component.entry.spec.ts'
-    );
+    const fileContent = harness.readFile('src/spec/ng-if-spec/ng-if.spec.ts');
 
     return harness.writeFiles({
-      'src/spec/base-component/base-component.entry.spec.ts': `${fileContent}
+      'src/spec/ng-if-spec/ng-if.spec.ts': `${fileContent}
       describe('test-add',()=>{it('main',()=>{expect(true).toBe(true)})});`,
     });
   }

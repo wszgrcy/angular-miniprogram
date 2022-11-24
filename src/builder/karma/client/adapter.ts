@@ -427,10 +427,17 @@ function getShardedSpecsToRun(specs: any[], clientConfig: Record<string, any>) {
  * @param {!Object} jasmineEnv
  */
 class KarmaSpecFilter {
+  specIdsToRun: any[];
   constructor(
     private clientConfig: Record<string, any>,
     private jasmineEnv: jasmine.Env
-  ) {}
+  ) {
+    this.specIdsToRun = this.getSpecsToRun(
+      undefined as any,
+      this.clientConfig,
+      this.jasmineEnv
+    ).map(getId);
+  }
   /**
    * Walk the test suite tree depth first and collect all test specs
    * @param {!Object} jasmineEnv
@@ -481,12 +488,6 @@ class KarmaSpecFilter {
       specs
     );
   }
-
-  specIdsToRun = this.getSpecsToRun(
-    undefined as any,
-    this.clientConfig,
-    this.jasmineEnv
-  ).map(getId);
 
   matches(spec: jasmine.Suite) {
     return this.specIdsToRun.indexOf(spec.id) !== -1;

@@ -5,8 +5,10 @@ import {
 } from 'ng-packagr/lib/graph/transform';
 import {
   EntryPointNode,
+  PackageNode,
   isEntryPoint,
   isEntryPointInProgress,
+  isPackage,
 } from 'ng-packagr/lib/ng-package/nodes';
 import { NgPackagrOptions } from 'ng-packagr/lib/ng-package/options.di';
 import { NgccProcessor } from 'ng-packagr/lib/ngc/ngcc-processor';
@@ -38,6 +40,9 @@ export const myCompileNgcTransformFactory = (
         entryPoint.data.tsConfig!,
         entryPoints
       );
+      const ngPackageNode: PackageNode = graph.find(isPackage)!;
+
+      const projectBasePath = ngPackageNode.data.primary.basePath;
 
       // Compile TypeScript sources
       const { esm2020, declarations } = entryPoint.data.destinationFiles;
@@ -63,6 +68,7 @@ export const myCompileNgcTransformFactory = (
       }
 
       entryPoint.cache.stylesheetProcessor ??= new StylesheetProcessor(
+        projectBasePath,
         basePath,
         cssUrl,
         styleIncludePaths,

@@ -4,7 +4,8 @@
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
     "types": ["jasmine"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "target": "ES2022"
   },
   "files": ["test.ts"],
   "include": [
