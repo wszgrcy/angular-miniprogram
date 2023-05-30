@@ -9,13 +9,14 @@ import type {
 } from 'angular-miniprogram/platform/type';
 import { AgentNode } from './agent-node';
 import { diffNodeData } from './diff-node-data';
-
+//packages\core\src\render3\interfaces\view.ts
 const CLEANUP = 7;
 export const LVIEW_CONTEXT = 8;
 export const INJECTOR = 9;
+//packages\core\src\render3\interfaces\container.ts
 const VIEW_REFS = 8;
 // HEADER_OFFSET
-const start = 22;
+const start = 25;
 
 const linkMap = new Map<LView, any>();
 const nodePathMap = new Map<LView, NodePath>();
