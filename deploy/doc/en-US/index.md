@@ -34,14 +34,13 @@ reduce cross-platform costs</p>
 
 ### Prerequisites
 
-- `Node.js` greater than 14
-- `@angular/cli` 14
-- `yarn`
+- `Node.js` greater than 16
+- `@angular/cli` 16
 
 ### hello-world
 
 - use this Template [https://github.com/wszgrcy/angular-miniprogram-template](https://github.com/wszgrcy/angular-miniprogram-template) or download
-- use `yarn` install dependencies
+- use `npm` install dependencies
 
 ### Quickstart
 

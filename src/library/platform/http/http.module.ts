@@ -1,9 +1,8 @@
 import { NgModule } from '@angular/core';
 import {
   HttpBackend,
-  HttpClient,
-  HttpHandler,
-  ɵHttpInterceptingHandler,
+  provideHttpClient,
+  withInterceptorsFromDi,
 } from 'angular-miniprogram/common/http';
 import { MiniprogramHttpBackend } from './backend';
 @NgModule({
@@ -11,10 +10,16 @@ import { MiniprogramHttpBackend } from './backend';
   imports: [],
   exports: [],
   providers: [
-    HttpClient,
-    { provide: HttpHandler, useClass: ɵHttpInterceptingHandler },
     MiniprogramHttpBackend,
-    { provide: HttpBackend, useExisting: MiniprogramHttpBackend },
+    provideHttpClient(
+      {
+        ɵkind: 2,
+        ɵproviders: [
+          { provide: HttpBackend, useExisting: MiniprogramHttpBackend },
+        ],
+      },
+      withInterceptorsFromDi()
+    ),
   ],
 })
 export class HttpClientModule {}

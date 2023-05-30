@@ -121,9 +121,9 @@ function changeNgTemplateOutlet(selector: CssSelectorForTs) {
     new ReplaceChange(
       node.pos,
       node.end - node.pos,
-      `{...this.ngTemplateOutletContext,${templateName}:${getTemplateNameExpressionStr(
+      `{...context,${templateName}:${getTemplateNameExpressionStr(
         'this.ngTemplateOutlet'
-      )}}`
+      )}}as any`
     )
   );
 

@@ -1,4 +1,6 @@
 import { join, normalize } from '@angular-devkit/core';
+import fs from 'node:fs';
+import path from 'node:path';
 import { of } from 'rxjs';
 import { concatMap, skip, take } from 'rxjs/operators';
 import {
@@ -59,38 +61,13 @@ describeBuilder(
               if (index) {
                 return of(result);
               }
+              const value = JSON.parse(harness.readFile('src/app.json'));
+              value.pages.push(`pages/sub3/sub3-entry`);
+              const data = readFixture('watch/sub3', 'src/pages/sub3');
               harness
                 .writeFiles({
-                  'src/pages/sub3/sub3.component.html': `<p>{{title}} works!</p>`,
-                  'src/pages/sub3/sub3.component.ts': `import { Component } from '@angular/core';
-              
-              @Component({
-                selector: 'app-sub3',
-                templateUrl: './sub3.component.html',
-              })
-              export class Sub3Component {
-                title = 'sub3组件';
-               
-              }
-              `,
-                  'src/pages/sub3/sub3.entry.json': `{
-                "usingComponents": { }
-              }
-              `,
-                  'src/pages/sub3/sub3.entry.ts': `import { pageStartup } from 'angular-miniprogram';
-              import { Sub3Component } from './sub3.component';
-              import { Sub3Module } from './sub3.module';
-              
-              pageStartup(Sub3Module, Sub3Component);
-              `,
-                  'src/pages/sub3/sub3.module.ts': `import { NgModule } from '@angular/core';
-              import { Sub3Component } from './sub3.component';
-              
-              @NgModule({
-                declarations: [Sub3Component],
-              })
-              export class Sub3Module {}
-              `,
+                  'src/app.json': JSON.stringify(value),
+                  ...data,
                 })
                 .then(
                   (res) => {},
@@ -156,3 +133,14 @@ describeBuilder(
     });
   }
 );
+function readFixture(dir: string, to: string) {
+  const dirPath = path.resolve(__dirname, 'test/fixture', dir);
+  const list = fs.readdirSync(dirPath);
+  const fileObject: Record<string, string> = {};
+  for (const item of list) {
+    const filePath = path.resolve(dirPath, item);
+    const content = fs.readFileSync(filePath, { encoding: 'utf8' });
+    fileObject[`${path.posix.join(to, item)}`] = content;
+  }
+  return fileObject;
+}
