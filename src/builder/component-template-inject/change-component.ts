@@ -10,30 +10,21 @@ import { RawUpdater } from '../util';
 export function changeComponent(data: string) {
   const sf = ts.createSourceFile('', data, ts.ScriptTarget.Latest, true);
   const selector = createCssSelectorForTs(sf);
-  const componentNodeList = selector
-    .queryAll(`ClassDeclaration`)
-    .filter((item) =>
-      selector.queryOne(item, `PropertyDeclaration[name=ɵcmp]`)
-    ) as ts.ClassDeclaration[];
 
   const ɵcmpNodeList = selector.queryAll(
-    `BinaryExpression[left$=ɵcmp]`
+    `PropertyAccessExpression[name=ɵɵdefineComponent]~SyntaxList ObjectLiteralExpression`
   ) as ts.BinaryExpression[];
-  if (!componentNodeList.length && !ɵcmpNodeList.length) {
+  if (!ɵcmpNodeList.length) {
     return undefined;
   }
-  const isLibrary = ɵcmpNodeList.length > 0 && componentNodeList.length === 0;
   const changeList: Change[] = [];
-  for (const componentNode of isLibrary ? ɵcmpNodeList : componentNodeList) {
-    const ɵcmpNode = isLibrary
-      ? (componentNode as ts.BinaryExpression)
-      : (selector.queryOne(
-          componentNode,
-          `PropertyDeclaration[name=ɵcmp]`
-        ) as ts.BinaryExpression);
+  for (const componentNode of ɵcmpNodeList) {
+    //PropertyAssignment[name=type]::initializer
+    const ɵcmpNode = componentNode;
+
     const templateNode = selector.queryOne(
       ɵcmpNode,
-      `CallExpression ObjectLiteralExpression PropertyAssignment[name=template]`
+      `PropertyAssignment[name=template]::initializer`
     ) as ts.PropertyAssignment;
     const initIfNode = selector.queryOne(
       templateNode,
@@ -75,10 +66,8 @@ export function changeComponent(data: string) {
   return {
     content: RawUpdater.update(data, changeList),
     // todo library可否支持同文件多组件
-    componentName: isLibrary
-      ? (
-          ɵcmpNodeList[0].left as ts.PropertyAccessExpression
-        ).expression.getText()
-      : componentNodeList[0].name!.getText(),
+    componentName: selector
+      .queryOne(ɵcmpNodeList[0], 'PropertyAssignment[name=type]::initializer')
+      .getText(),
   };
 }
