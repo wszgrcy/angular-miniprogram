@@ -23,7 +23,7 @@ jobs:
           node-version: 16.x
       - name: install-dependencies
         run: |
-          npm i
+          npm i --legacy-peer-deps
       - name: hook-code
         run: |
           npm run hook-code
