@@ -1,4 +1,6 @@
 import { join, normalize } from '@angular-devkit/core';
+import fs from 'node:fs';
+import path from 'node:path';
 import { of } from 'rxjs';
 import { concatMap, skip, take } from 'rxjs/operators';
 import {
@@ -16,8 +18,6 @@ import {
 } from '../../test/util/file';
 import { runBuilder } from './application';
 import { PlatformType } from './platform/platform';
-import path from 'node:path';
-import fs from 'node:fs';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,
@@ -61,9 +61,9 @@ describeBuilder(
               if (index) {
                 return of(result);
               }
-              let value = JSON.parse(harness.readFile('src/app.json'));
+              const value = JSON.parse(harness.readFile('src/app.json'));
               value.pages.push(`pages/sub3/sub3-entry`);
-              let data = readFixture('watch/sub3', 'src/pages/sub3');
+              const data = readFixture('watch/sub3', 'src/pages/sub3');
               harness
                 .writeFiles({
                   'src/app.json': JSON.stringify(value),
@@ -134,12 +134,12 @@ describeBuilder(
   }
 );
 function readFixture(dir: string, to: string) {
-  let dirPath = path.resolve(__dirname, 'test/fixture', dir);
-  let list = fs.readdirSync(dirPath);
-  let fileObject: Record<string, string> = {};
+  const dirPath = path.resolve(__dirname, 'test/fixture', dir);
+  const list = fs.readdirSync(dirPath);
+  const fileObject: Record<string, string> = {};
   for (const item of list) {
-    let filePath = path.resolve(dirPath, item);
-    let content = fs.readFileSync(filePath, { encoding: 'utf8' });
+    const filePath = path.resolve(dirPath, item);
+    const content = fs.readFileSync(filePath, { encoding: 'utf8' });
     fileObject[`${path.posix.join(to, item)}`] = content;
   }
   return fileObject;

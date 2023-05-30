@@ -19,7 +19,6 @@ export function changeComponent(data: string) {
   }
   const changeList: Change[] = [];
   for (const componentNode of ɵcmpNodeList) {
-    //PropertyAssignment[name=type]::initializer
     const ɵcmpNode = componentNode;
 
     const templateNode = selector.queryOne(

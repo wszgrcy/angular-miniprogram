@@ -1,10 +1,8 @@
-import { dirname, normalize } from '@angular-devkit/core';
-import { join } from 'node:path';
-
 import type {
   CompilerOptions,
   ParsedConfiguration,
 } from '@angular/compiler-cli';
+import { dirname, normalize } from '@angular-devkit/core';
 import { BuildGraph } from 'ng-packagr/lib/graph/build-graph';
 import {
   EntryPointNode,
@@ -19,6 +17,7 @@ import {
 } from 'ng-packagr/lib/ts/cache-compiler-host';
 import * as log from 'ng-packagr/lib/utils/log';
 import { ngCompilerCli } from 'ng-packagr/lib/utils/ng-compiler-cli';
+import { join } from 'node:path';
 import path from 'path';
 import { Injector } from 'static-injector';
 import ts from 'typescript';
@@ -34,6 +33,7 @@ import {
   ENTRY_POINT_TOKEN,
   RESOLVED_DATA_GROUP_TOKEN,
 } from './token';
+
 export async function compileSourceFiles(
   graph: BuildGraph,
   tsConfig: ParsedConfiguration,
@@ -49,6 +49,7 @@ export async function compileSourceFiles(
     ...extraOptions,
   };
   const entryPoint: EntryPointNode = graph.find(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     isEntryPointInProgress() as any
   )!;
   const ngPackageNode: PackageNode = graph.find(isPackage)!;

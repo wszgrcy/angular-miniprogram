@@ -23,7 +23,7 @@ export class OutputTemplateMetadataService {
   ) {}
 
   run(fileName: string, data: string, sourceFile: ts.SourceFile) {
-    let list = data.split(/\n|\r\n/g);
+    const list = data.split(/\n|\r\n/g);
     list.splice(
       list.length - 1,
       0,

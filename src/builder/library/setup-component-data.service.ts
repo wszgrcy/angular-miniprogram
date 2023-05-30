@@ -83,7 +83,7 @@ export class SetupComponentDataService {
       insertComponentData.style = styleContentList.join('\n');
     }
 
-    let list = changedData.content.split(/\n|\r\n/g);
+    const list = changedData.content.split(/\n|\r\n/g);
     list.splice(
       Math.max(list.length - 1, 0),
       0,
