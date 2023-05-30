@@ -37,14 +37,13 @@ layout: home
 
 ### 前提条件
 
-- `Node.js` 版本大于 14
-- `@angular/cli` 版本为 14
-- `yarn`
+- `Node.js` 版本大于 16
+- `@angular/cli` 版本为 16
 
 ### hello-world
 
 - 使用[https://github.com/wszgrcy/angular-miniprogram-template](https://github.com/wszgrcy/angular-miniprogram-template)模板或将此项目下载
-- 使用 yarn 安装依赖
+- 使用 npm 安装依赖
 
 ### 快速启动
 
