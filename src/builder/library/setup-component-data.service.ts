@@ -83,10 +83,15 @@ export class SetupComponentDataService {
       insertComponentData.style = styleContentList.join('\n');
     }
 
-    return `${
-      changedData.content
-    }\nlet ${componentClassName}_${LIBRARY_COMPONENT_METADATA_SUFFIX}=${JSON.stringify(
-      insertComponentData
-    )}`;
+    let list = changedData.content.split(/\n|\r\n/g);
+    list.splice(
+      Math.max(list.length - 1, 0),
+      0,
+      `let ${componentClassName}_${LIBRARY_COMPONENT_METADATA_SUFFIX}=${JSON.stringify(
+        insertComponentData
+      )}`
+    );
+
+    return list.join('\n');
   }
 }

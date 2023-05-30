@@ -1,4 +1,6 @@
-import { dirname, join, normalize } from '@angular-devkit/core';
+import { dirname, normalize } from '@angular-devkit/core';
+import { join } from 'node:path';
+
 import type {
   CompilerOptions,
   ParsedConfiguration,
@@ -10,13 +12,11 @@ import {
   isEntryPointInProgress,
   isPackage,
 } from 'ng-packagr/lib/ng-package/nodes';
-import { NgccProcessor } from 'ng-packagr/lib/ngc/ngcc-processor';
 import { StylesheetProcessor } from 'ng-packagr/lib/styles/stylesheet-processor';
 import {
   augmentProgramWithVersioning,
   cacheCompilerHost,
 } from 'ng-packagr/lib/ts/cache-compiler-host';
-import { ngccTransformCompilerHost } from 'ng-packagr/lib/ts/ngcc-transform-compiler-host';
 import * as log from 'ng-packagr/lib/utils/log';
 import { ngCompilerCli } from 'ng-packagr/lib/utils/ng-compiler-cli';
 import path from 'path';
@@ -34,14 +34,12 @@ import {
   ENTRY_POINT_TOKEN,
   RESOLVED_DATA_GROUP_TOKEN,
 } from './token';
-
 export async function compileSourceFiles(
   graph: BuildGraph,
   tsConfig: ParsedConfiguration,
   moduleResolutionCache: ts.ModuleResolutionCache,
   extraOptions?: Partial<CompilerOptions>,
   stylesheetProcessor?: StylesheetProcessor,
-  ngccProcessor?: NgccProcessor,
   watch?: boolean
 ) {
   const { NgtscProgram, formatDiagnostics } = await ngCompilerCli();
@@ -51,24 +49,18 @@ export async function compileSourceFiles(
     ...extraOptions,
   };
   const entryPoint: EntryPointNode = graph.find(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     isEntryPointInProgress() as any
   )!;
   const ngPackageNode: PackageNode = graph.find(isPackage)!;
   const inlineStyleLanguage = ngPackageNode.data.inlineStyleLanguage;
 
-  const tsCompilerHost = ngccTransformCompilerHost(
-    cacheCompilerHost(
-      graph,
-      entryPoint,
-      tsConfigOptions,
-      moduleResolutionCache,
-      stylesheetProcessor,
-      inlineStyleLanguage
-    ),
+  const tsCompilerHost = cacheCompilerHost(
+    graph,
+    entryPoint,
     tsConfigOptions,
-    ngccProcessor!,
-    moduleResolutionCache
+    moduleResolutionCache,
+    stylesheetProcessor,
+    inlineStyleLanguage
   );
   // inject
   augmentLibraryMetadata(tsCompilerHost);
@@ -203,6 +195,7 @@ export async function compileSourceFiles(
   for (const sourceFile of builder.getSourceFiles()) {
     if (!ignoreForDiagnostics.has(sourceFile)) {
       allDiagnostics.push(
+        ...builder.getDeclarationDiagnostics(sourceFile),
         ...builder.getSyntacticDiagnostics(sourceFile),
         ...builder.getSemanticDiagnostics(sourceFile)
       );
@@ -215,7 +208,7 @@ export async function compileSourceFiles(
     // Collect sources that are required to be emitted
     if (
       !ignoreForEmit.has(sourceFile) &&
-      !angularCompiler.incrementalDriver.safeToSkipEmit(sourceFile)
+      !angularCompiler.incrementalCompilation.safeToSkipEmit(sourceFile)
     ) {
       // If required to emit, diagnostics may have also changed
       if (!ignoreForDiagnostics.has(sourceFile)) {
@@ -305,7 +298,7 @@ export async function compileSourceFiles(
       const sourceFile = sourceFiles && sourceFiles[0];
       if (sourceFile) {
         if (
-          entryFileName ===
+          normalize(entryFileName) ===
           normalize(sourceFile.fileName.replace(/\.ts$/, '.js'))
         ) {
           const service = injector.get(OutputTemplateMetadataService);
