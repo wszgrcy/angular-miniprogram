@@ -8,9 +8,10 @@ title: Attention
 
 ## Import Change
 
-- Use `angular-miniprogram/common` replace `@angular/common`,
+- Use `angular-miniprogram/common` replace `@angular/common`
+- Use `angular-miniprogram/common/http` replace `@angular/common/http`
 - Use `angular-miniprogram/forms` replace `@angular/forms`
-- Use `import { HttpClientModule } from 'angular-miniprogram';` replace `import { HttpClientModule } from '@angular/common/http'`
+- Use `import { HttpClientModule, provideHttpClient } from 'angular-miniprogram'` replace `import { HttpClientModule, provideHttpClient } from '@angular/common/http'`
 
 ## Attention
 
