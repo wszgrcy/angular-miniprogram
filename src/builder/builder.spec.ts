@@ -100,7 +100,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
             .expectFile(componentPath + buildPlatform.fileExtname.content)
             .toExist();
         });
-        const realTestPath: string = result.result?.outputPath as string;
+        const realTestPath: string = result.result?.baseOutputPath as string;
         const appTestPath = path.resolve(process.cwd(), '__test-app');
         fs.copySync(realTestPath, path.resolve(process.cwd(), '__test-app'));
         // ('等待断点放开');

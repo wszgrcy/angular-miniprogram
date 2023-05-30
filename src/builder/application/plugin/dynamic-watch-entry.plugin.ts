@@ -4,7 +4,7 @@ import { normalizeAssetPatterns } from '@angular-devkit/build-angular/src/utils'
 import { Path, getSystemPath, normalize, resolve } from '@angular-devkit/core';
 import * as glob from 'glob';
 import * as path from 'path';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { filter, take } from 'rxjs/operators';
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
@@ -116,28 +116,37 @@ export class DynamicWatchEntryPlugin {
       rootCompilation = false;
     });
     // 入口移动到这里是因为ng新增了一个插件也同时修改了入口,
-    const originEntryConfig = compiler.options.entry;
-    compiler.options.entry = async () => {
-      await this.entryPattern$.pipe(filter(Boolean), take(1)).toPromise();
-      const entryPattern = this.entryPattern$.value!;
-
-      const list = [...entryPattern.pageList, ...entryPattern.componentList];
-      const result = (await (typeof originEntryConfig === 'function'
-        ? originEntryConfig()
-        : originEntryConfig))!;
-      if (result['app']) {
-        throw new Error(
-          '资源文件不能指定为app文件名或bundleName,请重新修改(不影响导出)'
-        );
+    compiler.hooks.environment.tap(
+      { name: `DynamicWatchEntryPlugin`, stage: 9999 },
+      () => {
+        const originEntryConfig = compiler.options.entry;
+        compiler.options.entry = async () => {
+          await firstValueFrom(
+            this.entryPattern$.pipe(filter(Boolean), take(1))
+          );
+          const entryPattern = this.entryPattern$.value!;
+          const list = [
+            ...entryPattern.pageList,
+            ...entryPattern.componentList,
+          ];
+          const result = (await (typeof originEntryConfig === 'function'
+            ? originEntryConfig()
+            : originEntryConfig))!;
+          if (result['app']) {
+            throw new Error(
+              '资源文件不能指定为app文件名或bundleName,请重新修改(不影响导出)'
+            );
+          }
+          return {
+            ...result,
+            ...list.reduce((pre, cur) => {
+              pre[cur.entryName] = { import: [cur.src] };
+              return pre;
+            }, {} as Record<string, Exclude<webpack.EntryNormalized, Function>[string]>),
+          };
+        };
       }
-      return {
-        ...result,
-        ...list.reduce((pre, cur) => {
-          pre[cur.entryName] = { import: [cur.src] };
-          return pre;
-        }, {} as Record<string, Exclude<webpack.EntryNormalized, Function>[string]>),
-      };
-    };
+    );
   }
   private async generateModuleInfo(
     list: AssetPattern[],

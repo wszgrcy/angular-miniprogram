@@ -23,7 +23,13 @@ export class OutputTemplateMetadataService {
   ) {}
 
   run(fileName: string, data: string, sourceFile: ts.SourceFile) {
-    return `${data}\n${this.getSelfTemplate()};${this.getLibraryTemplate()}`;
+    const list = data.split(/\n|\r\n/g);
+    list.splice(
+      list.length - 1,
+      0,
+      `${this.getSelfTemplate()};${this.getLibraryTemplate()}`
+    );
+    return list.join('\n');
   }
   private getSelfTemplate() {
     const selfMetaCollection = this.dataGroup.otherMetaCollectionGroup['$self'];

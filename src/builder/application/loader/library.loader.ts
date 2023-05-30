@@ -31,7 +31,9 @@ export default async function (
 ) {
   const callback = this.async();
   const selector = createCssSelectorForTs(data);
-  const list = selector.queryAll(`BinaryExpression[left$=ɵcmp]`);
+  const list = selector.queryAll(
+    `PropertyAccessExpression[name=ɵɵdefineComponent]~SyntaxList ObjectLiteralExpression PropertyAssignment[name=type]::initializer`
+  );
   if (!list.length) {
     callback(undefined, data, map);
     return;
@@ -45,9 +47,7 @@ export default async function (
   const scopeLibraryObj: Record<string, ExtraTemplateData[]> = {};
   for (let i = 0; i < list.length; i++) {
     const element = list[i] as ts.BinaryExpression;
-    const componentName = (
-      element.left as ts.PropertyAccessExpression
-    ).expression.getText();
+    const componentName = element.getText();
     const extraNode = selector.queryOne(
       `VariableDeclaration[name="${componentName}_${LIBRARY_COMPONENT_METADATA_SUFFIX}"]`
     ) as ts.VariableDeclaration;

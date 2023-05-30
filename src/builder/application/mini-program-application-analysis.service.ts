@@ -1,6 +1,6 @@
-import { join, normalize, resolve } from '@angular-devkit/core';
 import type { NgtscProgram, ParsedConfiguration } from '@angular/compiler-cli';
 import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
+import { join, normalize, resolve } from '@angular-devkit/core';
 import { externalizePath } from '@ngtools/webpack/src/ivy/paths';
 import { createHash } from 'crypto';
 import { createCssSelectorForTs } from 'cyia-code-util';

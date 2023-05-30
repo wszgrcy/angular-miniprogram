@@ -25,14 +25,14 @@ describeBuilder(execute, LIBRARY_BUILDER_INFO, (harness) => {
       const outputPath = normalize(`dist/test-library`);
       const output = path.join(workspaceRoot, outputPath);
       const entryFile = harness.expectFile(
-        join(outputPath, 'esm2020', 'test-library.mjs')
+        join(outputPath, 'esm2022', 'test-library.mjs')
       );
       entryFile.toExist();
       entryFile.content.toContain(`$self_Global_Template`);
       const globalSelfTemplate = harness.expectFile(
         join(
           outputPath,
-          'esm2020',
+          'esm2022',
           'global-self-template',
           'global-self-template.component.mjs'
         )

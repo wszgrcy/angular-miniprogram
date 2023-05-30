@@ -20,17 +20,17 @@ jobs:
       - name: install-node
         uses: actions/setup-node@v1
         with:
-          node-version: 14.x
+          node-version: 16.x
       - name: install-dependencies
         run: |
-          yarn
+          npm i --legacy-peer-deps
       - name: hook-code
         run: |
-          yarn hook-code
+          npm run hook-code
       - name: build-docs
         continue-on-error: true
         run: |
-          yarn deploy
+          npm run deploy
           cp -rp docs/ ../dist
           git branch gh-pages
           git checkout gh-pages
