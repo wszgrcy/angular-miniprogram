@@ -30,7 +30,7 @@ jobs:
           npm run lint
       - name: hook-code
         run: |
-          npm run hook-code
+          npm run sync
       - name: test
         run: |
           npm run test:ci
