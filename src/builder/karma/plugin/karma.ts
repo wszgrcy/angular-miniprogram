@@ -1,4 +1,4 @@
-import { statsErrorsToString } from '@angular-devkit/build-angular/src/webpack/utils/stats';
+// import { statsErrorsToString } from '@angular-devkit/build-angular/src/webpack/utils/stats';
 import { logging } from '@angular-devkit/core';
 import { createConsoleLogger } from '@angular-devkit/core/node';
 import { ConfigOptions, launcher } from 'karma';
@@ -90,7 +90,7 @@ function init(
         warnings: true,
       });
 
-      logger.error(statsErrorsToString(statsJson, { colors: true }));
+      logger.error(JSON.stringify(statsJson));
 
       // Notify potential listeners of the compile error.
       emitter.emit('compile_error', {
