@@ -1,13 +1,13 @@
 {
   "name": "angular-miniprogram",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "使用Angular开发小程序",
   "keywords": [
     "Angular",
     "miniprogram",
     "wechat",
     "weixin",
-    "Angular 16"
+    "Angular 17"
   ],
   "repository": {
     "type": "git",

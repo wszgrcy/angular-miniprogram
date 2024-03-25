@@ -39,7 +39,7 @@ jobs:
           npm run build
       - id: publish
         name: publish
-        uses: JS-DevTools/npm-publish@v1
+        uses: JS-DevTools/npm-publish@v3
         if: ${{ github.repository_owner	== 'wszgrcy' }}
         with:
           token: ${{ secrets.NPM_PUBLISH_TOKEN }}
