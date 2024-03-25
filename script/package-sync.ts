@@ -33,11 +33,11 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
   let exclude = [
     'forms/src/directives/default_value_accessor.ts',
     'forms/src/directives/checkbox_value_accessor.ts',
-    'forms/src/directives/number_value_accessor.ts',
+    // 'forms/src/directives/number_value_accessor.ts',
     'forms/src/directives/radio_control_value_accessor.ts',
-    'forms/src/directives/range_value_accessor.ts',
-    'forms/src/directives/select_control_value_accessor.ts',
-    'forms/src/directives/select_multiple_control_value_accessor.ts',
+    // 'forms/src/directives/range_value_accessor.ts',
+    // 'forms/src/directives/select_control_value_accessor.ts',
+    // 'forms/src/directives/select_multiple_control_value_accessor.ts',
     'forms/src/directives.ts',
     'forms/src/forms.ts',
   ];
