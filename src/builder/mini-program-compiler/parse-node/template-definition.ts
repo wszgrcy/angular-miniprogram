@@ -21,8 +21,20 @@ import type {
   SafeKeyedRead,
   SafePropertyRead,
   Text,
+  TmplAstDeferredBlock,
+  TmplAstDeferredBlockError,
+  TmplAstDeferredBlockLoading,
+  TmplAstDeferredBlockPlaceholder,
+  TmplAstDeferredTrigger,
+  TmplAstForLoopBlock,
+  TmplAstForLoopBlockEmpty,
+  TmplAstIfBlock,
+  TmplAstIfBlockBranch,
   TmplAstNode,
   TmplAstRecursiveVisitor,
+  TmplAstSwitchBlock,
+  TmplAstSwitchBlockCase,
+  TmplAstUnknownBlock,
   Visitor,
 } from '@angular/compiler';
 
@@ -173,6 +185,19 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       this.declIndex++;
     });
   }
+  // todo
+  visitDeferredBlock(deferred: TmplAstDeferredBlock): void {}
+  visitDeferredBlockError(block: TmplAstDeferredBlockError): void {}
+  visitDeferredBlockLoading(block: TmplAstDeferredBlockLoading): void {}
+  visitDeferredBlockPlaceholder(block: TmplAstDeferredBlockPlaceholder): void {}
+  visitDeferredTrigger(trigger: TmplAstDeferredTrigger): void {}
+  visitForLoopBlock(block: TmplAstForLoopBlock): void {}
+  visitForLoopBlockEmpty(block: TmplAstForLoopBlockEmpty): void {}
+  visitIfBlock(block: TmplAstIfBlock): void {}
+  visitIfBlockBranch(block: TmplAstIfBlockBranch): void {}
+  visitSwitchBlock(block: TmplAstSwitchBlock): void {}
+  visitSwitchBlockCase(block: TmplAstSwitchBlockCase): void {}
+  visitUnknownBlock(block: TmplAstUnknownBlock): void {}
 }
 export function visitAll(visitor: TemplateDefinition, nodes: TmplAstNode[]) {
   for (const node of nodes) {

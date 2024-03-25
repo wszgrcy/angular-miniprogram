@@ -11,6 +11,7 @@ register({
       before: [transformer],
     };
   },
+  logError: true,
 });
 let jasmineInstance = new Jasmine();
 let args = process.argv.slice(2) || [];

@@ -66,7 +66,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
     return new Observable((observer: Observer<HttpEvent<any>>) => {
       let currentZone = Zone.current;
       // The response header event handler
-      const onHeadersReceived: WechatMiniprogram.OnHeadersReceivedCallback = ({
+      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
         header,
       }) => {
         currentZone.run(() => {
@@ -180,7 +180,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
     return new Observable((observer: Observer<HttpEvent<any>>) => {
       let currentZone = Zone.current;
       // The response header event handler
-      const onHeadersReceived: WechatMiniprogram.OnHeadersReceivedCallback = ({
+      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
         header,
       }) => {
         currentZone.run(() => {
@@ -287,7 +287,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
     return new Observable((observer: Observer<HttpEvent<any>>) => {
       let currentZone = Zone.current;
       // The response header event handler
-      const onHeadersReceived: WechatMiniprogram.OnHeadersReceivedCallback = ({
+      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
         header,
       }) => {
         currentZone.run(() => {

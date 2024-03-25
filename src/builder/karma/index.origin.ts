@@ -21,13 +21,13 @@ import type {
   KarmaBuilderOptions,
 } from '@angular-devkit/build-angular';
 import { FindTestsPlugin } from '@angular-devkit/build-angular/src/builders/karma/find-tests-plugin';
-import { purgeStaleBuildCache } from '@angular-devkit/build-angular/src/utils/purge-cache';
-import { assertCompatibleAngularVersion } from '@angular-devkit/build-angular/src/utils/version';
-import { generateBrowserWebpackConfigFromContext } from '@angular-devkit/build-angular/src/utils/webpack-browser-config';
 import {
   getCommonConfig,
   getStylesConfig,
-} from '@angular-devkit/build-angular/src/webpack/configs';
+} from '@angular-devkit/build-angular/src/tools/webpack/configs';
+import { purgeStaleBuildCache } from '@angular-devkit/build-angular/src/utils/purge-cache';
+import { assertCompatibleAngularVersion } from '@angular-devkit/build-angular/src/utils/version';
+import { generateBrowserWebpackConfigFromContext } from '@angular-devkit/build-angular/src/utils/webpack-browser-config';
 
 import { Config, ConfigOptions } from 'karma';
 import * as path from 'path';
@@ -118,7 +118,7 @@ export function execute(
 
       // Convert browsers from a string to an array
       if (options.browsers) {
-        karmaOptions.browsers = options.browsers.split(',');
+        karmaOptions.browsers = (options.browsers as string)!.split(',');
       }
 
       if (options.reporters) {

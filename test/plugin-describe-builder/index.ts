@@ -3,12 +3,9 @@
 import type { TestProjectHost } from '@angular-devkit/architect/testing';
 
 import { Path, join, normalize } from '@angular-devkit/core';
-import {
-  fileBufferToString,
-  stringToFileBuffer,
-} from '@angular-devkit/core/src/virtual-fs/host';
-
+import { virtualFs } from '@angular-devkit/core';
 import type { Configuration } from 'webpack';
+let { fileBufferToString, stringToFileBuffer } = virtualFs;
 
 export interface TestContext {
   buildSuccess: (webpackConfig: Configuration) => void;
