@@ -143,7 +143,7 @@ export class WebpackConfigurationChangeService {
     ).chunks = (chunk) => {
       if (
         this.entryList.find((item) => item.entryName === chunk.name) ||
-        chunk.name.startsWith(`${LIBRARY_OUTPUT_ROOTDIR}/`)
+        chunk.name!.startsWith(`${LIBRARY_OUTPUT_ROOTDIR}/`)
       ) {
         return true;
       }
@@ -173,7 +173,7 @@ export class WebpackConfigurationChangeService {
         [...chunk.files].some((file) =>
           file.endsWith(this.buildPlatform.fileExtname.style)
         ) ||
-        chunk.name.startsWith(`${LIBRARY_OUTPUT_ROOTDIR}/`)
+        chunk.name!.startsWith(`${LIBRARY_OUTPUT_ROOTDIR}/`)
       ) {
         return true;
       }
@@ -231,6 +231,7 @@ export class WebpackConfigurationChangeService {
       navigator: `${this.buildPlatform.globalVariablePrefix}.navigator`,
       wx: this.buildPlatform.globalObject,
       miniProgramPlatform: `"${this.buildPlatform.globalObject}"`,
+      queueMicrotask:`${this.buildPlatform.globalVariablePrefix}.queueMicrotask`
     };
     if (this.config.mode === 'development') {
       defineObject[
