@@ -11,7 +11,7 @@
     "build": " npm run build:library && npm run build:builder && npm run copy:assets && npm run build:karma",
     "copy:assets": "cpx \"./src/builder/**/*.json\" ./dist/builder && cpx \"./src/builder/**/*.js\" ./dist/builder && cpx ./readme.md ./dist",
     "build:library": "node ./script/start-build-library",
-    "build:builder": "ts-node -P ./script/tsconfig.json ./script/build.ts ./tsconfig.builder.json",
+    "build:builder": "tsx ./script/build.ts ./tsconfig.builder.json",
     "build:karma": "tsx ./script/build.ts ./src/builder/karma/client/tsconfig.json && tsx ./script/build.ts ./src/builder/karma/plugin/tsconfig.json",
     "prepare": "husky install",
     "lint": "eslint --max-warnings 0 \"./**/*.ts\"",
@@ -19,7 +19,7 @@
     "coverage": "nyc npm run test",
     "typedoc": "typedoc",
     "deploy": "npm run typedoc && npm run build:library && npm run test:jasmine library && npm run coverage-badge -- init && cpx \"./deploy/doc/**/*\" ./docs && cpx \"./deploy/api-doc/**/*\" ./docs/api-doc && npm run coverage && npm run coverage-badge -- success && cpx ./deploy/doc/assets/img/badge.svg ./docs/assets/img",
-    "coverage-badge": "ts-node ./script/coverage-badge.ts"
+    "coverage-badge": "tsx ./script/coverage-badge.ts"
   },
   "private": true,
   "author": "wszgrcy",
@@ -42,7 +42,6 @@
     "@types/karma": "^6.3.3",
     "@types/node": "20.11.30",
     "@types/socket.io-client": "^3.0.0",
-    "@types/webpack-sources": "^3.2.0",
     "@typescript-eslint/eslint-plugin": "^5.44.0",
     "@typescript-eslint/parser": "^5.44.0",
     "cpx": "^1.5.0",
