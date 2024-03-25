@@ -45,7 +45,7 @@ jobs:
           token: ${{ secrets.NPM_PUBLISH_TOKEN }}
           package: ./dist/package.json
           tag: alpha
-      - if: ${{ github.repository_owner	== 'wszgrcy' && steps.publish.outputs.type != 'none' }}
+      - if: ${{ github.repository_owner	== 'wszgrcy' && steps.publish.outputs.type  }}
         run: |
           echo "[${{ steps.publish.outputs.type }}]版本已变更: ${{ steps.publish.outputs.old-version }} => ${{ steps.publish.outputs.version }}"
           git tag v${{steps.publish.outputs.version}}
