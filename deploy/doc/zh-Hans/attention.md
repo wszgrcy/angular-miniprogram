@@ -84,3 +84,8 @@ export function libraryTemplateScopeName(library: string) {
   [template]="$$mp$$TestLibrary$$first"
 ></app-outside-template>
 ```
+
+
+### 未实现
+- 控制流(control flow)
+> 这部分功能目前看起来是动态生成的,要转换为静态的就只能用小程序原生的一些方法,但是又没法1:1对应,所以暂时没想到好方法

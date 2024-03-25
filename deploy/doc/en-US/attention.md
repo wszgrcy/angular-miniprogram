@@ -88,3 +88,7 @@ export function libraryTemplateScopeName(library: string) {
   [template]="$$mp$$TestLibrary$$first"
 ></app-outside-template>
 ```
+
+### Unrealized
+- control flow
+> This part of the functionality currently appears to be dynamically generated, and to convert it to static, we can only use some native methods of the mini program, but it cannot be matched 1:1, so we haven't thought of a good method yet

@@ -37,8 +37,8 @@ layout: home
 
 ### 前提条件
 
-- `Node.js` 版本大于 16
-- `@angular/cli` 版本为 16
+- `Node.js` 版本大于 20
+- `@angular/cli` 版本为 17
 
 ### hello-world
 

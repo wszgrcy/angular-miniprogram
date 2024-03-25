@@ -34,8 +34,8 @@ reduce cross-platform costs</p>
 
 ### Prerequisites
 
-- `Node.js` greater than 16
-- `@angular/cli` 16
+- `Node.js` greater than 20
+- `@angular/cli` 17
 
 ### hello-world
 
