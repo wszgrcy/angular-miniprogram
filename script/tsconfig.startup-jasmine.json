@@ -1,7 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": { "skipLibCheck": true, "outDir": "." },
-  "files": ["./startup-jasmine.ts"],
-  "include": [],
-  "exclude": []
-}

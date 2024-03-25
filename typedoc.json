@@ -1,7 +1,0 @@
-{
-  "entryPoints": ["./src/library/platform/index.ts"],
-  "out": "deploy/api-doc",
-  "tsconfig": "tsconfig.doc.json",
-  "excludePrivate": true,
-  "readme": "none"
-}
