@@ -11,8 +11,9 @@ title: 注意事项
 ## 引入变更
 
 - 使用`angular-miniprogram/common`代替`@angular/common`,
+- 使用`angular-miniprogram/common/http`代替`@angular/common/http`
 - 使用`angular-miniprogram/forms`代替`@angular/forms`
-- 使用`import { HttpClientModule } from 'angular-miniprogram';`代替`import { HttpClientModule } from '@angular/common/http'`
+- 使用`import { HttpClientModule, provideHttpClient } from 'angular-miniprogram'`代替`import { HttpClientModule, provideHttpClient } from '@angular/common/http'`
 
 ## 注意
 

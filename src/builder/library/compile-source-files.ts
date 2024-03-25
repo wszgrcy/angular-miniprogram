@@ -15,8 +15,8 @@ import {
   augmentProgramWithVersioning,
   cacheCompilerHost,
 } from 'ng-packagr/lib/ts/cache-compiler-host';
+import { ngCompilerCli } from 'ng-packagr/lib/utils/load-esm';
 import * as log from 'ng-packagr/lib/utils/log';
-import { ngCompilerCli } from 'ng-packagr/lib/utils/ng-compiler-cli';
 import { join } from 'node:path';
 import path from 'path';
 import { Injector } from 'static-injector';

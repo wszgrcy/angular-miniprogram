@@ -43,16 +43,14 @@ export class MiniprogramHttpBackend implements HttpBackend {
   handle(request: HttpRequest<any>): Observable<HttpEvent<any>> {
     if (
       request.method === 'POST' &&
-      // TODO angular v13.1 后采用 context.has()
-      request.context.get(UPLOAD_FILE_TOKEN)?.filePath
+      request.context.has(UPLOAD_FILE_TOKEN)
     ) {
       return this.upload(request);
     }
 
     if (
       request.method === 'GET' &&
-      // TODO angular v13.1 后采用 context.has()
-      request.context.get(DOWNLOAD_FILE_TOKEN)?.filePath
+      request.context.has(DOWNLOAD_FILE_TOKEN)
     ) {
       return this.download(request);
     }
@@ -68,7 +66,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
     return new Observable((observer: Observer<HttpEvent<any>>) => {
       let currentZone = Zone.current;
       // The response header event handler
-      const onHeadersReceived: WechatMiniprogram.OnHeadersReceivedCallback = ({
+      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
         header,
       }) => {
         currentZone.run(() => {
@@ -182,7 +180,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
     return new Observable((observer: Observer<HttpEvent<any>>) => {
       let currentZone = Zone.current;
       // The response header event handler
-      const onHeadersReceived: WechatMiniprogram.OnHeadersReceivedCallback = ({
+      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
         header,
       }) => {
         currentZone.run(() => {
@@ -289,7 +287,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
     return new Observable((observer: Observer<HttpEvent<any>>) => {
       let currentZone = Zone.current;
       // The response header event handler
-      const onHeadersReceived: WechatMiniprogram.OnHeadersReceivedCallback = ({
+      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
         header,
       }) => {
         currentZone.run(() => {
