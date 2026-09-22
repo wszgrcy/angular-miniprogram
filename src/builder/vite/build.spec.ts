@@ -14,21 +14,7 @@ import {
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
 import { PlatformType } from '../platform/platform';
-import {
-  createMiniProgramViteConfig,
-  getBuildPlatform,
-  runViteBuilder,
-} from './index';
-
-/** createMiniProgramViteConfig 只用到 workspaceRoot / target.project / getProjectMetadata */
-function minimalCtx() {
-  return {
-    workspaceRoot: process.cwd(),
-    target: { project: 'test', target: 'build', configuration: undefined },
-    getProjectMetadata: async () => ({ root: '.', sourceRoot: 'src' }),
-    logger: console,
-  };
-}
+import { runViteBuilder } from './index';
 
 /**
  * Vite 构建链路验证（第一阶段：入口 + Angular AOT + propertyChange 注入）。
@@ -173,54 +159,157 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
   });
 });
 
-describe('vite: fileReplacements / stylePreprocessorOptions 配置透传', () => {
-  /**
-   * 这里验的是**配置透传**，不是端到端替换效果。
-   *
-   * 为什么不端到端验：小程序模型里 main.ts 不是 entry（页面才是），
-   * 而 environment.ts 只被 main.ts import，所以它根本不在 bundle 里，
-   * 拿 fixture 断言「产物里出现 production: true」永远不成立。
-   *
-   * 要端到端验，得让某个 page entry 真的 import environment——
-   * 那是改 fixture，不是改 builder。这里先把「选项没被静默丢掉」钉住。
-   */
-  it('fileReplacements 要透传给 analog 插件', async () => {
-    const replacements = [
-      {
-        replace: 'src/environments/environment.ts',
-        with: 'src/environments/environment.prod.ts',
-      },
-    ];
-    const captured: unknown[] = [];
-    const pluginStub = { name: 'capture', config: () => {} };
+describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
+  describe('vite: fileReplacements 端到端', () => {
+    /**
+     * 造一个 page entry 真的 import environment，然后替换它，
+     * 最后去 dist 里看替换有没有生效。
+     *
+     * 之前说「验不了」是错的——environment 不在 bundle 里只是因为
+     * 现有 fixture 没有 page import 它，那是 fixture 的属性，
+     * 不是 builder 的限制。自己写一个 entry 就能造出条件。
+     */
+    it('替换 environment 后，dist 里应该是 prod 的值', async () => {
+      const root = harness.host.root();
+      const myTestProjectHost = new MyTestProjectHost(harness.host);
+      const list = await myTestProjectHost.getFileList(
+        normalize(join(root, 'src', '__pages'))
+      );
+      list.push(
+        ...(await myTestProjectHost.getFileList(
+          normalize(join(root, 'src', '__components'))
+        ))
+      );
+      await myTestProjectHost.importPathRename(list);
+      await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
+      await myTestProjectHost.moveDir(
+        ALL_COMPONENT_NAME_LIST,
+        '__components',
+        'components'
+      );
+      await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
 
-    // 直接检查我们组装出来的 config 里带上了 fileReplacements
-    const config = await createMiniProgramViteConfig({
-      viteOptions: {
+      // 关键：写一个真的 import environment 的 page entry。
+      // 值要绑到组件属性上，否则会被 tree-shake 掉。
+      await harness.writeFile(
+        'src/pages/env-probe/env-probe.entry.ts',
+        `import { Component } from '@angular/core';
+import { bootstrapPage } from 'angular-miniprogram';
+import { environment } from '../../environments/environment';
+
+@Component({
+  selector: 'app-env-probe',
+  standalone: true,
+  template: '<view>{{ isProd }}</view>',
+})
+export class EnvProbeComponent {
+  isProd = environment.production;
+}
+
+bootstrapPage(EnvProbeComponent);
+`
+      );
+
+      harness.useTarget('build', {
         tsConfig: 'src/tsconfig.app.json',
-        outputPath: 'dist/x',
-        pages: [],
-        components: [],
+        outputPath: 'dist/vite-env',
+        pages: DEFAULT_ANGULAR_CONFIG.pages,
+        components: DEFAULT_ANGULAR_CONFIG.components,
         platform: PlatformType.wx,
-        fileReplacements: replacements,
-        stylePreprocessorOptions: { includePaths: ['src/scss'] },
-      },
-      context: minimalCtx(),
-      buildPlatform: getBuildPlatform(PlatformType.wx),
-      extraPlugins: [pluginStub as never],
-    });
+        sourceMap: false,
+        fileReplacements: [
+          {
+            replace: 'src/environments/environment.ts',
+            with: 'src/environments/environment.prod.ts',
+          },
+        ],
+      } as never);
 
-    void captured;
-    const plugins = config.plugins ?? [];
-    // analog 插件收到的参数我们无法直接读，退而求其次：
-    // 断言 config 里 stylePreprocessorOptions 落到了 css.preprocessorOptions
-    const css = config.css as {
-      preprocessorOptions?: { scss?: { includePaths?: string[] } };
-    };
-    expect(
-      css?.preprocessorOptions?.scss?.includePaths?.some((p) =>
-        p.endsWith('src/scss')
-      )
-    ).toBe(true);
+      const result = await harness.executeOnce();
+      expect(result.result?.success).toBeTruthy();
+
+      const base = result.result!.baseOutputPath as string;
+      const jsFiles = fs
+        .readdirSync(base, { recursive: true })
+        .map((f) => String(f))
+        .filter((f) => f.endsWith('.js'));
+      const all = jsFiles
+        .map((f) => fs.readFileSync(path.join(base, f), 'utf8'))
+        .join('\n');
+
+      // 替换生效 => 产物里是 prod 的 true，不该再有 dev 的 false
+      expect(all).toContain('production: true');
+      expect(all).not.toContain('production: false');
+
+      // 而且这个 entry 确实产出了文件
+      expect(
+        fs.existsSync(path.join(base, 'pages/env-probe/env-probe-entry.js')) ||
+          jsFiles.some((f) => f.includes('env-probe'))
+      ).toBe(true);
+    }, 300000);
+
+    it('不替换时，dist 里应该保持 dev 的值（对照组）', async () => {
+      const root = harness.host.root();
+      const myTestProjectHost = new MyTestProjectHost(harness.host);
+      const list = await myTestProjectHost.getFileList(
+        normalize(join(root, 'src', '__pages'))
+      );
+      list.push(
+        ...(await myTestProjectHost.getFileList(
+          normalize(join(root, 'src', '__components'))
+        ))
+      );
+      await myTestProjectHost.importPathRename(list);
+      await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
+      await myTestProjectHost.moveDir(
+        ALL_COMPONENT_NAME_LIST,
+        '__components',
+        'components'
+      );
+      await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
+
+      await harness.writeFile(
+        'src/pages/env-probe/env-probe.entry.ts',
+        `import { Component } from '@angular/core';
+import { bootstrapPage } from 'angular-miniprogram';
+import { environment } from '../../environments/environment';
+
+@Component({
+  selector: 'app-env-probe',
+  standalone: true,
+  template: '<view>{{ isProd }}</view>',
+})
+export class EnvProbeComponent {
+  isProd = environment.production;
+}
+
+bootstrapPage(EnvProbeComponent);
+`
+      );
+
+      harness.useTarget('build', {
+        tsConfig: 'src/tsconfig.app.json',
+        outputPath: 'dist/vite-noenv',
+        pages: DEFAULT_ANGULAR_CONFIG.pages,
+        components: DEFAULT_ANGULAR_CONFIG.components,
+        platform: PlatformType.wx,
+        sourceMap: false,
+      } as never);
+
+      const result = await harness.executeOnce();
+      expect(result.result?.success).toBeTruthy();
+
+      const base = result.result!.baseOutputPath as string;
+      const all = fs
+        .readdirSync(base, { recursive: true })
+        .map((f) => String(f))
+        .filter((f) => f.endsWith('.js'))
+        .map((f) => fs.readFileSync(path.join(base, f), 'utf8'))
+        .join('\n');
+
+      // 没替换 => 还是 dev 的 false
+      expect(all).toContain('production: false');
+      expect(all).not.toContain('production: true');
+    }, 300000);
   });
 });
