@@ -31,6 +31,12 @@
   ],
   "angularCompilerOptions": {
     "enableIvy": true,
-    "compilationMode": "full"
+    "compilationMode": "full",
+    // Angular 21 开始会对 @HostBinding 做 schema 校验（typeCheckHostBindings 默认 true）。
+    // 本库的表单 accessor 绑的是小程序自定义元素（checkbox / switch / radio / slider /
+    // picker / picker-view），这些永远不在 Angular 的 DOM schema 里，会全部报 NG8002。
+    // 这些绑定最终由本库的模板编译器翻译成 wxml，不会真的去 set DOM property，
+    // 所以这里关掉 host binding 的类型检查。
+    "typeCheckHostBindings": false
   }
 }

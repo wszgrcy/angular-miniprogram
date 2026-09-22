@@ -22,12 +22,8 @@ import {
   isBuilderOutput,
 } from '@angular-devkit/architect';
 import { TestProjectHost } from '@angular-devkit/architect/testing';
-import {
-  Path,
-  getSystemPath,
-  json,
-  logging,
-} from '@angular-devkit/core';
+import { Path, getSystemPath, json, logging } from '@angular-devkit/core';
+import nodePath from 'node:path';
 import { Observable, Subject, firstValueFrom, lastValueFrom, of } from 'rxjs';
 import {
   catchError,
@@ -91,7 +87,7 @@ export interface BuilderHarnessExecutionOptions {
 }
 
 export interface BuilderHarnessExecutionResult<
-  T extends BuilderOutput = BuilderOutput
+  T extends BuilderOutput = BuilderOutput,
 > {
   result?: T;
   error?: Error;
@@ -165,7 +161,9 @@ export class BuilderHarness<T> {
   }
 
   private resolvePath(path: string): string {
-    return `${getSystemPath(this.host.root())}/${path}`;
+    // 必须用 join 而不是字符串拼接：`resolvePath('.')` 拼出来会带尾部的 `/.`，
+    // 之后 build-angular 用 startsWith 校验资源路径是否在工作区内时会全部失配。
+    return nodePath.join(getSystemPath(this.host.root()), path);
   }
 
   useProject(name: string, metadata: Record<string, unknown> = {}): this {
@@ -255,20 +253,30 @@ export class BuilderHarness<T> {
 
         throw new Error('Project target does not exist.');
       },
-      getBuilderName: async function (this: HarnessContextHost, project: string, target: string) {
-        return (await this.findBuilderByTarget(project, target)).info.builderName;
+      getBuilderName: async function (
+        this: HarnessContextHost,
+        project: string,
+        target: string
+      ) {
+        return (await this.findBuilderByTarget(project, target)).info
+          .builderName;
       },
       getMetadata: async (project: string) => {
         this.validateProjectName(project);
 
         return this.projectMetadata;
       },
-      getOptions: async (project: string, target: string, configuration?: string) => {
+      getOptions: async (
+        project: string,
+        target: string,
+        configuration?: string
+      ) => {
         this.validateProjectName(project);
         if (target === this.targetName) {
           return (
-            (this.options.get(configuration ?? null) as json.JsonObject |
-              undefined) ?? {}
+            (this.options.get(configuration ?? null) as
+              | json.JsonObject
+              | undefined) ?? {}
           );
         } else if (configuration !== undefined) {
           // Harness builder targets currently do not support configurations
@@ -343,7 +351,11 @@ export class BuilderHarness<T> {
         return of({ result: undefined, error });
       }),
       map(({ result, error }) => {
-        if (outputLogsOnFailure && result?.success === false && logs.length > 0) {
+        if (
+          outputLogsOnFailure &&
+          result?.success === false &&
+          logs.length > 0
+        ) {
           // eslint-disable-next-line no-console
           console.error(logs.map((entry) => entry.message).join('\n'));
         }
@@ -492,7 +504,8 @@ function convertBuilderOutputToObservable(
 
 function isAsyncIterable(obj: unknown): obj is AsyncIterable<BuilderOutput> {
   return (
-    !!obj && typeof (obj as Record<symbol, unknown>)[Symbol.asyncIterator] === 'function'
+    !!obj &&
+    typeof (obj as Record<symbol, unknown>)[Symbol.asyncIterator] === 'function'
   );
 }
 
@@ -723,7 +736,9 @@ export function expectFile<T>(
 /** jasmine 的类型里没有暴露 expector，这里只声明用到的部分 */
 interface ExpectorHost {
   expector: {
-    addFilter(f: { selectComparisonFunc(): () => { pass: boolean; message: string } }): ExpectorHost['expector'];
+    addFilter(f: {
+      selectComparisonFunc(): () => { pass: boolean; message: string };
+    }): ExpectorHost['expector'];
   };
 }
 

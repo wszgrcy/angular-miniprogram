@@ -14,8 +14,15 @@ function getTemplateNameExpressionStr(templateRefName: string) {
 let fn: ScriptFunction = async (util, rule, host, injector) => {
   let path = util.path;
 
+  /**
+   * Angular 仓库地址。默认走 GitHub，可以用 `ANGULAR_REPO` 指向本地已有的 clone，
+   * 离线或内网环境下用得上（`git clone` 对本地路径同样有效）。
+   */
+  const angularRepo =
+    process.env.ANGULAR_REPO || 'https://github.com/angular/angular.git';
+
   let data = await rule.os.gitClone(
-    'https://github.com/angular/angular.git',
+    angularRepo,
     [
       '/packages/common',
       '/packages/forms',
@@ -28,7 +35,8 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
     ],
     'packages',
     'branch',
-    '20.3.15'
+    // Angular 21 起 tag 改成带 `v` 前缀（20.x 及以前是裸版本号）
+    'v21.2.23'
   );
   let exclude = [
     'forms/src/directives/default_value_accessor.ts',

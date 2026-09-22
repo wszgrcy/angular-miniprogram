@@ -1,5 +1,6 @@
 import type {
   AST,
+  ArrowFunction,
   AstVisitor,
   Binary,
   BindingPipe,
@@ -16,9 +17,11 @@ import type {
   ParenthesizedExpression,
   PrefixNot,
   PropertyRead,
+  RegularExpressionLiteral,
   SafeCall,
   SafeKeyedRead,
   SafePropertyRead,
+  SpreadElement,
   TaggedTemplateLiteral,
   TemplateLiteral,
   TemplateLiteralElement,
@@ -39,8 +42,11 @@ import type {
   TmplAstRecursiveVisitor,
   TmplAstSwitchBlock,
   TmplAstSwitchBlockCase,
+  TmplAstSwitchBlockCaseGroup,
+  TmplAstSwitchExhaustiveCheck,
   TmplAstUnknownBlock,
   TypeofExpression,
+  Unary,
   Visitor,
 } from '@angular/compiler';
 
@@ -249,26 +255,41 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   /**
    * `@switch` / `@case` / `@default`，槽位规则与 `@if` 一致，
    * 只是管道来自 `@switch` 主表达式和各 `@case` 表达式。
+   *
+   * Angular 21 重构了 `@switch` 的 AST：children 不再挂在 `@case` 上，而是把
+   * 「共享同一份子节点的连续 case」合并成 `SwitchBlockCaseGroup`。
+   * 一个 group 对应一份可渲染模板，所以占位按 group 走，
+   * `@case` 只提供判断表达式。
    */
   visitSwitchBlock(block: TmplAstSwitchBlock): void {
-    const cases = block.cases;
-    if (!cases.length) {
+    const groups = block.groups;
+    if (!groups.length) {
       return;
     }
-    const pipeCount = this.countPipeSlots(
-      block.expression,
-      ...cases.map((item) => item.expression)
+    const caseExpressions = groups.flatMap((group) =>
+      group.cases.map((item) => item.expression)
     );
+    const pipeCount = this.countPipeSlots(block.expression, ...caseExpressions);
     const firstIndex = this.declIndex++;
-    this.createControlFlowTemplate(cases[0].children, firstIndex, 'switchCase');
+    this.createControlFlowTemplate(
+      groups[0].children,
+      firstIndex,
+      'switchCase'
+    );
     this.declIndex += pipeCount;
-    for (let i = 1; i < cases.length; i++) {
+    for (let i = 1; i < groups.length; i++) {
       const index = this.declIndex++;
-      this.createControlFlowTemplate(cases[i].children, index, 'switchCase');
+      this.createControlFlowTemplate(groups[i].children, index, 'switchCase');
     }
   }
   visitSwitchBlockCase(block: TmplAstSwitchBlockCase): void {
     // case 由 visitSwitchBlock 统一处理
+  }
+  visitSwitchBlockCaseGroup(group: TmplAstSwitchBlockCaseGroup): void {
+    // group 由 visitSwitchBlock 统一处理
+  }
+  visitSwitchExhaustiveCheck(check: TmplAstSwitchExhaustiveCheck): void {
+    // `@default` 的穷尽检查，不产生渲染节点
   }
 
   /**
@@ -447,6 +468,20 @@ class CustomAstVisitor implements AstVisitor {
     this.visitAll(ast.expressions);
   }
   visitTemplateLiteralElement(ast: TemplateLiteralElement) {}
+  /** Angular 21 新增：箭头函数 */
+  visitArrowFunction(ast: ArrowFunction) {
+    ast.body.visit(this);
+  }
+  /** Angular 21 新增：正则字面量（叶子节点） */
+  visitRegularExpressionLiteral(ast: RegularExpressionLiteral) {}
+  /** Angular 21 新增：展开元素 `...x` */
+  visitSpreadElement(ast: SpreadElement) {
+    ast.expression.visit(this);
+  }
+  /** Angular 21 新增：一元运算符 `-x` / `+x` */
+  visitUnary(ast: Unary) {
+    ast.expr.visit(this);
+  }
   visitConditional(ast: Conditional) {
     ast.condition.visit(this);
     ast.trueExp.visit(this);

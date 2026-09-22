@@ -15,7 +15,6 @@ import {
   augmentProgramWithVersioning,
   cacheCompilerHost,
 } from 'ng-packagr/src/lib/ts/cache-compiler-host';
-import { ngCompilerCli } from 'ng-packagr/src/lib/utils/load-esm';
 import * as log from 'ng-packagr/src/lib/utils/log';
 import { join } from 'node:path';
 import path from 'path';
@@ -33,6 +32,14 @@ import {
   ENTRY_POINT_TOKEN,
   RESOLVED_DATA_GROUP_TOKEN,
 } from './token';
+
+/**
+ * ng-packagr 21 删掉了 `src/lib/utils/load-esm`，改成直接 require compiler-cli。
+ * 这里自己保留一个懒加载入口，避免在模块顶层就把 compiler-cli 拉进来。
+ */
+async function ngCompilerCli() {
+  return import('@angular/compiler-cli');
+}
 
 export async function compileSourceFiles(
   graph: BuildGraph,

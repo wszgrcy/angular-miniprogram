@@ -5,7 +5,7 @@
     "outDir": "./dist/out-tsc",
     "sourceMap": true,
     "declaration": false,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "esModuleInterop": true,
@@ -25,7 +25,13 @@
       "angular-miniprogram/forms": ["../../dist/forms"],
       "angular-miniprogram/common": ["../../dist/common"],
       "angular-miniprogram/common/http": ["../../dist/common/http"],
-      "angular-miniprogram/karma/client": ["../../src/builder/karma/client"]
+      "angular-miniprogram/karma/client": ["../../src/builder/karma/client"],
+      "angular-miniprogram/event-dispatch-contract": ["../../src/builder/karma/client/event-dispatch-contract"]
     }
+  },
+  "angularCompilerOptions": {
+    // 与 tsconfig.library.json 同理：小程序自定义元素不在 Angular 的 DOM schema 里，
+    // Angular 21 默认开启的 host binding 校验会对它们全部报 NG8002。
+    "typeCheckHostBindings": false
   }
 }
