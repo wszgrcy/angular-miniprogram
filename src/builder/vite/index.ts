@@ -107,15 +107,21 @@ export function buildAlias(
  * 平台替换必须排在 tsconfig paths 之前生效，否则 `angular-miniprogram/platform`
  * 这种前缀 alias 会把 `angular-miniprogram/platform/wx` 抢走。
  */
+/** Vite alias 数组形式（可展开、顺序可控） */
+export type ViteAliasEntry = {
+  find: string | RegExp;
+  replacement: string;
+};
+
 export function buildViteAlias(
   buildPlatform: BuildPlatform,
   tsConfigPath: string,
   workspaceRoot: string
-): AliasOptions {
+): ViteAliasEntry[] {
   const tsAliases = tsConfigPathsToAliases(
     path.resolve(workspaceRoot, tsConfigPath)
   );
-  const list: { find: string | RegExp; replacement: string }[] = [
+  const list: ViteAliasEntry[] = [
     ...platformReplacementAlias(buildPlatform),
     ...tsAliases,
   ];
