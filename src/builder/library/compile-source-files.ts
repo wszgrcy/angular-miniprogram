@@ -67,6 +67,9 @@ export async function compileSourceFiles(
   augmentLibraryMetadata(tsCompilerHost);
   const cache = entryPoint.cache;
   const sourceFileCache = cache.sourcesFileCache;
+  // ng-packagr 19: Angular 诊断缓存从 FileCache 中拆出，
+  // 改为 entryPoint.cache.angularDiagnosticCache（get/update）
+  const angularDiagnosticsCache = cache.angularDiagnosticCache;
 
   // Create the Angular specific program that contains the Angular compiler
   const angularProgram = new NgtscProgram(
@@ -221,9 +224,8 @@ export async function compileSourceFiles(
       !ignoreForDiagnostics.has(sourceFile)
     ) {
       // Use cached Angular diagnostics for unchanged and unaffected files
-      const angularDiagnostics =
-        sourceFileCache.getAngularDiagnostics(sourceFile);
-      if (angularDiagnostics?.length) {
+      const angularDiagnostics = angularDiagnosticsCache.get(sourceFile);
+      if (angularDiagnostics.length) {
         allDiagnostics.push(...angularDiagnostics);
       }
     }
@@ -237,7 +239,7 @@ export async function compileSourceFiles(
     );
 
     allDiagnostics.push(...angularDiagnostics);
-    sourceFileCache.updateAngularDiagnostics(affectedFile, angularDiagnostics);
+    angularDiagnosticsCache.update(affectedFile, angularDiagnostics);
   }
 
   const otherDiagnostics = [];

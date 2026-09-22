@@ -1,6 +1,7 @@
 import { Directive, EventEmitter, Input, Output } from '@angular/core';
 
 @Directive({
+  standalone: false,
   selector: '[libInputOutput]',
 })
 export class InputOutputDirective {

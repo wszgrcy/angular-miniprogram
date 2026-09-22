@@ -51,6 +51,7 @@ export const SWITCH_VALUE_ACCESSOR: any = {
  * @publicApi
  */
 @Directive({
+  standalone: false,
   selector: 'switch[formControlName],switch[formControl],switch[ngModel]',
   host: { '(bindchange)': 'valueChange($event.detail.value)' },
   providers: [SWITCH_VALUE_ACCESSOR],

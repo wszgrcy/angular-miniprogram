@@ -24,21 +24,14 @@ describeBuilder(execute, LIBRARY_BUILDER_INFO, (harness) => {
       const workspaceRoot: string = (result.result as any).workspaceRoot;
       const outputPath = normalize(`dist/test-library`);
       const output = path.join(workspaceRoot, outputPath);
+      // ng-packagr 19 起不再把逐文件的 ESM（esm2022）产物写到磁盘，
+      // 只输出打包后的 fesm2022（以及 .d.ts），因此断言改为 fesm2022 产物。
       const entryFile = harness.expectFile(
-        join(outputPath, 'esm2022', 'test-library.mjs')
+        join(outputPath, 'fesm2022', 'test-library.mjs')
       );
       entryFile.toExist();
       entryFile.content.toContain(`$self_Global_Template`);
-      const globalSelfTemplate = harness.expectFile(
-        join(
-          outputPath,
-          'esm2022',
-          'global-self-template',
-          'global-self-template.component.mjs'
-        )
-      );
-      globalSelfTemplate.toExist();
-      globalSelfTemplate.content.toContain(
+      entryFile.content.toContain(
         `GlobalSelfTemplateComponent_${LIBRARY_COMPONENT_METADATA_SUFFIX}`
       );
       fs.copySync(

@@ -3,6 +3,7 @@ import { HttpClient } from 'angular-miniprogram/common/http';
 import { BehaviorSubject } from 'rxjs';
 
 @Component({
+  standalone: false,
   selector: 'app-http-spec',
   template: ``,
 })

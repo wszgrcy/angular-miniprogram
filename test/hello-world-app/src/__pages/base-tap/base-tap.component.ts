@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'app-base-tap',
   templateUrl: './base-tap.component.html',
   styleUrls: ['./base-tap.component.css'],

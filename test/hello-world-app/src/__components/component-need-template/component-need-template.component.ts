@@ -1,6 +1,7 @@
 import { Component, Input, OnInit, TemplateRef } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'app-component-need-template',
   templateUrl: './component-need-template.component.html',
   styleUrls: ['./component-need-template.component.css'],

@@ -6,6 +6,7 @@ import { NgTemplateOutletComponent } from '../../spec-component/ng-template-outl
 import { nodeExist } from '../util';
 
 @Component({
+  standalone: false,
   selector: 'app-ng-template-outlet-spec',
   template: `<app-ng-template-outlet #instance></app-ng-template-outlet>`,
 })

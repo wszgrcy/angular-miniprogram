@@ -75,6 +75,7 @@ export const COMPOSITION_BUFFER_MODE = new InjectionToken<boolean>(
  * @publicApi
  */
 @Directive({
+  standalone: false,
   selector:
     'input[formControlName],textarea[formControlName],input[formControl],textarea[formControl],input[ngModel],textarea[ngModel],[ngDefaultControl]',
   // TODO: vsavkin replace the above selector with the one below it once

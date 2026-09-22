@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'app-other',
   templateUrl: './other.component.html',
   styleUrls: ['./other.component.css'],

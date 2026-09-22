@@ -60,7 +60,10 @@ export const myCompileNgcTransformFactory = (
         basePath,
         cssUrl,
         styleIncludePaths,
-        options.cacheEnabled && options.cacheDirectory
+        // ng-packagr 19 在 cacheDirectory 之前新增了 `sass` 参数
+        undefined,
+        options.cacheEnabled && options.cacheDirectory,
+        options.watch
       );
 
       await compileSourceFiles(

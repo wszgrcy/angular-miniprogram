@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'app-base-directive',
   templateUrl: './base-directive.component.html',
   styleUrls: ['./base-directive.component.css'],

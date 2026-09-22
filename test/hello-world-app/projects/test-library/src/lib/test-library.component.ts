@@ -1,6 +1,7 @@
 import { Component, HostBinding, Input, OnInit } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'lib-test-library',
   template: ``,
   styleUrls: ['./test-library.component.scss'],

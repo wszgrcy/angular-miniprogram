@@ -108,6 +108,7 @@ export class RadioControlRegistry {
   }
 }
 @Directive({
+  standalone: false,
   selector:
     'radio-group[formControlName],radio-group[formControl],radio-group[ngModel]',
   host: {
@@ -159,6 +160,7 @@ export class RadioGroupValueAccessor
  * todo 写入值可以从这里来,读取的话就需要从上一级,需要处理本组件与group的关系
  */
 @Directive({
+  standalone: false,
   selector: 'radio',
   host: {},
 })

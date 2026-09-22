@@ -28,7 +28,7 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
     ],
     'packages',
     'branch',
-    '18.2.14'
+    '19.2.17'
   );
   let exclude = [
     'forms/src/directives/default_value_accessor.ts',
@@ -42,6 +42,29 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
     'forms/src/forms.ts',
   ];
 
+  /**
+   * Angular 19 起 `packages/common/http` 内部改用相对路径（如 `../../index`）
+   * 引用 `@angular/common`（18 及以前是直接写 `@angular/common`）。
+   * 直接保留相对路径会让 ng-packagr 跨 entry point 取源码，报
+   * TS6059（不在 rootDir 下），因此统一改写为库的公开入口。
+   */
+  function rewriteCrossEntryPointImports(filePath: string, content: string) {
+    return content.replace(
+      /(from\s+')((?:\.\.\/)+index)(')/g,
+      (match, prefix: string, spec: string, suffix: string) => {
+        const resolved = path
+          .normalize(path.join(path.dirname(filePath), spec))
+          .split('\\')
+          .join('/');
+        if (/^common(\/[^/]+)*\/index$/.test(resolved)) {
+          const entryDir = resolved.replace(/\/index$/, '');
+          return `${prefix}angular-miniprogram/${entryDir}${suffix}`;
+        }
+        return match;
+      }
+    );
+  }
+
   for (const key in data) {
     if (exclude.includes(key)) {
       continue;
@@ -52,6 +75,7 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
         /@angular\/common/g,
         `angular-miniprogram/common`
       );
+      content = rewriteCrossEntryPointImports(key, content);
       buffer = stringToFileBuffer(content);
     }
     await completePromise(host.write(path.normalize(key), buffer));

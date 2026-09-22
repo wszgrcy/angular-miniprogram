@@ -1,6 +1,7 @@
 import { Directive, HostBinding, HostListener, Output } from '@angular/core';
 
 @Directive({
+  standalone: false,
   selector: '[libTestLibrary]',
   host: {
     '(tap)': 'hostTap($event)',

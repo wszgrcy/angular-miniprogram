@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'app-base-forms',
   templateUrl: './base-forms.component.html',
   styleUrls: ['./base-forms.component.css'],

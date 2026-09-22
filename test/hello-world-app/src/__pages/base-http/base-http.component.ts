@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { HttpClient } from 'angular-miniprogram/common/http';
 
 @Component({
+  standalone: false,
   selector: 'app-base-http',
   templateUrl: './base-http.component.html',
   styleUrls: ['./base-http.component.css'],

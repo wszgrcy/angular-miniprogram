@@ -51,6 +51,7 @@ export const PICKER_VIEW_VALUE_ACCESSOR: any = {
  * @publicApi
  */
 @Directive({
+  standalone: false,
   selector:
     'picker-view[formControlName],picker-view[formControl],picker-view[ngModel]',
   host: { '(bindchange)': 'valueChange($event.detail.value)' },

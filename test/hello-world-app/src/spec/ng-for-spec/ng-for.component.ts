@@ -6,6 +6,7 @@ import { NgForComponent } from '../../spec-component/ng-for/ng-for.component';
 import { nodeExist } from '../util';
 
 @Component({
+  standalone: false,
   selector: 'app-ng-for-spec',
   template: `<app-ng-for #instance [list]="list"></app-ng-for>`,
 })

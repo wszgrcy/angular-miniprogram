@@ -20,6 +20,8 @@ import type {
   SafeCall,
   SafeKeyedRead,
   SafePropertyRead,
+  TemplateLiteral,
+  TemplateLiteralElement,
   Text,
   TmplAstDeferredBlock,
   TmplAstDeferredBlockError,
@@ -36,6 +38,7 @@ import type {
   TmplAstSwitchBlock,
   TmplAstSwitchBlockCase,
   TmplAstUnknownBlock,
+  TypeofExpression,
   Visitor,
 } from '@angular/compiler';
 
@@ -266,6 +269,15 @@ class CustomAstVisitor implements AstVisitor {
   visitChain(ast: Chain) {
     this.visitAll(ast.expressions);
   }
+  /** Angular 19 新增：`typeof` 表达式 */
+  visitTypeofExpression(ast: TypeofExpression) {
+    ast.expression.visit(this);
+  }
+  /** Angular 19 新增：模板字符串字面量 */
+  visitTemplateLiteral(ast: TemplateLiteral) {
+    this.visitAll(ast.expressions);
+  }
+  visitTemplateLiteralElement(ast: TemplateLiteralElement) {}
   visitConditional(ast: Conditional) {
     ast.condition.visit(this);
     ast.trueExp.visit(this);

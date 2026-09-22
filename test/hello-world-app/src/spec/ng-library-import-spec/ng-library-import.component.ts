@@ -6,6 +6,7 @@ import { NgLibraryImportComponent } from '../../spec-component/ng-library-import
 import { nodeExist } from '../util';
 
 @Component({
+  standalone: false,
   selector: 'app-ng-library-import-spec',
   template: `<app-ng-library-import #instance></app-ng-library-import>`,
 })

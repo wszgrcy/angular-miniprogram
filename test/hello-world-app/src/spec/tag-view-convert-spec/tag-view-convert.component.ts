@@ -6,6 +6,7 @@ import { TagViewConvertComponent } from '../../spec-component/tag-view-convert/t
 import { nodeExist } from '../util';
 
 @Component({
+  standalone: false,
   selector: 'app-tag-view-convert-spec',
   template: `<app-tag-view-convert #instance></app-tag-view-convert>`,
 })

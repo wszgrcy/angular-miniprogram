@@ -1,6 +1,7 @@
 import { Directive, Input, TemplateRef, ViewContainerRef } from '@angular/core';
 
 @Directive({
+  standalone: false,
   selector: '[appStructural1]',
 })
 export class Structural1Directive {

@@ -6,6 +6,7 @@ import { NgContentComponent } from '../../spec-component/ng-content/ng-content.c
 import { nodeExist, nodeNotEmpty } from '../util';
 
 @Component({
+  standalone: false,
   selector: 'app-ng-content-spec',
   template: `<app-ng-content #instance
     ><div class="container">container</div></app-ng-content

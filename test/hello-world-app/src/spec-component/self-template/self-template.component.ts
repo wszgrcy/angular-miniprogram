@@ -1,6 +1,7 @@
 import { Component, Input, OnInit, TemplateRef } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'app-self-template',
   templateUrl: './self-template.component.html',
 })

@@ -1,6 +1,7 @@
 import { Component, HostListener, OnInit } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'app-lib-comp1',
   templateUrl: './lib-comp1.component.html',
   styleUrls: ['./lib-comp1.component.css'],

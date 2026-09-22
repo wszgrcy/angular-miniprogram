@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'app-custom-structural-directive',
   templateUrl: './custom-structural-directive.component.html',
   styleUrls: ['./custom-structural-directive.component.css'],

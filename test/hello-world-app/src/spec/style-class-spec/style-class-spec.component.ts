@@ -6,6 +6,7 @@ import { StyleClassComponent } from '../../spec-component/style-class/style-clas
 import { fields, nodeExist } from '../util';
 
 @Component({
+  standalone: false,
   selector: 'app-style-class-spec',
   template: `<app-style-class #instance></app-style-class>`,
 })
