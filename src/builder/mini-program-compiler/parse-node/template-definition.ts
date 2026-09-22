@@ -30,6 +30,7 @@ import type {
   TmplAstForLoopBlockEmpty,
   TmplAstIfBlock,
   TmplAstIfBlockBranch,
+  TmplAstLetDeclaration,
   TmplAstNode,
   TmplAstRecursiveVisitor,
   TmplAstSwitchBlock,
@@ -149,6 +150,11 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     }
   }
   visitVariable(variable: t.Variable) {}
+  /**
+   * Angular 18 新增的 `@let` 模板语法。
+   * 它不会产生任何渲染节点，因此这里不占用 declIndex，仅作为空实现保证访问器完整。
+   */
+  visitLetDeclaration(declaration: TmplAstLetDeclaration) {}
   visitReference(reference: t.Reference) {}
   visitTextAttribute(attribute: t.TextAttribute) {}
   visitBoundAttribute(attribute: t.BoundAttribute) {}

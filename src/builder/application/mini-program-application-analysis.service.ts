@@ -342,7 +342,7 @@ export class MiniProgramApplicationAnalysisService {
   cleanDependencyFileCache() {
     this.cleanDependencyFileCacheSet.forEach((filePath) => {
       try {
-        this.compiler.inputFileSystem.purge!(filePath);
+        this.compiler.inputFileSystem?.purge!(filePath);
       } catch (error) {}
     });
   }

@@ -7,6 +7,13 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+// Angular 18 将这两个工具函数迁移到了 `@angular/build/private`。
+// 由于本仓库使用 moduleResolution: "node"（无法解析 exports 子路径），
+// 对应的类型通过 tsconfig 的 paths 映射到 @angular/build/src/private.d.ts。
+import {
+  assertCompatibleAngularVersion,
+  purgeStaleBuildCache,
+} from '@angular/build/private';
 import {
   BuilderContext,
   BuilderOutput,
@@ -25,8 +32,6 @@ import {
   getCommonConfig,
   getStylesConfig,
 } from '@angular-devkit/build-angular/src/tools/webpack/configs';
-import { purgeStaleBuildCache } from '@angular-devkit/build-angular/src/utils/purge-cache';
-import { assertCompatibleAngularVersion } from '@angular-devkit/build-angular/src/utils/version';
 import { generateBrowserWebpackConfigFromContext } from '@angular-devkit/build-angular/src/utils/webpack-browser-config';
 
 import { Config, ConfigOptions } from 'karma';

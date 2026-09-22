@@ -3,6 +3,9 @@
   "compilerOptions": {
     "sourceMap": true,
     "paths": {
+      "@angular/build/private": [
+        "./node_modules/@angular/build/src/private.d.ts"
+      ],
       "angular-miniprogram/platform/default": [
         "./src/library/platform/default/index.ts"
       ],

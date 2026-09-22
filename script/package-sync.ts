@@ -28,7 +28,7 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
     ],
     'packages',
     'branch',
-    '17.3.1'
+    '18.2.14'
   );
   let exclude = [
     'forms/src/directives/default_value_accessor.ts',
