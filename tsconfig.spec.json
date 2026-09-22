@@ -6,6 +6,9 @@
       "@angular/build/private": [
         "./node_modules/@angular/build/src/private.d.ts"
       ],
+      // vite 的 package.json 没有 main / types 字段，只靠 exports map，
+      // moduleResolution: node10 认不出来，这里显式指到类型入口
+      "vite": ["./node_modules/vite/dist/node/index.d.ts"],
       "angular-miniprogram/platform/default": [
         "./src/library/platform/default/index.ts"
       ],
