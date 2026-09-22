@@ -149,20 +149,20 @@ Angular v20 已经可以完全不依赖 `zone.js`（`provideZonelessChangeDetect
 
 ### 关键改动
 
-| 位置 | 变更 |
-| --- | --- |
-| `src/library/platform/util/change-detection.ts` | 新增 `runInAngular()` / `scheduleChangeDetection()`，统一封装「执行回调 + 通知调度器」 |
-| `src/library/platform/default/platform-core.ts` | `__ngZone` 换成 `__ngChangeDetectionScheduler`；事件回调改为 `try { handler() } finally { notify() }`；`runOutsideAngular` 包裹的 diff/setData 直接执行 |
-| `src/library/platform/default/component-template-hook.factory.ts` | `propertyChange()` 不再取 `NgZone` |
-| `src/library/platform/page.service.ts` | 页面注册改用 `runInAngular(injector, ...)` |
-| `src/library/platform/http/backend.ts` | 注入 `ChangeDetectionScheduler`，所有 `Zone.current.run(...)` 改为 `this.runInAngular(...)` |
-| `src/library/platform/type/type.ts` | `MiniProgramComponentVariable.__ngZone` → `__ngChangeDetectionScheduler` |
-| `src/library/declaration/index.d.ts` | 删除 `declare const Zone: any` |
-| `src/builder/application/webpack-configuration-change.service.ts` | DefinePlugin 不再映射全局 `Zone` |
-| `src/builder/platform/template/app-template.js` | 平台模板不再导出 `Zone` |
-| `script/package-sync.ts` | 同步 `@angular/common/http` 时剥掉 `fetch.ts` 里的 `import type {} from 'zone.js'` 与 `Zone.current`（zoneless 下 `reqZone` 恒为 `undefined`） |
-| `test/hello-world-app/src/main.ts` / `test.ts` | 删除 `import 'zone.js'` |
-| `test/hello-world-app/src/main.module.ts` / `main-test.module.ts` | `providers: [provideZonelessChangeDetection()]` |
+| 位置                                                              | 变更                                                                                                                                                    |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/library/platform/util/change-detection.ts`                   | 新增 `runInAngular()` / `scheduleChangeDetection()`，统一封装「执行回调 + 通知调度器」                                                                  |
+| `src/library/platform/default/platform-core.ts`                   | `__ngZone` 换成 `__ngChangeDetectionScheduler`；事件回调改为 `try { handler() } finally { notify() }`；`runOutsideAngular` 包裹的 diff/setData 直接执行 |
+| `src/library/platform/default/component-template-hook.factory.ts` | `propertyChange()` 不再取 `NgZone`                                                                                                                      |
+| `src/library/platform/page.service.ts`                            | 页面注册改用 `runInAngular(injector, ...)`                                                                                                              |
+| `src/library/platform/http/backend.ts`                            | 注入 `ChangeDetectionScheduler`，所有 `Zone.current.run(...)` 改为 `this.runInAngular(...)`                                                             |
+| `src/library/platform/type/type.ts`                               | `MiniProgramComponentVariable.__ngZone` → `__ngChangeDetectionScheduler`                                                                                |
+| `src/library/declaration/index.d.ts`                              | 删除 `declare const Zone: any`                                                                                                                          |
+| `src/builder/application/webpack-configuration-change.service.ts` | DefinePlugin 不再映射全局 `Zone`                                                                                                                        |
+| `src/builder/platform/template/app-template.js`                   | 平台模板不再导出 `Zone`                                                                                                                                 |
+| `script/package-sync.ts`                                          | 同步 `@angular/common/http` 时剥掉 `fetch.ts` 里的 `import type {} from 'zone.js'` 与 `Zone.current`（zoneless 下 `reqZone` 恒为 `undefined`）          |
+| `test/hello-world-app/src/main.ts` / `test.ts`                    | 删除 `import 'zone.js'`                                                                                                                                 |
+| `test/hello-world-app/src/main.module.ts` / `main-test.module.ts` | `providers: [provideZonelessChangeDetection()]`                                                                                                         |
 
 > 库本身不再强制 zoneless：由使用方在 root provider 里加
 > `provideZonelessChangeDetection()`。库只是不再产生任何 zone 依赖。
@@ -209,10 +209,10 @@ Angular 的模板插值不会自动 unwrap signal。
 必须和 Angular 的 `slot_allocation` + `pipe_creation` 两个 phase 完全一致，
 否则后面所有节点的 `nodeList[i]` 都会错位。规则（实测 20.3.x 产物得出）：
 
-| 语法 | 槽位布局 |
-| --- | --- |
-| `@if` / `@switch` | `i` = 第一个分支模板；`i+1 .. i+P` = **所有**分支条件表达式里的管道（统一插到第一个 create 之后）；`i+P+1 ..` = 其余分支模板 |
-| `@for` | `i` = `RepeaterMetadata`（不是 TNode，不可渲染但必须占位）；`i+1` = 主模板；`i+2` = `@empty` 模板（若有）；其后是被遍历表达式的管道槽位 |
+| 语法              | 槽位布局                                                                                                                                |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `@if` / `@switch` | `i` = 第一个分支模板；`i+1 .. i+P` = **所有**分支条件表达式里的管道（统一插到第一个 create 之后）；`i+P+1 ..` = 其余分支模板            |
+| `@for`            | `i` = `RepeaterMetadata`（不是 TNode，不可渲染但必须占位）；`i+1` = 主模板；`i+2` = `@empty` 模板（若有）；其后是被遍历表达式的管道槽位 |
 
 `track` 表达式 Angular 禁止使用管道，无需考虑。
 
@@ -239,3 +239,97 @@ wxml 的 `<template name>` 必须全文件唯一。以前用 `ngDefault_${index}
   `@if (x; as y)`、条件带管道、`@for`+`@empty`+`$index`、`@switch`+`@default`、控制流嵌套。
 - `test/hello-world-app/src/spec/control-flow-spec/`：小程序内验证渲染与状态切换
   （需微信开发者工具）。
+
+## 页面 standalone 化与 `bootstrapPage`
+
+### 背景
+
+以前一个页面要三个文件：`foo.component.ts`（`standalone: false`）+ `foo.module.ts` +
+`foo.entry.ts`（`pageStartup(FooModule, FooComponent)`）。即使组件根本不需要 NgModule，
+也必须先声明一个模块才能启动。
+
+### 现在的写法
+
+```ts
+// foo.component.ts
+@Component({
+  standalone: true,
+  imports: [CommonModule, SomeComponent, SomeDirective],
+  templateUrl: './foo.component.html',
+})
+export class FooComponent {}
+
+// foo.entry.ts
+import { bootstrapPage } from 'angular-miniprogram';
+bootstrapPage(FooComponent); // 页面
+bootstrapPage(FooComponent, { useComponent: true }); // 以 Component 而非 Page 启动
+```
+
+`pageStartup(module, component)` 标记 `@deprecated` 但保持可用，内部走
+`__ngStartPageWithModule`。
+
+### 运行时改动
+
+- `AppOptions.__ngStartPage(component, instance)` 改为 standalone 语义，
+  内部 `createComponent` + `EnvironmentInjector`，不再产生 `NgModuleRef`。
+- `PageService.createPageInjector()` 统一构造带 `PAGE_TOKEN` 的子注入器。
+- `linkNgComponentWithPage` 的 `ngModuleRef` 改为可选，destroy 时用可选链。
+
+### 编译器改动（standalone 引入 NgModule 的展开）
+
+standalone 组件的 `imports` 允许直接写 NgModule。这时
+`R3ComponentMetadata.declarations` 里会出现 `R3TemplateDependencyKind.NgModule`
+（值为 2）的项，它只带一个指向**模块标识符**的 `type.node`，没有普通依赖上的
+`ref.node`，直接拿去查元数据会 `Cannot read properties of undefined`。
+
+`MiniProgramCompilerService.resolveTemplateDeclarations()` 的处理：
+
+1. 没有 `kind === 2` 的项 → 原样返回，非 standalone 组件行为完全不变。
+2. 有 → 改用 Angular 自己的 `TypeCheckScope`
+   （`ngCompiler.compilation.typeCheckScopeRegistry.getTypeCheckScope()`）拿扁平化后的
+   作用域，模块会被展开成它导出的指令与管道。
+
+展开出来的是 ngtsc 的 `DirectiveMeta` / `PipeMeta`，与下游
+`ComponentContext` 读的 R3 形状不一致，需要补齐：
+
+| R3 期望                      | ngtsc 实际             | 处理                              |
+| ---------------------------- | ---------------------- | --------------------------------- |
+| `importedFile: SourceFile`   | 无                     | 用 `dep.ref.node.getSourceFile()` |
+| `inputs: string[]`（绑定名） | `ClassPropertyMapping` | 取 `reverseMap` 的 key            |
+| `outputs: string[]`          | `ClassPropertyMapping` | 取 `reverseMap` 的 key            |
+
+`getComponentPagePattern()` 同时识别两种入口调用：`pageStartup` 取
+`arguments[1]`，`bootstrapPage` 取 `arguments[0]`。
+
+## miniprogram-api-typings 3 → 4 → 5
+
+`Component.Options` 的泛型在 v4 从 5 个参数变成 6 个，中间插入了必填的
+`TBehavior extends BehaviorOption`（即 `BehaviorIdentifier[]`）作为第 4 位：
+
+```
+v3: Options<TData, TProperty, TMethod, TCustomInstanceProperty, TIsPage>
+v4: Options<TData, TProperty, TMethod, TBehavior, TCustomInstanceProperty, TIsPage>
+```
+
+原来写在第 4 位的 `{}` 落到 `TBehavior` 上会报不满足约束；同时 `TIsPage` 掉回默认
+`false`，`methods` 里就没有 `onHide` / `onShow` / `onUnload` 了。迁移方式：
+
+```
+Options<{}, {}, {}, {}, true>  ->  Options<{}, {}, {}, [], {}, true>
+Options<{}, {}, {}>            ->  Options<{}, {}, {}, []>
+```
+
+`Page.Options<TData, TCustom>` 没变。v5 相对 v4 本项目零改动。
+
+## cyia-ngx-devkit 内联
+
+上游包停在 `0.0.5` 且不再更新，`peerDependencies` 钉死
+`@angular-devkit/architect@0.1703.1` / `@angular-devkit/core@17.3.1`，
+而本项目已经是 20.x。之前靠 `overrides` 强拉版本，每升一次都得再 override。
+
+现在源码在 `test/cyia-ngx-devkit/`，按 20.x 的 architect 类型重写为 TS，
+`test/plugin-describe-builder` 用相对路径引用。npm 依赖与对应 `overrides` 已删除
+（`tapable` 的 override 保留，那是另一个问题）。
+
+顺带去掉了原实现里 `console.error` -> `process.exit(100)` 的全局钩子：任何一次
+`console.error` 都会直接杀掉测试进程，日志都来不及看。
