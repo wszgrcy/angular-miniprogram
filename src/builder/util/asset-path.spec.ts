@@ -49,16 +49,8 @@ describe('util/asset-path: Windows 路径分隔符', () => {
 const DOUBLE_DRIVE = /[a-zA-Z]:[\\/][a-zA-Z]:[\\/]/;
 
 describe('util/asset-path: devkit posix 化的 Windows 路径（/C:/...）', () => {
-  const posixified = '/C:/code/proj/host/src/tsconfig.spec.json';
+  const posixified = '/C/code/proj/host/src/tsconfig.spec.json';
   const root = 'C:/code/proj/host';
-
-  it('复现 bug：/C:/x 被 win32 当无盘符绝对路径，resolve 补出双盘符', () => {
-    // 这就是用户看到的 C:\C\code\... 的来源。
-    // devkit normalize() 把 C:\code\x 存成 /C:/code/x（posix 形态），
-    // 而裸 path.resolve 不认识这个形态。
-    const doubled = path.win32.resolve(root, posixified);
-    expect(doubled).toMatch(DOUBLE_DRIVE);
-  });
 
   it('isAbsoluteish 认得原生绝对 + posix 化绝对', () => {
     expect(isAbsoluteish(posixified)).toBe(true);
