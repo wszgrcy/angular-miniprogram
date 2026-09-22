@@ -84,7 +84,7 @@ async function buildSnapshot(
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         walk(full);
-      } else if (/\.(wxml|json)$/.test(entry.name)) {
+      } else if (/\.(wxml|json|js|wxss)$/.test(entry.name)) {
         const rel = path.relative(base, full).split(path.sep).join('/');
         byName.set(rel, fs.readFileSync(full, 'utf8'));
       }
@@ -126,16 +126,70 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
 });
 
 describe('parity: webpack vs vite 产物对等', () => {
-  it('两边产出的文件清单一致', async () => {
+  /**
+   * 小程序侧产物（wxml / json / wxss / app.*）清单必须完全一致。
+   *
+   * JS chunk 结构不纳入严格比对——webpack 有 runtime.js / vendor.js /
+   * module-chunk.js 这种自己的拆包产物，Vite（rolldown）的 hash 和拆包
+   * 策略本来就不同，比这个没有意义。真正要比的是「小程序能跑起来需要的
+   * 那批文件在两边都在、内容对」。
+   */
+  it('小程序侧产物清单一致（排除 js chunk 结构差异）', async () => {
     const [w, v] = await Promise.all([webpackSnap.load(), viteSnap.load()]);
-    const wKeys = [...w.byName.keys()].sort();
-    const vKeys = [...v.byName.keys()].sort();
+    const isMpArtifact = (k: string) =>
+      /\.(wxml|json|wxss)$/.test(k) || k === 'app.js' || k === 'app.wxss';
+    const wKeys = [...w.byName.keys()].filter(isMpArtifact).sort();
+    const vKeys = [...v.byName.keys()].filter(isMpArtifact).sort();
     const onlyWebpack = wKeys.filter((k) => !v.byName.has(k));
     const onlyVite = vKeys.filter((k) => !w.byName.has(k));
     expect({ onlyWebpack, onlyVite }).toEqual({
       onlyWebpack: [],
       onlyVite: [],
     });
+    // 防止过滤条件写错导致空对空
+    expect(wKeys.length).toBeGreaterThan(20);
+  }, 600000);
+
+  it('每个页面/组件入口 js 两边都存在', async () => {
+    const [w, v] = await Promise.all([webpackSnap.load(), viteSnap.load()]);
+    const entries = (snap: Snapshot) =>
+      [...snap.byName.keys()]
+        .filter(
+          (k) =>
+            /\.(js)$/.test(k) && /^(pages|components)\/[\w./-]+\.js$/.test(k)
+        )
+        .sort();
+    const wEntries = entries(w);
+    const vEntries = entries(v);
+    expect({ onlyWebpack: wEntries.filter((k) => !v.byName.has(k)) }).toEqual({
+      onlyWebpack: [],
+    });
+    expect({ onlyVite: vEntries.filter((k) => !w.byName.has(k)) }).toEqual({
+      onlyVite: [],
+    });
+    expect(wEntries.length).toBeGreaterThan(10);
+  }, 600000);
+
+  it('app.js 里 require 的文件都真实存在', async () => {
+    const v = await viteSnap.load();
+    const appJs = v.byName.get('app.js') ?? '';
+    const required = [...appJs.matchAll(/require\('\.\/([^']+)'\)/g)].map(
+      (m) => m[1]
+    );
+    expect(required.length).toBeGreaterThan(0);
+    const missing = required.filter((f) => !v.byName.has(f));
+    expect(missing).toEqual([]);
+  }, 600000);
+
+  it('app.js 存在且是 require 列表', async () => {
+    const [w, v] = await Promise.all([webpackSnap.load(), viteSnap.load()]);
+    const wApp = w.byName.get('app.js');
+    const vApp = v.byName.get('app.js');
+    expect(typeof wApp).toBe('string');
+    expect(typeof vApp).toBe('string');
+    // 小程序没有模块系统，app.js 靠一串 require 把启动需要的 chunk 拉起来
+    expect(wApp).toContain('require(');
+    expect(vApp).toContain('require(');
   }, 600000);
 
   it('wxml 内容逐字节一致', async () => {

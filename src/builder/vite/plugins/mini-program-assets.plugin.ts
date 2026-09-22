@@ -98,6 +98,8 @@ export interface MiniProgramAssetsPluginOptions {
   templateScope?: LibraryTemplateScopeService;
   /** builder 配置里的 assets，app.json / project.config.json 从这里来 */
   assets?: AssetPattern[];
+  /** builder 配置里的全局样式，产出 app.wxss */
+  styles?: (string | { input: string })[];
   absoluteProjectRoot?: Path;
   absoluteProjectSourceRoot?: Path;
 }
@@ -323,6 +325,67 @@ export function miniProgramAssetsPlugin(
         for (const item of copied) {
           emit(item.outputRelPath, fs.readFileSync(item.sourcePath, 'utf8'));
         }
+      }
+
+      // 9. app.js：小程序没有模块系统，靠 app.js 里一串 require 把启动
+      //    需要的 chunk 拉起来。对应 webpack 的 BootstrapAssetsPlugin：
+      //      'app.js': importTemplate + json.scripts.map(i => `require('./${i.src}')`)
+      // require 顺序必须依赖在前、入口在后（拼接后都是全局作用域）。
+      /** Vite 的 bundle 类型和 rollup 的不完全一致，这里只用到这两个字段 */
+      interface JsChunk {
+        type: 'chunk';
+        fileName: string;
+        imports: string[];
+      }
+      const jsChunks = Object.values(bundle).filter(
+        (item) => item.type === 'chunk' && item.fileName.endsWith('.js')
+      ) as unknown as JsChunk[];
+      const byFileName = new Map(jsChunks.map((c) => [c.fileName, c]));
+      const emittedOrder: string[] = [];
+      const visiting = new Set<string>();
+      const visited = new Set<string>();
+      const visit = (fileName: string, stack: Set<string>) => {
+        if (visited.has(fileName) || stack.has(fileName)) {
+          return;
+        }
+        stack.add(fileName);
+        const chunk = byFileName.get(fileName);
+        if (chunk) {
+          for (const dep of chunk.imports) {
+            if (byFileName.has(dep)) {
+              visit(dep, stack);
+            }
+          }
+        }
+        stack.delete(fileName);
+        visited.add(fileName);
+        emittedOrder.push(fileName);
+      };
+      for (const chunk of jsChunks) {
+        visit(chunk.fileName, visiting);
+      }
+      const requireList = emittedOrder
+        .map((f) => `require('./${f}')`)
+        .join(';');
+      emit(
+        'app.js',
+        `${options.buildPlatform.importTemplate};\n${requireList};`
+      );
+
+      // 10. app.wxss：小程序的全局样式。对应 builder 配置里的 styles
+      //     （webpack 侧走 MiniCssExtractPlugin，这里直接过一遍样式管线）。
+      if (options.styles?.length) {
+        const globalStyleSources = options.styles
+          .map((s) => (typeof s === 'string' ? s : s.input))
+          .filter((s) => fs.existsSync(path.resolve(options.workspaceRoot, s)))
+          .map((s) => path.resolve(options.workspaceRoot, s));
+        const compiledGlobal = await compileStyles(
+          new Set(globalStyleSources.map((s) => path.normalize(s)))
+        );
+        const globalCss = globalStyleSources
+          .map((s) => compiledStyles.get(path.normalize(s)) ?? '')
+          .join('\n');
+        emit('app.wxss', globalCss);
       }
 
       void bundle;

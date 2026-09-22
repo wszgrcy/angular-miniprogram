@@ -192,6 +192,7 @@ export async function createMiniProgramViteConfig(options: {
         watch: false,
         templateScope,
         assets: viteOptions.assets,
+        styles: viteOptions.styles,
         absoluteProjectRoot,
         absoluteProjectSourceRoot,
       }),
