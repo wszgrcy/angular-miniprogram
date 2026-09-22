@@ -1,7 +1,11 @@
+import { CommonModule } from 'angular-miniprogram/common';
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [CommonModule],
+  schemas: [NO_ERRORS_SCHEMA],
   selector: 'app-base-tap',
   templateUrl: './base-tap.component.html',
   styleUrls: ['./base-tap.component.css'],

@@ -1,4 +1,3 @@
-import { pageStartup } from 'angular-miniprogram';
-import { LifeTimePageModule } from './life-time.module';
+import { bootstrapPage } from 'angular-miniprogram';
 import { LifeTimePage } from './life-time.component';
-pageStartup(LifeTimePageModule, LifeTimePage, { useComponent: true });
+bootstrapPage(LifeTimePage, { useComponent: true });

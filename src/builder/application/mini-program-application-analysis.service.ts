@@ -217,10 +217,23 @@ export class MiniProgramApplicationAnalysisService {
           const selector = createCssSelectorForTs(sourceFile);
           let importComponent: ts.Expression;
           if (maybeEntryPath.type === 'page') {
-            const node = selector.queryOne(
+            // `pageStartup(Module, Component)` 的组件在第二个参数，
+            // `bootstrapPage(Component)` 在第一个参数。
+            const legacyNode = selector.queryOne(
               `CallExpression[expression=pageStartup]`
             ) as ts.CallExpression;
-            importComponent = node.arguments[1];
+            const standaloneNode = selector.queryOne(
+              `CallExpression[expression=bootstrapPage]`
+            ) as ts.CallExpression;
+            if (legacyNode) {
+              importComponent = legacyNode.arguments[1];
+            } else if (standaloneNode) {
+              importComponent = standaloneNode.arguments[0];
+            } else {
+              throw new Error(
+                `${maybeEntryPath.src} 找不到 pageStartup / bootstrapPage 调用`
+              );
+            }
           } else {
             const node = selector.queryOne(
               `CallExpression[expression=componentRegistry]`

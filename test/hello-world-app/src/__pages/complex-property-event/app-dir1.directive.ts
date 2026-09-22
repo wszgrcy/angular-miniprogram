@@ -1,7 +1,7 @@
 import { Directive, HostListener } from '@angular/core';
 
 @Directive({
-  standalone: false,
+  standalone: true,
   selector: '[appDir1]',
 })
 export class AppDir1Directive {

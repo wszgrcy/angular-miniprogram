@@ -1,3 +1,4 @@
+import { CommonModule } from 'angular-miniprogram/common';
 import { Component } from '@angular/core';
 
 /**
@@ -12,7 +13,8 @@ import { Component } from '@angular/core';
  * - 控制流嵌套
  */
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [CommonModule],
   selector: 'app-control-flow',
   templateUrl: './control-flow.component.html',
 })

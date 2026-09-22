@@ -1,8 +1,10 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram';
+import { CommonModule } from 'angular-miniprogram/common';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [CommonModule],
   selector: 'app-root',
   templateUrl: './root.component.html',
   styleUrls: ['./root.component.css'],
