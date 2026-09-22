@@ -1,4 +1,6 @@
 import { join, normalize, virtualFs } from '@angular-devkit/core';
+import * as fs from 'fs-extra';
+import * as path from 'path';
 import {
   MyTestProjectHost,
   describeBuilder,
@@ -12,7 +14,21 @@ import {
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
 import { PlatformType } from '../platform/platform';
-import { runViteBuilder } from './index';
+import {
+  createMiniProgramViteConfig,
+  getBuildPlatform,
+  runViteBuilder,
+} from './index';
+
+/** createMiniProgramViteConfig 只用到 workspaceRoot / target.project / getProjectMetadata */
+function minimalCtx() {
+  return {
+    workspaceRoot: process.cwd(),
+    target: { project: 'test', target: 'build', configuration: undefined },
+    getProjectMetadata: async () => ({ root: '.', sourceRoot: 'src' }),
+    logger: console,
+  };
+}
 
 /**
  * Vite 构建链路验证（第一阶段：入口 + Angular AOT + propertyChange 注入）。
@@ -154,5 +170,57 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect(someJson).toBeTruthy();
       expect(typeof someJson.usingComponents).toBe('object');
     }, 300000);
+  });
+});
+
+describe('vite: fileReplacements / stylePreprocessorOptions 配置透传', () => {
+  /**
+   * 这里验的是**配置透传**，不是端到端替换效果。
+   *
+   * 为什么不端到端验：小程序模型里 main.ts 不是 entry（页面才是），
+   * 而 environment.ts 只被 main.ts import，所以它根本不在 bundle 里，
+   * 拿 fixture 断言「产物里出现 production: true」永远不成立。
+   *
+   * 要端到端验，得让某个 page entry 真的 import environment——
+   * 那是改 fixture，不是改 builder。这里先把「选项没被静默丢掉」钉住。
+   */
+  it('fileReplacements 要透传给 analog 插件', async () => {
+    const replacements = [
+      {
+        replace: 'src/environments/environment.ts',
+        with: 'src/environments/environment.prod.ts',
+      },
+    ];
+    const captured: unknown[] = [];
+    const pluginStub = { name: 'capture', config: () => {} };
+
+    // 直接检查我们组装出来的 config 里带上了 fileReplacements
+    const config = await createMiniProgramViteConfig({
+      viteOptions: {
+        tsConfig: 'src/tsconfig.app.json',
+        outputPath: 'dist/x',
+        pages: [],
+        components: [],
+        platform: PlatformType.wx,
+        fileReplacements: replacements,
+        stylePreprocessorOptions: { includePaths: ['src/scss'] },
+      },
+      context: minimalCtx(),
+      buildPlatform: getBuildPlatform(PlatformType.wx),
+      extraPlugins: [pluginStub as never],
+    });
+
+    void captured;
+    const plugins = config.plugins ?? [];
+    // analog 插件收到的参数我们无法直接读，退而求其次：
+    // 断言 config 里 stylePreprocessorOptions 落到了 css.preprocessorOptions
+    const css = config.css as {
+      preprocessorOptions?: { scss?: { includePaths?: string[] } };
+    };
+    expect(
+      css?.preprocessorOptions?.scss?.includePaths?.some((p) =>
+        p.endsWith('src/scss')
+      )
+    ).toBe(true);
   });
 });

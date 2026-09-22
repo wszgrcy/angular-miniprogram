@@ -40,6 +40,18 @@ export interface ViteMiniProgramBuildOptions {
   base?: string;
   /** 监听模式：对应小程序的开发方式（微信开发者工具盯着 dist 目录） */
   watch?: boolean;
+  /**
+   * 文件替换，CLI 标准形状：[{ replace: 'src/environments/environment.ts',
+   * with: 'src/environments/environment.prod.ts' }]
+   */
+  fileReplacements?: {
+    replace: string;
+    with: string;
+  }[];
+  /** scss / sass / less 的 includePaths 等预处理器选项 */
+  stylePreprocessorOptions?: {
+    includePaths?: string[];
+  };
 }
 
 /**
@@ -189,12 +201,34 @@ export async function createMiniProgramViteConfig(options: {
         context.workspaceRoot
       ),
     },
+    // scss / sass 的 includePaths。不接的话项目里 `@import 'variables'`
+    // 这种写法会直接编译失败。
+    css: viteOptions.stylePreprocessorOptions?.includePaths?.length
+      ? {
+          preprocessorOptions: {
+            scss: {
+              includePaths: viteOptions.stylePreprocessorOptions.includePaths.map(
+                (p) => path.resolve(context.workspaceRoot, p)
+              ),
+            },
+            sass: {
+              includePaths: viteOptions.stylePreprocessorOptions.includePaths.map(
+                (p) => path.resolve(context.workspaceRoot, p)
+              ),
+            },
+          },
+        }
+      : {},
     plugins: [
       ...angular({
         tsconfig: viteOptions.tsConfig,
         workspaceRoot: context.workspaceRoot,
         fastCompile: false,
         experimental: { useAngularCompilationAPI: true },
+        // fileReplacements 是 Angular 切环境的标准机制（environment.prod.ts），
+        // 不接的话「生产构建」会静默用着 dev 配置——这是会直接上线出事的坑。
+        // analog 插件本身支持 CLI 风格的 { replace, with }，透传即可。
+        fileReplacements: viteOptions.fileReplacements ?? [],
       }),
       libraryTemplatePlugin({ buildPlatform, templateScope }),
       miniProgramComponentTransformPlugin(),
