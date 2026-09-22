@@ -15,7 +15,7 @@ import {
 } from '../../../../test/util/file';
 import { PlatformType } from '../../platform/platform';
 import { getBuildPlatform } from '../../vite';
-import { createKarmaViteConfig } from './index';
+import { KarmaViteBuilderOptions, createKarmaViteConfig } from './index';
 
 /**
  * createKarmaViteConfig 实际只用到 workspaceRoot / target.project /
@@ -69,7 +69,7 @@ describeBuilder(
 
         const config = await createKarmaViteConfig({
           karmaOptions: {
-            ...(DEFAULT_ANGULAR_KARMA_CONFIG as never),
+            ...(DEFAULT_ANGULAR_KARMA_CONFIG as KarmaViteBuilderOptions),
             outputPath: 'dist/karma-vite',
             platform: PlatformType.wx,
             port: 9876,

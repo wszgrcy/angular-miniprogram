@@ -2,6 +2,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "sourceMap": true,
+    "types": ["jasmine", "node"],
     "paths": {
       "@angular/build/private": [
         "./node_modules/@angular/build/src/private.d.ts"
