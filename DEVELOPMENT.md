@@ -640,6 +640,57 @@ karma 这块不是「换个 bundler」就完事：它走的是
 另外 karma 那两个 spec 需要微信开发者工具，容器里跑不了（一直是 pending），
 所以这块迁移没法像构建链路那样用 parity 自动验证。
 
+### 已打通：karma-vite（commit `7aaef52`）
+
+上面那个阻塞点已经解掉了。**换掉的是「编译这一步用谁」，
+karma 的 launcher / reporter / socket 协议一行都没动。**
+
+```jsonc
+"builder": "angular-miniprogram:karma"        // webpack
+"builder": "angular-miniprogram:karma-vite"   // Vite 打包 + karma runner
+```
+
+关键架构点：**打包不经过 karma**。
+
+```
+vite.build() 产出 spec 小程序到磁盘
+  → 起 karma server（只提供 socket + reporter）
+  → 微信开发者工具从磁盘打开产物
+  → client 连 socket，jasmine 在小程序运行时里跑
+  → 结果回传
+```
+
+原来 `plugin/karma.ts` 里那一大堆 webpack compiler 编排（自建 compiler、
+`hooks.done -> refreshFiles`、`requestBlocker`）在 Vite 链路下全都不需要，
+因为小程序侧的 bundle 是开发者工具**从磁盘读的**，不走 karma 的 HTTP
+文件服务——client 只靠 `KARMA_PORT` 连 socket。
+
+`build.spec.ts` 验了三个编译期替换都成立：jasmine 全局 → `wx.__window.*`、
+`KARMA_PORT` 注入、组件模板注入（`propertyChange`）。
+
+### 移除 webpack 的完整路径（已无阻塞）
+
+现在还在 import webpack 的只剩两条**已被取代的旧链路**，共 14 个文件：
+
+| 位置                                                           | 文件数 | 取代者             |
+| -------------------------------------------------------------- | ------ | ------------------ |
+| `src/builder/application/**`                                   | 11     | `application-vite` |
+| `src/builder/karma/{index.ts,index.origin.ts,plugin/karma.ts}` | 3      | `karma-vite`       |
+
+`src/builder/vite/**` 和 `src/builder/karma/vite/**` 都**完全不 import webpack**
+（只在注释里提）。
+
+删除步骤：
+
+1. 项目里把 `application` → `application-vite`、`karma` → `karma-vite`
+2. 跑一段时间确认产物和测试都对
+3. 删掉上面 14 个文件 + `package.json` 里的 `webpack` /
+   `@ngtools/webpack` / `webpack-bootstrap-assets-plugin` /
+   `karma-*` 里只被 webpack 链路用到的部分
+4. `builders.json` 里去掉 `application` / `karma` 两个条目
+
+**注意**：`library` builder 走的是 ng-packagr，跟 webpack 无关，不用动。
+
 ### 踩过的坑（Vite 迁移专用）
 
 1. **Vite / Rolldown 不读 tsconfig paths**。`angular-miniprogram` 这类映射
