@@ -1,4 +1,6 @@
 import type { BuilderContext } from '@angular-devkit/architect';
+import type { AssetPattern } from '@angular-devkit/build-angular';
+import type { Path } from '@angular-devkit/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Injector } from 'static-injector';
@@ -14,10 +16,14 @@ import {
   WEBPACK_COMPILATION,
   WEBPACK_COMPILER,
 } from '../../application/token';
-import type { LibraryTemplateLiteralConvertOptions , PagePattern } from '../../application/type';
+import type {
+  LibraryTemplateLiteralConvertOptions,
+  PagePattern,
+} from '../../application/type';
 import { CustomStyleSheetProcessor } from '../../library/stylesheet-processor';
 import { BuildPlatform } from '../../platform/platform';
 import { literalResolve } from '../../util';
+import { collectAssets } from '../copy-assets';
 
 /**
  * 一个纯 node fs 的 ts.System。
@@ -49,7 +55,9 @@ export function createNodeTsSystem(
     },
     getDirectories: (p) => {
       try {
-        return fs.readdirSync(p).filter((f) => fs.statSync(path.join(p, f)).isDirectory());
+        return fs
+          .readdirSync(p)
+          .filter((f) => fs.statSync(path.join(p, f)).isDirectory());
       } catch {
         return [];
       }
@@ -86,6 +94,12 @@ export interface MiniProgramAssetsPluginOptions {
   entryPatterns: PagePattern[];
   context: BuilderContext;
   watch?: boolean;
+  /** 与 library-template 插件共享同一个实例，否则 scope 注册信息对不上 */
+  templateScope?: LibraryTemplateScopeService;
+  /** builder 配置里的 assets，app.json / project.config.json 从这里来 */
+  assets?: AssetPattern[];
+  absoluteProjectRoot?: Path;
+  absoluteProjectSourceRoot?: Path;
 }
 
 /**
@@ -102,9 +116,12 @@ export interface MiniProgramAssetsPluginOptions {
 export function miniProgramAssetsPlugin(
   options: MiniProgramAssetsPluginOptions
 ): Plugin {
-  const libraryTemplateScopeService = new LibraryTemplateScopeService();
+  const libraryTemplateScopeService =
+    options.templateScope ?? new LibraryTemplateScopeService();
   type MetaMap = Awaited<
-    ReturnType<MiniProgramApplicationAnalysisService['exportComponentBuildMetaMap']>
+    ReturnType<
+      MiniProgramApplicationAnalysisService['exportComponentBuildMetaMap']
+    >
   >;
   let analysisPromise: Promise<MetaMap> | null = null;
   let styleProcessor: CustomStyleSheetProcessor | undefined;
@@ -230,22 +247,44 @@ export function miniProgramAssetsPlugin(
         config.component ??= value.component;
         config.usingComponents = {
           ...(config.usingComponents as Record<string, string> | undefined),
-          ...value.usingComponents.reduce((pre, cur) => {
-            pre[cur.selector] = cur.path;
-            return pre;
-          }, {} as Record<string, string>),
+          ...value.usingComponents.reduce(
+            (pre, cur) => {
+              pre[cur.selector] = cur.path;
+              return pre;
+            },
+            {} as Record<string, string>
+          ),
         };
         emit(outPath, JSON.stringify(config));
       });
 
-      // 4. library 组件 config
+      // 4. otherMetaCollectionGroup -> 把模板 / usingComponents 回注到 scope
+      //    这一步必须在 exportLibraryTemplate() 之前，否则 templateList 是空的，
+      //    library-template/*.wxml 会产出一个空文件。
+      for (const [key, element] of Object.entries(
+        resolved.otherMetaCollectionGroup
+      )) {
+        libraryTemplateScopeService.setScopeExtraUseComponents(key, {
+          useComponents: {
+            ...[...element.localPath, ...element.libraryPath].reduce(
+              (pre, cur) => {
+                pre[cur.selector] = cur.path;
+                return pre;
+              },
+              {} as Record<string, string>
+            ),
+          },
+          templateList: element.templateList.map((item) => item.content),
+        });
+      }
+
+      // 5. library 组件 config
       for (const item of libraryTemplateScopeService.exportLibraryComponentConfig()) {
         emit(item.filePath, JSON.stringify(item.content));
       }
 
-      // 5. library 模板
-      const templateGroup =
-        libraryTemplateScopeService.exportLibraryTemplate();
+      // 6. library 模板
+      const templateGroup = libraryTemplateScopeService.exportLibraryTemplate();
       for (const [key, element] of Object.entries(templateGroup)) {
         emit(
           key,
@@ -265,13 +304,27 @@ export function miniProgramAssetsPlugin(
         );
       }
 
-      // 6. self template
+      // 7. self template
       for (const [key, content] of Object.entries(resolved.selfTemplate)) {
         emit(key, content);
       }
 
-      // Vite 会把没有对应模块的 css chunk 留空，这里不动它，
-      // 小程序侧只认上面 emit 出来的文件
+      // 8. builder 配置里的 assets（app.json / project.config.json 等）
+      if (
+        options.assets?.length &&
+        options.absoluteProjectRoot &&
+        options.absoluteProjectSourceRoot
+      ) {
+        const copied = await collectAssets(options.assets, {
+          workspaceRoot: options.workspaceRoot,
+          absoluteProjectRoot: options.absoluteProjectRoot,
+          absoluteProjectSourceRoot: options.absoluteProjectSourceRoot,
+        });
+        for (const item of copied) {
+          emit(item.outputRelPath, fs.readFileSync(item.sourcePath, 'utf8'));
+        }
+      }
+
       void bundle;
     },
     async closeBundle() {

@@ -5,12 +5,18 @@ import * as path from 'path';
 import { Observable } from 'rxjs';
 import { Injector } from 'static-injector';
 import type { AliasOptions, InlineConfig } from 'vite';
+import { LibraryTemplateScopeService } from '../application/library-template-scope.service';
 import { changeComponent } from '../component-template-inject/change-component';
 import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
-import { generateEntryPatterns, toRollupInput } from './entry-patterns';
+import {
+  generateEntryPatterns,
+  resolveProjectRoots,
+  toRollupInput,
+} from './entry-patterns';
 import { miniProgramComponentTransformPlugin } from './plugins/component-transform.plugin';
+import { libraryTemplatePlugin } from './plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from './plugins/mini-program-assets.plugin';
 import { tsConfigPathsToAliases } from './tsconfig-paths';
 
@@ -135,6 +141,14 @@ export async function createMiniProgramViteConfig(options: {
     ...entryPatterns.pageList,
     ...entryPatterns.componentList,
   ];
+  const { absoluteProjectRoot, absoluteProjectSourceRoot } =
+    await resolveProjectRoots({
+      workspaceRoot: context.workspaceRoot,
+      context,
+    });
+  // assets 插件和 library 插件必须共享同一个 scope service，
+  // 前者读后者注册的 useComponents / templateList
+  const templateScope = new LibraryTemplateScopeService();
 
   // 该包是 ESM，esModuleInterop 下命名空间的 default 就是工厂函数；
   // 但类型声明里模块本身就是函数类型，这里运行时兜两种形态、类型上收敛成函数。
@@ -167,6 +181,7 @@ export async function createMiniProgramViteConfig(options: {
         fastCompile: false,
         experimental: { useAngularCompilationAPI: true },
       }),
+      libraryTemplatePlugin({ buildPlatform, templateScope }),
       miniProgramComponentTransformPlugin(),
       miniProgramAssetsPlugin({
         tsConfig: viteOptions.tsConfig,
@@ -175,6 +190,10 @@ export async function createMiniProgramViteConfig(options: {
         entryPatterns: allEntries,
         context,
         watch: false,
+        templateScope,
+        assets: viteOptions.assets,
+        absoluteProjectRoot,
+        absoluteProjectSourceRoot,
       }),
       ...(options.extraPlugins || []),
     ],
@@ -226,7 +245,14 @@ export function runViteBuilder(
         });
         const vite = await import('vite');
         await vite.build(config);
-        observer.next({ success: true });
+        observer.next({
+          success: true,
+          // 和 webpack browser builder 的输出契约对齐，spec 里靠这个定位产物
+          baseOutputPath: path.resolve(
+            context.workspaceRoot,
+            options.outputPath
+          ),
+        } as BuilderOutput);
         observer.complete();
       } catch (error) {
         context.logger.error(String((error as Error)?.message ?? error));
