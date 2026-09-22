@@ -1,3 +1,4 @@
+import { analyzeFileInjection } from '../../../test/util/template-inject-ast';
 import { changeComponent } from './change-component';
 
 const UPDATE_CALL = 'amp.propertyChange(ampNgCore.ɵɵgetCurrentView());';
@@ -86,6 +87,69 @@ describe('component-template-inject: changeComponent', () => {
     });
   });
 
+  describe('回归：多组件文件 + 类上有 template 字段', () => {
+    /**
+     * OutsideTemplateComponent 就是这个形状：类自己有个 `template` 字段，
+     * 同时 ɵɵdefineComponent 里也有 `template: function`。
+     *
+     * 旧实现用 createCssSelectorForTs 的相邻兄弟组合符定位元数据对象，
+     * 同文件多组件时兄弟关系错位，`PropertyAssignment[name=template]::initializer`
+     * 会解析到一个 StringLiteral，initIfNode 拿不到，整个组件被 `continue`
+     * 静默跳过——函数照常返回结果，但一条 propertyChange 都没插进去。
+     * 线上表现是该组件的属性变更不会同步到小程序侧。
+     */
+    it('两个组件都必须被注入', () => {
+      const r = changeComponent(MULTI_WITH_TEMPLATE_FIELD);
+      expect(r).toBeTruthy();
+      const report = analyzeFileInjection('multi.js', r!.content);
+      const names = report.components.map((c) => c.componentName);
+      expect(names).toContain('OutsideTemplateComponent');
+      expect(names).toContain('PlainComponent');
+      for (const c of report.components) {
+        expect(c.hasInitBlock).toBe(true);
+        expect(c.branch).not.toBeNull();
+        expect(c.propertyChangeCount).toBe(1);
+        expect(c.isLastStatement).toBe(true);
+      }
+      expect(report.strayCalls).toBe(0);
+    });
+
+    it('不能因为漏注入而“假装成功”返回', () => {
+      const r = changeComponent(MULTI_WITH_TEMPLATE_FIELD);
+      const injected = (r!.content.match(/[\w$.]*\.propertyChange\(/g) || [])
+        .length;
+      // 两个组件 = 2 次调用，少于 2 就是漏了
+      expect(injected).toBe(2);
+    });
+  });
+
+  describe('AST 层面复核单元用例的分支判定', () => {
+    it('分支 A / 分支 B 能被 AST 正确区分', () => {
+      const a = analyzeFileInjection(
+        'a.js',
+        changeComponent(WITH_UPDATE_BLOCK)!.content
+      );
+      const b = analyzeFileInjection(
+        'b.js',
+        changeComponent(WITHOUT_UPDATE_BLOCK)!.content
+      );
+      expect(a.components[0].branch).toBe('A');
+      expect(b.components[0].branch).toBe('B');
+      expect(a.components[0].updateStatementCount).toBeGreaterThan(1);
+      expect(b.components[0].updateStatementCount).toBe(1);
+    });
+
+    it('空模板（无 rf & 1）不注入，但仍按契约返回结果', () => {
+      // 不能返回 undefined：SetupComponentDataService 靠返回值决定组件是否产出，
+      // 空模板组件也得正常产出，只是没有注入点而已
+      const r = changeComponent(EMPTY_TEMPLATE);
+      expect(r).toBeTruthy();
+      expect(r!.componentName).toBe('EmptyTpl');
+      expect(r!.content).not.toContain('propertyChange(');
+      expect(r!.content).not.toContain('import * as amp');
+    });
+  });
+
   it('同文件多组件：每个组件都被改到，componentName 取第一个', () => {
     const r = changeComponent(TWO_COMPONENTS);
     expect(r!.componentName).toBe('Comp1');
@@ -142,6 +206,55 @@ export class Baz {
         i0.ɵɵelement(0, "view");
       }
       if (rf & 2) {
+      }
+    },
+  });
+}
+`;
+
+const EMPTY_TEMPLATE = `
+export class EmptyTpl {
+  static ɵcmp = i0.ɵɵdefineComponent({
+    type: EmptyTpl,
+    selectors: [["empty-tpl"]],
+    template: function EmptyTpl_Template(rf, ctx) {},
+  });
+}
+`;
+
+const MULTI_WITH_TEMPLATE_FIELD = `
+export class OutsideTemplateComponent {
+  template;
+  constructor() { }
+  static ɵcmp = i0.ɵɵdefineComponent({
+    type: OutsideTemplateComponent,
+    selectors: [["app-outside-template"]],
+    inputs: { template: "template" },
+    decls: 3,
+    vars: 1,
+    template: function OutsideTemplateComponent_Template(rf, ctx) {
+      if (rf & 1) {
+        i0.ɵɵelementStart(0, "div");
+        i0.ɵɵtext(1, "下面将传入一个由外部提供的模板");
+        i0.ɵɵelementEnd();
+      }
+      if (rf & 2) {
+        i0.ɵɵadvance(2);
+        i0.ɵɵproperty("ngIf", ctx.template);
+      }
+    },
+  });
+}
+
+export class PlainComponent {
+  static ɵcmp = i0.ɵɵdefineComponent({
+    type: PlainComponent,
+    selectors: [["app-plain"]],
+    decls: 1,
+    vars: 0,
+    template: function PlainComponent_Template(rf, ctx) {
+      if (rf & 1) {
+        i0.ɵɵelement(0, "view");
       }
     },
   });
