@@ -47,7 +47,6 @@
     "@typescript-eslint/parser": "^5.44.0",
     "cpx": "^1.5.0",
     "cross-env": "^7.0.3",
-    "cyia-ngx-devkit": "0.0.5",
     "eslint": "^7.32.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-import": "^2.26.0",
@@ -81,10 +80,6 @@
   },
   "resolutions": {},
   "overrides": {
-    "cyia-ngx-devkit": {
-      "@angular-devkit/architect": "0.2003.13",
-      "@angular-devkit/core": "20.3.13"
-    },
     "tapable": "2.2.1"
   }
 }
