@@ -431,3 +431,83 @@ false，一开始写的类名比对根本没生效，两个组件仍然都解析
 `npm run test:ci` **不会**用 `tsconfig.builder.json`（strict）类型检查 `src/builder`，
 builder 里的 strict 类型错误只有 `npm run build` 才暴露。改完 builder 一定要跑
 `npm run build`，不能只跑 test。
+
+---
+
+## 已知问题（未修，遇到时按这里排查）
+
+### 同一个组件被两个 entry 注册 → 第二个 entry 产出残缺组件
+
+**状态**：已知，未修。触发条件偏，先不处理，但产物是坏的且不报错，务必记住这个症状。
+
+**触发写法**
+
+```ts
+// entry-a.entry.ts
+import { FooComponent } from '../foo.component';
+componentRegistry(FooComponent);
+
+// entry-b.entry.ts  —— 注册的是同一个组件
+import { FooComponent } from '../foo.component';
+componentRegistry(FooComponent);
+```
+
+**症状**
+
+`entry-a` 产出完整四件套，`entry-b` **只有 `.js`，没有 `.wxml` / `.json` / `.wxss`**。
+构建 `success: true`，没有任何 warning。在微信里表现为该组件页面直接跑不起来。
+
+实测输出：
+
+```
+entry-a/entry-a-entry.js     len=585514
+entry-a/entry-a-entry.json   len=39
+entry-a/entry-a-entry.wxml   len=260
+entry-a/entry-a-entry.wxss   len=0
+entry-b/entry-b-entry.js     len=585514   ← 只有 js，其余三个文件根本不存在
+```
+
+**原因**
+
+`ResolvedDataGroup.outputContent` 里 `foo.component.ts#FooComponent` 只有**一条**记录。
+`MiniProgramApplicationAnalysisService.getComponentPagePattern()` 从源文件出发走
+反向依赖链（`dependencyUseModule`）找入口，**找到第一个匹配的 entry 就 `break`**，
+于是这条模板内容只会被写到 entry-a 的输出路径，entry-b 拿不到任何东西。
+
+**怎么快速确认是不是这个坑**
+
+在构建产物目录里找「只有 js 没有 wxml」的组件目录：
+
+```bash
+# 在 dist 里找有 .js 但缺同名 .wxml 的路径
+for f in $(find dist -name '*.entry.js'); do
+  base="${f%.js}"
+  [ -f "${base}.wxml" ] || echo "残缺: $f"
+done
+```
+
+出现 `残缺` 就往「同一组件被多 entry 注册」上查——去看各 entry 文件里
+`componentRegistry(...)` / `bootstrapPage(...)` 的参数是不是指向同一个类。
+
+**注意区分：组件重名不是问题**
+
+| 情况                       | 结果                               |
+| -------------------------- | ---------------------------------- |
+| 不同文件同名类，各自 entry | ✅ 正常，各归各（已实测）          |
+| 同文件同名类               | 构造不出来，JS 语法禁止            |
+| 同一组件被 2 个 entry 注册 | ⚠️ 就是本条，第二个 entry 静默残缺 |
+
+复合 key 是 `源文件#类名`，不同文件同名类 key 天然不同；且
+`getComponentPagePattern` 的 BFS 从源文件出发，比对范围被限定在该文件的引用者里，
+不会跨文件乱匹配。
+
+**如果以后要修**
+
+最小改法：`getComponentPagePattern` 里对同一个 `源文件#组件名` 记录命中的 entry，
+发现命中多个就构建期抛错，把静默残缺换成明确提示。改动量很小（一个 Set + throw），
+不影响任何现有正常路径。
+
+### 同 entry 注册多个组件（不支持，平台限制）
+
+小程序侧「一个组件 = 一个 js = 一次 `Component()` 调用」，同一个 entry 里注册两个
+组件本身就不合法，不做支持。合法形态见上面「同文件多组件支持 → 合法形态」。
