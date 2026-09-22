@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { stripPosixDrivePrefix, toNativePath } from './asset-path';
+import { isAbsoluteish, resolveNative, toNativePath } from './asset-path';
 
 /**
  * 复刻 devkit normalizeAssetPatterns 里的校验：
@@ -52,49 +52,36 @@ describe('util/asset-path: devkit posix 化的 Windows 路径（/C:/...）', () 
   const posixified = '/C:/code/proj/host/src/tsconfig.spec.json';
   const root = 'C:/code/proj/host';
 
-  it('复现双盘符：不剥斜杠直接 win32 resolve 会拼出 C:\\C\\...', () => {
-    // 这就是用户看到的 C:\C\code\... 的来源：
-    // `/C:/...` 在 win32 下是「无盘符绝对路径」，resolve 时重新补盘
+  it('复现 bug：/C:/x 被 win32 当无盘符绝对路径，resolve 补出双盘符', () => {
+    // 这就是用户看到的 C:\C\code\... 的来源。
+    // devkit normalize() 把 C:\code\x 存成 /C:/code/x（posix 形态），
+    // 而裸 path.resolve 不认识这个形态。
     const doubled = path.win32.resolve(root, posixified);
-    // 双盘符的特征是「盘符出现在非首位」，即 X:\Y:\ 这种。
-    // 不能用 toContain('c:\\c')——正常路径 c:\code 里就有 c:\c，误报。
     expect(doubled).toMatch(DOUBLE_DRIVE);
   });
 
-  it('stripPosixDrivePrefix 把 /C:/ 变回 C:/，win32 认它是带盘符的绝对路径', () => {
-    const stripped = stripPosixDrivePrefix(posixified);
-    expect(stripped).toBe('C:/code/proj/host/src/tsconfig.spec.json');
-    expect(path.win32.isAbsolute(stripped)).toBe(true);
-    // 盘符只出现一次
-    expect(/c:[\\/]?c:/i.test(stripped)).toBe(false);
+  it('isAbsoluteish 认得原生绝对 + posix 化绝对', () => {
+    expect(isAbsoluteish(posixified)).toBe(true);
+    expect(isAbsoluteish('C:/code/x')).toBe(true);
+    expect(isAbsoluteish('C:\\code\\x')).toBe(true);
+    expect(isAbsoluteish('/workspace/x')).toBe(true);
+    expect(isAbsoluteish('src/tsconfig.spec.json')).toBe(false);
+    expect(isAbsoluteish('./src/x')).toBe(false);
   });
 
-  it('剥完之后 win32 resolve 不再双盘符', () => {
-    const joined = path.win32.resolve(
-      stripPosixDrivePrefix(root),
-      stripPosixDrivePrefix(posixified)
-    );
-    expect(joined).not.toMatch(DOUBLE_DRIVE);
-    expect(joined.toLowerCase()).toBe(
-      'c:\\code\\proj\\host\\src\\tsconfig.spec.json'
-    );
+  it('resolveNative：绝对输入不再跟 base 拼，且不会双盘符', () => {
+    const out = resolveNative(root, posixified);
+    expect(out).not.toMatch(DOUBLE_DRIVE);
   });
 
-  it('普通 unix 路径不被 strip 影响', () => {
-    const unix = '/workspace/miniprogram/proj/src/tsconfig.spec.json';
-    expect(stripPosixDrivePrefix(unix)).toBe(unix);
+  it('resolveNative：相对输入相对 base 解析，而不是 process.cwd()', () => {
+    const out = resolveNative('/base/dir', 'src/tsconfig.spec.json');
+    expect(out).toBe(path.resolve('/base/dir/src/tsconfig.spec.json'));
+    expect(out).not.toBe(path.resolve('src/tsconfig.spec.json'));
   });
 
-  it('相对路径不被 strip 影响，仍走 resolve 补 cwd', () => {
-    const rel = 'src/tsconfig.spec.json';
-    expect(stripPosixDrivePrefix(rel)).toBe(rel);
-    expect(path.isAbsolute(toNativePath(rel))).toBe(true);
-  });
-
-  it('toNativePath 对当前平台的绝对路径直接短路，不进 devkit normalize', () => {
-    // 关键回归点：先 normalize 会把 C:/x 补成 /C:/x，双盘符复活。
-    // 所以绝对路径必须在 normalize 之前短路掉。
-    const abs = path.resolve('src/tsconfig.spec.json');
-    expect(toNativePath(abs)).toBe(abs);
+  it('toNativePath 幂等（当前平台）', () => {
+    const once = toNativePath('/workspace/proj/x');
+    expect(toNativePath(once)).toBe(once);
   });
 });

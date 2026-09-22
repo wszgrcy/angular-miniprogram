@@ -18,36 +18,49 @@ import * as path from 'path';
  * 把盘符前的斜杠去掉，它就变回 win32 认的真绝对路径。
  * 普通 unix 路径（`/workspace/...`）不匹配这个模式，不受影响。
  */
-export function stripPosixDrivePrefix(p: string): string {
-  return p.replace(/^[/\\]?([a-zA-Z]:[/\\])/, '$1');
+/** devkit posix 化的 Windows 绝对路径，如 `/C:/code/x` */
+const POSIXIFIED_WIN_ABS = /^[/\\]?([a-zA-Z]:[/\\])/;
+
+/**
+ * 是不是「绝对路径」——含当前平台原生绝对，以及 devkit posix 化的
+ * `/C:/x`（win32 下它是无盘符绝对路径，posix 下它不是绝对）。
+ */
+export function isAbsoluteish(p: string): boolean {
+  return path.isAbsolute(p) || POSIXIFIED_WIN_ABS.test(p);
 }
 
 /**
  * 转成**当前系统原生的绝对路径**字符串。
  *
- * 注意顺序：必须**先判绝对，再考虑 devkit normalize**。
+ * 完全走 devkit 自己的转换，不要自己写正则猜形态：
  *
- * 如果先跑 devkit `normalize()`，它用 posix 语义，会把 `C:/x` 当成相对
- * 路径又补一个前导 `/` 变回 `/C:/x`，经 `getSystemPath` 后成为无盘符
- * 绝对路径，最后 `path.resolve` 再补一次盘——双盘符又回来了。
- * 所以绝对路径要短路，不进 normalize。
+ *   normalize('C:\\code\\x')  ->  '/C:/code/x'   （path.js 显式把
+ *                                                  `^[A-Z]:[/\\]` 转成
+ *                                                  `/C:/...` 的 posix 形态）
+ *   getSystemPath('/C:/code/x') ->  'C:\\code\\x'  （asWindowsPath 里
+ *                                                    `/^(\\/(\\w)(?:\\/(.*))?$/`
+ *                                                    把盘符还原回开头）
  *
- * 三步：
- * 1. `stripPosixDrivePrefix`：`/C:/x` -> `C:/x`，让 win32 认它是带盘符
- *    的绝对路径。普通 unix 路径不匹配此模式，原样过去。
- * 2. 已是当前平台认得的绝对路径 -> 直接 `path.resolve`，**不走 devkit
- *    normalize**（见上）。
- * 3. 否则才走 `getSystemPath(normalize(...))` + `resolve`，把 devkit Path
- *    / 相对路径统一拉成绝对原生路径。devkit `normalize('./x')` 会给个
- *    相对的 `x`，而 `resolve('x', './src/pages')` 是 `<cwd>/x/src/pages`，
- *    `startsWith('x')` 仍为 false，所以绝对化是必要的。
+ * 所以 normalize + getSystemPath 这一对，对
+ * `C:\\x` / `C:/x` / `/C:/x` 三种输入都能收敛到 `C:\\x`。
  */
 export function toNativePath(p: string | Path): string {
-  const stripped = stripPosixDrivePrefix(p as string);
-  if (path.isAbsolute(stripped)) {
-    return path.resolve(stripped);
+  return path.resolve(getSystemPath(normalize(p as string)));
+}
+
+/**
+ * 以 base 为基准把 p 解析成原生绝对路径。
+ *
+ * p 已经是绝对的（含 /C:/x 形态）就直接归一后用它，
+ * 否则相对 base 解析——不能直接 path.resolve(p)，那样会落到
+ * process.cwd() 而不是 base。
+ */
+export function resolveNative(base: string | Path, p: string | Path): string {
+  const pStr = p as string;
+  if (isAbsoluteish(pStr)) {
+    return toNativePath(pStr);
   }
-  return path.resolve(getSystemPath(normalize(stripped)));
+  return path.resolve(toNativePath(base), pStr);
 }
 
 /**

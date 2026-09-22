@@ -1,4 +1,4 @@
-import { join, normalize } from '@angular-devkit/core';
+import { getSystemPath, join, normalize } from '@angular-devkit/core';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import {
@@ -63,7 +63,13 @@ describeBuilder(
 
         const buildPlatform = getBuildPlatform(PlatformType.wx);
         const outDir = path.join(
-          harness.host.root().toString(),
+          // 必须用 getSystemPath，不能用 .toString()。
+          // host.root() 是 devkit 的虚拟 Path，Windows 上形态是
+          // `/C:/code/...`（posix 化，盘符前带斜杠），
+          // .toString() 会把这个虚拟形态原样带出去，下游 path.resolve
+          // 把它当「无盘符绝对路径」重新补盘 -> C:\C\code\...
+          // getSystemPath -> asWindowsPath 才是官方还原：/C:/x -> C:\x
+          getSystemPath(harness.host.root()),
           'dist/karma-vite'
         );
 
@@ -74,7 +80,7 @@ describeBuilder(
             platform: PlatformType.wx,
             port: 9876,
           },
-          context: minimalContext(harness.host.root().toString()) as never,
+          context: minimalContext(getSystemPath(harness.host.root())) as never,
           buildPlatform,
         });
 
