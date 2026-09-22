@@ -10,7 +10,10 @@ import ts from 'typescript';
 import type { CompilerOptions } from 'typescript';
 import { Compilation, Compiler } from 'webpack';
 import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
-import { MiniProgramCompilerService } from '../mini-program-compiler';
+import {
+  MiniProgramCompilerService,
+  splitComponentKey,
+} from '../mini-program-compiler';
 import { BuildPlatform } from '../platform/platform';
 import { angularCompilerCliPromise } from '../util/load_esm';
 import {
@@ -91,12 +94,20 @@ export class MiniProgramApplicationAnalysisService {
     });
     const styleMap = new Map<string, string[]>();
     metaMap.style.forEach((value, key) => {
-      const entryPattern = this.getComponentPagePattern(key);
+      const { sourceFile, componentClassName } = splitComponentKey(key);
+      const entryPattern = this.getComponentPagePattern(
+        sourceFile,
+        componentClassName
+      );
       styleMap.set(entryPattern.outputFiles.style, value);
     });
     const contentMap = new Map<string, string>();
     metaMap.outputContent.forEach((value, key) => {
-      const entryPattern = this.getComponentPagePattern(key);
+      const { sourceFile, componentClassName } = splitComponentKey(key);
+      const entryPattern = this.getComponentPagePattern(
+        sourceFile,
+        componentClassName
+      );
       contentMap.set(entryPattern.outputFiles.content, value);
     });
 
@@ -110,7 +121,11 @@ export class MiniProgramApplicationAnalysisService {
       }
     >();
     metaMap.useComponentPath.forEach((value, key) => {
-      const entryPattern = this.getComponentPagePattern(key);
+      const { sourceFile, componentClassName } = splitComponentKey(key);
+      const entryPattern = this.getComponentPagePattern(
+        sourceFile,
+        componentClassName
+      );
       const list = [
         ...value.libraryPath.map((item) => {
           item.path = resolve(
@@ -168,6 +183,34 @@ export class MiniProgramApplicationAnalysisService {
     };
   }
 
+  /**
+   * 取 entry 里 `componentRegistry(XxxComponent)` / `bootstrapPage(XxxComponent)`
+   * 真正指向的组件类名。
+   *
+   * `getSymbolAtLocation` 拿到的声明通常是 ImportSpecifier（`import { X } from ...`），
+   * 不是类声明本身，所以要先沿 alias 解到原始 symbol 再取类名。
+   * `import { X as Y }` 的情况以原始类名为准。
+   */
+  private resolveImportedComponentName(symbol: ts.Symbol | undefined): string {
+    if (!symbol) {
+      return '';
+    }
+    let current = symbol;
+    // alias 链最多走几层，防御性地防止环
+    for (let i = 0; i < 5; i++) {
+      if ((current.flags & ts.SymbolFlags.Alias) === ts.SymbolFlags.Alias) {
+        current = this.typeChecker.getAliasedSymbol(current);
+        continue;
+      }
+      const decl = current.getDeclarations()?.[0];
+      if (decl && ts.isClassDeclaration(decl)) {
+        return decl.name?.getText() ?? '';
+      }
+      return '';
+    }
+    return '';
+  }
+
   private initHost(config: ParsedConfiguration) {
     const host = ts.createIncrementalCompilerHost(config.options, this.system);
     this.augmentResolveModuleNames(host, config.options);
@@ -199,7 +242,10 @@ export class MiniProgramApplicationAnalysisService {
     this.ngCompiler = this.ngTscProgram.compiler;
   }
   /** 获得组件/页面的入口 */
-  private getComponentPagePattern(fileName: string) {
+  private getComponentPagePattern(
+    fileName: string,
+    componentClassName?: string
+  ) {
     const findList = [fileName];
     let maybeEntryPath: PagePattern | undefined;
 
@@ -242,6 +288,19 @@ export class MiniProgramApplicationAnalysisService {
           }
           const symbol = this.typeChecker.getSymbolAtLocation(importComponent);
           const node = symbol?.getDeclarations()?.[0];
+          // 同文件多组件时，光比对文件路径分不出到底是哪个组件：
+          // 两个 entry 各自 import 同一个文件的不同组件时，必须连类名一起对上，
+          // 否则先那个组件会被解析到别人的 entry 上，模板就串了。
+          const resolvedComponentName =
+            this.resolveImportedComponentName(symbol);
+          if (
+            componentClassName &&
+            resolvedComponentName &&
+            resolvedComponentName !== componentClassName
+          ) {
+            maybeEntryPath = undefined;
+            continue;
+          }
           const importDeclaration = node?.parent.parent
             .parent as ts.ImportDeclaration;
           const relativeImportComponentPath = importDeclaration.moduleSpecifier
@@ -262,7 +321,9 @@ export class MiniProgramApplicationAnalysisService {
       }
     }
     if (!maybeEntryPath) {
-      throw new Error(`没有找到组件[${fileName}]对应的入口点`);
+      throw new Error(
+        `没有找到组件[${componentClassName ?? fileName}]对应的入口点`
+      );
     }
     return maybeEntryPath;
   }

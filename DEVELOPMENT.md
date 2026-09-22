@@ -388,3 +388,46 @@ npm run build
 npm run test:jasmine library && npm run test
 npm run lint && npm run coverage
 ```
+
+## 同文件多组件支持
+
+### 改造前的实测症状
+
+`ResolvedDataGroup` 的 `outputContent` / `useComponentPath` / `style` 三个 map
+**按源文件路径做 key**。同文件多组件时后编译的覆盖先编译的：
+
+| 场景                                    | 结果                                                                                      |
+| --------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 2 个组件共用一个源文件 + 2 个独立 entry | 先编译的组件模板**彻底丢失**（A 的 wxml 数 = 0），且两个 entry 都渲染成最后编译的那个组件 |
+| 元数据                                  | `componentName` 取第一个组件，模板内容却是最后一个组件的 —— 名字和内容对不上              |
+
+### 合法形态
+
+小程序侧「一个组件 = 一个 js = 一次 `Component()` 调用」，所以**同一个 entry 里
+注册两个组件本身就不合法**。合法形态是：一个组件源文件导出多个组件，各自用独立
+entry 注册。
+
+### 改法
+
+1. **map key 改成 `源文件#组件类名`**（`makeComponentKey` / `splitComponentKey`，
+   见 `mini-program-compiler/type.ts`）。`#` 在 POSIX / Windows 路径里都不会出现。
+2. **`getComponentPagePattern(fileName, componentClassName?)` 加组件名比对**。
+   原来只比对文件路径，两个 entry 各自 import 同一文件的不同组件时分不出来。
+3. **`changeComponent` 返回 `componentNames: string[]`**（`componentName` 保留为
+   `componentNames[0]`，已标 deprecated）。
+4. **`SetupComponentDataService` 按组件逐个产出元数据**，每个组件用自己的
+   `outputContent` / `useComponentPath` / `style`，缺内容的组件跳过而不是乱接。
+
+### 一个容易踩的坑
+
+`typeChecker.getSymbolAtLocation(importComponent)` 拿到的声明是 **`ImportSpecifier`**
+（`import { X } from ...`），**不是类声明**。所以 `ts.isClassDeclaration(node)` 恒为
+false，一开始写的类名比对根本没生效，两个组件仍然都解析到 entry-a。
+必须先用 `getAliasedSymbol` 沿 alias 链解到原始 symbol 再取类名
+（`resolveImportedComponentName`）。`import { X as Y }` 以原始类名为准。
+
+### 另一个流程上的坑
+
+`npm run test:ci` **不会**用 `tsconfig.builder.json`（strict）类型检查 `src/builder`，
+builder 里的 strict 类型错误只有 `npm run build` 才暴露。改完 builder 一定要跑
+`npm run build`，不能只跑 test。

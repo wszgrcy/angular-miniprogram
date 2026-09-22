@@ -30,6 +30,7 @@ import {
   MetaFromLibrary,
   ResolvedDataGroup,
   UseComponent,
+  makeComponentKey,
 } from './type';
 
 /** `R3TemplateDependencyKind.NgModule`，compiler 没有把这个枚举导出到运行时 */
@@ -112,7 +113,10 @@ export class MiniProgramCompilerService {
           ...(trait as any).resolution,
         };
         this.resolvedDataGroup.style.set(
-          path.normalize(fileName),
+          makeComponentKey(
+            path.normalize(fileName),
+            classDeclaration.name?.getText() ?? ''
+          ),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ((trait as any)?.analysis?.styleUrls || []).map(
             (item: { url: string }) => this.resolveStyleUrl(fileName, item.url)
@@ -190,13 +194,17 @@ export class MiniProgramCompilerService {
         directiveMatcher,
         meta
       );
+      const componentKey = makeComponentKey(
+        fileName,
+        classDeclaration.name?.getText() ?? ''
+      );
       this.resolvedDataGroup.outputContent.set(
-        path.normalize(fileName),
+        componentKey,
         componentBuildMeta.content
       );
 
       this.resolvedDataGroup.useComponentPath.set(
-        path.normalize(fileName),
+        componentKey,
         componentBuildMeta.useComponentPath
       );
       for (const key in componentBuildMeta.otherMetaGroup) {

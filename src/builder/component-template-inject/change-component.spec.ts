@@ -28,6 +28,19 @@ describe('component-template-inject: changeComponent', () => {
     expect(r!.componentName).toBe('Bar');
   });
 
+  it('componentNames 列出本文件全部组件，componentName 等于第一个', () => {
+    const single = changeComponent(WITH_UPDATE_BLOCK);
+    expect(single!.componentNames).toEqual(['Bar']);
+    expect(single!.componentName).toBe(single!.componentNames[0]);
+
+    const multi = changeComponent(MULTI_WITH_TEMPLATE_FIELD);
+    expect(multi!.componentNames).toEqual([
+      'OutsideTemplateComponent',
+      'PlainComponent',
+    ]);
+    expect(multi!.componentName).toBe('OutsideTemplateComponent');
+  });
+
   describe('已有 if (rf & 2) 更新块', () => {
     it('把 propertyChange 插到更新块最后一条语句之后', () => {
       const r = changeComponent(WITH_UPDATE_BLOCK);

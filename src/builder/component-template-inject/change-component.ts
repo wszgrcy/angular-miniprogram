@@ -62,7 +62,10 @@ function getTemplateFunction(
   meta: ts.ObjectLiteralExpression
 ): ts.FunctionLikeDeclaration | undefined {
   const initializer = pickProperty(sf, meta, 'template')?.initializer;
-  if (ts.isFunctionExpression(initializer) || ts.isArrowFunction(initializer)) {
+  if (
+    initializer !== undefined &&
+    (ts.isFunctionExpression(initializer) || ts.isArrowFunction(initializer))
+  ) {
     return initializer;
   }
   return undefined;
@@ -111,12 +114,18 @@ export function changeComponent(data: string) {
   }
 
   const changeList: Change[] = [];
+  const componentNames: string[] = [];
   let injectedCount = 0;
 
   for (const meta of metaList) {
+    const componentName =
+      pickProperty(sf, meta, 'type')?.initializer.getText() ?? '';
     const templateFn = getTemplateFunction(sf, meta);
     if (!templateFn) {
       continue;
+    }
+    if (componentName) {
+      componentNames.push(componentName);
     }
     // 空模板（`template: function X_Template(rf, ctx) {}`）没有 rf & 1，
     // 没有可注入的位置，跳过
@@ -171,8 +180,12 @@ export function changeComponent(data: string) {
 
   return {
     content: RawUpdater.update(data, changeList),
-    // todo library可否支持同文件多组件
-    componentName:
-      pickProperty(sf, metaList[0], 'type')?.initializer.getText() ?? '',
+    /** 本文件所有组件的类名，顺序与源文件中 ɵɵdefineComponent 出现顺序一致 */
+    componentNames,
+    /**
+     * @deprecated 用 componentNames。保留是为了不破坏已有调用方，
+     * 等于 componentNames[0]。
+     */
+    componentName: componentNames[0] ?? '',
   };
 }

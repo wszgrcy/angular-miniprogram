@@ -155,10 +155,10 @@ export class WebpackConfigurationChangeService {
         // webpack 5.101 起 splitChunks.test 的参数类型为 Module，需要向下转型
         const name = (module as webpack.NormalModule).nameForCondition();
         return !!(
-          ((name &&
+          (name &&
             name.endsWith('.ts') &&
             !/[\\/]node_modules[\\/]/.test(name)) ||
-            name?.includes('angular-miniprogram\\dist'))
+          name?.includes('angular-miniprogram\\dist')
         );
       },
       minChunks: 2,
@@ -231,12 +231,11 @@ export class WebpackConfigurationChangeService {
       navigator: `${this.buildPlatform.globalVariablePrefix}.navigator`,
       wx: this.buildPlatform.globalObject,
       miniProgramPlatform: `"${this.buildPlatform.globalObject}"`,
-      queueMicrotask:`${this.buildPlatform.globalVariablePrefix}.queueMicrotask`
+      queueMicrotask: `${this.buildPlatform.globalVariablePrefix}.queueMicrotask`,
     };
     if (this.config.mode === 'development') {
-      defineObject[
-        'ngDevMode'
-      ] = `${this.buildPlatform.globalObject}.__global.ngDevMode`;
+      defineObject['ngDevMode'] =
+        `${this.buildPlatform.globalObject}.__global.ngDevMode`;
     }
     this.config.plugins!.push(new DefinePlugin(defineObject));
   }
