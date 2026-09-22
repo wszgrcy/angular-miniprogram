@@ -46,10 +46,15 @@ export function changeComponent(data: string) {
       `IfStatement[expression="rf & 2"]`
     ) as ts.IfStatement;
     const updateContent = `amp.propertyChange(ampNgCore.ɵɵgetCurrentView());`;
-    if (updateIfNode) {
-      const updateBlock = updateIfNode.thenStatement as ts.Block;
+    // 没有现成的 `if (rf & 2)` 更新块，或者更新块是空的（`statements` 为 []）时，
+    // 都走「在 init 块后面补一个完整更新块」这条路。
+    // 空块如果还按老逻辑取 statements[length - 1] 会是 undefined，
+    // insertNode 里读 getStart 直接崩掉。
+    const updateBlock = updateIfNode?.thenStatement as ts.Block | undefined;
+    const updateStatements = updateBlock?.statements ?? [];
+    if (updateStatements.length) {
       updateInsertChange = change.insertNode(
-        updateBlock.statements[updateBlock.statements.length - 1],
+        updateStatements[updateStatements.length - 1],
         `;${updateContent}`,
         'end'
       );
