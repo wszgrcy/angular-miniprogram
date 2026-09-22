@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type {
+  ɵChangeDetectionScheduler as ChangeDetectionScheduler,
   ComponentRef,
   Injector,
   NgModuleRef,
-  NgZone,
   Type,
   ViewRef,
 } from '@angular/core';
@@ -28,7 +28,8 @@ export interface MiniProgramComponentVariable<NG_COMPONENT_INSTANCE = unknown> {
   /** page使用 */
   __ngComponentHostView: ViewRef;
   __ngComponentInjector: Injector;
-  __ngZone: NgZone;
+  /** zoneless 变更检测调度器，取代原来的 `__ngZone` */
+  __ngChangeDetectionScheduler: ChangeDetectionScheduler;
   /** 小程序组件是否与lview链接成功 */
   __isLink: boolean;
   __lView: LView;

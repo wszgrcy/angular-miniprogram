@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, TemplateRef } from '@angular/core';
+import { Component, OnInit, TemplateRef, input } from '@angular/core';
 
 @Component({
   standalone: false,
@@ -7,7 +7,7 @@ import { Component, Input, OnInit, TemplateRef } from '@angular/core';
   styleUrls: ['./component-need-template.component.css'],
 })
 export class ComponentNeedTemplateComponent implements OnInit {
-  @Input() templateRef: TemplateRef<any>;
+  templateRef = input.required<TemplateRef<any>>();
   constructor() {}
 
   ngOnInit() {}

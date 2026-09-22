@@ -1,5 +1,4 @@
 const obj = {
-  Zone: typeof Zone !== 'undefined' && Zone,
   setTimeout: typeof setTimeout !== 'undefined' && setTimeout,
   clearTimeout:
     typeof clearTimeout !== 'undefined' &&

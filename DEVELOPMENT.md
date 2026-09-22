@@ -134,3 +134,56 @@ npm run lint && npm run coverage
 
 > 注意：本仓库历史代码不是按 prettier 3 默认配置格式化的（`trailingComma`），
 > 因此**不要**对未修改的文件批量跑 `prettier --write`，会产生大量无关 diff。
+
+## 去 zone.js 化（zoneless）与 signal input/output
+
+### 背景
+
+Angular v20 已经可以完全不依赖 `zone.js`（`provideZonelessChangeDetection()`）。
+本仓库原先靠 `NgZone.run()` 从「小程序侧」触发变更检测，靠
+`runOutsideAngular()` 把 diff/setData 排除在 Angular 之外。现在改为：
+
+- 进入 Angular 的回调执行完后，显式
+  `ChangeDetectionScheduler.notify(ɵNotificationSource.Listener)`；
+- 需要「在 Angular 之外跑」的部分本来就不会触发 CD，直接调用即可。
+
+### 关键改动
+
+| 位置 | 变更 |
+| --- | --- |
+| `src/library/platform/util/change-detection.ts` | 新增 `runInAngular()` / `scheduleChangeDetection()`，统一封装「执行回调 + 通知调度器」 |
+| `src/library/platform/default/platform-core.ts` | `__ngZone` 换成 `__ngChangeDetectionScheduler`；事件回调改为 `try { handler() } finally { notify() }`；`runOutsideAngular` 包裹的 diff/setData 直接执行 |
+| `src/library/platform/default/component-template-hook.factory.ts` | `propertyChange()` 不再取 `NgZone` |
+| `src/library/platform/page.service.ts` | 页面注册改用 `runInAngular(injector, ...)` |
+| `src/library/platform/http/backend.ts` | 注入 `ChangeDetectionScheduler`，所有 `Zone.current.run(...)` 改为 `this.runInAngular(...)` |
+| `src/library/platform/type/type.ts` | `MiniProgramComponentVariable.__ngZone` → `__ngChangeDetectionScheduler` |
+| `src/library/declaration/index.d.ts` | 删除 `declare const Zone: any` |
+| `src/builder/application/webpack-configuration-change.service.ts` | DefinePlugin 不再映射全局 `Zone` |
+| `src/builder/platform/template/app-template.js` | 平台模板不再导出 `Zone` |
+| `script/package-sync.ts` | 同步 `@angular/common/http` 时剥掉 `fetch.ts` 里的 `import type {} from 'zone.js'` 与 `Zone.current`（zoneless 下 `reqZone` 恒为 `undefined`） |
+| `test/hello-world-app/src/main.ts` / `test.ts` | 删除 `import 'zone.js'` |
+| `test/hello-world-app/src/main.module.ts` / `main-test.module.ts` | `providers: [provideZonelessChangeDetection()]` |
+
+> 库本身不再强制 zoneless：由使用方在 root provider 里加
+> `provideZonelessChangeDetection()`。库只是不再产生任何 zone 依赖。
+
+### signal input / output
+
+fixture 里所有 `@Input()` / `@Output()` 已改为 `input()` / `output()`。
+注意 **模板里读 signal 必须显式调用**（`{{ input1() }}`、`*ngFor="let x of list()"`），
+Angular 的模板插值不会自动 unwrap signal。
+
+新增覆盖：
+
+- `src/library/platform/util/change-detection.spec.ts`：5 个 Node 端单测，
+  覆盖返回值、通知次数、抛错时仍然通知、自定义通知来源。
+- `src/builder/zoneless.spec.ts`：构建整个 fixture 后扫描产物，
+  断言没有 `__zone_symbol__` / `zone.js/dist`，且包含 `ChangeDetectionSchedulerImpl`。
+- `test/hello-world-app/src/spec/signal-io-spec/`：小程序内 karma 用例，
+  验证 signal input 渲染 + signal output 回传（需微信开发者工具，容器内跑不了）。
+
+### 已知限制
+
+`ChangeDetectionScheduler` 只在 `notify()` 之后调度一次 tick。若将来新增
+「从 `NgZone` 之外进入 Angular」的入口，必须显式调用
+`scheduleChangeDetection()`，否则视图不会刷新。

@@ -219,7 +219,6 @@ export class WebpackConfigurationChangeService {
       global: `${this.buildPlatform.globalObject}.__global`,
       window: `${this.buildPlatform.globalVariablePrefix}`,
       globalThis: `${this.buildPlatform.globalVariablePrefix}`,
-      Zone: `${this.buildPlatform.globalVariablePrefix}.Zone`,
       setTimeout: `${this.buildPlatform.globalVariablePrefix}.setTimeout`,
       clearTimeout: `${this.buildPlatform.globalVariablePrefix}.clearTimeout`,
       setInterval: `${this.buildPlatform.globalVariablePrefix}.setInterval`,

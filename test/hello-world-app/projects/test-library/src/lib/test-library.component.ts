@@ -1,4 +1,4 @@
-import { Component, HostBinding, Input, OnInit } from '@angular/core';
+import { Component, HostBinding, OnInit, input } from '@angular/core';
 
 @Component({
   standalone: false,
@@ -7,7 +7,8 @@ import { Component, HostBinding, Input, OnInit } from '@angular/core';
   styleUrls: ['./test-library.component.scss'],
 })
 export class TestLibraryComponent implements OnInit {
-  @Input() input1;
+  /** signal input，替代 @Input() */
+  input1 = input<any>(undefined);
   @HostBinding('property1') property1;
 
   constructor() {}

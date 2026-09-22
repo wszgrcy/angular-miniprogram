@@ -1,7 +1,6 @@
 import { platformMiniProgram } from 'angular-miniprogram';
 import { startupTest } from 'angular-miniprogram/karma/client';
 import { MainTestModule } from './main-test.module';
-import 'zone.js';
 
 let jasmineRequire = require('jasmine-core/lib/jasmine-core/jasmine.js');
 

@@ -65,6 +65,23 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
     );
   }
 
+  /**
+   * 本库已迁移到 zoneless，不再引入 zone.js。
+   * `@angular/common/http` 的 FetchBackend 依赖 zone.js 的全局 `Zone` 类型，
+   * 这里在同步阶段直接剖除。
+   */
+  function stripZoneJs(content: string) {
+    return content
+      .replace(
+        /\/\/ Needed for the global `Zone` ambient types to be available\.\nimport type \{\} from 'zone\.js';\n\n/,
+        ''
+      )
+      .replace(
+        /      \/\/ We have to check whether the Zone is defined in the global scope because this may be called\n      \/\/ when the zone is nooped\.\n      const reqZone = typeof Zone !== 'undefined' && Zone\.current;/,
+        '      // 已迁移 zoneless：不存在 Zone，进度回调直接执行\n      const reqZone: any = undefined;'
+      );
+  }
+
   for (const key in data) {
     if (exclude.includes(key)) {
       continue;
@@ -76,6 +93,7 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
         `angular-miniprogram/common`
       );
       content = rewriteCrossEntryPointImports(key, content);
+      content = stripZoneJs(content);
       buffer = stringToFileBuffer(content);
     }
     await completePromise(host.write(path.normalize(key), buffer));

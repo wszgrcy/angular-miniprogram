@@ -1,10 +1,11 @@
 /// <reference types="miniprogram-api-typings"/>
 import {
   ApplicationRef,
+  ɵChangeDetectionScheduler as ChangeDetectionScheduler,
   ChangeDetectorRef,
   ComponentRef,
   NgModuleRef,
-  NgZone,
+  ɵNotificationSource as NotificationSource,
   Type,
 } from '@angular/core';
 import type {
@@ -66,8 +67,8 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.__lView = lView;
     mpComponentInstance.__ngComponentInstance = lView[LVIEW_CONTEXT];
     mpComponentInstance.__ngComponentInjector = injector;
-    const ngZone = injector.get(NgZone);
-    mpComponentInstance.__ngZone = ngZone;
+    const scheduler = injector.get(ChangeDetectionScheduler);
+    mpComponentInstance.__ngChangeDetectionScheduler = scheduler;
     const componentFinderService = injector.get(ComponentFinderService);
     componentFinderService.set(
       mpComponentInstance.__ngComponentInstance,
@@ -79,13 +80,11 @@ export class MiniProgramCoreFactory {
     setLViewPath(lView, list);
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__waitLinkResolve();
-    ngZone.runOutsideAngular(() => {
-      const initValue = getPageRefreshContext(lView);
-      const diffData = getDiffData(lView, initValue);
-      if (Object.keys(diffData).length) {
-        mpComponentInstance.setData(diffData);
-      }
-    });
+    const initValue = getPageRefreshContext(lView);
+    const diffData = getDiffData(lView, initValue);
+    if (Object.keys(diffData).length) {
+      mpComponentInstance.setData(diffData);
+    }
   }
   /** 监听事件 */
   protected listenerEvent() {
@@ -115,11 +114,16 @@ export class MiniProgramCoreFactory {
           _this
             .getListenerEventMapping(cur.prefix, eventName)
             .forEach((name) => {
-              this.__ngZone.run(() => {
+              try {
                 if (el.listener[name]) {
                   el.listener[name](event);
                 }
-              });
+              } finally {
+                // zoneless：回调可能修改了应用状态，显式调度一次变更检测
+                this.__ngChangeDetectionScheduler?.notify(
+                  NotificationSource.Listener
+                );
+              }
             });
         } else {
           throw new Error('未绑定lView');
@@ -159,19 +163,17 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.__ngComponentHostView = componentRef.hostView;
     mpComponentInstance.__ngComponentInstance = componentRef.instance;
     mpComponentInstance.__ngComponentInjector = componentRef.injector;
-    const ngZone = componentRef.injector.get(NgZone);
-    mpComponentInstance.__ngZone = ngZone;
+    const scheduler = componentRef.injector.get(ChangeDetectionScheduler);
+    mpComponentInstance.__ngChangeDetectionScheduler = scheduler;
     const { lView, id }: { lView: LView; id: number } =
       findPageLView(componentRef);
     setLViewPath(lView, [id]);
     mpComponentInstance.__completePath = [id];
-    ngZone.runOutsideAngular(() => {
-      const initValue = getPageRefreshContext(lView);
-      const diffData = getDiffData(lView, initValue);
-      if (Object.keys(diffData).length) {
-        mpComponentInstance.setData(diffData);
-      }
-    });
+    const initValue = getPageRefreshContext(lView);
+    const diffData = getDiffData(lView, initValue);
+    if (Object.keys(diffData).length) {
+      mpComponentInstance.setData(diffData);
+    }
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__lView = lView;
     mpComponentInstance.__ngDestroy = () => {

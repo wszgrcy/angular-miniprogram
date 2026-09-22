@@ -12,12 +12,15 @@ import {
   HttpUploadProgressEvent,
 } from 'angular-miniprogram/common/http';
 import { MiniProgramCore } from 'angular-miniprogram/platform/wx';
+import {
+  ɵChangeDetectionScheduler as ChangeDetectionScheduler,
+  ɵNotificationSource as NotificationSource,
+} from '@angular/core';
 import { Observable, Observer } from 'rxjs';
 import {
   MiniProgramHttpDownloadResponse,
   MiniProgramHttpResponse,
 } from './response';
-declare const Zone: any;
 /** Use this token to pass additional `wx.uploadFile()` parameter */
 export const UPLOAD_FILE_TOKEN = new HttpContextToken<{
   filePath?: string;
@@ -40,6 +43,22 @@ export const REQUSET_TOKEN = new HttpContextToken<{
 }>(() => ({}));
 
 export class MiniprogramHttpBackend implements HttpBackend {
+  constructor(
+    private changeDetectionScheduler: ChangeDetectionScheduler
+  ) {}
+
+  /**
+   * 小程序回调里执行 Angular 逻辑，并在结束后调度一次变更检测。
+   * 取代原来依赖 zone.js 的 `Zone.current.run(...)`。
+   */
+  private runInAngular(fn: () => void): void {
+    try {
+      fn();
+    } finally {
+      this.changeDetectionScheduler.notify(NotificationSource.Listener);
+    }
+  }
+
   handle(request: HttpRequest<any>): Observable<HttpEvent<any>> {
     if (
       request.method === 'POST' &&
@@ -64,12 +83,11 @@ export class MiniprogramHttpBackend implements HttpBackend {
    */
   private upload(request: HttpRequest<any>): Observable<HttpEvent<any>> {
     return new Observable((observer: Observer<HttpEvent<any>>) => {
-      let currentZone = Zone.current;
       // The response header event handler
       const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
         header,
       }) => {
-        currentZone.run(() => {
+        this.runInAngular(() => {
           observer.next(
             new HttpHeaderResponse({
               url: request.url,
@@ -82,7 +100,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
       // The upload progress event handler
       const onUpProgressUpdate: WechatMiniprogram.UploadTaskOnProgressUpdateCallback =
         ({ totalBytesSent, totalBytesExpectedToSend }) => {
-          currentZone.run(() => {
+          this.runInAngular(() => {
             observer.next({
               type: HttpEventType.UploadProgress,
               loaded: totalBytesSent,
@@ -101,7 +119,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
         formData: request.body,
         timeout: timeout,
         success: ({ data, statusCode: status, errMsg: statusText }) => {
-          currentZone.run(() => {
+          this.runInAngular(() => {
             let ok = status >= 200 && status < 300;
             let body: any | null = null;
 
@@ -143,7 +161,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
           });
         },
         fail: ({ errMsg }: WechatMiniprogram.GeneralCallbackResult) => {
-          currentZone.run(() => {
+          this.runInAngular(() => {
             observer.error(
               new HttpErrorResponse({
                 url: request.url,
@@ -178,12 +196,11 @@ export class MiniprogramHttpBackend implements HttpBackend {
    */
   private download(request: HttpRequest<any>): Observable<HttpEvent<any>> {
     return new Observable((observer: Observer<HttpEvent<any>>) => {
-      let currentZone = Zone.current;
       // The response header event handler
       const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
         header,
       }) => {
-        currentZone.run(() => {
+        this.runInAngular(() => {
           observer.next(
             new HttpHeaderResponse({
               url: request.url,
@@ -196,7 +213,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
       // The download progress event handler
       const onDownProgressUpdate: WechatMiniprogram.DownloadTaskOnProgressUpdateCallback =
         ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
-          currentZone.run(() => {
+          this.runInAngular(() => {
             observer.next({
               type: HttpEventType.DownloadProgress,
               loaded: totalBytesWritten,
@@ -218,7 +235,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
           tempFilePath,
           profile,
         }) => {
-          Zone.run(() => {
+          this.runInAngular(() => {
             const ok = status >= 200 && status < 300;
 
             if (ok) {
@@ -245,7 +262,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
           });
         },
         fail: ({ errMsg }: WechatMiniprogram.GeneralCallbackResult) => {
-          currentZone.run(() => {
+          this.runInAngular(() => {
             observer.error(
               new HttpErrorResponse({
                 url: request.url,
@@ -285,12 +302,11 @@ export class MiniprogramHttpBackend implements HttpBackend {
       );
     }
     return new Observable((observer: Observer<HttpEvent<any>>) => {
-      let currentZone = Zone.current;
       // The response header event handler
       const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
         header,
       }) => {
-        currentZone.run(() => {
+        this.runInAngular(() => {
           observer.next(
             new HttpHeaderResponse({
               url: request.url,
@@ -319,7 +335,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
           cookies,
           profile,
         }) => {
-          currentZone.run(() => {
+          this.runInAngular(() => {
             const ok = status >= 200 && status < 300;
             const headers = new HttpHeaders(header);
 
@@ -350,7 +366,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
           });
         },
         fail: ({ errMsg }: WechatMiniprogram.GeneralCallbackResult) => {
-          currentZone.run(() => {
+          this.runInAngular(() => {
             observer.error(
               new HttpErrorResponse({
                 url: request.url,

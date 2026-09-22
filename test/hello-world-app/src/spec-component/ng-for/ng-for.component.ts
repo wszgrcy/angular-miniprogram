@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, OnInit, input } from '@angular/core';
 
 @Component({
   standalone: false,
@@ -6,7 +6,7 @@ import { Component, Input, OnInit } from '@angular/core';
   templateUrl: './ng-for.component.html',
 })
 export class NgForComponent implements OnInit {
-  @Input() list: string[];
+  list = input<string[]>([]);
   constructor() {}
 
   ngOnInit() {}

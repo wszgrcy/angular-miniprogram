@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ComponentRef, NgZone } from '@angular/core';
+import { ComponentRef } from '@angular/core';
 import { LView } from 'angular-miniprogram/platform/type';
 import type {
   MPElementData,
@@ -27,19 +27,16 @@ let waitingRefreshLViewList: (() => void)[] = [];
 /** @internal */
 export function propertyChange(lView: LView) {
   if (linkMap.has(lView)) {
-    const ngZone = lView[INJECTOR]!.get(NgZone);
     waitingRefreshLViewList.push(() => {
-      ngZone.runOutsideAngular(() => {
-        const instance = linkMap.get(lView);
-        if (!instance) {
-          return;
-        }
-        const currentData = getPageRefreshContext(lView);
-        const diffData = getDiffData(lView, currentData);
-        if (Object.keys(diffData).length) {
-          instance.setData(diffData);
-        }
-      });
+      const instance = linkMap.get(lView);
+      if (!instance) {
+        return;
+      }
+      const currentData = getPageRefreshContext(lView);
+      const diffData = getDiffData(lView, currentData);
+      if (Object.keys(diffData).length) {
+        instance.setData(diffData);
+      }
     });
   }
 }

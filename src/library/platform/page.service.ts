@@ -3,7 +3,6 @@ import {
   Inject,
   Injectable,
   Injector,
-  NgZone,
   Type,
   createNgModuleRef,
 } from '@angular/core';
@@ -13,14 +12,14 @@ import {
 } from 'angular-miniprogram/platform/type';
 import { PAGE_TOKEN } from 'angular-miniprogram/platform/wx';
 import { APP_TOKEN } from './token';
+import { runInAngular } from './util/change-detection';
 
 @Injectable()
 export class PageService {
   constructor(
     private injector: Injector,
     private applicationRef: ApplicationRef,
-    @Inject(APP_TOKEN) private app: AppOptions,
-    private ngZone: NgZone
+    @Inject(APP_TOKEN) private app: AppOptions
   ) {}
 
   register() {
@@ -29,7 +28,7 @@ export class PageService {
       component: Type<C>,
       miniProgramComponentInstance: MiniProgramComponentInstance
     ) => {
-      return this.ngZone.run(() => {
+      return runInAngular(this.injector, () => {
         const injector = Injector.create({
           providers: [
             { provide: PAGE_TOKEN, useValue: miniProgramComponentInstance },

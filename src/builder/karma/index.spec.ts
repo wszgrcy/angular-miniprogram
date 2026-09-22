@@ -36,6 +36,7 @@ describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
         'ng-switch-spec',
         'ng-template-outlet-spec',
         'self-template-spec',
+        'signal-io-spec',
       ]);
       harness.useTarget('build', angularConfig);
       let appTestPath: string;
@@ -82,6 +83,7 @@ describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
         'ng-switch-spec',
         'ng-template-outlet-spec',
         'self-template-spec',
+        'signal-io-spec',
       ]);
       harness.useTarget('build', { ...angularConfig, watch: true });
       let appTestPath: string;

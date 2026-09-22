@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, OnInit, input } from '@angular/core';
 
 @Component({
   standalone: false,
@@ -7,7 +7,7 @@ import { Component, Input, OnInit } from '@angular/core';
   styleUrls: ['./component2.component.css'],
 })
 export class Component2Component implements OnInit {
-  @Input() cp2Input1 = '';
+  cp2Input1 = input('');
   constructor() {}
 
   ngOnInit() {}
