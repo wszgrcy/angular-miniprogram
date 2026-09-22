@@ -170,6 +170,23 @@ describe('parity: webpack vs vite 产物对等', () => {
     expect(wEntries.length).toBeGreaterThan(10);
   }, 600000);
 
+  /**
+   * chunk 数量不能失控。
+   *
+   * 小程序里每个 chunk 都是一次文件加载，chunk 数量爆炸会直接拖慢启动。
+   * 实测 webpack=34 / vite=35，基本持平，所以这里卡一个宽松上限，
+   * 防止以后改配置改出几十上百个碎片 chunk。
+   */
+  it('产物 chunk 数量与 webpack 相当（防止 chunk 爆炸）', async () => {
+    const [w, v] = await Promise.all([webpackSnap.load(), viteSnap.load()]);
+    const js = (snap: Snapshot) =>
+      [...snap.byName.keys()].filter((k) => k.endsWith('.js'));
+    const wCount = js(w).length;
+    const vCount = js(v).length;
+    expect(wCount).toBeGreaterThan(0);
+    expect(vCount).toBeLessThanOrEqual(Math.ceil(wCount * 1.2));
+  }, 600000);
+
   it('app.js 里 require 的文件都真实存在', async () => {
     const v = await viteSnap.load();
     const appJs = v.byName.get('app.js') ?? '';
