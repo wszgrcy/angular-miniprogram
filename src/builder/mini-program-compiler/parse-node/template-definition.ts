@@ -9,25 +9,27 @@ import type {
   ImplicitReceiver,
   Interpolation,
   KeyedRead,
-  KeyedWrite,
   LiteralArray,
   LiteralMap,
   LiteralPrimitive,
   NonNullAssert,
+  ParenthesizedExpression,
   PrefixNot,
   PropertyRead,
-  PropertyWrite,
   SafeCall,
   SafeKeyedRead,
   SafePropertyRead,
+  TaggedTemplateLiteral,
   TemplateLiteral,
   TemplateLiteralElement,
   Text,
+  TmplAstComponent,
   TmplAstDeferredBlock,
   TmplAstDeferredBlockError,
   TmplAstDeferredBlockLoading,
   TmplAstDeferredBlockPlaceholder,
   TmplAstDeferredTrigger,
+  TmplAstDirective,
   TmplAstForLoopBlock,
   TmplAstForLoopBlockEmpty,
   TmplAstIfBlock,
@@ -207,6 +209,9 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   visitSwitchBlock(block: TmplAstSwitchBlock): void {}
   visitSwitchBlockCase(block: TmplAstSwitchBlockCase): void {}
   visitUnknownBlock(block: TmplAstUnknownBlock): void {}
+  /** Angular 20 新增：模板 AST 中的组件 / 指令节点 */
+  visitComponent(component: TmplAstComponent) {}
+  visitDirective(directive: TmplAstDirective) {}
 }
 export function visitAll(visitor: TemplateDefinition, nodes: TmplAstNode[]) {
   for (const node of nodes) {
@@ -235,11 +240,6 @@ class CustomAstVisitor implements AstVisitor {
     ast.receiver.visit(this);
     ast.key.visit(this);
   }
-  visitKeyedWrite(ast: KeyedWrite) {
-    ast.receiver.visit(this);
-    ast.key.visit(this);
-    ast.value.visit(this);
-  }
   visitLiteralArray(ast: LiteralArray) {
     this.visitAll(ast.expressions);
   }
@@ -259,7 +259,6 @@ class CustomAstVisitor implements AstVisitor {
   visitPropertyRead(ast: PropertyRead) {
     ast.receiver.visit(this);
   }
-  visitPropertyWrite(ast: PropertyWrite) {}
 
   visitSafePropertyRead(ast: SafePropertyRead) {}
   visitBinary(ast: Binary) {
@@ -271,6 +270,19 @@ class CustomAstVisitor implements AstVisitor {
   }
   /** Angular 19 新增：`typeof` 表达式 */
   visitTypeofExpression(ast: TypeofExpression) {
+    ast.expression.visit(this);
+  }
+  /** Angular 20 新增：`void` 表达式（类型与 typeof 共用） */
+  visitVoidExpression(ast: TypeofExpression) {
+    ast.expression.visit(this);
+  }
+  /** Angular 20 新增：带标签的模板字符串 */
+  visitTaggedTemplateLiteral(ast: TaggedTemplateLiteral) {
+    ast.tag.visit(this);
+    this.visitAll(ast.template.expressions);
+  }
+  /** Angular 20 新增：括号表达式 */
+  visitParenthesizedExpression(ast: ParenthesizedExpression) {
     ast.expression.visit(this);
   }
   /** Angular 19 新增：模板字符串字面量 */

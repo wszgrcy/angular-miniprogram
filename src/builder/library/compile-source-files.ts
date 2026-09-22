@@ -3,20 +3,20 @@ import type {
   ParsedConfiguration,
 } from '@angular/compiler-cli';
 import { dirname, normalize } from '@angular-devkit/core';
-import { BuildGraph } from 'ng-packagr/lib/graph/build-graph';
+import { BuildGraph } from 'ng-packagr/src/lib/graph/build-graph';
 import {
   EntryPointNode,
   PackageNode,
   isEntryPointInProgress,
   isPackage,
-} from 'ng-packagr/lib/ng-package/nodes';
-import { StylesheetProcessor } from 'ng-packagr/lib/styles/stylesheet-processor';
+} from 'ng-packagr/src/lib/ng-package/nodes';
+import { StylesheetProcessor } from 'ng-packagr/src/lib/styles/stylesheet-processor';
 import {
   augmentProgramWithVersioning,
   cacheCompilerHost,
-} from 'ng-packagr/lib/ts/cache-compiler-host';
-import { ngCompilerCli } from 'ng-packagr/lib/utils/load-esm';
-import * as log from 'ng-packagr/lib/utils/log';
+} from 'ng-packagr/src/lib/ts/cache-compiler-host';
+import { ngCompilerCli } from 'ng-packagr/src/lib/utils/load-esm';
+import * as log from 'ng-packagr/src/lib/utils/log';
 import { join } from 'node:path';
 import path from 'path';
 import { Injector } from 'static-injector';

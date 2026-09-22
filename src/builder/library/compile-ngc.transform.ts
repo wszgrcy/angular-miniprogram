@@ -2,17 +2,17 @@
 import {
   Transform,
   transformFromPromise,
-} from 'ng-packagr/lib/graph/transform';
+} from 'ng-packagr/src/lib/graph/transform';
 import {
   EntryPointNode,
   PackageNode,
   isEntryPoint,
   isEntryPointInProgress,
   isPackage,
-} from 'ng-packagr/lib/ng-package/nodes';
-import { NgPackagrOptions } from 'ng-packagr/lib/ng-package/options.di';
-import { StylesheetProcessor as StylesheetProcessorClass } from 'ng-packagr/lib/styles/stylesheet-processor';
-import { setDependenciesTsConfigPaths } from 'ng-packagr/lib/ts/tsconfig';
+} from 'ng-packagr/src/lib/ng-package/nodes';
+import { NgPackagrOptions } from 'ng-packagr/src/lib/ng-package/options.di';
+import { StylesheetProcessor as StylesheetProcessorClass } from 'ng-packagr/src/lib/styles/stylesheet-processor';
+import { setDependenciesTsConfigPaths } from 'ng-packagr/src/lib/ts/tsconfig';
 import ora from 'ora';
 import * as path from 'path';
 import ts from 'typescript';

@@ -151,13 +151,14 @@ export class WebpackConfigurationChangeService {
     };
     ((this.config.optimization!.splitChunks as OptimizationSplitChunksOptions)
       .cacheGroups!['moduleChunks'] as OptimizationSplitChunksCacheGroup) = {
-      test: (module: webpack.NormalModule) => {
-        const name = module.nameForCondition();
-        return (
-          (name &&
+      test: (module: webpack.Module) => {
+        // webpack 5.101 起 splitChunks.test 的参数类型为 Module，需要向下转型
+        const name = (module as webpack.NormalModule).nameForCondition();
+        return !!(
+          ((name &&
             name.endsWith('.ts') &&
             !/[\\/]node_modules[\\/]/.test(name)) ||
-          name?.includes('angular-miniprogram\\dist')
+            name?.includes('angular-miniprogram\\dist'))
         );
       },
       minChunks: 2,

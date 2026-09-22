@@ -1,4 +1,4 @@
-import { StylesheetProcessor } from 'ng-packagr/lib/styles/stylesheet-processor';
+import { StylesheetProcessor } from 'ng-packagr/src/lib/styles/stylesheet-processor';
 
 export class CustomStyleSheetProcessor extends StylesheetProcessor {
   styleMap = new Map<string, string>();
