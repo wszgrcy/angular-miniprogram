@@ -511,3 +511,61 @@ done
 
 小程序侧「一个组件 = 一个 js = 一次 `Component()` 调用」，同一个 entry 里注册两个
 组件本身就不合法，不做支持。合法形态见上面「同文件多组件支持 → 合法形态」。
+
+## Vite 迁移（进行中）
+
+目标：用 Vite + `@analogjs/vite-plugin-angular` 替掉 webpack。
+实测 23 个入口 **1.5s**，webpack 是 5.7s。
+
+### 已打通（commit `a0e47b8`）
+
+`src/builder/vite/`：
+
+| 文件                                    | 作用                                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `entry-patterns.ts`                     | 从 `DynamicWatchEntryPlugin` 抽出的入站计算，webpack / Vite 共用一份；`toRollupInput` 把 `PagePattern` 转成 Rollup 多入口 |
+| `plugins/component-transform.plugin.ts` | transform 阶段注入 `propertyChange`，对应 webpack 的 `component-template.loader`                                          |
+| `tsconfig-paths.ts`                     | tsconfig `baseUrl` + `paths` → Vite `resolve.alias`                                                                       |
+| `index.ts`                              | Vite 配置组装 + Architect builder 包装                                                                                    |
+
+验证：`src/builder/vite/build.spec.ts` 跑通整个 fixture 多入口构建，
+产物里确认注入了 `propertyChange`，且输出路径带目录（与 webpack 时代
+`outputFiles.logic` 对齐）。
+
+### 三个必须自己补的坑
+
+1. **Vite / Rolldown 不读 tsconfig paths**。`angular-miniprogram` 这类映射
+   在 webpack 侧由 `@ngtools/webpack` 兜掉，Vite 必须自己转成 `resolve.alias`。
+   alias 要按 key 长度**倒序**排，否则 `angular-miniprogram` 会把
+   `angular-miniprogram/platform/wx` 一起抢走。
+
+2. **平台包替换必须用 RegExp 带边界**。Vite 的字符串 alias 走
+   「精确 或 `startsWith(find + '/')`」，写 `'.../wx$'` 会被当字面量，
+   根本匹不上。用 `new RegExp('^angular-miniprogram/platform/wx$')`。
+
+3. **注入插件要 `enforce: 'post'`**，保证排在 analog 的 Angular 插件之后，
+   这样拿到的才是 AOT 产物（带 `ɵɵdefineComponent` / `rf & 1` / `rf & 2`）
+   而不是原始 TS。
+
+另外 `tsconfig.builder.json` / `tsconfig.spec.json` 给 `vite` 加了显式类型入口
+（vite 的 `package.json` 没有 `main` / `types` 字段，只靠 exports map，
+`moduleResolution: node10` 认不出来）。
+
+### 还没做
+
+1. **wxml / json / wxss 产出**。要替掉 `ExportMiniProgramAssetsPlugin`。
+   `MiniProgramApplicationAnalysisService.exportComponentBuildMetaMap()`
+   返回的 map 已经是**按输出路径**索引的，可以直接落盘，但：
+   - 该服务通过 DI 依赖 `WEBPACK_COMPILATION` / `WEBPACK_COMPILER` / `TS_SYSTEM`，
+     实际只用到 `compiler.watchMode` 和 `compiler.inputFileSystem.purge()`
+     两处，可以用 stub + node 版 `ts.System` 顶掉
+   - `metaMap.style` 的值是**样式源文件路径数组**（scss/css），webpack 侧是从
+     `MiniCssExtractPlugin` 已产出的 CSS asset 里捞的。Vite 侧要自己走一遍
+     CSS 编译管线，这块是主要工作量
+2. **dev server** 切 Vite
+3. **app.js require 列表**（替掉 `webpack-bootstrap-assets-plugin`）
+4. **manualChunks** 移植 `moduleChunks` / `defaultVendors` 逻辑
+5. 53 个既有 spec 在 Vite 链路下重新跑绿（目前 Vite 只有自己的 1 个 spec，
+   webpack 链路仍是默认且未动）
+
+**当前 webpack 链路完全没动**，两套并存，可以随时回退。
