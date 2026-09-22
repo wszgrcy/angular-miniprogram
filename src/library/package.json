@@ -7,7 +7,7 @@
     "miniprogram",
     "wechat",
     "weixin",
-    "Angular 21"
+    "Angular 22"
   ],
   "repository": {
     "type": "git",
@@ -25,8 +25,8 @@
     "static-injector": "4.0.2"
   },
   "peerDependencies": {
-    "ng-packagr": "^21.2.7",
-    "@angular/core": "^21.2.23",
+    "ng-packagr": "^22.1.1",
+    "@angular/core": "^22.1.7",
     "jasmine-core": "5.1.2"
   },
   "exports": {

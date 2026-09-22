@@ -36,7 +36,7 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
     'packages',
     'branch',
     // Angular 21 起 tag 改成带 `v` 前缀（20.x 及以前是裸版本号）
-    'v21.2.23'
+    'v22.1.7'
   );
   let exclude = [
     'forms/src/directives/default_value_accessor.ts',

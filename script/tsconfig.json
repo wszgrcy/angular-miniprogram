@@ -2,7 +2,9 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "esModuleInterop": true,
-    "downlevelIteration": true
+    "downlevelIteration": true,
+    // TS 6.0 要求显式指定 rootDir，否则报 TS5011
+    "rootDir": "."
   },
   "include": ["**/*.ts"],
   "exclude": []

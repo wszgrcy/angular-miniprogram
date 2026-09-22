@@ -27,6 +27,7 @@ import type {
   TemplateLiteralElement,
   Text,
   TmplAstComponent,
+  TmplAstContentBlock,
   TmplAstDeferredBlock,
   TmplAstDeferredBlockError,
   TmplAstDeferredBlockLoading,
@@ -342,6 +343,14 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     this.visitDeferredBlock(null as unknown as TmplAstDeferredBlock);
   }
   visitDeferredTrigger(trigger: TmplAstDeferredTrigger): void {}
+  /**
+   * `@content`（Angular 22 新增）是内容查询块：它依赖 Angular 的 content query
+   * 机制在运行时观察投影内容并重新渲染，小程序的 slot / self 模板是静态的，
+   * 没有对应能力。同 `@defer` 一样显式抛错，避免静默渲染成空白。
+   */
+  visitContentBlock(block: TmplAstContentBlock): void {
+    throw new Error('暂不支持 @content 语法');
+  }
   visitUnknownBlock(block: TmplAstUnknownBlock): void {
     throw new Error(`无法识别的控制流块：@${block.name}`);
   }

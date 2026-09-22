@@ -10,7 +10,13 @@
     "experimentalDecorators": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    // TypeScript 6.0 把 strict（含 noImplicitAny / strictPropertyInitialization 等）
+    // 变成了默认开启。fixture 之前依赖的是这些默认关闭、只显式开 strictNullChecks 的行为，
+    // 这里显式写回 strict: false，保留原有严格度（单独设置的 strictNullChecks 不受影响）。
+    "strict": false,
     "strictNullChecks": true,
+    // TS 6.0 废弃了 baseUrl，但 paths 还要靠它做相对基准
+    "ignoreDeprecations": "6.0",
     "target": "es2022",
     "module": "es2020",
     "typeRoots": ["node_modules/@types"],

@@ -69,6 +69,10 @@
 
     /* Advanced Options */
     "skipLibCheck": true /* Skip type checking of declaration files. */,
-    "forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file. */
+    "forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file. */,
+    // TypeScript 6.0 把 moduleResolution=node10 / downlevelIteration / target=ES5
+    // 之类都标成废弃并直接报错。本仓库的构建脚本跑在 CJS + ts-node 上，
+    // 换 resolution strategy 风险比收益大，这里显式声明忽略这批废弃告警。
+    "ignoreDeprecations": "6.0"
   }
 }

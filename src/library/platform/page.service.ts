@@ -7,7 +7,7 @@ import {
   Injector,
   Type,
   createComponent,
-  createNgModuleRef,
+  createNgModule,
 } from '@angular/core';
 import {
   AppOptions,
@@ -65,12 +65,14 @@ export class PageService {
     ) => {
       return runInAngular(this.injector, () => {
         const injector = this.createPageInjector(miniProgramComponentInstance);
-        const ngModuleRef = createNgModuleRef(module, injector);
-        const componentFactory =
-          ngModuleRef.componentFactoryResolver.resolveComponentFactory(
-            component
-          );
-        const componentRef = componentFactory.create(injector);
+        const ngModuleRef = createNgModule(module, injector);
+        // Angular 22 删掉了 ComponentFactoryResolver / NgModuleRef.componentFactoryResolver。
+        // 非 standalone 组件的作用域在编译时已经通过模块的编译挂到组件 def 上，
+        // 这里用模块的 injector 当 environmentInjector 走 createComponent 即可。
+        const componentRef: ComponentRef<C> = createComponent(component, {
+          environmentInjector: ngModuleRef.injector,
+          elementInjector: injector,
+        });
         this.applicationRef.attachView(componentRef.hostView);
         return { componentRef, ngModuleRef };
       });
