@@ -333,3 +333,58 @@ Options<{}, {}, {}>            ->  Options<{}, {}, {}, []>
 
 顺带去掉了原实现里 `console.error` -> `process.exit(100)` 的全局钩子：任何一次
 `console.error` 都会直接杀掉测试进程，日志都来不及看。
+
+## Angular 版本升级记录（20 → 21 → 22）
+
+### 20 → 21
+
+| 项目                | 说明                                                                                                                                                                                                                                                 |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 版本                | `@angular/*` 21.2.23 / `@angular-devkit/*` 21.2.24 / ng-packagr 21.2.7 / TS 5.9.3 / webpack 5.105.2                                                                                                                                                  |
+| ng-packagr 路径变更 | 删掉了 `src/lib/utils/load-esm`，`compile-source-files.ts` 自己加 `ngCompilerCli()` 懒加载                                                                                                                                                           |
+| host binding 校验   | 21 起 `typeCheckHostBindings` 默认 `true`，会对 `@HostBinding` 做 DOM schema 校验。本库表单 accessor 绑的是小程序自定义元素（checkbox / switch / radio / slider / picker / picker-view），永远不在 schema 里，全部 NG8002。库与 fixture 都关掉该选项 |
+| `@switch` AST 重构  | children 不再挂在 `@case` 上，共享同一份子节点的连续 case 被合并成 `SwitchBlockCaseGroup`。`visitSwitchBlock` 改为按 group 占位，并补 `visitSwitchBlockCaseGroup` / `visitSwitchExhaustiveCheck`                                                     |
+| 表达式 AST 新增     | `ArrowFunction` / `SpreadElement` / `RegularExpressionLiteral` / `Unary`，`CustomAstVisitor` 补齐                                                                                                                                                    |
+| core 子路径导入     | `@angular/core` 的 fesm 里有 `import '@angular/core/primitives/signals'` 这类 bare 子路径，`moduleResolution: "node"` 认不了 exports map，fixture 改成 `"bundler"`                                                                                   |
+| git tag 命名        | Angular 21 起 tag 带 `v` 前缀（20.x 及以前是裸版本号），sync 脚本跟着改                                                                                                                                                                              |
+| typedoc             | 0.27 不支持 TS 5.9，升到 0.28.20                                                                                                                                                                                                                     |
+
+> 给 primitives 加 `paths` 指到 `.d.ts` 是**错**的做法：类型能过，但 webpack 会把
+> `.d.ts` 当运行时模块加载，`@ngtools` 直接报 `missing from the TypeScript compilation`。
+> 正确做法是让 moduleResolution 认 exports map。
+
+### 21 → 22
+
+| 项目                                | 说明                                                                                                                                                                                                                                   |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 版本                                | `@angular/*` 22.1.7 / `@angular-devkit/*` 22.1.8 / ng-packagr 22.1.1 / TS 6.0.3 / webpack 5.109.2                                                                                                                                      |
+| **TS 6.0：strict 默认开启**         | 空 tsconfig 也会开 `noImplicitAny`。本仓库 `tsconfig.base.json` 已显式 `strict: false`，但 fixture 的没写，直接继承新默认值，冒出成堆 TS7006 / TS7008 / TS2564。显式补 `strict: false`（单独设置的 `strictNullChecks` 不受影响）       |
+| TS 6.0：废弃项变硬错误              | `baseUrl` / `moduleResolution=node10` / `downlevelIteration` / `target=ES5` 全部报错，加 `"ignoreDeprecations": "6.0"`                                                                                                                 |
+| TS 6.0：根 tsconfig                 | 根 `tsconfig.json` 是 solution-style（只有 references），但 `code-recycle` 跑 sync 时 ts-node 会拿它直接用。空 `compilerOptions` 让 TS 6 用默认 `target=ES5` 并因缺 `rootDir` 报 TS5107 / TS5011，补上 `target` / `module` / `rootDir` |
+| TS 6.0：@types 不再自动全量注入     | karma client 的 tsconfig 显式声明 `typeRoots` 与 `types`（`jasmine` 命名空间、`node` 的 `Console`）                                                                                                                                    |
+| `createNgModuleRef` 移除            | 改用 `createNgModule`（签名一致）                                                                                                                                                                                                      |
+| `ComponentFactoryResolver` 整体移除 | `NgModuleRef.componentFactoryResolver` 也没了。废弃的 `pageStartup(module, component)` 路径改为用模块 injector 当 `environmentInjector` 走 `createComponent`                                                                           |
+| `@content` 新块                     | 内容查询块，依赖运行时 content query 观察投影内容并重渲染。小程序 slot / self 模板是静态的，对不上，按 `@defer` 先例显式抛错                                                                                                           |
+| `Object.hasOwn`                     | 同步过来的 `@angular/common` 用到 ES2022 的 `Object.hasOwn`，库的 `lib` 从 es2019 提到 es2022                                                                                                                                          |
+
+### 升级操作清单（21/22 修订版）
+
+```bash
+# 1. 参考源码切 tag（21 起 tag 带 v 前缀）
+git -C ../angular     checkout v<angular-tag>
+git -C ../angular-cli checkout v<cli-tag>
+
+# 2. 改 package.json / src/library/package.json 版本
+#    （rxjs、webpack 必须与 @angular-devkit/build-angular 的精确依赖一致）
+# 3. 改 script/package-sync.ts 的同步 tag
+rm -rf node_modules package-lock.json && npm install
+
+# 4. 重新同步生成源码（离线时用 ANGULAR_REPO 指向本地 clone）
+git clean -xdfq src/library/common src/library/forms
+ANGULAR_REPO=../angular npm run sync
+npm run build
+
+# 5. 先刷新 test-library 再跑全量
+npm run test:jasmine library && npm run test
+npm run lint && npm run coverage
+```
