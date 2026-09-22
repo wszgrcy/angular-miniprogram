@@ -1,6 +1,5 @@
 import type { BuilderContext } from '@angular-devkit/architect';
 import type { AssetPattern } from '@angular-devkit/build-angular';
-import { normalizeAssetPatterns } from '@angular-devkit/build-angular/src/utils';
 import {
   type Path,
   getSystemPath,
@@ -11,6 +10,7 @@ import * as glob from 'glob';
 import * as path from 'path';
 import type { PagePattern } from '../application/type';
 import type { BuildPlatform } from '../platform/platform';
+import { normalizeAssetPatternsSafe } from '../util/asset-path';
 
 function globAsync(pattern: string, options: glob.IOptions) {
   return new Promise<string[]>((resolvePromise, reject) =>
@@ -79,9 +79,9 @@ export async function generateModuleInfo(
   if (!list?.length) {
     return [];
   }
-  const patternList = normalizeAssetPatterns(
+  const patternList = normalizeAssetPatternsSafe(
     list,
-    normalize(options.workspaceRoot),
+    options.workspaceRoot,
     options.absoluteProjectRoot,
     options.absoluteProjectSourceRoot
   );

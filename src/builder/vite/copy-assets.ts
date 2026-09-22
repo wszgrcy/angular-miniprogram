@@ -1,9 +1,9 @@
 import type { AssetPattern } from '@angular-devkit/build-angular';
-import { normalizeAssetPatterns } from '@angular-devkit/build-angular/src/utils';
 import { type Path, normalize } from '@angular-devkit/core';
 import * as fs from 'fs';
 import * as glob from 'glob';
 import * as path from 'path';
+import { normalizeAssetPatternsSafe } from '../util/asset-path';
 
 function globAsync(pattern: string, options: glob.IOptions) {
   return new Promise<string[]>((resolvePromise, reject) =>
@@ -39,9 +39,9 @@ export async function collectAssets(
   if (!assets?.length) {
     return [];
   }
-  const patternList = normalizeAssetPatterns(
+  const patternList = normalizeAssetPatternsSafe(
     assets,
-    normalize(options.workspaceRoot),
+    options.workspaceRoot,
     options.absoluteProjectRoot,
     options.absoluteProjectSourceRoot
   );

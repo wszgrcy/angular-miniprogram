@@ -1,6 +1,5 @@
 import type { BuilderContext } from '@angular-devkit/architect';
 import type { AssetPattern } from '@angular-devkit/build-angular';
-import { normalizeAssetPatterns } from '@angular-devkit/build-angular/src/utils';
 import { Path, getSystemPath, normalize, resolve } from '@angular-devkit/core';
 import * as glob from 'glob';
 import * as path from 'path';
@@ -9,6 +8,7 @@ import { filter, take } from 'rxjs/operators';
 import { Injectable } from 'static-injector';
 import * as webpack from 'webpack';
 import { BuildPlatform } from '../../platform/platform';
+import { normalizeAssetPatternsSafe } from '../../util/asset-path';
 import type { PagePattern } from '../type';
 
 function globAsync(pattern: string, options: glob.IOptions) {
@@ -46,9 +46,8 @@ export class DynamicWatchEntryPlugin {
     if (!projectName) {
       throw new Error('The builder requires a target.');
     }
-    const projectMetadata = await this.options.context.getProjectMetadata(
-      projectName
-    );
+    const projectMetadata =
+      await this.options.context.getProjectMetadata(projectName);
     this.absoluteProjectRoot = normalize(
       getSystemPath(
         resolve(
@@ -95,7 +94,7 @@ export class DynamicWatchEntryPlugin {
         rootCompilation = true;
         if (this.first) {
           this.first = false;
-          const patternList = normalizeAssetPatterns(
+          const patternList = normalizeAssetPatternsSafe(
             [...(this.options.pages || []), ...(this.options.components || [])],
             this.options.workspaceRoot,
             this.absoluteProjectRoot,
@@ -139,10 +138,16 @@ export class DynamicWatchEntryPlugin {
           }
           return {
             ...result,
-            ...list.reduce((pre, cur) => {
-              pre[cur.entryName] = { import: [cur.src] };
-              return pre;
-            }, {} as Record<string, Exclude<webpack.EntryNormalized, Function>[string]>),
+            ...list.reduce(
+              (pre, cur) => {
+                pre[cur.entryName] = { import: [cur.src] };
+                return pre;
+              },
+              {} as Record<
+                string,
+                Exclude<webpack.EntryNormalized, Function>[string]
+              >
+            ),
           };
         };
       }
@@ -152,7 +157,7 @@ export class DynamicWatchEntryPlugin {
     list: AssetPattern[],
     type: 'page' | 'component'
   ) {
-    const patternList = normalizeAssetPatterns(
+    const patternList = normalizeAssetPatternsSafe(
       list,
       this.options.workspaceRoot,
       this.absoluteProjectRoot,
