@@ -1,5 +1,17 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { toNativePath } from '../../util/asset-path';
+
+/**
+ * 已经是绝对路径（含 win32 认得的 `C:\...`）就直接用，
+ * 不再跟 workspaceRoot 拼。devkit posix 化的 `/C:/...` 也归到这里。
+ */
+function stripDrive(p: string): string {
+  // 绝对路径（posix 或 win32）交给 resolve，它自己会丢弃前缀参数；
+  // 但 `/C:/x` 这种会被误当成无盘符绝对路径重新补盘，所以先剥斜杠。
+  const stripped = p.replace(/^[/\\]?([a-zA-Z]:[/\\])/, '$1');
+  return path.isAbsolute(stripped) ? stripped : p;
+}
 
 /**
  * 找 @types 到底在哪。
@@ -11,7 +23,8 @@ import * as path from 'path';
  */
 function resolveTypeRoots(workspaceRoot: string): string[] {
   const found: string[] = [];
-  let current = path.resolve(workspaceRoot);
+  // 同样先归一成原生绝对路径，否则 /C:/... 进来会把整条 walk-up 链算错
+  let current = toNativePath(workspaceRoot);
   const { root } = path.parse(current);
 
   while (current !== root) {
@@ -30,7 +43,7 @@ function resolveTypeRoots(workspaceRoot: string): string[] {
   // 而不是 typeRoots 为空这种更难查的形态
   return found.length
     ? found
-    : [path.resolve(workspaceRoot, 'node_modules/@types')];
+    : [path.resolve(toNativePath(workspaceRoot), 'node_modules/@types')];
 }
 
 /**
@@ -49,7 +62,12 @@ export function writeDerivedTsConfig(options: {
   /** 额外要加进来的类型库 */
   types?: string[];
 }): { path: string } {
-  const basePath = path.resolve(options.workspaceRoot, options.baseTsConfig);
+  // baseTsConfig 可能是 devkit posix 化的 Windows 绝对路径（/C:/...），
+  // 直接 path.resolve 会拼出 C:\C:\... 双盘符。走 toNativePath 统一掉。
+  const basePath = path.resolve(
+    toNativePath(options.workspaceRoot),
+    stripDrive(options.baseTsConfig)
+  );
   const raw = fs
     .readFileSync(basePath, 'utf8')
     // tsconfig 允许注释，JSON.parse 之前去掉
