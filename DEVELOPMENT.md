@@ -588,22 +588,57 @@ done
 `module-chunk.js` 这套自己的拆包产物，Vite(rolldown) 的 hash 和拆包策略
 本来就不同，逐文件比这个没有意义。
 
-### 还没做
+### 已打通：watch 模式（commit `a3b4719`）
 
-1. **watch / dev 模式**。目前 `watch: true` 会明确抛错，不会静默产出错误产物。
-   两个卡点：
+改成「发现变动就重算入口 + 重跑一次 vite.build」，不用 Vite 原生 watch。
 
-   - Vite/Rolldown 的 watch **不支持动态加 input**，watch 期间新增入口文件
-     不会被拉进来（webpack 侧靠 `DynamicWatchEntryPlugin` 每轮改 `config.entry`）
-   - devkit harness 的 `watcherNotifier` 走的是 webpack 的通知路径，
-     Vite watcher 的重构建事件传不回测试里，拿不到第二轮结果
+为什么不用原生 watch：Rolldown 的 watch **不支持动态加 input**，
+watch 期间新增的入口文件拉不进来。webpack 侧是靠
+`DynamicWatchEntryPlugin` 每轮重写 `config.entry` 解决的。
+重跑整轮构建顺带把这个问题一起解决，冷构建才 1.5s，dev 体验可接受。
 
-   要打通得自己监听 pages/components 目录、发现入口集合变化就重启 Vite build。
+`watch-sources.ts`：
 
-2. **manualChunks** 移植 `moduleChunks` / `defaultVendors` 逻辑
-   （纯产物体积优化，不影响正确性）
+- 优先用传入的 watcher 工厂（测试里是 harness 的 `WatcherNotifier`），
+  没有就退化成 `fs.watch` recursive
+- 带 debounce，一次保存不会触发多次重建
+- builder 侧 `running` / `queued` 两个标志位，构建中又改了会排到下一轮
 
-3. 把默认 builder 从 webpack 切到 Vite（目前 webpack 仍是默认）
+`watch.spec.ts` 覆盖两条：改模板能重产 wxml、watch 期间新增入口能被拉进来。
+
+### 已确认不需要做：manualChunks
+
+实测 webpack=34 / vite=35 个 js chunk，基本持平，
+webpack 那套 `moduleChunks` / `defaultVendors` 在 Vite 下没有收益，不移植。
+改成一条 chunk 数量守卫（vite 不超过 webpack 的 1.2 倍），
+防止以后改配置改出一堆碎片 chunk。
+
+### 已可用：application-vite builder（commit `036f4c2`）
+
+```jsonc
+"builder": "angular-miniprogram:application"        // webpack
+"builder": "angular-miniprogram:application-vite"   // Vite
+```
+
+### 移除 webpack 的最后一个阻塞点：karma
+
+Vite 链路本身**完全不 import webpack**（`src/builder/vite/**` 里 webpack
+只出现在注释里）。真正还在用 webpack 的只剩两块：
+
+| 位置                                    | 说明             | 移除方式                           |
+| --------------------------------------- | ---------------- | ---------------------------------- |
+| `src/builder/application/**`（11 文件） | webpack 构建链路 | 切到 `application-vite` 后可直接删 |
+| `src/builder/karma/**`（3 文件）        | karma 测试链路   | **需要先迁移**                     |
+
+karma 这块不是「换个 bundler」就完事：它走的是
+`@angular-devkit/build-angular` 的 karma builder（`execute`），
+通过 `webpackConfiguration` hook 注入 `WebpackConfigurationChangeService`
+和一个把 jasmine 全局（`describe` / `it` / `expect` / `spyOn`…）映射到
+`wx.__window.*` 的 `DefinePlugin`。
+
+要迁 Vite 得替掉 karma builder 自己的打包环节，是独立的一块工作。
+另外 karma 那两个 spec 需要微信开发者工具，容器里跑不了（一直是 pending），
+所以这块迁移没法像构建链路那样用 parity 自动验证。
 
 ### 踩过的坑（Vite 迁移专用）
 
