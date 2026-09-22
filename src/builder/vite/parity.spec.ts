@@ -40,24 +40,24 @@ type ParityHarness = Parameters<Parameters<typeof describeBuilder>[2]>[0];
 
 async function buildSnapshot(
   harness: ParityHarness,
-  outputPath: string
+  outputPath: string,
 ): Promise<Snapshot> {
   const root = harness.host.root();
   const myTestProjectHost = new MyTestProjectHost(harness.host);
   const list = await myTestProjectHost.getFileList(
-    normalize(path.join(root, 'src', '__pages'))
+    normalize(path.join(root, 'src', '__pages')),
   );
   list.push(
     ...(await myTestProjectHost.getFileList(
-      normalize(path.join(root, 'src', '__components'))
-    ))
+      normalize(path.join(root, 'src', '__components')),
+    )),
   );
   await myTestProjectHost.importPathRename(list);
   await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
   await myTestProjectHost.moveDir(
     ALL_COMPONENT_NAME_LIST,
     '__components',
-    'components'
+    'components',
   );
   await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
 
@@ -70,10 +70,10 @@ async function buildSnapshot(
     const errLogs = (result.logs || [])
       .filter((l: { level: string }) => l.level === 'error')
       .map((l: { message?: unknown; value?: unknown }) =>
-        String(l.message ?? l.value)
+        String(l.message ?? l.value),
       );
     throw new Error(
-      `构建失败 (${outputPath}): ${errLogs.join(' ~~ ').slice(0, 1200)}`
+      `构建失败 (${outputPath}): ${errLogs.join(' ~~ ').slice(0, 1200)}`,
     );
   }
 
@@ -106,7 +106,7 @@ const viteSnap = { load: () => Promise.resolve<Snapshot | null>(null) };
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('parity: webpack 侧构建', () => {
     webpackSnap.load = memoize(() =>
-      buildSnapshot(harness, 'dist/parity-webpack')
+      buildSnapshot(harness, 'dist/parity-webpack'),
     );
     it('webpack 构建成功', async () => {
       const snap = await webpackSnap.load();
@@ -156,7 +156,7 @@ describe('parity: webpack vs vite 产物对等', () => {
       [...snap.byName.keys()]
         .filter(
           (k) =>
-            /\.(js)$/.test(k) && /^(pages|components)\/[\w./-]+\.js$/.test(k)
+            /\.(js)$/.test(k) && /^(pages|components)\/[\w./-]+\.js$/.test(k),
         )
         .sort();
     const wEntries = entries(w);
@@ -191,10 +191,10 @@ describe('parity: webpack vs vite 产物对等', () => {
     const v = await viteSnap.load();
     const appJs = v.byName.get('app.js') ?? '';
     const required = [...appJs.matchAll(/require\('\.\/([^']+)'\)/g)].map(
-      (m) => m[1]
+      (m) => m[1],
     );
     expect(required.length).toBeGreaterThan(0);
-    const missing = required.filter((f) => !v.byName.has(f));
+    const missing = required.filter((f) => !v.byName.has(normalize(f)));
     expect(missing).toEqual([]);
   }, 600000);
 
