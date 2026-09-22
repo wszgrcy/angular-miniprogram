@@ -25,6 +25,7 @@
   "author": "wszgrcy",
   "license": "MIT",
   "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^2.7.2",
     "@angular-devkit/architect": "0.2201.8",
     "@angular-devkit/build-angular": "22.1.8",
     "@angular-devkit/core": "22.1.8",
@@ -41,7 +42,7 @@
     "@types/glob": "^7.2.0",
     "@types/jasmine": "^3.7.7",
     "@types/karma": "^6.3.3",
-    "@types/node": "20.11.30",
+    "@types/node": "^22.19.0",
     "@types/socket.io-client": "^3.0.0",
     "@typescript-eslint/eslint-plugin": "^5.44.0",
     "@typescript-eslint/parser": "^5.44.0",
@@ -70,6 +71,7 @@
     "tsx": "^4.7.1",
     "typedoc": "^0.28.20",
     "typescript": "6.0.3",
+    "vite": "^8.3.0",
     "weapp.socket.io": "^3.0.0",
     "webpack": "5.109.2"
   },
