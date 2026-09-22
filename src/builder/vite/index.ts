@@ -1,6 +1,7 @@
 import type { BuilderContext, BuilderOutput } from '@angular-devkit/architect';
 import { createBuilder } from '@angular-devkit/architect';
 import type { AssetPattern } from '@angular-devkit/build-angular';
+import { getSystemPath } from '@angular-devkit/core';
 import * as path from 'path';
 import { Observable } from 'rxjs';
 import { Injector } from 'static-injector';
@@ -19,6 +20,12 @@ import { miniProgramComponentTransformPlugin } from './plugins/component-transfo
 import { libraryTemplatePlugin } from './plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from './plugins/mini-program-assets.plugin';
 import { tsConfigPathsToAliases } from './tsconfig-paths';
+import {
+  type SourceWatcher,
+  type WatcherFactoryLike,
+  collectWatchDirectories,
+  watchSources,
+} from './watch-sources';
 
 export interface ViteMiniProgramBuildOptions {
   tsConfig: string;
@@ -238,35 +245,126 @@ export function runViteBuilder(
   context: BuilderContext
 ): Observable<BuilderOutput> {
   return new Observable<BuilderOutput>((observer) => {
+    let watcher: SourceWatcher | undefined;
+    let closed = false;
+
+    const baseOutputPath = path.resolve(
+      context.workspaceRoot,
+      options.outputPath
+    );
+    const emitSuccess = () => {
+      if (!closed) {
+        observer.next({
+          success: true,
+          // 和 webpack browser builder 的输出契约对齐，spec 里靠这个定位产物
+          baseOutputPath,
+        } as BuilderOutput);
+      }
+    };
+
     void (async () => {
       try {
         const buildPlatform = getBuildPlatform(options.platform);
-        const config = await createMiniProgramViteConfig({
-          viteOptions: options,
+        const vite = await import('vite');
+
+        const runOnce = async () => {
+          // 每轮重新生成 config，入口 glob 重新展开，
+          // 这样 watch 期间新增的入口文件能被拉进来
+          const config = await createMiniProgramViteConfig({
+            viteOptions: options,
+            context,
+            buildPlatform,
+          });
+          await vite.build(config);
+        };
+
+        await runOnce();
+
+        if (!options.watch) {
+          emitSuccess();
+          observer.complete();
+          return;
+        }
+
+        // watch：发现变动就重算入口 + 重跑一次 vite.build。
+        // 不用 Vite 原生 watch，因为 Rolldown watch 不支持动态加 input。
+        const entryPatterns = await generateEntryPatterns({
+          pages: options.pages || [],
+          components: options.components || [],
+          workspaceRoot: context.workspaceRoot,
           context,
           buildPlatform,
         });
-        const vite = await import('vite');
-        const baseOutputPath = path.resolve(
-          context.workspaceRoot,
-          options.outputPath
-        );
-        const emitSuccess = () =>
-          observer.next({
-            success: true,
-            // 和 webpack browser builder 的输出契约对齐，spec 里靠这个定位产物
-            baseOutputPath,
-          } as BuilderOutput);
+        const { absoluteProjectSourceRoot } = await resolveProjectRoots({
+          workspaceRoot: context.workspaceRoot,
+          context,
+        });
+        // 测试里走 harness 的 notify，真实环境退化成 fs.watch
+        const factory = (
+          context as unknown as {
+            getWatcherFactory?: () => WatcherFactoryLike | undefined;
+          }
+        ).getWatcherFactory?.();
 
-        await vite.build(config);
+        let running = false;
+        let queued = false;
+        const rebuild = async () => {
+          if (closed) {
+            return;
+          }
+          if (running) {
+            // 构建中又改了，排到下一轮
+            queued = true;
+            return;
+          }
+          running = true;
+          try {
+            await runOnce();
+            emitSuccess();
+          } catch (error) {
+            context.logger.error(String((error as Error)?.message ?? error));
+            if (!closed) {
+              observer.next({ success: false } as BuilderOutput);
+            }
+          } finally {
+            running = false;
+            if (queued && !closed) {
+              queued = false;
+              void rebuild();
+            }
+          }
+        };
+
+        watcher = watchSources({
+          directories: collectWatchDirectories({
+            workspaceRoot: context.workspaceRoot,
+            sourceRoot: getSystemPath(absoluteProjectSourceRoot),
+            entrySrcPaths: [
+              ...entryPatterns.pageList,
+              ...entryPatterns.componentList,
+            ].map((p) => p.src),
+          }),
+          factory,
+          onChange: () => void rebuild(),
+        });
+
+        // 注意顺序：watcher 必须先注册好，再推第一次成功输出。
+        // 否则消费方（包括测试）在收到第一轮结果后立刻改文件，
+        // 那个改动会发生在 watcher 注册之前，直接丢掉。
         emitSuccess();
-        observer.complete();
       } catch (error) {
         context.logger.error(String((error as Error)?.message ?? error));
-        observer.next({ success: false });
-        observer.complete();
+        if (!closed) {
+          observer.next({ success: false } as BuilderOutput);
+          observer.complete();
+        }
       }
     })();
+
+    return () => {
+      closed = true;
+      watcher?.close();
+    };
   });
 }
 

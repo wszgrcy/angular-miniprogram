@@ -288,6 +288,31 @@ export class MiniProgramApplicationAnalysisService {
           }
           const symbol = this.typeChecker.getSymbolAtLocation(importComponent);
           const node = symbol?.getDeclarations()?.[0];
+
+          // bootstrapPage(InlineComponent) 这种组件就在 entry 文件里、
+          // 不是 import 进来的，根本没有 ImportDeclaration，
+          // 不能再往下走 parent.parent.parent（会 undefined.parent 崩）。
+          // 组件声明文件就是 entry 本身，直接命中。
+          if (
+            node &&
+            !ts.isImportSpecifier(node) &&
+            path.normalize(node.getSourceFile().fileName) ===
+              path.normalize(maybeEntryPath.src)
+          ) {
+            const declaredName = ts.isClassDeclaration(node)
+              ? node.name?.getText()
+              : undefined;
+            if (
+              !componentClassName ||
+              !declaredName ||
+              declaredName === componentClassName
+            ) {
+              return maybeEntryPath;
+            }
+            maybeEntryPath = undefined;
+            continue;
+          }
+
           // 同文件多组件时，光比对文件路径分不出到底是哪个组件：
           // 两个 entry 各自 import 同一个文件的不同组件时，必须连类名一起对上，
           // 否则先那个组件会被解析到别人的 entry 上，模板就串了。
@@ -301,8 +326,17 @@ export class MiniProgramApplicationAnalysisService {
             maybeEntryPath = undefined;
             continue;
           }
-          const importDeclaration = node?.parent.parent
-            .parent as ts.ImportDeclaration;
+          const importDeclaration = node?.parent?.parent
+            ?.parent as ts.ImportDeclaration;
+          if (
+            !importDeclaration ||
+            !ts.isImportDeclaration(importDeclaration)
+          ) {
+            // 解析不到 import（组件不是 import 进来的），这个候选 entry 不匹配，
+            // 继续找下一个而不是直接崩
+            maybeEntryPath = undefined;
+            continue;
+          }
           const relativeImportComponentPath = importDeclaration.moduleSpecifier
             .getText()
             .slice(1, -1);

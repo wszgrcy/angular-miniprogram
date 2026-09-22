@@ -531,6 +531,19 @@ class HarnessBuilderContext implements BuilderContext {
     this.teardowns.push(teardown);
   }
 
+  /**
+   * 把 harness 的 watcher 暴露给 builder。
+   *
+   * 真实 architect 不提供这个（webpack 自己管 watch），但我们的 Vite builder
+   * 需要自己实现 watch，测试里又必须走 harness 的通知路径，
+   * 所以开一个口子让 builder 能拿到 watcher。
+   * 原生 fs watch 模式下（useNativeFileWatching）返回 undefined，
+   * builder 自己退化成 fs.watch。
+   */
+  getWatcherFactory(): BuilderWatcherFactory | undefined {
+    return this.watcherFactory;
+  }
+
   async getBuilderNameForTarget(target: Target): Promise<string> {
     return this.contextHost.getBuilderName(target.project, target.target);
   }
