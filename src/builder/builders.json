@@ -15,6 +15,11 @@
       "implementation": "./karma",
       "schema": "./karma/schema.json",
       "description": "小程序测试"
+    },
+    "application-vite": {
+      "implementation": "./vite",
+      "schema": "./vite/schema.json",
+      "description": "小程序构建builder（Vite 版，替代 webpack）"
     }
   }
 }
