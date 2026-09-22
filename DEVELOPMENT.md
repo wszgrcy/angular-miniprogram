@@ -551,21 +551,85 @@ done
 （vite 的 `package.json` 没有 `main` / `types` 字段，只靠 exports map，
 `moduleResolution: node10` 认不出来）。
 
+### 已打通：产物对等（commit `a9c8ebf` / `bc58481`）
+
+`parity.spec.ts` 把同一份 fixture 分别交给 webpack 和 Vite 构建，8 条断言全绿：
+
+| 断言                                                   | 结果 |
+| ------------------------------------------------------ | ---- |
+| webpack 构建成功                                       | ✅   |
+| vite 构建成功                                          | ✅   |
+| 小程序侧产物清单一致（wxml/json/wxss/app.js/app.wxss） | ✅   |
+| 每个页面、组件入口 js 两边路径一致                     | ✅   |
+| app.js 里 require 的文件都真实存在                     | ✅   |
+| app.js 存在且是 require 列表                           | ✅   |
+| **wxml 逐字节一致**                                    | ✅   |
+| json 语义一致（忽略 key 顺序）                         | ✅   |
+
+补齐的产出：
+
+- **wxml / json / wxss**：`plugins/mini-program-assets.plugin.ts`，
+  对应 `ExportMiniProgramAssetsPlugin`
+- **library 模板**：`plugins/library-template.plugin.ts`，把 webpack 的
+  `library.loader` + `library-template.loader` 合成一个 Vite transform
+- **assets**（`app.json` / `project.config.json`）：`copy-assets.ts`
+- **app.js require 列表**：按 chunk `imports` 拓扑排序生成，
+  保证依赖在前、入口在后（拼接后都是全局作用域，顺序错了会拿到 undefined）
+- **app.wxss**：builder 配置里 `styles` 的编译产物
+
+去 webpack 化的适配：
+
+- `ts.System`：换成纯 node fs 实现（原来是 `createWebpackSystem`）
+- `webpack.Compiler` 桩：分析服务实际只读 `watchMode` 和
+  `inputFileSystem.purge()` 两处，给最小 stub 即可
+- 样式编译复用已有的 `CustomStyleSheetProcessor`（ng-packagr 的子类）
+
+**JS chunk 结构不纳入比对**：webpack 有 `runtime.js` / `vendor.js` /
+`module-chunk.js` 这套自己的拆包产物，Vite(rolldown) 的 hash 和拆包策略
+本来就不同，逐文件比这个没有意义。
+
 ### 还没做
 
-1. **wxml / json / wxss 产出**。要替掉 `ExportMiniProgramAssetsPlugin`。
-   `MiniProgramApplicationAnalysisService.exportComponentBuildMetaMap()`
-   返回的 map 已经是**按输出路径**索引的，可以直接落盘，但：
-   - 该服务通过 DI 依赖 `WEBPACK_COMPILATION` / `WEBPACK_COMPILER` / `TS_SYSTEM`，
-     实际只用到 `compiler.watchMode` 和 `compiler.inputFileSystem.purge()`
-     两处，可以用 stub + node 版 `ts.System` 顶掉
-   - `metaMap.style` 的值是**样式源文件路径数组**（scss/css），webpack 侧是从
-     `MiniCssExtractPlugin` 已产出的 CSS asset 里捞的。Vite 侧要自己走一遍
-     CSS 编译管线，这块是主要工作量
-2. **dev server** 切 Vite
-3. **app.js require 列表**（替掉 `webpack-bootstrap-assets-plugin`）
-4. **manualChunks** 移植 `moduleChunks` / `defaultVendors` 逻辑
-5. 53 个既有 spec 在 Vite 链路下重新跑绿（目前 Vite 只有自己的 1 个 spec，
-   webpack 链路仍是默认且未动）
+1. **watch / dev 模式**。目前 `watch: true` 会明确抛错，不会静默产出错误产物。
+   两个卡点：
+
+   - Vite/Rolldown 的 watch **不支持动态加 input**，watch 期间新增入口文件
+     不会被拉进来（webpack 侧靠 `DynamicWatchEntryPlugin` 每轮改 `config.entry`）
+   - devkit harness 的 `watcherNotifier` 走的是 webpack 的通知路径，
+     Vite watcher 的重构建事件传不回测试里，拿不到第二轮结果
+
+   要打通得自己监听 pages/components 目录、发现入口集合变化就重启 Vite build。
+
+2. **manualChunks** 移植 `moduleChunks` / `defaultVendors` 逻辑
+   （纯产物体积优化，不影响正确性）
+
+3. 把默认 builder 从 webpack 切到 Vite（目前 webpack 仍是默认）
+
+### 踩过的坑（Vite 迁移专用）
+
+1. **Vite / Rolldown 不读 tsconfig paths**。`angular-miniprogram` 这类映射
+   在 webpack 侧由 `@ngtools/webpack` 兜掉，Vite 必须自己转成 `resolve.alias`。
+   alias 要按 key 长度**倒序**排，否则 `angular-miniprogram` 会把
+   `angular-miniprogram/platform/wx` 一起抢走。
+
+2. **平台包替换必须用 RegExp 带边界**。Vite 的字符串 alias 走「精确 或
+   `startsWith(find + '/')`」，写 `'.../wx$'` 会被当字面量，根本匹不上。
+
+3. **注入插件要 `enforce: 'post'`**，保证排在 analog 的 Angular 插件之后，
+   这样拿到的才是 AOT 产物（带 `ɵɵdefineComponent` / `rf & 1` / `rf & 2`）
+   而不是原始 TS。
+
+4. **`emitFile` 不接受以 `/` 开头的 fileName**（webpack 会归一化）。
+   `metaMap` 里有 `/self-template/self.wxml` 这种带前导斜杠的 key，
+   必须 strip。注意 wxml 里的 `<import src="/self-template/self.wxml"/>`
+   引用要**保留**前导斜杠——小程序里那表示包根路径，是对的。
+
+5. **漏移植 `otherMetaCollectionGroup -> setScopeExtraUseComponents`**
+   会导致 `library-template/*.wxml` 产出成 **0 字节文件**——文件在、不报错，
+   但内容是空的。这种静默空产物比直接崩难查得多，是靠 parity 的
+   **文件内容比对**（而不只是清单比对）抓出来的。
+
+6. `vite` 的 `package.json` 没有 `main` / `types` 字段，只靠 exports map，
+   `moduleResolution: node10` 认不出来，要在 tsconfig 里加显式类型入口。
 
 **当前 webpack 链路完全没动**，两套并存，可以随时回退。

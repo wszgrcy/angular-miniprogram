@@ -128,7 +128,9 @@ export function miniProgramAssetsPlugin(
   let analysisPromise: Promise<MetaMap> | null = null;
   let styleProcessor: CustomStyleSheetProcessor | undefined;
 
-  const runAnalysis = async () => {
+  const runAnalysis = async (
+    entryPatterns: PagePattern[] = options.entryPatterns
+  ) => {
     const system = createNodeTsSystem(() => options.workspaceRoot);
     const stubCompiler = createStubWebpackCompiler(!!options.watch);
 
@@ -143,7 +145,7 @@ export function miniProgramAssetsPlugin(
           provide: TS_CONFIG_TOKEN,
           useValue: path.resolve(options.workspaceRoot, options.tsConfig),
         },
-        { provide: PAGE_PATTERN_TOKEN, useValue: options.entryPatterns },
+        { provide: PAGE_PATTERN_TOKEN, useValue: entryPatterns },
         { provide: BuildPlatform, useValue: options.buildPlatform },
       ],
     });
@@ -190,14 +192,19 @@ export function miniProgramAssetsPlugin(
     name: 'mini-program:assets',
     enforce: 'post',
     buildStart() {
+      // watch 模式下每轮 buildStart 都要作废上一轮的分析结果，
+      // 否则改模板不会重新产出 wxml
+      if (options.watch) {
+        analysisPromise = null;
+      }
       analysisPromise ??= runAnalysis();
     },
     async generateBundle(_opts, bundle) {
-      if (!analysisPromise) {
+      if (options.watch) {
         analysisPromise = runAnalysis();
       }
-      const metaMap = (analysisPromise ??= runAnalysis());
-      const resolved = await metaMap;
+      analysisPromise ??= runAnalysis();
+      const resolved = await analysisPromise;
 
       // 收集所有要编译的样式源文件
       const styleSources = new Set<string>();

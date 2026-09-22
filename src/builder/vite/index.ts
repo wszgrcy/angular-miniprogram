@@ -31,6 +31,8 @@ export interface ViteMiniProgramBuildOptions {
   sourceMap?: boolean;
   optimization?: boolean;
   base?: string;
+  /** 监听模式：对应小程序的开发方式（微信开发者工具盯着 dist 目录） */
+  watch?: boolean;
 }
 
 /**
@@ -189,7 +191,7 @@ export async function createMiniProgramViteConfig(options: {
         buildPlatform,
         entryPatterns: allEntries,
         context,
-        watch: false,
+        watch: !!viteOptions.watch,
         templateScope,
         assets: viteOptions.assets,
         styles: viteOptions.styles,
@@ -245,15 +247,19 @@ export function runViteBuilder(
           buildPlatform,
         });
         const vite = await import('vite');
+        const baseOutputPath = path.resolve(
+          context.workspaceRoot,
+          options.outputPath
+        );
+        const emitSuccess = () =>
+          observer.next({
+            success: true,
+            // 和 webpack browser builder 的输出契约对齐，spec 里靠这个定位产物
+            baseOutputPath,
+          } as BuilderOutput);
+
         await vite.build(config);
-        observer.next({
-          success: true,
-          // 和 webpack browser builder 的输出契约对齐，spec 里靠这个定位产物
-          baseOutputPath: path.resolve(
-            context.workspaceRoot,
-            options.outputPath
-          ),
-        } as BuilderOutput);
+        emitSuccess();
         observer.complete();
       } catch (error) {
         context.logger.error(String((error as Error)?.message ?? error));
