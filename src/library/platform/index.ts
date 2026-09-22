@@ -8,6 +8,7 @@ export {
   ComponentFinderService,
 } from 'angular-miniprogram/platform/wx';
 export const pageStartup = MiniProgramCore.pageStartup;
+export const bootstrapPage = MiniProgramCore.bootstrapPage;
 export const componentRegistry = MiniProgramCore.componentRegistry;
 export * from './token';
 export { PAGE_TOKEN } from 'angular-miniprogram/platform/wx';

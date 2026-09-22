@@ -10,7 +10,18 @@ import type {
 import type { LView } from './internal-type';
 
 export interface AppOptions {
-  __ngStartPage<M, C>(
+  /** 启动一个 standalone 组件作为页面 */
+  __ngStartPage<C>(
+    component: Type<C>,
+    miniProgramComponentInstance: any
+  ): {
+    componentRef: ComponentRef<C>;
+  };
+  /**
+   * @deprecated 仍用于 `pageStartup(module, component)` 的 NgModule 启动方式，
+   * 新代码请用 `bootstrapPage(StandaloneComponent)`。
+   */
+  __ngStartPageWithModule<M, C>(
     module: Type<M>,
     component: Type<C>,
     miniProgramComponentInstance: any

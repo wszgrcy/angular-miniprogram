@@ -157,7 +157,8 @@ export class MiniProgramCoreFactory {
   protected linkNgComponentWithPage(
     mpComponentInstance: MiniProgramComponentInstance,
     componentRef: ComponentRef<unknown>,
-    ngModuleRef: NgModuleRef<unknown>
+    /** standalone 页面没有 NgModule */
+    ngModuleRef?: NgModuleRef<unknown>
   ) {
     mpComponentInstance.__isLink = true;
     mpComponentInstance.__ngComponentHostView = componentRef.hostView;
@@ -177,16 +178,25 @@ export class MiniProgramCoreFactory {
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__lView = lView;
     mpComponentInstance.__ngDestroy = () => {
-      ngModuleRef.destroy();
+      ngModuleRef?.destroy();
       componentRef.destroy();
       removePageLViewLink(id);
       cleanAll(lView);
     };
   }
 
-  public pageStartup = (
-    module: Type<unknown>,
+  /**
+   * 页面启动的公共实现。
+   *
+   * @param component 页面组件
+   * @param startPage 真正创建组件的方式（standalone / NgModule）
+   */
+  protected createPageBootstrap = (
     component: Type<unknown>,
+    startPage: (instance: MiniProgramComponentInstance) => {
+      componentRef: ComponentRef<unknown>;
+      ngModuleRef?: NgModuleRef<unknown>;
+    },
     pageOptions?: { useComponent: boolean }
   ) => {
     const _this = this;
@@ -224,14 +234,14 @@ export class MiniProgramCoreFactory {
       config.lifetimes = config.lifetimes || {};
       const oldCreated = config.lifetimes.created;
       let componentRef: ComponentRef<unknown>,
-        ngModuleRef: NgModuleRef<unknown>;
+        ngModuleRef: NgModuleRef<unknown> | undefined;
       config.lifetimes.created = function (this: MiniProgramComponentInstance) {
         const app = getApp<AppOptions>();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.__lifeTimePromiseObject = {} as any;
         return (this.__lifeTimePromiseObject['created'] =
           app.__ngStartPagePromise.then(() => {
-            const result = app.__ngStartPage(module, component, this);
+            const result = startPage(this);
             componentRef = result.componentRef;
             ngModuleRef = result.ngModuleRef;
             if (oldCreated) {
@@ -276,11 +286,7 @@ export class MiniProgramCoreFactory {
         this.__lifeTimePromiseObject = {} as any;
         return (this.__lifeTimePromiseObject['onLoad'] =
           app.__ngStartPagePromise.then(() => {
-            const { componentRef, ngModuleRef } = app.__ngStartPage(
-              module,
-              component,
-              this
-            );
+            const { componentRef, ngModuleRef } = startPage(this);
             _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
             if (options.onLoad) {
               return options.onLoad.bind(this)(query);
@@ -304,6 +310,48 @@ export class MiniProgramCoreFactory {
         });
       },
     });
+  };
+
+  /**
+   * 启动一个 standalone 组件作为小程序页面，不需要 NgModule。
+   *
+   * ```ts
+   * // foo.entry.ts
+   * import { bootstrapPage } from 'angular-miniprogram';
+   * import { FooComponent } from './foo.component';
+   * bootstrapPage(FooComponent);
+   * ```
+   */
+  public bootstrapPage = (
+    component: Type<unknown>,
+    pageOptions?: { useComponent: boolean }
+  ) => {
+    return this.createPageBootstrap(
+      component,
+      (instance) => getApp<AppOptions>().__ngStartPage(component, instance),
+      pageOptions
+    );
+  };
+
+  /**
+   * @deprecated 请改用 `bootstrapPage(StandaloneComponent)`，
+   * 页面组件直接用 `standalone: true`，不再需要 NgModule。
+   */
+  public pageStartup = (
+    module: Type<unknown>,
+    component: Type<unknown>,
+    pageOptions?: { useComponent: boolean }
+  ) => {
+    return this.createPageBootstrap(
+      component,
+      (instance) =>
+        getApp<AppOptions>().__ngStartPageWithModule(
+          module,
+          component,
+          instance
+        ),
+      pageOptions
+    );
   };
   protected addNgComponentLinkLogic(
     config: WechatMiniprogram.Component.Options<{}, {}, {}>
