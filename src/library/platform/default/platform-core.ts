@@ -202,35 +202,41 @@ export class MiniProgramCoreFactory {
     const _this = this;
     if (pageOptions?.useComponent) {
       const options = this.getComponentOptions<true>(component) || {};
-      const config: WechatMiniprogram.Component.Options<{}, {}, {}, {}, true> =
-        {
-          ...options,
-          data: { hasLoad: false },
-          options: { ...options?.options, multipleSlots: true },
-          methods: {
-            ...options.methods,
-            ...this.listenerEvent(),
-            onHide: async function (this: MiniProgramComponentInstance) {
-              if (options.methods?.onHide) {
-                await options.methods.onHide.bind(this)();
-              }
-              _this.pageStatus.detachView.bind(this)();
-            },
-            onUnload: async function (this: MiniProgramComponentInstance) {
-              if (options.methods?.onUnload) {
-                await options.methods.onUnload.bind(this)();
-              }
-              _this.pageStatus.destroy.bind(this)();
-            },
-
-            onShow: async function (this: MiniProgramComponentInstance) {
-              if (options.methods?.onShow) {
-                await options.methods.onShow.bind(this)();
-              }
-              return _this.pageStatus.attachView.bind(this)();
-            },
+      const config: WechatMiniprogram.Component.Options<
+        {},
+        {},
+        {},
+        [],
+        {},
+        true
+      > = {
+        ...options,
+        data: { hasLoad: false },
+        options: { ...options?.options, multipleSlots: true },
+        methods: {
+          ...options.methods,
+          ...this.listenerEvent(),
+          onHide: async function (this: MiniProgramComponentInstance) {
+            if (options.methods?.onHide) {
+              await options.methods.onHide.bind(this)();
+            }
+            _this.pageStatus.detachView.bind(this)();
           },
-        };
+          onUnload: async function (this: MiniProgramComponentInstance) {
+            if (options.methods?.onUnload) {
+              await options.methods.onUnload.bind(this)();
+            }
+            _this.pageStatus.destroy.bind(this)();
+          },
+
+          onShow: async function (this: MiniProgramComponentInstance) {
+            if (options.methods?.onShow) {
+              await options.methods.onShow.bind(this)();
+            }
+            return _this.pageStatus.attachView.bind(this)();
+          },
+        },
+      };
       config.lifetimes = config.lifetimes || {};
       const oldCreated = config.lifetimes.created;
       let componentRef: ComponentRef<unknown>,
@@ -354,7 +360,7 @@ export class MiniProgramCoreFactory {
     );
   };
   protected addNgComponentLinkLogic(
-    config: WechatMiniprogram.Component.Options<{}, {}, {}>
+    config: WechatMiniprogram.Component.Options<{}, {}, {}, []>
   ) {
     config.lifetimes = config.lifetimes || {};
     const oldCreate = config.lifetimes.created;
@@ -409,7 +415,7 @@ export class MiniProgramCoreFactory {
   }
   public componentRegistry = (component: Type<unknown>) => {
     const options = this.getComponentOptions(component) || {};
-    let config: WechatMiniprogram.Component.Options<{}, {}, {}> = {
+    let config: WechatMiniprogram.Component.Options<{}, {}, {}, []> = {
       ...options,
       data: { hasLoad: false },
       options: { ...options?.options, multipleSlots: true },
@@ -432,6 +438,7 @@ export class MiniProgramCoreFactory {
       {},
       {},
       {},
+      [],
       {},
       T
     >;
