@@ -1,0 +1,281 @@
+import type { BuilderContext } from '@angular-devkit/architect';
+import * as fs from 'fs';
+import * as path from 'path';
+import { Injector } from 'static-injector';
+import ts from 'typescript';
+import type { Plugin } from 'vite';
+import { LibraryTemplateScopeService } from '../../application/library-template-scope.service';
+import { MiniProgramApplicationAnalysisService } from '../../application/mini-program-application-analysis.service';
+import {
+  OLD_BUILDER,
+  PAGE_PATTERN_TOKEN,
+  TS_CONFIG_TOKEN,
+  TS_SYSTEM,
+  WEBPACK_COMPILATION,
+  WEBPACK_COMPILER,
+} from '../../application/token';
+import type { LibraryTemplateLiteralConvertOptions , PagePattern } from '../../application/type';
+import { CustomStyleSheetProcessor } from '../../library/stylesheet-processor';
+import { BuildPlatform } from '../../platform/platform';
+import { literalResolve } from '../../util';
+
+/**
+ * 一个纯 node fs 的 ts.System。
+ *
+ * webpack 侧用的是 @ngtools/webpack 的 createWebpackSystem（走 compiler.inputFileSystem），
+ * Vite 侧没有那层，直接拿 node fs 拼一个够用的实现。
+ */
+export function createNodeTsSystem(
+  getCurrentDirectory: () => string
+): ts.System {
+  return {
+    ...ts.sys,
+    getCurrentDirectory,
+    // 明确走 node fs，避免被 ts.sys 的缓存策略影响
+    fileExists: (p) => fs.existsSync(p),
+    readFile: (p) => {
+      try {
+        return fs.readFileSync(p, 'utf8');
+      } catch {
+        return undefined;
+      }
+    },
+    directoryExists: (p) => {
+      try {
+        return fs.statSync(p).isDirectory();
+      } catch {
+        return false;
+      }
+    },
+    getDirectories: (p) => {
+      try {
+        return fs.readdirSync(p).filter((f) => fs.statSync(path.join(p, f)).isDirectory());
+      } catch {
+        return [];
+      }
+    },
+  };
+}
+
+/**
+ * 顶替 webpack.Compiler。
+ *
+ * MiniProgramApplicationAnalysisService 实际只读两处：
+ *   - compiler.watchMode
+ *   - compiler.inputFileSystem?.purge?.()
+ * 所以这里给一个最小实现就够，不用真的造一个 webpack。
+ */
+export function createStubWebpackCompiler(watchMode: boolean): {
+  watchMode: boolean;
+  inputFileSystem: { purge: (p: string) => void };
+} {
+  return {
+    watchMode,
+    inputFileSystem: {
+      purge: () => {
+        /* node fs 没有 webpack 的内存缓存要清，空实现即可 */
+      },
+    },
+  };
+}
+
+export interface MiniProgramAssetsPluginOptions {
+  tsConfig: string;
+  workspaceRoot: string;
+  buildPlatform: BuildPlatform;
+  entryPatterns: PagePattern[];
+  context: BuilderContext;
+  watch?: boolean;
+}
+
+/**
+ * 把 wxml / json / wxss 产出到 Vite 的 bundle。
+ *
+ * 对应 webpack 的 ExportMiniProgramAssetsPlugin，产出内容完全一致：
+ *   1. metaMap.outputContent  -> wxml
+ *   2. metaMap.style          -> wxss（样式源文件编译后按组件拼接）
+ *   3. metaMap.config         -> json（合并已存在的配置文件）
+ *   4. library 组件 config    -> json
+ *   5. library 模板          -> 经 literalResolve 转换后落盘
+ *   6. metaMap.selfTemplate   -> self template
+ */
+export function miniProgramAssetsPlugin(
+  options: MiniProgramAssetsPluginOptions
+): Plugin {
+  const libraryTemplateScopeService = new LibraryTemplateScopeService();
+  type MetaMap = Awaited<
+    ReturnType<MiniProgramApplicationAnalysisService['exportComponentBuildMetaMap']>
+  >;
+  let analysisPromise: Promise<MetaMap> | null = null;
+  let styleProcessor: CustomStyleSheetProcessor | undefined;
+
+  const runAnalysis = async () => {
+    const system = createNodeTsSystem(() => options.workspaceRoot);
+    const stubCompiler = createStubWebpackCompiler(!!options.watch);
+
+    const injector = Injector.create({
+      providers: [
+        { provide: MiniProgramApplicationAnalysisService },
+        { provide: WEBPACK_COMPILATION, useValue: undefined },
+        { provide: WEBPACK_COMPILER, useValue: stubCompiler },
+        { provide: OLD_BUILDER, useValue: undefined },
+        { provide: TS_SYSTEM, useValue: system },
+        {
+          provide: TS_CONFIG_TOKEN,
+          useValue: path.resolve(options.workspaceRoot, options.tsConfig),
+        },
+        { provide: PAGE_PATTERN_TOKEN, useValue: options.entryPatterns },
+        { provide: BuildPlatform, useValue: options.buildPlatform },
+      ],
+    });
+
+    const service = injector.get(MiniProgramApplicationAnalysisService);
+    await service.analyzeAsync();
+    const metaMap = await service.exportComponentBuildMetaMap();
+    service.cleanDependencyFileCache();
+    return metaMap;
+  };
+
+  /** 编译样式源文件，返回 path -> css 文本 */
+  const compileStyles = async (styleSourcePaths: Set<string>) => {
+    if (!styleSourcePaths.size) {
+      return new Map<string, string>();
+    }
+    styleProcessor ??= new CustomStyleSheetProcessor(
+      options.workspaceRoot,
+      options.workspaceRoot,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      !!options.watch
+    );
+    const compiled = new Map<string, string>();
+    for (const stylePath of styleSourcePaths) {
+      try {
+        const result = await styleProcessor.bundleFile(stylePath);
+        compiled.set(path.normalize(stylePath), result.contents ?? '');
+      } catch (error) {
+        options.context.logger.warn(
+          `样式编译失败 ${stylePath}: ${String(
+            (error as Error)?.message ?? error
+          )}`
+        );
+        compiled.set(path.normalize(stylePath), '');
+      }
+    }
+    return compiled;
+  };
+
+  return {
+    name: 'mini-program:assets',
+    enforce: 'post',
+    buildStart() {
+      analysisPromise ??= runAnalysis();
+    },
+    async generateBundle(_opts, bundle) {
+      if (!analysisPromise) {
+        analysisPromise = runAnalysis();
+      }
+      const metaMap = (analysisPromise ??= runAnalysis());
+      const resolved = await metaMap;
+
+      // 收集所有要编译的样式源文件
+      const styleSources = new Set<string>();
+      resolved.style.forEach((sourceList) => {
+        for (const s of sourceList) {
+          styleSources.add(path.normalize(s));
+        }
+      });
+      const compiledStyles = await compileStyles(styleSources);
+
+      const emit = (fileName: string, source: string) => {
+        // Rollup / Rolldown 不接受绝对路径或以 / 开头的 fileName
+        // （webpack 会帮你归一化），这里自己处理。
+        // metaMap 的 key 有些是 `/self-template/self.wxml` 这种带前导斜杠的。
+        const normalized = path
+          .normalize(fileName)
+          .replace(/^([/\\])+/, '')
+          .replace(/^\.\//, '');
+        if (!normalized || normalized.startsWith('..')) {
+          this.warn(`跳过无法归一化的产物路径: ${fileName}`);
+          return;
+        }
+        this.emitFile({
+          type: 'asset',
+          fileName: normalized,
+          source,
+        });
+      };
+
+      // 1. wxml
+      resolved.outputContent.forEach((content, outPath) => {
+        emit(outPath, content);
+      });
+
+      // 2. wxss：按组件把编译后的样式拼起来
+      resolved.style.forEach((sourceList, outPath) => {
+        const css = sourceList
+          .map((s) => compiledStyles.get(path.normalize(s)) ?? '')
+          .join('\n');
+        emit(outPath, css);
+      });
+
+      // 3. json：合并组件目录里已存在的配置文件
+      resolved.config.forEach((value, outPath) => {
+        let config: Record<string, unknown> = {};
+        if (value.existConfig && fs.existsSync(value.existConfig)) {
+          config = JSON.parse(fs.readFileSync(value.existConfig, 'utf8'));
+        }
+        config.component ??= value.component;
+        config.usingComponents = {
+          ...(config.usingComponents as Record<string, string> | undefined),
+          ...value.usingComponents.reduce((pre, cur) => {
+            pre[cur.selector] = cur.path;
+            return pre;
+          }, {} as Record<string, string>),
+        };
+        emit(outPath, JSON.stringify(config));
+      });
+
+      // 4. library 组件 config
+      for (const item of libraryTemplateScopeService.exportLibraryComponentConfig()) {
+        emit(item.filePath, JSON.stringify(item.content));
+      }
+
+      // 5. library 模板
+      const templateGroup =
+        libraryTemplateScopeService.exportLibraryTemplate();
+      for (const [key, element] of Object.entries(templateGroup)) {
+        emit(
+          key,
+          literalResolve<LibraryTemplateLiteralConvertOptions>(
+            `\`${element}\``,
+            {
+              directivePrefix:
+                options.buildPlatform.templateTransform.getData()
+                  .directivePrefix,
+              eventListConvert:
+                options.buildPlatform.templateTransform.eventListConvert,
+              templateInterpolation:
+                options.buildPlatform.templateTransform.templateInterpolation,
+              fileExtname: options.buildPlatform.fileExtname,
+            }
+          )
+        );
+      }
+
+      // 6. self template
+      for (const [key, content] of Object.entries(resolved.selfTemplate)) {
+        emit(key, content);
+      }
+
+      // Vite 会把没有对应模块的 css chunk 留空，这里不动它，
+      // 小程序侧只认上面 emit 出来的文件
+      void bundle;
+    },
+    async closeBundle() {
+      styleProcessor?.destroy?.();
+    },
+  };
+}

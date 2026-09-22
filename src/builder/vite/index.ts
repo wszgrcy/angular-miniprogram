@@ -11,6 +11,7 @@ import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
 import { generateEntryPatterns, toRollupInput } from './entry-patterns';
 import { miniProgramComponentTransformPlugin } from './plugins/component-transform.plugin';
+import { miniProgramAssetsPlugin } from './plugins/mini-program-assets.plugin';
 import { tsConfigPathsToAliases } from './tsconfig-paths';
 
 export interface ViteMiniProgramBuildOptions {
@@ -167,6 +168,14 @@ export async function createMiniProgramViteConfig(options: {
         experimental: { useAngularCompilationAPI: true },
       }),
       miniProgramComponentTransformPlugin(),
+      miniProgramAssetsPlugin({
+        tsConfig: viteOptions.tsConfig,
+        workspaceRoot: context.workspaceRoot,
+        buildPlatform,
+        entryPatterns: allEntries,
+        context,
+        watch: false,
+      }),
       ...(options.extraPlugins || []),
     ],
     build: {
