@@ -187,3 +187,55 @@ Angular 的模板插值不会自动 unwrap signal。
 `ChangeDetectionScheduler` 只在 `notify()` 之后调度一次 tick。若将来新增
 「从 `NgZone` 之外进入 Angular」的入口，必须显式调用
 `scheduleChangeDetection()`，否则视图不会刷新。
+
+## 内建控制流（`@if` / `@for` / `@switch`）
+
+模板编译器（`src/builder/mini-program-compiler`）已支持 Angular 17+ 的内建控制流语法，
+实现位置：`parse-node/template-definition.ts` 的 `visitIfBlock` / `visitForLoopBlock` /
+`visitSwitchBlock`。
+
+### 原理
+
+内建控制流在 Angular 里最终也会编译成 embedded template（`ɵɵconditionalCreate` /
+`ɵɵrepeaterCreate`），和 `<ng-template>` 是同一套锚点机制，所以可以直接复用
+`ParsedNgTemplate` 与 wxml 的 `<block wx:for="{{nodeList[i]}}">` 渲染方式：
+`nodeList[i]` 是该锚点下已创建视图的数组，条件为假时数组为空，天然实现显隐。
+
+分支内容是独立的 embedded view，拥有自己的声明索引空间，因此子节点用新的
+`TemplateDefinition` 访问，不影响当前视图的 `declIndex`。
+
+### 槽位（declIndex）分配规则
+
+必须和 Angular 的 `slot_allocation` + `pipe_creation` 两个 phase 完全一致，
+否则后面所有节点的 `nodeList[i]` 都会错位。规则（实测 20.3.x 产物得出）：
+
+| 语法 | 槽位布局 |
+| --- | --- |
+| `@if` / `@switch` | `i` = 第一个分支模板；`i+1 .. i+P` = **所有**分支条件表达式里的管道（统一插到第一个 create 之后）；`i+P+1 ..` = 其余分支模板 |
+| `@for` | `i` = `RepeaterMetadata`（不是 TNode，不可渲染但必须占位）；`i+1` = 主模板；`i+2` = `@empty` 模板（若有）；其后是被遍历表达式的管道槽位 |
+
+`track` 表达式 Angular 禁止使用管道，无需考虑。
+
+### 模板名唯一性
+
+wxml 的 `<template name>` 必须全文件唯一。以前用 `ngDefault_${index}`，而 `index`
+是每个 embedded view 各自从 0 重新计数，嵌套时会重名互相覆盖
+（`complex-structure` 里原本就有 4 个 `ngDefault_1`）。
+现在 `TemplateDefinition` 带 `namePrefix`，每下一层追加 `${index}_`，
+控制流模板名形如 `ifBlock_15_1`，保证全局唯一。
+
+### 未实现
+
+- `@defer`：依赖延迟加载与触发器调度，和小程序静态模板机制对不上，
+  直接抛错（静默渲染成空白更难排查）。
+- `@unknown`：抛错。
+
+### 测试
+
+- `src/builder/control-flow.spec.ts`：构建 fixture 后交叉校验
+  wxml 里的控制流锚点与编译产物 JS 的 `conditionalCreate` / `repeaterCreate` 索引一致，
+  并断言模板名不重复。
+- `test/hello-world-app/src/__pages/control-flow/`：覆盖 `@if`/`@else if`/`@else`、
+  `@if (x; as y)`、条件带管道、`@for`+`@empty`+`$index`、`@switch`+`@default`、控制流嵌套。
+- `test/hello-world-app/src/spec/control-flow-spec/`：小程序内验证渲染与状态切换
+  （需微信开发者工具）。

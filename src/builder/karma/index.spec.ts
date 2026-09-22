@@ -37,6 +37,7 @@ describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
         'ng-template-outlet-spec',
         'self-template-spec',
         'signal-io-spec',
+        'control-flow-spec',
       ]);
       harness.useTarget('build', angularConfig);
       let appTestPath: string;
@@ -84,6 +85,7 @@ describeBuilder(runBuilder, KARMA_BUILDER_INFO, (harness) => {
         'ng-template-outlet-spec',
         'self-template-spec',
         'signal-io-spec',
+        'control-flow-spec',
       ]);
       harness.useTarget('build', { ...angularConfig, watch: true });
       let appTestPath: string;

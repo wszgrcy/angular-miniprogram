@@ -65,7 +65,12 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   });
   constructor(
     private nodes: t.Node[],
-    private componentContext: ComponentContext
+    private componentContext: ComponentContext,
+    /**
+     * 当前视图在组件模板中的路径前缀，用于保证生成的模板名在
+     * 同一个 wxml 里全局唯一（否则嵌套的匿名模板会互相覆盖）。
+     */
+    private namePrefix = ''
   ) {}
   init() {}
   visit?(node: t.Node) {}
@@ -116,10 +121,16 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
 
   visitTemplate(template: t.Template) {
     const nodeIndex = this.declIndex++;
+    // 有引用名就用引用名，否则用带路径前缀的默认名，保证全局唯一
+    const templateName =
+      template.references && template.references.length
+        ? undefined
+        : `ngDefault_${this.namePrefix}${nodeIndex}`;
     const templateInstance = new ParsedNgTemplate(
       template,
       this.parentNode,
-      nodeIndex
+      nodeIndex,
+      templateName
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(templateInstance);
@@ -135,7 +146,8 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     });
     const instance = new TemplateDefinition(
       template.children,
-      this.componentContext
+      this.componentContext,
+      `${this.namePrefix}${nodeIndex}_`
     );
     instance.parentNode = templateInstance;
     this.templateDefinitionMap.set(template, instance);
@@ -155,6 +167,167 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     }
   }
   visitVariable(variable: t.Variable) {}
+  /**
+   * 统计若干表达式中管道占用的声明槽位。
+   * 内建控制流的条件表达式在 Angular 里会被编译成宿主视图的 `ɵɵpipe`，
+   * 每个管道占一个声明索引，必须跟着一起算，否则后面的节点全错位。
+   */
+  private countPipeSlots(
+    ...asts: Array<{ visit: (v: AstVisitor) => unknown } | null | undefined>
+  ): number {
+    let count = 0;
+    const visitor = new CustomAstVisitor(() => {
+      count++;
+    });
+    asts.forEach((ast) => ast?.visit(visitor));
+    return count;
+  }
+
+  /**
+   * 为控制流分支建立一个模板节点。
+   * 分支内容是一个独立的 embedded view，拥有自己的声明索引空间，
+   * 所以这里用新的 `TemplateDefinition` 访问子节点，不影响当前视图的 `declIndex`。
+   */
+  private createControlFlowTemplate(
+    children: TmplAstNode[],
+    index: number,
+    kind: string
+  ) {
+    const name = `${kind}_${this.namePrefix}${index}`;
+    const templateInstance = new ParsedNgTemplate(
+      null,
+      this.parentNode,
+      index,
+      name
+    );
+    if (this.parentNode) {
+      this.parentNode.appendNgNodeChild(templateInstance);
+    }
+    const instance = new TemplateDefinition(
+      children,
+      this.componentContext,
+      `${this.namePrefix}${index}_`
+    );
+    instance.parentNode = templateInstance;
+    instance.run();
+    if (!this.parentNode) {
+      this.list.push(templateInstance);
+    }
+  }
+
+  /**
+   * `@if` / `@else if` / `@else`。
+   *
+   * Angular 的槽位分配（见 `slot_allocation` + `pipe_creation` 两个 phase）：
+   *
+   * ```text
+   * i        : 第一个分支的模板锚点（ɵɵconditionalCreate）
+   * i+1..P   : 所有分支条件表达式里的管道（统一插到第一个 create 之后）
+   * i+P+1..  : 其余分支的模板锚点（ɵɵconditionalBranchCreate）
+   * ```
+   */
+  visitIfBlock(block: TmplAstIfBlock): void {
+    const branches = block.branches;
+    if (!branches.length) {
+      return;
+    }
+    const pipeCount = this.countPipeSlots(
+      ...branches.map((branch) => branch.expression)
+    );
+    const firstIndex = this.declIndex++;
+    this.createControlFlowTemplate(branches[0].children, firstIndex, 'ifBlock');
+    this.declIndex += pipeCount;
+    for (let i = 1; i < branches.length; i++) {
+      const index = this.declIndex++;
+      this.createControlFlowTemplate(branches[i].children, index, 'ifBlock');
+    }
+  }
+  visitIfBlockBranch(branch: TmplAstIfBlockBranch): void {
+    // 分支由 visitIfBlock 统一处理，这里不单独占位
+  }
+
+  /**
+   * `@switch` / `@case` / `@default`，槽位规则与 `@if` 一致，
+   * 只是管道来自 `@switch` 主表达式和各 `@case` 表达式。
+   */
+  visitSwitchBlock(block: TmplAstSwitchBlock): void {
+    const cases = block.cases;
+    if (!cases.length) {
+      return;
+    }
+    const pipeCount = this.countPipeSlots(
+      block.expression,
+      ...cases.map((item) => item.expression)
+    );
+    const firstIndex = this.declIndex++;
+    this.createControlFlowTemplate(cases[0].children, firstIndex, 'switchCase');
+    this.declIndex += pipeCount;
+    for (let i = 1; i < cases.length; i++) {
+      const index = this.declIndex++;
+      this.createControlFlowTemplate(cases[i].children, index, 'switchCase');
+    }
+  }
+  visitSwitchBlockCase(block: TmplAstSwitchBlockCase): void {
+    // case 由 visitSwitchBlock 统一处理
+  }
+
+  /**
+   * `@for` / `@empty`（`ɵɵrepeaterCreate`）。
+   *
+   * ```text
+   * i        : RepeaterMetadata 槽位（不是 TNode，不可渲染，但必须占位）
+   * i+1      : 主模板锚点
+   * i+2      : @empty 模板锚点（若有）
+   * 之后      : 被遍历表达式里的管道
+   * ```
+   *
+   * `track` 表达式 Angular 禁止使用管道，故不用考虑。
+   */
+  visitForLoopBlock(block: TmplAstForLoopBlock): void {
+    const pipeCount = this.countPipeSlots(block.expression);
+    // RepeaterMetadata 占位，不产生渲染节点
+    this.declIndex++;
+    const mainIndex = this.declIndex++;
+    this.createControlFlowTemplate(block.children, mainIndex, 'forBlock');
+    if (block.empty) {
+      const emptyIndex = this.declIndex++;
+      this.createControlFlowTemplate(
+        block.empty.children,
+        emptyIndex,
+        'forEmpty'
+      );
+    }
+    this.declIndex += pipeCount;
+  }
+  visitForLoopBlockEmpty(block: TmplAstForLoopBlockEmpty): void {
+    // @empty 作为 @for 的属性被处理，不会作为兄弟节点出现
+  }
+  /**
+   * `@defer` 依赖延迟加载与触发器调度，与小程序的静态模板机制对不上，
+   * 目前不支持。静默渲染成空白比直接报错更难排查，所以这里显式抛错。
+   */
+  visitDeferredBlock(deferred: TmplAstDeferredBlock): void {
+    throw new Error(
+      '暂不支持 @defer 语法，请改用 @if 或组件自身的延迟加载能力'
+    );
+  }
+  visitDeferredBlockError(block: TmplAstDeferredBlockError): void {
+    this.visitDeferredBlock(null as unknown as TmplAstDeferredBlock);
+  }
+  visitDeferredBlockLoading(block: TmplAstDeferredBlockLoading): void {
+    this.visitDeferredBlock(null as unknown as TmplAstDeferredBlock);
+  }
+  visitDeferredBlockPlaceholder(block: TmplAstDeferredBlockPlaceholder): void {
+    this.visitDeferredBlock(null as unknown as TmplAstDeferredBlock);
+  }
+  visitDeferredTrigger(trigger: TmplAstDeferredTrigger): void {}
+  visitUnknownBlock(block: TmplAstUnknownBlock): void {
+    throw new Error(`无法识别的控制流块：@${block.name}`);
+  }
+  /** Angular 20 新增：模板 AST 中的组件 / 指令节点 */
+  visitComponent(component: TmplAstComponent) {}
+  visitDirective(directive: TmplAstDirective) {}
+
   /**
    * Angular 18 新增的 `@let` 模板语法。
    * 它不会产生任何渲染节点，因此这里不占用 declIndex，仅作为空实现保证访问器完整。
@@ -196,22 +369,6 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       this.declIndex++;
     });
   }
-  // todo
-  visitDeferredBlock(deferred: TmplAstDeferredBlock): void {}
-  visitDeferredBlockError(block: TmplAstDeferredBlockError): void {}
-  visitDeferredBlockLoading(block: TmplAstDeferredBlockLoading): void {}
-  visitDeferredBlockPlaceholder(block: TmplAstDeferredBlockPlaceholder): void {}
-  visitDeferredTrigger(trigger: TmplAstDeferredTrigger): void {}
-  visitForLoopBlock(block: TmplAstForLoopBlock): void {}
-  visitForLoopBlockEmpty(block: TmplAstForLoopBlockEmpty): void {}
-  visitIfBlock(block: TmplAstIfBlock): void {}
-  visitIfBlockBranch(block: TmplAstIfBlockBranch): void {}
-  visitSwitchBlock(block: TmplAstSwitchBlock): void {}
-  visitSwitchBlockCase(block: TmplAstSwitchBlockCase): void {}
-  visitUnknownBlock(block: TmplAstUnknownBlock): void {}
-  /** Angular 20 新增：模板 AST 中的组件 / 指令节点 */
-  visitComponent(component: TmplAstComponent) {}
-  visitDirective(directive: TmplAstDirective) {}
 }
 export function visitAll(visitor: TemplateDefinition, nodes: TmplAstNode[]) {
   for (const node of nodes) {
