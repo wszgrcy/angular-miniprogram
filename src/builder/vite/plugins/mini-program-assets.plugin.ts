@@ -379,7 +379,7 @@ export function miniProgramAssetsPlugin(
         `${options.buildPlatform.importTemplate};\n${requireList};`
       );
 
-      // 10. app.wxss：小程序的全局样式。对应 builder 配置里的 styles
+      // 10. 全局样式（app 级）。对应 builder 配置里的 styles
       //     （webpack 侧走 MiniCssExtractPlugin，这里直接过一遍样式管线）。
       if (options.styles?.length) {
         const globalStyleSources = options.styles
@@ -392,7 +392,9 @@ export function miniProgramAssetsPlugin(
         const globalCss = globalStyleSources
           .map((s) => compiledStyles.get(path.normalize(s)) ?? '')
           .join('\n');
-        emit('app.wxss', globalCss);
+        // 文件名跟着平台走：wx 是 app.wxss，bdzn 是 app.css，
+        // zfb 是 app.acss……写死 wxss 会让其他平台拿不到全局样式。
+        emit('app' + options.buildPlatform.fileExtname.style, globalCss);
       }
 
       void bundle;

@@ -14,8 +14,8 @@ import {
   ALL_PAGE_NAME_LIST,
 } from '../../test/util/file';
 // 主测试链路已切到 Vite builder（webpack 链路待删除）
-import { runViteBuilder as runBuilder } from './vite';
 import { PlatformType } from './platform/platform';
+import { runViteBuilder as runBuilder } from './vite';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,
@@ -84,6 +84,17 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         path.join(base, 'pages/control-flow/control-flow-entry.js'),
         'utf8'
       );
+      console.log(
+        'CFPROBE repeaterCreateCount=' +
+          (compiled.match(/repeaterCreate/g) || []).length +
+          ' templateNames=' +
+          JSON.stringify(
+            (compiled.match(/function [A-Za-z0-9_]*Template/g) || []).slice(
+              0,
+              30
+            )
+          )
+      );
       return { wxml, compiled };
     });
 
@@ -112,8 +123,11 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           parseInt(m[1], 10)
         )
       );
+      // bundler 无关：webpack 产出 `["ɵɵrepeaterCreate"](11,`，
+      // Vite/Rolldown 产出 `ɵɵrepeaterCreate(11,`。
+      // `(?:"])?` 让中间那段 webpack 包装变成可选。
       const repeaters = [
-        ...compiled.matchAll(/repeaterCreate"\]\((\d+),/g),
+        ...compiled.matchAll(/repeaterCreate(?:"])?\((\d+),/g),
       ].map((m) => parseInt(m[1], 10));
       const repeaterSlots = new Set<number>(
         repeaters.flatMap((start) => [start, start + 1, start + 2])
@@ -133,17 +147,33 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     it('@for 主模板位于 repeaterCreate(index+1)，@empty 位于 index+2', async () => {
       const { wxml, compiled } = await load();
       const anchors = collectAnchorsFromWxml(wxml);
-      const repeaters = [
-        ...compiled.matchAll(/repeaterCreate"\]\((\d+),/g),
-      ].map((m) => parseInt(m[1], 10));
-      const expectedMain = new Set(repeaters.map((start) => start + 1));
-      const expectedEmpty = new Set(
-        repeaters
-          .filter((start) =>
-            compiled.includes(`ForEmpty_${start + 2}_Template`)
-          )
-          .map((start) => start + 2)
+
+      // 不能用 `repeaterCreate"]\((\d+),` 这种正则：那是 webpack 的格式化
+      // 产物。Vite/Rolldown 会把调用重命名成短别名（`At(10, ...)`），
+      // 按名字找不到，于是 repeaters 恒为空，断言退化成
+      // 「Set(11,14) 等于 Set()」而失败。
+      //
+      // 改用**模板名**推导——Angular 生成的模板函数名自带索引，
+      // 且不受 bundler 影响：
+      //   ControlFlowComponent_For_11_Template       主模板
+      //   ControlFlowComponent_ForEmpty_12_Template  @empty 模板
+      const expectedMain = new Set<number>(
+        [...compiled.matchAll(/_For_(\d+)_Template/g)].map((m) =>
+          parseInt(m[1], 10)
+        )
       );
+      const expectedEmpty = new Set<number>(
+        [...compiled.matchAll(/_ForEmpty_(\d+)_Template/g)].map((m) =>
+          parseInt(m[1], 10)
+        )
+      );
+      // 先确认确实抓到了，否则两个空 Set 相等会假通过
+      expect(expectedMain.size).toBeGreaterThan(0);
+      expect(expectedEmpty.size).toBeGreaterThan(0);
+      // @empty 必须紧跟主模板后一位
+      for (const main of expectedMain) {
+        expect(expectedEmpty.has(main + 1)).toBe(true);
+      }
       expect(anchors.get('forBlock')).toEqual(expectedMain);
       expect(anchors.get('forEmpty')).toEqual(expectedEmpty);
     });

@@ -14,8 +14,8 @@ import {
   ALL_PAGE_NAME_LIST,
 } from '../../test/util/file';
 // 主测试链路已切到 Vite builder（webpack 链路待删除）
-import { runViteBuilder as runBuilder } from './vite';
 import { PlatformType } from './platform/platform';
+import { runViteBuilder as runBuilder } from './vite';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,

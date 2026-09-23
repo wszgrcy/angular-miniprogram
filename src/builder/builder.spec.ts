@@ -17,10 +17,10 @@ import {
   TEST_LIBRARY_COMPONENT_LIST,
 } from '../../test/util/file';
 // 主测试链路已切到 Vite builder（webpack 链路待删除）
-import { runViteBuilder as runBuilder } from './vite';
 import { LIBRARY_OUTPUT_ROOTDIR } from './library';
 import { BuildPlatform, PlatformType } from './platform/platform';
 import { getBuildPlatformInjectConfig } from './platform/platform-inject-config';
+import { runViteBuilder as runBuilder } from './vite';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,
