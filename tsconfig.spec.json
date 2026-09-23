@@ -8,6 +8,11 @@
     "lib": ["es2022", "dom", "dom.iterable"],
     "types": ["jasmine", "node"],
     "paths": {
+      // @angular/core/testing 只靠 exports map，moduleResolution: node10
+      // 认不出来（与 vite 同因），显式指到类型入口
+      "@angular/core/testing": [
+        "./node_modules/@angular/core/types/testing.d.ts"
+      ],
       "@angular/build/private": [
         "./node_modules/@angular/build/src/private.d.ts"
       ],
