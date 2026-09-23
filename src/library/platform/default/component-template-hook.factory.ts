@@ -11,12 +11,13 @@ import { AgentNode } from './agent-node';
 import { diffNodeData } from './diff-node-data';
 // packages\core\src\render3\interfaces\view.ts
 const CLEANUP = 7;
+// CONTEXT
 export const LVIEW_CONTEXT = 8;
 export const INJECTOR = 9;
 // packages\core\src\render3\interfaces\container.ts
 const VIEW_REFS = 8;
-// HEADER_OFFSET
-const start = 25;
+// packages\core\src\render3\interfaces\view.ts HEADER_OFFSET
+const HEADER_OFFSET = 27;
 
 const linkMap = new Map<LView, any>();
 const nodePathMap = new Map<LView, NodePath>();
@@ -62,10 +63,10 @@ function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
   const tView = lView[1];
   const end = tView.bindingStartIndex;
   const nodeList: MPView['nodeList'] = [];
-  for (let index = start; index < end; index++) {
+  for (let index = HEADER_OFFSET; index < end; index++) {
     const item = lView[index];
     if (item instanceof AgentNode) {
-      nodeList[index - start] = item.toView();
+      nodeList[index - HEADER_OFFSET] = item.toView();
     } else if (item && item[1] === true) {
       const lContainerList: MPView[] = [];
       const viewRefList: any[] = item[VIEW_REFS] || [];
@@ -73,7 +74,7 @@ function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
         const nodePath = [
           ...parentNodePath,
           'directive',
-          index - start,
+          index - HEADER_OFFSET,
           itemIndex,
         ];
         lContainerList.push({
@@ -85,10 +86,10 @@ function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
           index: lContainerList.length,
         });
       });
-      nodeList[index - start] = lContainerList;
+      nodeList[index - HEADER_OFFSET] = lContainerList;
     } else {
       // todo
-      nodeList[index - start] = {} as any;
+      nodeList[index - HEADER_OFFSET] = {} as any;
     }
   }
   return nodeList;
@@ -129,12 +130,12 @@ export function resolveNodePath(list: NodePath): any {
     const item = list.shift()!;
     if (item === 'directive') {
       const index = list.shift()! as number;
-      const lContainer = lView[index + start];
+      const lContainer = lView[index + HEADER_OFFSET];
       const child = list.shift() as number;
       const viewRef = lContainer[VIEW_REFS][child];
       lView = viewRef['_lView'];
     } else {
-      lView = lView[start + item];
+      lView = lView[HEADER_OFFSET + item];
     }
   }
   return lView;
@@ -145,12 +146,12 @@ export function findCurrentElement(lView: LView, list: NodePath = []) {
     const item = list.shift()!;
     if (item === 'directive') {
       const index = list.shift() as number;
-      const lContainer = lView[index + start];
+      const lContainer = lView[index + HEADER_OFFSET];
       const child = list.shift() as number;
       const viewRef = lContainer[VIEW_REFS][child];
       lView = viewRef['_lView'];
     } else {
-      lView = lView[item + start];
+      lView = lView[item + HEADER_OFFSET];
     }
   }
 
@@ -173,7 +174,7 @@ export function cleanAll(lView: LView) {
 }
 
 export function findPageLView(componentRef: ComponentRef<unknown>) {
-  const lView = (componentRef as any)._rootLView[start];
+  const lView = (componentRef as any)._rootLView[HEADER_OFFSET];
 
   index++;
   pageRegistryMap.set(index, lView);
