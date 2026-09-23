@@ -20,6 +20,10 @@ import {
   extractViewTreesFromSource,
 } from '../../../test/util/node-manifest';
 import {
+  nodeListIndices,
+  splitWxmlTopLevelBlocks,
+} from '../../../test/util/wxml-blocks';
+import {
   getGeneratedWxmlRecords,
   resetGeneratedWxmlRecords,
 } from '../mini-program-compiler/manifest-registry';
@@ -224,9 +228,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
        * 用「子集」断言而非直接忽略：清单只能缩小，不能扩大。
        * 新增一个验证不了的 wxml 就会失败——防止缺口悄悄增长。
        */
-      const KNOWN_EXTRACTION_GAPS = new Set([
-        'pages/default-structural-directive/default-structural-directive-entry.wxml',
-      ]);
+      const KNOWN_EXTRACTION_GAPS = new Set<string>([]);
 
       const newGaps = [
         ...new Set(violations.map((v) => v.split(':')[0])),
@@ -415,12 +417,19 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
        * 找到那些独立模板函数并一并遍历（每个视图有各自从 0 开始的下标
        * 空间，需要按视图分组，不能混在一起比）。
        */
-      const KNOWN_PRECISION_GAPS = new Set([
-        'ControlFlowComponent',
-        'CustomStructuralDirectiveComponent',
-        'DefaultStructuralDirectiveComponent',
-        'NgContentComponent',
-      ]);
+      /**
+       * 已知缺口：只剩 ControlFlowComponent。
+       *
+       * 这是**本测试口径本身**的局限，不是产物错误：
+       * 「按组件精确」把组件的所有 wxml 下标拍成一个并集去比，
+       * 但 ControlFlowComponent 的 wxml 里含大量具名块
+       * (ifBlock_3 / forBlock_11 / Case_18 ...)，那些下标属于
+       * **各自子视图**的 0 基空间，混进组件级并集必然串。
+       *
+       * 更精确的「按视图分块」测试已 **零缺口** 覆盖同一批组件，
+       * 所以这里保留一个组件名不代表未验证。
+       */
+      const KNOWN_PRECISION_GAPS = new Set(['ControlFlowComponent']);
 
       const newViolations = [
         ...new Set(violations.map((v) => v.split(':')[0].trim())),
@@ -476,38 +485,20 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
  */
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('节点下标两端等价性（按视图分块）', () => {
-    interface Block {
-      name: string;
-      indices: Set<number>;
-    }
+    /**
+     * 用平衡匹配的分块器（见 test/util/wxml-blocks）。
+     *
+     * 之前这里用非贪婪正则切具名模板，遇到**嵌套**具名模板会在第一个
+     * </template> 处截断，把外层模板的闭合残尾留在根区，导致根区
+     * 引用了不属于它的下标（ControlFlowComponent 就是这么栽的）。
+     */
+    type Block = { name: string; indices: Set<number> };
 
-    /** 把 wxml 拆成具名模板块 + 根块 */
     function splitWxmlBlocks(wxml: string): Block[] {
-      const blocks: Block[] = [];
-      const re = /<template\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/template>/g;
-      let m: RegExpExecArray | null;
-      let covered = 0;
-      while ((m = re.exec(wxml)) !== null) {
-        blocks.push({
-          name: m[1],
-          indices: wxmlReferencedIndices(m[2]),
-        });
-        covered = re.lastIndex;
-      }
-      // 剩余部分（含 <block wx:if="{{hasLoad}}"> 根渲染区）算根块
-      const rest = wxml.slice(0, wxml.length); // 具名模板已单独取出，这里取未被嵌套的根区
-      const rootIdx = wxml.indexOf('<block');
-      if (rootIdx >= 0) {
-        // 根块 = 从第一个 <block 开始、排除掉具名 template 的部分
-        const withoutNamed = wxml.replace(re, '');
-        blocks.push({
-          name: '__root__',
-          indices: wxmlReferencedIndices(withoutNamed),
-        });
-      }
-      void rest;
-      void covered;
-      return blocks;
+      return splitWxmlTopLevelBlocks(wxml).map((b) => ({
+        name: b.name,
+        indices: nodeListIndices(b.content),
+      }));
     }
 
     let cache: {

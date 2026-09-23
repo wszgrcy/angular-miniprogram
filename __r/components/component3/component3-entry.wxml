@@ -1,0 +1,1 @@
+<import src="/self-template/self.wxml"/><block wx:if="{{hasLoad}}"><view  class="{{nodeList[0].class}}" style="{{nodeList[0].style}}" >component3 works!</view></block>

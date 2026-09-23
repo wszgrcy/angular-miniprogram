@@ -1,0 +1,8 @@
+<import src="/self-template/self.wxml"/><template name="ngDefault_1"><block ></block></template><template name="ngDefault_3"><view  class="{{nodeList[0].class}}" style="{{nodeList[0].style}}" ></view></template><block wx:if="{{hasLoad}}">ngTemplateOutlet插入
+<block wx:for="{{nodeList[1]}}" wx:key="index">
+      <template is="{{item.__templateName||'ngDefault_1'}}" data="{{...nodeList[1][index] }}"></template>
+      </block>
+ngIf 插入
+<block wx:for="{{nodeList[3]}}" wx:key="index">
+      <template is="{{item.__templateName||'ngDefault_3'}}" data="{{...nodeList[3][index] }}"></template>
+      </block></block>

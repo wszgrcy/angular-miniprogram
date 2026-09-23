@@ -1,0 +1,1 @@
+<import src="/library-template/TestLibrary.wxml"/><import src="/library/test-library/self.wxml"/><block wx:if="{{hasLoad}}"></block>

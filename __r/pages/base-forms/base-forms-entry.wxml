@@ -1,0 +1,1 @@
+<import src="/self-template/self.wxml"/><block wx:if="{{hasLoad}}"><input  type="text" class="{{nodeList[0].class}}" style="{{nodeList[0].style}}" /><checkbox-group  class="{{nodeList[1].class}}" style="{{nodeList[1].style}}" ><checkbox  class="{{nodeList[2].class}}" style="{{nodeList[2].style}}" ></checkbox></checkbox-group></block>
