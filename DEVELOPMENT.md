@@ -931,7 +931,7 @@ wxml 里没有对应元素是正常的。
 三个根因（链式 codegen / 嵌套具名模板切分 / repeater 锚点槽）
 都是**提取器与分块器**的缺陷，产物本身一直是对的。
 
-## 半运行时测试（进行中）
+## 半运行时测试（boot 已跑通，比对逻辑待接）
 
 ### 目标
 
@@ -970,25 +970,71 @@ import `NG_ZONE_CONFIG`（`ɵ` 私有 token，非公开 API）。
 | `wx` / `App` 全局 | ✅ 通 |
 | zone（NG0908） | ✅ 用 `provideZonelessChangeDetection()` 后消失 |
 | `RendererFactory2`（NG0407） | ✅ 提供 `MiniProgramRendererFactory` 后解决 |
-| `ChangeDetectionSchedulerImpl`（NG0201） | ❌ **当前卡点** |
+| `ChangeDetectionSchedulerImpl`（NG0201） | ✅ 见下 |
+| 真实 boot | ✅ **已跑通**，拿到真实 lView / nodeList |
 
-### 当前卡点与下一步
+### 打通最后两关的做法
 
-`provideZonelessChangeDetection()` 内部用 `makeEnvironmentProviders()`，
-那是给**真实 bootstrap 路径**用的；裸 `createEnvironmentInjector`
-不会展开它，于是 `ChangeDetectionScheduler → ChangeDetectionSchedulerImpl`
-注入失败。
+`provideZonelessChangeDetection()` 返回 `{ɵproviders: [...]}`，其中
+第 0 条只是 `{provide: <接口>, useExisting: ChangeDetectionSchedulerImpl}`
+——**引用**实现但不**提供**实现。实现类由 bootstrap 内部注册，
+裸 `createEnvironmentInjector` 拿不到。
 
-`bootstrapApplication` 也不可用——`@angular/platform-browser` 没装
-（与本 fork 不用 DOM 一致）。
+解法：把实现类自己注册进去。
 
-**下一步**：走 fork 自己的 bootstrap，即
-`platformMiniProgram().bootstrapModule(SomeModule)`，其中 SomeModule 带
-`providers: [provideZonelessChangeDetection()]` 与
-`imports: [MiniProgramModule]`（renderer 来自后者）。
-`bootstrapModule` 会正确建立 platform / module / 环境 injector 三层，
-`makeEnvironmentProviders` 才会被展开。
+```ts
+import { ɵChangeDetectionScheduler } from '@angular/core';
 
-拿到真实 `nodeList` 后，比对逻辑接现有件即可：
-wxml 侧用 `nodeListIndices()`（`test/util/wxml-blocks.ts`），
-运行时侧用 `getPageRefreshContext(lView).nodeList.length`。
+const env = createEnvironmentInjector(
+  [
+    ...flattenZonelessProviders(),   // 摊平 ɵproviders（含一层嵌套）
+    ɵChangeDetectionScheduler,      // 实现类要自己补
+    MiniProgramRendererFactory,
+    { provide: RendererFactory2, useExisting: MiniProgramRendererFactory },
+  ],
+  platform.injector,
+  'spike'
+);
+const ref = createComponent(SpikeComponent, {
+  elementInjector: env,
+  environmentInjector: env,
+});
+ref.changeDetectorRef.detectChanges();
+const lView = (ref.hostView as any)._lView;
+const ctx = getPageRefreshContext(lView);   // 真实 nodeList
+```
+
+注意**不要**在 spec 文件里内联 `@NgModule` 并 import `MiniProgramModule`
+——它的 `constructor(pageService: PageService)` 在 ts-node JIT 下会
+NG0202。直接提供 renderer 绕开。
+
+### 遗留疑点（下一步要查，且本身就是有价值的信号）
+
+boot 出来的数据：
+
+| 量 | 值 |
+|---|---|
+| `ɵcmp.decls` | 6（模板 `<div>hello<span>x</span><p>y</p></div>`，编译正确） |
+| `tView.bindingStartIndex` | 28 |
+| `LVIEW.HEADER_OFFSET` | 27（已对 Angular 交叉验证） |
+| `nodeList.length` | **1** |
+
+`bindingStartIndex(28) - HEADER_OFFSET(27) = 1`，但 `decls = 6`。
+两种可能：
+
+  (a) `ref.hostView._lView` 取的是**宿主视图**而非模板视图，
+      模板节点在子 lView 里；
+  (b) `detectChanges()` 没跑完 create pass，`bindingStartIndex` 是中间态。
+
+**这个差异正是该测试要抓的东西** —— 如果真实运行时 nodeList 真的比
+模板声明的节点少，wxml 引用高位下标就会越界。所以这不是「测试没写好」，
+而是测试开始给出真实信号了，需要分辨是取错视图还是真问题。
+
+### 下一步
+
+1. 分辨上面 (a)/(b)：试 `ref._lView`、或从 `hostView` 往下找模板子视图，
+   确认哪个 lView 的 `bindingStartIndex - HEADER_OFFSET === decls`。
+2. 确认后用**真实页面组件**（非为测试造的组件）boot，
+   与已构建产物 wxml 比对：
+   `nodeList.length > max(nodeListIndices(wxml))`
+   wxml 侧用 `test/util/wxml-blocks.ts` 的 `nodeListIndices()`。
