@@ -2,6 +2,10 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "sourceMap": true,
+    // 与 tsconfig.library.json 对齐：小程序运行时不是 DOM，但代码大量
+    // **使用 DOM 类型**（Document / HTMLElement / Node 等），
+    // base 的 ES2019 没有这些，spec 侧必须补上，否则类型对不上。
+    "lib": ["es2022", "dom", "dom.iterable"],
     "types": ["jasmine", "node"],
     "paths": {
       "@angular/build/private": [

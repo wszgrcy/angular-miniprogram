@@ -25,7 +25,7 @@ describe('fake-document', () => {
     installFakeDocument();
     // 从 core 内部拿 getDocument 验证：装了之后不应抛
     const core = await import('@angular/core');
-    const getDocument = (core as unknown as { ɵgetDocument?: () => unknown })
+    const getDocument = (core as unknown as { ɵgetDocument?: () => Document })
       .ɵgetDocument;
     if (getDocument) {
       expect(() => getDocument()).not.toThrow();

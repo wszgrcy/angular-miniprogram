@@ -58,17 +58,9 @@ import { DOCUMENT, ɵsetDocument } from '@angular/core';
  * 不只是 injector 那一条路。两者都上，避免哪天又冒出个直接调
  * `getDocument()` 的新代码路径。
  */
-/**
- * 本模块刻意不引用全局 `Document` 类型：小程序库不该依赖 DOM 类型，
- * 且 tsconfig.spec.json 也没挂 dom lib。用本地最小形状 + 消费点 cast。
- */
-export interface FakeDocumentLike {
-  head: unknown;
-}
-
-export const MINI_PROGRAM_FAKE_DOCUMENT: FakeDocumentLike = {
+export const MINI_PROGRAM_FAKE_DOCUMENT = {
   head: {},
-};
+} as unknown as Document;
 
 /**
  * 在平台初始化时调用，把 Angular 的 document 指向占位物。
@@ -76,7 +68,7 @@ export const MINI_PROGRAM_FAKE_DOCUMENT: FakeDocumentLike = {
  * 必须在任何组件创建之前执行（platform 建立阶段即可）。
  */
 export function installFakeDocument(): void {
-  ɵsetDocument(MINI_PROGRAM_FAKE_DOCUMENT as never);
+  ɵsetDocument(MINI_PROGRAM_FAKE_DOCUMENT);
 }
 
 /**
