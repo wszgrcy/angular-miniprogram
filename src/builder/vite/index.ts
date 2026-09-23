@@ -63,6 +63,17 @@ export interface ViteMiniProgramBuildOptions {
    * "Component constructors should be called while initialization"。
    */
   main?: string;
+  /**
+   * 产物模块格式。默认 'cjs'。
+   *
+   * 小程序的 JS 运行时是 CommonJS（require / module.exports），
+   * 不原生支持 ESM 的 import / export。之前 Vite 默认吐 'es'，
+   * 能跑起来是靠微信开发者工具「增强编译」在兜，属于隐式依赖：
+   * 真机 / 关掉增强编译 / CI 里直接跑就可能挂。
+   *
+   * 这里显式出 cjs，不再依赖工具链兜底。
+   */
+  format?: 'cjs' | 'es';
 }
 
 /**
@@ -284,6 +295,12 @@ export async function createMiniProgramViteConfig(options: {
           entryFileNames: '[name].js',
           chunkFileNames: '[name]-[hash].js',
           assetFileNames: '[name].[ext]',
+          // 小程序运行时是 CommonJS，默认出 cjs。
+          // 注意扩展名仍然要 .js（不是 .cjs）——小程序只认 .js。
+          format: viteOptions.format ?? 'cjs',
+          // 多入口 + cjs 时，named / default 混用会让 Rollup 犹豫，
+          // auto 让它按实际导出形态决定，避免额外包一层 default
+          exports: 'auto',
         },
       },
     },

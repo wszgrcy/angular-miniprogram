@@ -305,6 +305,26 @@ describe('parity: webpack vs vite 产物对等', () => {
     expect(required).toContain('./main.js');
   }, 600000);
 
+  it('产物是 CJS 而非 ESM（小程序运行时只认 CommonJS）', async () => {
+    const snap = await viteSnap.load();
+    const jsFiles = [...snap.byName.entries()].filter(([name]) =>
+      name.endsWith('.js')
+    );
+    expect(jsFiles.length).toBeGreaterThan(0);
+
+    // 顶层 import / export 语句 = ESM。小程序运行时是 CommonJS，
+    // 出现这些就得靠开发者工具「增强编译」兜，属于隐式依赖：
+    // 关掉增强编译 / 真机 / CI 直接跑就可能挂。
+    const esmFiles = jsFiles
+      .filter(([, src]) => /^\s*(import\s|export\s)/m.test(String(src)))
+      .map(([name]) => name);
+    expect({ esmChunks: esmFiles }).toEqual({ esmChunks: [] });
+
+    // 反向确认确实是 CJS：入口文件里应有 require()
+    const main = String(snap.byName.get('main.js'));
+    expect(main).toMatch(/\brequire\(/);
+  }, 600000);
+
   it('wxml 内容逐字节一致', async () => {
     const [w, v] = await Promise.all([webpackSnap.load(), viteSnap.load()]);
     const diff: string[] = [];

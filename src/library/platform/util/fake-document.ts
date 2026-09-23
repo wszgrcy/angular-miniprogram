@@ -78,3 +78,17 @@ export const FAKE_DOCUMENT_PROVIDER = {
   provide: DOCUMENT,
   useValue: MINI_PROGRAM_FAKE_DOCUMENT,
 };
+
+/**
+ * 模块加载即安装。
+ *
+ * 只靠 platformMiniProgram() 里调用是不够的：那条路依赖调用方在
+ * page bootstrap 之前正确建立了 platform。一旦调用方的 main.ts 走了
+ * 别的引导方式、或者用的是旧产物，就会漏装，微信里直接 NG0210。
+ *
+ * 放在模块顶层，只要有人 import 到本模块（platform 的 index 会带进来），
+ * 就立刻装好——早于任何 createComponent 的可能时机。
+ * installFakeDocument() 是幂等的（重复 setDocument 同一个对象），
+ * 所以顶层调一次 + platformMiniProgram 再调一次没有副作用。
+ */
+installFakeDocument();
