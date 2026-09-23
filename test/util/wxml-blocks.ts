@@ -109,3 +109,32 @@ export function nodeListIndices(content: string): Set<number> {
   }
   return s;
 }
+
+/**
+ * 提取「下标 → 承载该下标的 wxml 标签」。
+ *
+ * wxml 里每个可渲染元素都带 `class="{{nodeList[i].class}}"`，
+ * 该元素的标签名就是这个下标在 wxml 侧的**类型**。
+ *
+ * 用途：与 Angular `ɵɵelementStart(i, tag)` 的 tag（经映射）交叉校验，
+ * 抓住「下标对但节点类型错」——纯下标断言抓不到这类问题。
+ */
+export function wxmlTagsByIndex(content: string): Map<number, string> {
+  const map = new Map<number, string>();
+  // 开标签：标签名 + 属性区（属性值里的引号内容不吞掉 `>`）
+  const tagRe = /<([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>/g;
+  let m: RegExpExecArray | null;
+  while ((m = tagRe.exec(content)) !== null) {
+    const tag = m[1];
+    const attrs = m[2];
+    const idx = /nodeList\[(\d+)\]\.class/.exec(attrs);
+    if (idx) {
+      const n = Number(idx[1]);
+      // 同一 index 若出现多次（如 wx:for 包裹），保留首个承载元素
+      if (!map.has(n)) {
+        map.set(n, tag);
+      }
+    }
+  }
+  return map;
+}

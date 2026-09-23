@@ -22,11 +22,16 @@ import {
 import {
   nodeListIndices,
   splitWxmlTopLevelBlocks,
+  wxmlTagsByIndex,
 } from '../../../test/util/wxml-blocks';
 import {
   getGeneratedWxmlRecords,
   resetGeneratedWxmlRecords,
 } from '../mini-program-compiler/manifest-registry';
+import {
+  isTextInstruction,
+  mapAngularTagToWxml,
+} from '../mini-program-compiler/tag-mapping';
 import { PlatformType } from '../platform/platform';
 import { runViteBuilder as runBuilder } from './index';
 
@@ -134,6 +139,63 @@ function wxmlReferencedIndices(wxml: string): Set<number> {
     s.add(Number(m[1]));
   }
   return s;
+}
+
+/**
+ * 标签类型对应校验（可复用，供正向与反向对照共用同一判定逻辑）。
+ *
+ * 返回违规描述数组；空数组表示两端类型一致。
+ */
+function checkTagCorrespondence(
+  blocksByComponent: Map<
+    string,
+    { name: string; indices: Set<number>; content: string }[]
+  >,
+  trees: {
+    componentName: string;
+    views: {
+      indices: Set<number>;
+      entries: { index: number; instruction: string; tag?: string }[];
+    }[];
+  }[]
+): { violations: string[]; compared: number } {
+  const violations: string[] = [];
+  let compared = 0;
+  for (const [cmp, blocks] of blocksByComponent) {
+    const tree = trees.find((t) => t.componentName === cmp);
+    if (!tree) {
+      continue;
+    }
+    for (const b of blocks) {
+      if (b.indices.size === 0) {
+        continue;
+      }
+      const covering = tree.views.filter((v) =>
+        [...b.indices].every((i) => v.indices.has(i))
+      );
+      if (covering.length === 0) {
+        continue;
+      }
+      const wxmlTags = wxmlTagsByIndex(b.content);
+      for (const [idx, wtag] of wxmlTags) {
+        const entries = covering
+          .flatMap((v) => v.entries.filter((e) => e.index === idx))
+          .filter((e) => !isTextInstruction(e.instruction) && e.tag);
+        if (entries.length === 0) {
+          continue;
+        }
+        const expected = mapAngularTagToWxml(entries[0].tag as string);
+        compared++;
+        if (expected !== wtag) {
+          violations.push(
+            `${cmp} 块 ${b.name} 下标 ${idx}: wxml=<${wtag}> ` +
+              `但 Angular 是 "${entries[0].tag}"，映射后应为 <${expected}>`
+          );
+        }
+      }
+    }
+  }
+  return { violations, compared };
 }
 
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
@@ -504,12 +566,17 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
      * </template> 处截断，把外层模板的闭合残尾留在根区，导致根区
      * 引用了不属于它的下标（ControlFlowComponent 就是这么栽的）。
      */
-    type Block = { name: string; indices: Set<number> };
+    type Block = {
+      name: string;
+      indices: Set<number>;
+      content: string;
+    };
 
     function splitWxmlBlocks(wxml: string): Block[] {
       return splitWxmlTopLevelBlocks(wxml).map((b) => ({
         name: b.name,
         indices: nodeListIndices(b.content),
+        content: b.content,
       }));
     }
 
@@ -687,6 +754,101 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         uncoveredNamedBlocks: [],
       });
     }, 600000);
+
+    it('标签类型对应：wxml 承载某下标的标签，必须等于 Angular 该槽标签经映射', async () => {
+      /**
+       * 纯下标断言抓不到「下标对但节点类型错」——
+       * 比如 index 3 在 Angular 是 div、wxml 写成 text，下标仍然覆盖。
+       *
+       * 这里比对两端**类型**：
+       *   wxml 侧：承载 `nodeList[i].class` 的那个元素的标签名
+       *   Angular 侧：`ɵɵelementStart(i, tag)` 的 tag
+       * 经 `mapAngularTagToWxml`（与 element.ts 同源）换算后必须相等。
+       */
+      const c = await load();
+      const { violations, compared } = checkTagCorrespondence(
+        c.blocksByComponent as never,
+        c.trees as never
+      );
+      console.log(`标签比对对数: ${compared}`);
+      expect(compared)
+        .withContext('比对数为 0 说明本断言空跑，没有真正校验任何东西')
+        .toBeGreaterThan(50);
+      expect(violations).toEqual([]);
+    });
+
+    it('反向对照：篡改 wxml 承载标签后，类型校验必须报违规', async () => {
+      /**
+       * 关键：走的是与正向**同一个** checkTagCorrespondence，
+       * 只是把 wxml 内容里的承载标签换掉。
+       * 若这条不失败，说明类型校验是摆设。
+       */
+      const c = await load();
+
+      // 找一个真实的 view 承载元素
+      let target: {
+        cmp: string;
+        blockName: string;
+        idx: number;
+        snippet: string;
+      } | null = null;
+      outer: for (const [cmp, blocks] of c.blocksByComponent) {
+        for (const b of blocks) {
+          const tags = wxmlTagsByIndex(b.content);
+          for (const [idx, tag] of tags) {
+            if (tag === 'view') {
+              const snippet = `<view  class="{{nodeList[${idx}].class}}"`;
+              if (b.content.includes(snippet)) {
+                target = { cmp, blockName: b.name, idx, snippet };
+                break outer;
+              }
+            }
+          }
+        }
+      }
+      expect(target)
+        .withContext('没找到可篡改的 view 承载元素，无法构造反向对照')
+        .not.toBeNull();
+      const t = target as {
+        cmp: string;
+        blockName: string;
+        idx: number;
+        snippet: string;
+      };
+
+      // 篡改：view → text（合法 wxml 标签，但类型错）
+      const tamperedBlocks = new Map<
+        string,
+        typeof c.blocksByComponent extends Map<string, infer B> ? B : never
+      >();
+      for (const [cmp, blocks] of c.blocksByComponent) {
+        tamperedBlocks.set(
+          cmp,
+          blocks.map((b) =>
+            cmp === t.cmp && b.name === t.blockName
+              ? {
+                  ...b,
+                  content: b.content.replace(
+                    t.snippet,
+                    t.snippet.replace('<view', '<text')
+                  ),
+                }
+              : b
+          )
+        );
+      }
+
+      const { violations } = checkTagCorrespondence(
+        tamperedBlocks as never,
+        c.trees as never
+      );
+      const hit = violations.filter((v) => v.includes(`下标 ${t.idx}`));
+      expect(hit.length)
+        .withContext(
+          `篡改 ${t.cmp} 下标 ${t.idx} 的承载标签为 <text> 后，校验未报违规 → 类型校验是摆设`
+        )
+        .toBeGreaterThan(0);
+    });
 
     it('反向对照：篡改某个模板块下标后，必须识别为不覆盖', async () => {
       const c = await load();
