@@ -28,6 +28,28 @@ const NODE_SLOT_INSTRUCTIONS = new Set([
   'text',
   'template',
   'elementContainer',
+  /**
+   * 本 fork 的 patched 指令名（`ɵɵdom*` 系列）。
+   *
+   * ⚠️ 之前漏了这一组，导致 manifest 只收到 text（偶数下标），
+   * 元素节点（奇数下标）全丢，「按组件精确校验」误报 8 个组件错位。
+   * 实际产物是正确的——是提取器不完整，不是渲染 off-by-one。
+   *
+   * 已核对首参：
+   *   domElementStart(index, ...)          消耗
+   *   domElement(index)                   消耗
+   *   domElementContainer(index, ...)     消耗
+   *   domElementContainerStart(index,..)  消耗
+   *   domTemplate(index, ...)             消耗
+   * 不消耗（无 index 参数，故不列入）：
+   *   domElementEnd() / domElementContainerEnd()
+   *   domListener / domProperty / advance
+   */
+  'domElementStart',
+  'domElement',
+  'domElementContainer',
+  'domElementContainerStart',
+  'domTemplate',
   // 控制流 create 也占节点槽（本 fixture 未出现，但必须计入，
   // 否则又回到「漏算槽位」的老问题）
   'conditionalCreate',

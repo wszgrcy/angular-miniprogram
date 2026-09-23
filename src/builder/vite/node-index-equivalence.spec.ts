@@ -399,15 +399,26 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
        * 用子集断言固化：清单只能缩小，新增即失败。
        * 查清一个就从这里删一个，直到清空。
        */
+      /**
+       * 已修复：原先列了 8 个组件，实为提取器漏了 `ɵɵdom*` 系列指令
+       * （本 fork 的 patched 指令名），导致元素节点全丢、误报 off-by-one。
+       * 补上后 8 → 4。那 4 个不是渲染错位，是我提取不全。
+       *
+       * 剩下 4 个的共同点：重度使用控制流 / 结构型指令。
+       * Angular 把 @if/@for/@ngIf 的分支编译成**独立的顶层模板函数**
+       * （ɵɵtemplate(2, X_Conditional_1_Template, decls, vars, ...)），
+       * 不在主模板函数体内，所以 extractNodeManifest 只收到根视图节点，
+       * 而 wxml 引用了分支视图的下标。
+       *
+       * 下一步：让 extractNodeManifest 顺着 ɵɵtemplate 的第二个参数
+       * 找到那些独立模板函数并一并遍历（每个视图有各自从 0 开始的下标
+       * 空间，需要按视图分组，不能混在一起比）。
+       */
       const KNOWN_PRECISION_GAPS = new Set([
-        'BaseHttpComponent',
-        'BaseTagComponent',
-        'Component3Component',
         'ControlFlowComponent',
         'CustomStructuralDirectiveComponent',
         'DefaultStructuralDirectiveComponent',
         'NgContentComponent',
-        'RootComponent',
       ]);
 
       const newViolations = [
