@@ -16,7 +16,8 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../test/util/file';
-import { runBuilder } from './application';
+// 主测试链路已切到 Vite builder（webpack 链路待删除）
+import { runViteBuilder as runBuilder } from './vite';
 import { PlatformType } from './platform/platform';
 
 const angularConfig = {
@@ -81,11 +82,16 @@ describeBuilder(
             skip(1)
           )
           .subscribe((result) => {
-            expect(result.logs[0].level !== 'error').toBeTruthy();
+            // 同上：Vite 可能不产日志，查全部而不是 logs[0]
+            expect(
+              result.logs.filter((l) => l.level === 'error').map((l) => l.value)
+            ).toEqual([]);
             expect(result).toBeTruthy();
             expect(result.error).toBeFalsy();
             expect(result.result?.success).toBeTruthy();
-            expect(result.logs[0].message).toContain('sub3-entry.js');
+            // 不再断言 logs[0].message 含 sub3-entry.js：
+            // Vite 链路不保证输出这种文件清单日志，而下面 expectFile
+            // 已经直接验了产物文件存在，这条日志断言是冗余的。
             harness
               .expectFile(
                 join(

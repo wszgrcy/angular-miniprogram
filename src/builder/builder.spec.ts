@@ -16,7 +16,8 @@ import {
   ALL_PAGE_NAME_LIST,
   TEST_LIBRARY_COMPONENT_LIST,
 } from '../../test/util/file';
-import { runBuilder } from './application';
+// 主测试链路已切到 Vite builder（webpack 链路待删除）
+import { runViteBuilder as runBuilder } from './vite';
 import { LIBRARY_OUTPUT_ROOTDIR } from './library';
 import { BuildPlatform, PlatformType } from './platform/platform';
 import { getBuildPlatformInjectConfig } from './platform/platform-inject-config';
@@ -63,7 +64,11 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         const result = await harness.executeOnce();
         expect(result).toBeTruthy();
         expect(result.error).toBeFalsy();
-        expect(result.logs[0].level !== 'error').toBeTruthy();
+        // Vite 链路可能不产生日志，logs[0] 会是 undefined；
+        // 本意是「构建没报错」，那就查全部而不是只看第一条。
+        expect(
+          result.logs.filter((l) => l.level === 'error').map((l) => l.value)
+        ).toEqual([]);
         expect(result.result?.success).toBeTruthy();
         const injectList = getBuildPlatformInjectConfig(angularConfig.platform);
         const injector = Injector.create({ providers: injectList });

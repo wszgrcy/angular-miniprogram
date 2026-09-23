@@ -13,7 +13,8 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../test/util/file';
-import { runBuilder } from './application';
+// 主测试链路已切到 Vite builder（webpack 链路待删除）
+import { runViteBuilder as runBuilder } from './vite';
 import { PlatformType } from './platform/platform';
 
 const angularConfig = {

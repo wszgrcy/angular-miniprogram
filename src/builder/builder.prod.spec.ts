@@ -12,7 +12,8 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../test/util/file';
-import { runBuilder } from './application';
+// 主测试链路已切到 Vite builder（webpack 链路待删除）
+import { runViteBuilder as runBuilder } from './vite';
 import { PlatformType } from './platform/platform';
 
 const angularConfig = {
@@ -49,7 +50,14 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const result = await harness.executeOnce();
       expect(result).toBeTruthy();
       expect(result.error).toBeFalsy();
-      expect(result.logs[0].level !== 'error').toBeTruthy();
+      // 不能写 logs[0].level !== 'error'：
+      // 1. Vite 链路可能一条日志都不产生，logs[0] 直接 undefined
+      // 2. 就算有，只看第一条也漏掉了后面的 error
+      // 本意是「构建过程没有报错」，那就该查全部。
+      const errorLogs = result.logs.filter((l) => l.level === 'error');
+      expect({ errorLogs: errorLogs.map((l) => l.value) }).toEqual({
+        errorLogs: [],
+      });
       expect(result.result?.success).toBeTruthy();
     });
   });
