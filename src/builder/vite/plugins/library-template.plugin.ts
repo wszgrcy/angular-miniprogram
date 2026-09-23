@@ -18,12 +18,17 @@ import type {
 } from '../../library/type';
 import { BuildPlatform } from '../../platform/platform';
 import { libraryTemplateScopeName, literalResolve } from '../../util';
+import { toPosixPath } from '../../util/asset-path';
 
-/** rollup 不接受以 / 开头的 fileName，devkit 的 join/normalize 会带前导斜杠 */
+/**
+ * 产物路径归一：正斜杠 + 剥前导 `/`。
+ *
+ * devkit 的 join/normalize 会带前导斜杠，rollup 的 emitFile 不接受；
+ * 而 Windows 下若混进反斜杠，会污染 app.js 的 require 字面量
+ * （`\c` 之类无效转义被吃掉）。统一走 toPosixPath。
+ */
 function toRollupFileName(p: string) {
-  return normalize(p)
-    .replace(/^([/\\])+/, '')
-    .replace(/^\.\//, '');
+  return toPosixPath(normalize(p) as string);
 }
 
 export interface LibraryTemplatePluginOptions {

@@ -101,3 +101,22 @@ export function normalizeAssetPatternsSafe(
       : toNativePath(projectSourceRoot)
   );
 }
+
+/**
+ * 产物路径统一成 posix 正斜杠形式。
+ *
+ * **必须做，不是洁癖。** 这些路径最终会进两个只认 `/` 的地方：
+ *
+ * 1. **JS 字符串字面量**。app.js 里生成 `require('./components\c\x.js')`，
+ *    `\c` 在 JS 里是无效转义，会被吃成 `c`，路径直接变成
+ *    `./componentscxs.js`，运行时找不到模块。
+ * 2. **小程序自己的模块解析 / wxml 的 src 引用**，一律正斜杠。
+ *
+ * 而 `path.join` 在 Windows 上产出的是反斜杠，所以凡是
+ * 「参与产物命名」的路径都要过这个函数。
+ *
+ * 顺带剥掉前导 `/`——rollup 的 emitFile fileName 不接受绝对路径。
+ */
+export function toPosixPath(p: string): string {
+  return p.replace(/\\/g, '/').replace(/^\/+/, '').replace(/^\.\//, '');
+}

@@ -23,6 +23,7 @@ import type {
 import { CustomStyleSheetProcessor } from '../../library/stylesheet-processor';
 import { BuildPlatform } from '../../platform/platform';
 import { literalResolve } from '../../util';
+import { toPosixPath } from '../../util/asset-path';
 import { collectAssets } from '../copy-assets';
 
 /**
@@ -216,13 +217,12 @@ export function miniProgramAssetsPlugin(
       const compiledStyles = await compileStyles(styleSources);
 
       const emit = (fileName: string, source: string) => {
-        // Rollup / Rolldown 不接受绝对路径或以 / 开头的 fileName
-        // （webpack 会帮你归一化），这里自己处理。
-        // metaMap 的 key 有些是 `/self-template/self.wxml` 这种带前导斜杠的。
-        const normalized = path
-          .normalize(fileName)
-          .replace(/^([/\\])+/, '')
-          .replace(/^\.\//, '');
+        // 不能用 path.normalize：Windows 上它会把 `/` 转成 `\`，
+        // 产物路径就带上反斜杠，进而污染 app.js 的 require 字面量
+        // （`\c` 之类无效转义被吃掉，路径直接废掉）。
+        // 产物路径一律 posix 正斜杠，并剥掉前导 `/`
+        // （rollup 的 emitFile fileName 不接受绝对路径）。
+        const normalized = toPosixPath(fileName);
         if (!normalized || normalized.startsWith('..')) {
           this.warn(`跳过无法归一化的产物路径: ${fileName}`);
           return;
@@ -371,8 +371,11 @@ export function miniProgramAssetsPlugin(
       for (const chunk of jsChunks) {
         visit(chunk.fileName, visiting);
       }
+      // f 必须过 toPosixPath：Windows 下 chunk fileName 带反斜杠，
+      // 直接塞进 `require('...')` 字面量后 `\c` 这类无效转义会被吃掉，
+      // 路径变成 ./componentscxs.js，运行时找不到模块。
       const requireList = emittedOrder
-        .map((f) => `require('./${f}')`)
+        .map((f) => `require('./${toPosixPath(f)}')`)
         .join(';');
       emit(
         'app.js',

@@ -40,24 +40,24 @@ type ParityHarness = Parameters<Parameters<typeof describeBuilder>[2]>[0];
 
 async function buildSnapshot(
   harness: ParityHarness,
-  outputPath: string,
+  outputPath: string
 ): Promise<Snapshot> {
   const root = harness.host.root();
   const myTestProjectHost = new MyTestProjectHost(harness.host);
   const list = await myTestProjectHost.getFileList(
-    normalize(path.join(root, 'src', '__pages')),
+    normalize(path.join(root, 'src', '__pages'))
   );
   list.push(
     ...(await myTestProjectHost.getFileList(
-      normalize(path.join(root, 'src', '__components')),
-    )),
+      normalize(path.join(root, 'src', '__components'))
+    ))
   );
   await myTestProjectHost.importPathRename(list);
   await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
   await myTestProjectHost.moveDir(
     ALL_COMPONENT_NAME_LIST,
     '__components',
-    'components',
+    'components'
   );
   await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
 
@@ -70,10 +70,10 @@ async function buildSnapshot(
     const errLogs = (result.logs || [])
       .filter((l: { level: string }) => l.level === 'error')
       .map((l: { message?: unknown; value?: unknown }) =>
-        String(l.message ?? l.value),
+        String(l.message ?? l.value)
       );
     throw new Error(
-      `构建失败 (${outputPath}): ${errLogs.join(' ~~ ').slice(0, 1200)}`,
+      `构建失败 (${outputPath}): ${errLogs.join(' ~~ ').slice(0, 1200)}`
     );
   }
 
@@ -106,7 +106,7 @@ const viteSnap = { load: () => Promise.resolve<Snapshot | null>(null) };
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('parity: webpack 侧构建', () => {
     webpackSnap.load = memoize(() =>
-      buildSnapshot(harness, 'dist/parity-webpack'),
+      buildSnapshot(harness, 'dist/parity-webpack')
     );
     it('webpack 构建成功', async () => {
       const snap = await webpackSnap.load();
@@ -156,7 +156,7 @@ describe('parity: webpack vs vite 产物对等', () => {
       [...snap.byName.keys()]
         .filter(
           (k) =>
-            /\.(js)$/.test(k) && /^(pages|components)\/[\w./-]+\.js$/.test(k),
+            /\.(js)$/.test(k) && /^(pages|components)\/[\w./-]+\.js$/.test(k)
         )
         .sort();
     const wEntries = entries(w);
@@ -191,7 +191,7 @@ describe('parity: webpack vs vite 产物对等', () => {
     const v = await viteSnap.load();
     const appJs = v.byName.get('app.js') ?? '';
     const required = [...appJs.matchAll(/require\('\.\/([^']+)'\)/g)].map(
-      (m) => m[1],
+      (m) => m[1]
     );
     expect(required.length).toBeGreaterThan(0);
     const missing = required.filter((f) => !v.byName.has(normalize(f)));
@@ -207,6 +207,17 @@ describe('parity: webpack vs vite 产物对等', () => {
     // 小程序没有模块系统，app.js 靠一串 require 把启动需要的 chunk 拉起来
     expect(wApp).toContain('require(');
     expect(vApp).toContain('require(');
+
+    // require 路径必须是正斜杠。Windows 下若混进反斜杠，
+    // `require('./a\b.js')` 里 `` 会被 JS 当成退格符、`\c` 之类
+    // 直接吃掉反斜杠，路径静默损坏成 `./ab.js`，运行时找不到模块。
+    const badInVite = ((vApp as string).match(/\\/g) || []).length;
+    expect({ badBackslashesInViteApp: badInVite }).toEqual({
+      badBackslashesInViteApp: 0,
+    });
+    // 顺带确认 webpack 侧本来也是干净的（作为对照，说明这条约束不是新加的怪要求）
+    const badInWebpack = ((wApp as string).match(/\\/g) || []).length;
+    expect(badInWebpack).toBe(0);
   }, 600000);
 
   it('wxml 内容逐字节一致', async () => {

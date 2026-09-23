@@ -10,7 +10,7 @@ import * as glob from 'glob';
 import * as path from 'path';
 import type { PagePattern } from '../application/type';
 import type { BuildPlatform } from '../platform/platform';
-import { normalizeAssetPatternsSafe } from '../util/asset-path';
+import { normalizeAssetPatternsSafe , toPosixPath } from '../util/asset-path';
 
 function globAsync(pattern: string, options: glob.IOptions) {
   return new Promise<string[]>((resolvePromise, reject) =>
@@ -180,7 +180,9 @@ export function toRollupInput(
 ): Record<string, string> {
   const input: Record<string, string> = {};
   for (const item of patternList) {
-    input[item.outputFiles.path] = item.src;
+    // key 必须正斜杠：Windows 下 outputFiles.path 是 path.join 出来的
+    // 反斜杠形式，会一路带进 chunk fileName 和 app.js 的 require 字面量
+    input[toPosixPath(item.outputFiles.path)] = item.src;
   }
   return input;
 }
