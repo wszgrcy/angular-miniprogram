@@ -1,3 +1,4 @@
+import { CommonModule } from '@angular/common';
 import {
   ApplicationModule,
   ErrorHandler,
@@ -5,7 +6,6 @@ import {
   RendererFactory2,
   ɵINJECTOR_SCOPE,
 } from '@angular/core';
-import { CommonModule } from 'angular-miniprogram/common';
 import {
   ComponentFinderService,
   MiniProgramRendererFactory,

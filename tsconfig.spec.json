@@ -31,7 +31,8 @@
       "angular-miniprogram/common/http": ["./src/library/common/http/index.ts"],
       // 同 tsconfig.library.json：Angular 22 子路径只靠 exports map，
       // moduleResolution: node 认不出来。
-      "@angular/common/http": ["./node_modules/@angular/common/types/http.d.ts"]
+      "@angular/common/http": ["./node_modules/@angular/common/types/http.d.ts"],
+      "@angular/common": ["./node_modules/@angular/common/types/common.d.ts"]
     }
   },
   "exclude": ["**/fixture/**"],
