@@ -122,6 +122,63 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const snap = await viteSnap.load();
       expect(snap.byName.size).toBeGreaterThan(0);
     }, 600000);
+
+    /**
+     * main.js 必须真的带 app 引导。
+     *
+     * 只断言 app.js require 了 ./main.js 是不够的：main 指到别的文件时
+     * require 照样成立，但小程序起不来。这里直接验内容。
+     */
+    it('main.js 带 platformMiniProgram 引导', async () => {
+      const snap = await viteSnap.load();
+      const main = snap.byName.get('main.js');
+      expect(typeof main).toBe('string');
+      expect(main).toContain('platformMiniProgram');
+      expect(main).toContain('bootstrapModule');
+    }, 600000);
+
+    /**
+     * library 组件的 .js 必须真的调 componentRegistry。
+     *
+     * 这个 entry 是我在 vite 侧新写的（对齐 webpack 的
+     * DynamicLibraryComponentEntryPlugin）。只验「文件存在」不够——
+     * 空文件也存在，但组件注册不上，小程序里组件就是空的。
+     */
+    it('library 组件 entry 调 componentRegistry', async () => {
+      const snap = await viteSnap.load();
+      const libJs = [...snap.byName.entries()].filter(
+        ([name]) => name.startsWith('library/') && name.endsWith('.js')
+      );
+      expect(libJs.length).toBeGreaterThan(0);
+      const missing = libJs
+        .filter(([, src]) => !String(src).includes('componentRegistry'))
+        .map(([name]) => name);
+      expect({ libraryEntriesMissingRegistry: missing }).toEqual({
+        libraryEntriesMissingRegistry: [],
+      });
+    }, 600000);
+
+    /**
+     * page entry 必须真的调 bootstrapPage / pageStartup。
+     * 同理：文件存在不等于会注册成小程序页面。
+     */
+    it('page entry 调 bootstrapPage 或 pageStartup', async () => {
+      const snap = await viteSnap.load();
+      const pageJs = [...snap.byName.entries()].filter(
+        ([name]) => name.startsWith('pages/') && name.endsWith('.js')
+      );
+      expect(pageJs.length).toBeGreaterThan(0);
+      const missing = pageJs
+        .filter(
+          ([, src]) =>
+            !String(src).includes('bootstrapPage') &&
+            !String(src).includes('pageStartup')
+        )
+        .map(([name]) => name);
+      expect({ pageEntriesMissingBootstrap: missing }).toEqual({
+        pageEntriesMissingBootstrap: [],
+      });
+    }, 600000);
   });
 });
 
