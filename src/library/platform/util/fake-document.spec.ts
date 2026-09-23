@@ -21,19 +21,21 @@ describe('fake-document', () => {
     expect(MINI_PROGRAM_FAKE_DOCUMENT.head).toBeDefined();
   });
 
-  it('installFakeDocument 让 Angular 内部 getDocument() 不再抛', async () => {
+  it('installFakeDocument 让 Angular 内部 getDocument() 返回占位物', async () => {
     installFakeDocument();
-    // 从 core 内部拿 getDocument 验证：装了之后不应抛
     const core = await import('@angular/core');
     const getDocument = (core as unknown as { ɵgetDocument?: () => Document })
       .ɵgetDocument;
-    if (getDocument) {
-      expect(() => getDocument()).not.toThrow();
-      expect(getDocument()).toBe(MINI_PROGRAM_FAKE_DOCUMENT);
-    } else {
-      // 没导出公开名时，退而验证 setDocument 至少被调用过不抛
-      expect(() => installFakeDocument()).not.toThrow();
-    }
+
+    // 必须存在。之前写成 `if (getDocument) {...} else {宽松兜底}`，
+    // 一旦 Angular 改了导出名，这条用例会在什么都没验证的情况下通过，
+    // 而真正要防的 NG0210 又回来了。所以这里 fail fast。
+    expect(getDocument)
+      .withContext('ɵgetDocument 应从 @angular/core 导出')
+      .toBeInstanceOf(Function);
+
+    expect(() => getDocument()).not.toThrow();
+    expect(getDocument()).toBe(MINI_PROGRAM_FAKE_DOCUMENT);
   });
 
   it('provider 指向同一个占位物', () => {
