@@ -930,3 +930,65 @@ wxml 里没有对应元素是正常的。
 
 三个根因（链式 codegen / 嵌套具名模板切分 / repeater 锚点槽）
 都是**提取器与分块器**的缺陷，产物本身一直是对的。
+
+## 半运行时测试（进行中）
+
+### 目标
+
+在 Node 里 boot 真实组件，拿 `getPageRefreshContext` 产出的**真实
+`nodeList`**，与页面 wxml 的下标需求比对：
+
+  nodeList.length  必须 >  wxml 里最大的 nodeList[k]
+
+现有 `lview-to-node-list.spec.ts` 用的是**合成** lView（N 是编的），
+只验证下标算术，没跟真实 wxml 比对。这条补上后，「运行时数据是否
+超出 wxml 索引范围」就是**测出来的**，不是推断的。
+
+### 已铺好的前置（已提交 4d5bf73）
+
+| 障碍 | 解法 |
+|---|---|
+| 50 处包自引用 Node 运行时解析不了 | `tsconfig-paths` 挂 `Module._resolveFilename` |
+| `MINIPROGRAM_GLOBAL = wx` 直接引用全局 | Proxy 兜底装 `wx` + `App`/`Page`/`Component`/`getApp`/`getCurrentPages` |
+
+### 关于 zone 的澄清
+
+项目**就是 zoneless**，zone.js 连装都没装。真实配置在 app 的 NgModule：
+
+```ts
+providers: [provideZonelessChangeDetection()]
+```
+
+spike 一度撞 NG0908 是因为用了裸 `createEnvironmentInjector` 且试图
+import `NG_ZONE_CONFIG`（`ɵ` 私有 token，非公开 API）。
+
+### spike 进展（逐关打通）
+
+| 关卡 | 结果 |
+|---|---|
+| 包自引用解析 | ✅ 通 |
+| `wx` / `App` 全局 | ✅ 通 |
+| zone（NG0908） | ✅ 用 `provideZonelessChangeDetection()` 后消失 |
+| `RendererFactory2`（NG0407） | ✅ 提供 `MiniProgramRendererFactory` 后解决 |
+| `ChangeDetectionSchedulerImpl`（NG0201） | ❌ **当前卡点** |
+
+### 当前卡点与下一步
+
+`provideZonelessChangeDetection()` 内部用 `makeEnvironmentProviders()`，
+那是给**真实 bootstrap 路径**用的；裸 `createEnvironmentInjector`
+不会展开它，于是 `ChangeDetectionScheduler → ChangeDetectionSchedulerImpl`
+注入失败。
+
+`bootstrapApplication` 也不可用——`@angular/platform-browser` 没装
+（与本 fork 不用 DOM 一致）。
+
+**下一步**：走 fork 自己的 bootstrap，即
+`platformMiniProgram().bootstrapModule(SomeModule)`，其中 SomeModule 带
+`providers: [provideZonelessChangeDetection()]` 与
+`imports: [MiniProgramModule]`（renderer 来自后者）。
+`bootstrapModule` 会正确建立 platform / module / 环境 injector 三层，
+`makeEnvironmentProviders` 才会被展开。
+
+拿到真实 `nodeList` 后，比对逻辑接现有件即可：
+wxml 侧用 `nodeListIndices()`（`test/util/wxml-blocks.ts`），
+运行时侧用 `getPageRefreshContext(lView).nodeList.length`。
