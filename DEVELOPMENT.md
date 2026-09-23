@@ -1038,3 +1038,61 @@ boot 出来的数据：
    与已构建产物 wxml 比对：
    `nodeList.length > max(nodeListIndices(wxml))`
    wxml 侧用 `test/util/wxml-blocks.ts` 的 `nodeListIndices()`。
+
+### 本轮排查结论：JIT 这条路走不通（已定位根因）
+
+试过把测试用的 `@NgModule` 移出 spec、独立成 fixture 文件、空 ctor、
+`DoBootstrap` 手动挂 standalone 组件 —— 仍然 NG0202。
+
+**根因**：`tsconfig.base.json` 里 `emitDecoratorMetadata` 是**注释掉的**：
+
+```jsonc
+"experimentalDecorators": true
+// "emitDecoratorMetadata": true,     ← 没开
+```
+
+没有它，JIT 拿不到 `design:paramtypes`，于是
+`MiniProgramModule.constructor(pageService)` / `PageService` 的 4 参 ctor
+全部无法解析 → NG0202。
+
+在 `tsconfig.spec.json` 里单独打开 `emitDecoratorMetadata` **也没用**
+—— 与 `static-injector` 的 transformer 冲突（该 transformer 自己处理
+DI，走的是另一套元数据，Angular 的 JIT 读不到）。
+
+所以：**`platformMiniProgram().bootstrapModule()` 这条 JIT 路在本仓库
+的编译设置下走不通**。库能正常构建是因为走的是 AOT 式 transform，
+不是 JIT。
+
+### 同时确认的事实
+
+`node_modules/@angular/core/fesm2022/_pending_tasks-chunk.mjs`:
+
+  const HEADER_OFFSET = 27
+
+**我们的 `LVIEW.HEADER_OFFSET = 27` 是对的**，之前怀疑它错了可以排除。
+
+### 剩下的真问题
+
+裸 `createEnvironmentInjector` 能 boot（拿到真实 lView / nodeList），
+但 `nodeList.length = 1` 而 `decls = 6`。缺的是**完整的 create pass**，
+而它需要 `ApplicationRef`（`attachView`）—— 裸 injector 里没有
+`ApplicationRef`（NG0201）。
+
+于是形成闭环死结：
+
+| 路径 | 缺什么 |
+|---|---|
+| 裸 injector | 缺 `ApplicationRef` → create pass 不完整 |
+| 真实 `bootstrapModule` | JIT 元数据缺失 → NG0202 |
+
+### 若要继续，两条可选路（都需要新增件）
+
+1. **加 `@internal` 测试专用 bootstrap**：在库里写一个函数，手工建立
+   `ApplicationRef` + 完整 injector（不经 JIT），用 `@internal` 注释
+   不对外导出。工作量中等，但要碰 Angular 内部装配逻辑。
+
+2. **改用 karma 真实运行时**：`test/hello-world-app/src/spec/**` 那套
+   已经在真实小程序运行时里跑（`getCurrentPages()`）。在那里读
+   `nodeList` 与 wxml 比对，天然完整。需要小程序模拟器环境。
+
+**推荐 2** —— 那条路已经在跑，且测的是真实运行时而非模拟装配。
