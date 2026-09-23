@@ -20,7 +20,11 @@
       "angular-miniprogram/platform/type": ["./platform/type/index.ts"],
       "angular-miniprogram/platform": ["./platform/index.ts"],
       "angular-miniprogram/common": ["./common/index.ts"],
-      "angular-miniprogram/common/http": ["./common/http/index.ts"]
+      "angular-miniprogram/common/http": ["./common/http/index.ts"],
+      // Angular 22 的 `@angular/common/http` 只靠 exports map 暴露子路径，
+      // 不再提供 node10 兼容的 `http/` 目录，moduleResolution: node 认不出来，
+      // 这里显式指到类型入口。
+      "@angular/common/http": ["../../node_modules/@angular/common/types/http.d.ts"]
     }
   },
   "exclude": [

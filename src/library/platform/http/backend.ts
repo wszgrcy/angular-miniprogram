@@ -10,7 +10,7 @@ import {
   HttpRequest,
   HttpResponse,
   HttpUploadProgressEvent,
-} from 'angular-miniprogram/common/http';
+} from '@angular/common/http';
 import { MiniProgramCore } from 'angular-miniprogram/platform/wx';
 import {
   ɵChangeDetectionScheduler as ChangeDetectionScheduler,

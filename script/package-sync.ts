@@ -28,6 +28,18 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
       '/packages/forms',
       '!/packages/common/test',
       '!/packages/forms/test',
+      /**
+       * 不再同步 `packages/common/http`。
+       *
+       * 小程序只需要替换传输层，而 Angular 已经把 `HttpBackend` 设计成
+       * 可插拔接缝——`platform/http/MiniprogramHttpBackend` 用
+       * `wx.request` 实现它就够了。整个 http 包（约 9000 行）里
+       * xhr / jsonp / xsrf / transfer_cache / fetch 在小程序里全是死代码。
+       *
+       * 现在 `angular-miniprogram/common/http` 改为薄再导出
+       * `@angular/common/http`，对外 API 不变，源码不再 vendor。
+       */
+      '!/packages/common/http',
       '!**/*.bazel',
       '!**/*spec.ts',
       '!**/*.js',

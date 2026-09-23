@@ -1,5 +1,5 @@
 import { NgModule } from '@angular/core';
-import { withInterceptorsFromDi } from 'angular-miniprogram/common/http';
+import { withInterceptorsFromDi } from '@angular/common/http';
 import { provideHttpClient } from './provider';
 
 @NgModule({

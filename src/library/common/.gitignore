@@ -3,3 +3,6 @@
 !ng-package.json
 !/http
 !/http/ng-package.json
+# http 不再由 sync 生成，改为手写薄再导出层，需进版本库
+!/http/index.ts
+!/http/public_api.ts

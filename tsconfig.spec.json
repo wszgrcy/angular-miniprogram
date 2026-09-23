@@ -28,7 +28,10 @@
       ],
       "angular-miniprogram/platform": ["./src/library/platform/index.ts"],
       "angular-miniprogram/common": ["./src/library/common/index.ts"],
-      "angular-miniprogram/common/http": ["./src/library/common/http/index.ts"]
+      "angular-miniprogram/common/http": ["./src/library/common/http/index.ts"],
+      // 同 tsconfig.library.json：Angular 22 子路径只靠 exports map，
+      // moduleResolution: node 认不出来。
+      "@angular/common/http": ["./node_modules/@angular/common/types/http.d.ts"]
     }
   },
   "exclude": ["**/fixture/**"],
