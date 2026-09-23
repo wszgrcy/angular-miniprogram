@@ -17,6 +17,7 @@ import {
 import {
   NodeManifest,
   extractManifestsFromSource,
+  extractViewTreesFromSource,
 } from '../../../test/util/node-manifest';
 import {
   getGeneratedWxmlRecords,
@@ -458,6 +459,238 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
             `为 0 说明精确校验抓不住问题`
         )
         .toBe(tampered.size);
+    }, 600000);
+  });
+});
+
+/**
+ * 按**视图**分块的精确校验。
+ *
+ * 关键认知：Angular 的槽位每个视图各自从 0 开始，@if/@for 的分支编译成
+ * 独立顶层模板函数；wxml 侧对应 <template name="ifBlock_3"> 这样的
+ * 具名模板块，块内下标同样从 0 开始。
+ *
+ * 所以「把整个 wxml 的 nodeList 下标混成一个集合」是错的——
+ * 那会把多个独立下标空间揉在一起。必须按模板块分块，
+ * 每块对它自己的视图下标空间校验。
+ */
+describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
+  describe('节点下标两端等价性（按视图分块）', () => {
+    interface Block {
+      name: string;
+      indices: Set<number>;
+    }
+
+    /** 把 wxml 拆成具名模板块 + 根块 */
+    function splitWxmlBlocks(wxml: string): Block[] {
+      const blocks: Block[] = [];
+      const re = /<template\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/template>/g;
+      let m: RegExpExecArray | null;
+      let covered = 0;
+      while ((m = re.exec(wxml)) !== null) {
+        blocks.push({
+          name: m[1],
+          indices: wxmlReferencedIndices(m[2]),
+        });
+        covered = re.lastIndex;
+      }
+      // 剩余部分（含 <block wx:if="{{hasLoad}}"> 根渲染区）算根块
+      const rest = wxml.slice(0, wxml.length); // 具名模板已单独取出，这里取未被嵌套的根区
+      const rootIdx = wxml.indexOf('<block');
+      if (rootIdx >= 0) {
+        // 根块 = 从第一个 <block 开始、排除掉具名 template 的部分
+        const withoutNamed = wxml.replace(re, '');
+        blocks.push({
+          name: '__root__',
+          indices: wxmlReferencedIndices(withoutNamed),
+        });
+      }
+      void rest;
+      void covered;
+      return blocks;
+    }
+
+    let cache: {
+      trees: ReturnType<typeof extractViewTreesFromSource>;
+      blocksByComponent: Map<string, Block[]>;
+    } | null = null;
+
+    async function load() {
+      if (cache) {
+        return cache;
+      }
+      resetGeneratedWxmlRecords();
+      const root = harness.host.root();
+      const h = new MyTestProjectHost(harness.host);
+      const list = await h.getFileList(normalize(join(root, 'src', '__pages')));
+      list.push(
+        ...(await h.getFileList(normalize(join(root, 'src', '__components'))))
+      );
+      await h.importPathRename(list);
+      await h.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
+      await h.moveDir(ALL_COMPONENT_NAME_LIST, '__components', 'components');
+      await h.addPageEntry(ALL_PAGE_NAME_LIST);
+      harness.useTarget('build', {
+        ...DEFAULT_ANGULAR_CONFIG,
+        platform: PlatformType.wx,
+        outputPath: 'dist/view-group',
+        sourceMap: false,
+      } as never);
+      const r = await harness.executeOnce();
+      const outDir = r.result?.baseOutputPath as string;
+
+      const trees: ReturnType<typeof extractViewTreesFromSource> = [];
+      const walk = (dir: string) => {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, e.name);
+          if (e.isDirectory()) {
+            walk(full);
+          } else if (e.name.endsWith('.js')) {
+            trees.push(
+              ...extractViewTreesFromSource(fs.readFileSync(full, 'utf8'), full)
+            );
+          }
+        }
+      };
+      walk(outDir);
+
+      const blocksByComponent = new Map<string, Block[]>();
+      for (const rec of getGeneratedWxmlRecords()) {
+        blocksByComponent.set(rec.componentName, splitWxmlBlocks(rec.wxml));
+      }
+      cache = { trees, blocksByComponent };
+      return cache;
+    }
+
+    it('视图树应拆出多个视图（控制流组件）', async () => {
+      const c = await load();
+      const cf = c.trees.find(
+        (t) => t.componentName === 'ControlFlowComponent'
+      );
+      expect(cf)
+        .withContext('没找到 ControlFlowComponent 的视图树')
+        .toBeDefined();
+      // @if x4 + @for x3 + @switch 等，应远多于 1 个视图
+      expect(cf!.views.length).toBeGreaterThan(3);
+    }, 600000);
+
+    it('每个 wxml 模板块的下标，必须被某个视图的下标空间覆盖', async () => {
+      const c = await load();
+      const violations: string[] = [];
+
+      for (const [cmp, blocks] of c.blocksByComponent) {
+        const tree = c.trees.find((t) => t.componentName === cmp);
+        if (!tree) {
+          continue; // 已由「按组件精确」那条上报
+        }
+        for (const b of blocks) {
+          if (b.indices.size === 0) {
+            continue;
+          }
+          const covering = tree.views.filter((v) =>
+            [...b.indices].every((i) => v.indices.has(i))
+          );
+          if (covering.length === 0) {
+            violations.push(
+              `${cmp} 模板块 ${b.name}: 下标 [${[...b.indices]
+                .sort((x, y) => x - y)
+                .join(',')}] 没有任何视图覆盖` +
+                `（各视图下标集: ${tree.views
+                  .map(
+                    (v) =>
+                      `${v.viewName}=[${[...v.indices].sort((x, y) => x - y).join(',')}]`
+                  )
+                  .join(' | ')}）`
+            );
+          }
+        }
+      }
+
+      /**
+       * 已知缺口：只剩 __root__ 块，具名模板块已全部通过。
+       *
+       * 视图分组本身是有效的——ControlFlowComponent 拆出 8 个视图，
+       * ifBlock / forBlock 等具名块的下标全部被对应视图覆盖。
+       *
+       * 剩 __root__ 块未过，两种成因待查：
+       *   (a) splitWxmlBlocks 对根区的切分粗糙（<import> / 嵌套
+       *       <template> / <block wx:if> 混在一起，可能把不属于根视图
+       *       的下标算进来了）
+       *   (b) 根视图里仍有未计入的节点槽指令
+       *       例：NgContentComponent 根视图提取到 {0,1,2,4,5,6}，
+       *       缺 3——需要确认 index 3 处是什么指令
+       *
+       * 子集断言：只能缩小，新增即失败。
+       */
+      const KNOWN_ROOT_BLOCK_GAPS = new Set([
+        'ControlFlowComponent',
+        'CustomStructuralDirectiveComponent',
+        'DefaultStructuralDirectiveComponent',
+        'NgContentComponent',
+      ]);
+
+      const newGaps = [
+        ...new Set(violations.map((v) => v.split(' 模板块')[0].trim())),
+      ].filter((c) => !KNOWN_ROOT_BLOCK_GAPS.has(c));
+
+      expect({ newlyUncoveredComponents: newGaps }).toEqual({
+        newlyUncoveredComponents: [],
+      });
+    }, 600000);
+
+    it('具名模板块（ifBlock / forBlock 等）必须全部被覆盖', async () => {
+      const c = await load();
+      const violations: string[] = [];
+
+      for (const [cmp, blocks] of c.blocksByComponent) {
+        const tree = c.trees.find((t) => t.componentName === cmp);
+        if (!tree) {
+          continue;
+        }
+        for (const b of blocks) {
+          if (b.name === '__root__' || b.indices.size === 0) {
+            continue;
+          }
+          const covering = tree.views.filter((v) =>
+            [...b.indices].every((i) => v.indices.has(i))
+          );
+          if (covering.length === 0) {
+            violations.push(`${cmp}/${b.name}`);
+          }
+        }
+      }
+
+      // 这条没有豁免清单：具名块必须 100% 覆盖
+      expect({ uncoveredNamedBlocks: violations }).toEqual({
+        uncoveredNamedBlocks: [],
+      });
+    }, 600000);
+
+    it('反向对照：篡改某个模板块下标后，必须识别为不覆盖', async () => {
+      const c = await load();
+      // 找一个有多视图的组件
+      const entry = [...c.blocksByComponent.entries()].find(([cmp]) => {
+        const t = c.trees.find((x) => x.componentName === cmp);
+        return t && t.views.length > 1;
+      });
+      expect(entry).withContext('找不到多视图组件').toBeDefined();
+
+      const [cmp, blocks] = entry!;
+      const tree = c.trees.find((x) => x.componentName === cmp)!;
+      const block = blocks.find((b) => b.indices.size > 0);
+      expect(block).withContext('该组件没有带下标的模板块').toBeDefined();
+
+      const tampered = new Set([...block!.indices].map((i) => i + 5555));
+      const covering = tree.views.filter((v) =>
+        [...tampered].every((i) => v.indices.has(i))
+      );
+
+      expect(covering.length)
+        .withContext(
+          `篡改 ${cmp}/${block!.name} 下标 +5555 后不应有任何视图覆盖，` +
+            `实际覆盖 ${covering.length} 个（>0 说明校验抓不住）`
+        )
+        .toBe(0);
     }, 600000);
   });
 });

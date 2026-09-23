@@ -220,3 +220,215 @@ export function extractManifestsFromSource(
   visit(sf);
   return manifests;
 }
+
+/* ------------------------------------------------------------------ *
+ * 视图分组（view grouping）
+ * ------------------------------------------------------------------ *
+ *
+ * Angular 的槽位是**每个视图各自从 0 开始**的（allocateSlots 注释：
+ * "Slot indices start at 0 for each view (and are not unique between
+ * views)"）。@if / @for / @ngIf 的分支会被编译成**独立的顶层模板函数**
+ * （如 X_Conditional_1_Template），通过
+ *   ɵɵtemplate(rootSlot, X_Conditional_1_Template, decls, vars, ...)
+ * 挂在父视图的某个槽上。
+ *
+ * 对应到 wxml 侧，每个嵌入视图是一个具名模板：
+ *   <template name="ifBlock_3">...nodeList[0]...</template>
+ * 块内下标同样从 0 开始。
+ *
+ * 所以校验必须**按视图分块**进行。把整个 wxml 文件的 nodeList 下标
+ * 混成一个集合是错的——那会把多个独立下标空间揉在一起，
+ * 既可能假通过也可能假失败。
+ */
+
+export interface ViewManifest {
+  /** Angular 模板函数名，如 ControlFlowComponent_Conditional_1_Template */
+  viewName: string;
+  entries: ManifestEntry[];
+  indices: Set<number>;
+  nodeCount: number;
+  /** 本视图引用的子视图：父槽 -> 子模板函数名 */
+  childRefs: { slot: number; fnName: string }[];
+}
+
+export interface ComponentViewTree {
+  componentName: string;
+  /** 含根视图在内的所有视图 */
+  views: ViewManifest[];
+  root: ViewManifest;
+}
+
+/** 引用子模板函数的指令 */
+const TEMPLATE_REF_INSTRUCTIONS = new Set([
+  'template',
+  'domTemplate',
+  'conditionalCreate',
+  'conditionalBranchCreate',
+  'repeaterCreate',
+  'switchCreate',
+]);
+
+function collectTopLevelFunctions(
+  sf: ts.SourceFile
+): Map<string, ts.FunctionLikeDeclaration> {
+  const map = new Map<string, ts.FunctionLikeDeclaration>();
+  const add = (name: string, fn: ts.FunctionLikeDeclaration) => {
+    if (!map.has(name)) {
+      map.set(name, fn);
+    }
+  };
+  for (const stmt of sf.statements) {
+    if (ts.isFunctionDeclaration(stmt) && stmt.name) {
+      add(stmt.name.text, stmt);
+    } else if (ts.isVariableStatement(stmt)) {
+      for (const d of stmt.declarationList.declarations) {
+        if (
+          ts.isIdentifier(d.name) &&
+          d.initializer &&
+          (ts.isFunctionExpression(d.initializer) ||
+            ts.isArrowFunction(d.initializer))
+        ) {
+          add(d.name.text, d.initializer);
+        }
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * 把一个模板函数（含其引用到的所有子模板函数）拆成按视图分组的清单。
+ */
+export function extractViewTree(
+  rootFn: ts.FunctionLikeDeclaration,
+  rootViewName: string,
+  fnMap: Map<string, ts.FunctionLikeDeclaration>,
+  componentName: string
+): ComponentViewTree {
+  const views: ViewManifest[] = [];
+  const visited = new Set<string>();
+
+  const buildView = (fn: ts.FunctionLikeDeclaration, viewName: string) => {
+    if (visited.has(viewName)) {
+      return;
+    }
+    visited.add(viewName);
+
+    const entries: ManifestEntry[] = [];
+    const childRefs: { slot: number; fnName: string }[] = [];
+    const seen = new Set<ts.Node>();
+
+    const walk = (node: ts.Node) => {
+      if (seen.has(node)) {
+        return;
+      }
+      seen.add(node);
+
+      if (ts.isCallExpression(node)) {
+        const name = instructionName(node.expression);
+        if (name) {
+          const idx = firstArgAsNumber(node);
+          if (idx !== undefined && NODE_SLOT_INSTRUCTIONS.has(name)) {
+            entries.push({
+              index: idx,
+              instruction: name,
+              tag: secondArgAsString(node),
+            });
+          }
+          // 引用子视图：第二个参数是模板函数标识符
+          if (
+            idx !== undefined &&
+            TEMPLATE_REF_INSTRUCTIONS.has(name) &&
+            node.arguments[1] &&
+            ts.isIdentifier(node.arguments[1])
+          ) {
+            const fnName = node.arguments[1].text;
+            childRefs.push({ slot: idx, fnName });
+            const childFn = fnMap.get(fnName);
+            if (childFn) {
+              buildView(childFn, fnName);
+            }
+          }
+        }
+      }
+      ts.forEachChild(node, walk);
+    };
+
+    walk(fn);
+
+    const indices = new Set(entries.map((e) => e.index));
+    const max = indices.size > 0 ? Math.max(...indices) : -1;
+    views.push({
+      viewName,
+      entries,
+      indices,
+      nodeCount: max + 1,
+      childRefs,
+    });
+  };
+
+  buildView(rootFn, rootViewName);
+  const root = views[0];
+  return { componentName, views, root };
+}
+
+/** 从源码提取每个组件的视图树 */
+export function extractViewTreesFromSource(
+  source: string,
+  fileName: string
+): ComponentViewTree[] {
+  const sf = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  const fnMap = collectTopLevelFunctions(sf);
+  const trees: ComponentViewTree[] = [];
+
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node)) {
+      const name = instructionName(node.expression);
+      if (name === 'defineComponent') {
+        const arg = node.arguments[0];
+        if (arg && ts.isObjectLiteralExpression(arg)) {
+          const get = (prop: string) =>
+            arg.properties.find(
+              (p) =>
+                ts.isPropertyAssignment(p) &&
+                p.name.getText(sf).replace(/['"]/g, '') === prop
+            ) as ts.PropertyAssignment | undefined;
+
+          const typeProp = get('type');
+          const cmpName =
+            typeProp && ts.isIdentifier(typeProp.initializer)
+              ? typeProp.initializer.text
+              : 'Anonymous';
+          const tplProp = get('template');
+          const tpl = tplProp?.initializer;
+
+          let fn: ts.FunctionLikeDeclaration | undefined;
+          let viewName = `${cmpName}_Template`;
+          if (
+            tpl &&
+            (ts.isFunctionExpression(tpl) || ts.isArrowFunction(tpl))
+          ) {
+            fn = tpl;
+          } else if (tpl && ts.isIdentifier(tpl)) {
+            // hoisted: template: X_Template
+            fn = fnMap.get(tpl.text);
+            viewName = tpl.text;
+          }
+
+          if (fn) {
+            trees.push(extractViewTree(fn, viewName, fnMap, cmpName));
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sf);
+  return trees;
+}
