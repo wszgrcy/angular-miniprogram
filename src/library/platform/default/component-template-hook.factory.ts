@@ -9,15 +9,14 @@ import type {
 } from 'angular-miniprogram/platform/type';
 import { AgentNode } from './agent-node';
 import { diffNodeData } from './diff-node-data';
-// packages\core\src\render3\interfaces\view.ts
-const CLEANUP = 7;
-// CONTEXT
-export const LVIEW_CONTEXT = 8;
-export const INJECTOR = 9;
-// packages\core\src\render3\interfaces\container.ts
-const VIEW_REFS = 8;
-// packages\core\src\render3\interfaces\view.ts HEADER_OFFSET
-const HEADER_OFFSET = 27;
+import { LVIEW } from './lview-layout';
+
+// 这些下标统一由 util/lview-layout 提供（单一真源），
+// 不在本文件重复定义——它们会随 Angular 版本变化，
+// 集中一处才配得上配套的交叉校验。
+//
+// 历史上本文件曾 re-export LVIEW_CONTEXT / INJECTOR 两个裸常量，
+// 现已收归 LVIEW.CONTEXT / LVIEW.INJECTOR。
 
 const linkMap = new Map<LView, any>();
 const nodePathMap = new Map<LView, NodePath>();
@@ -63,33 +62,33 @@ function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
   const tView = lView[1];
   const end = tView.bindingStartIndex;
   const nodeList: MPView['nodeList'] = [];
-  for (let index = HEADER_OFFSET; index < end; index++) {
+  for (let index = LVIEW.HEADER_OFFSET; index < end; index++) {
     const item = lView[index];
     if (item instanceof AgentNode) {
-      nodeList[index - HEADER_OFFSET] = item.toView();
+      nodeList[index - LVIEW.HEADER_OFFSET] = item.toView();
     } else if (item && item[1] === true) {
       const lContainerList: MPView[] = [];
-      const viewRefList: any[] = item[VIEW_REFS] || [];
+      const viewRefList: any[] = item[LVIEW.CONTAINER_VIEW_REFS] || [];
       viewRefList.forEach((item, itemIndex) => {
         const nodePath = [
           ...parentNodePath,
           'directive',
-          index - HEADER_OFFSET,
+          index - LVIEW.HEADER_OFFSET,
           itemIndex,
         ];
         lContainerList.push({
-          __templateName: item._lView[LVIEW_CONTEXT]
-            ? item._lView[LVIEW_CONTEXT].__templateName
+          __templateName: item._lView[LVIEW.CONTEXT]
+            ? item._lView[LVIEW.CONTEXT].__templateName
             : undefined,
           nodeList: lViewToWXView(item._lView, nodePath),
           nodePath: nodePath,
           index: lContainerList.length,
         });
       });
-      nodeList[index - HEADER_OFFSET] = lContainerList;
+      nodeList[index - LVIEW.HEADER_OFFSET] = lContainerList;
     } else {
       // todo
-      nodeList[index - HEADER_OFFSET] = {} as any;
+      nodeList[index - LVIEW.HEADER_OFFSET] = {} as any;
     }
   }
   return nodeList;
@@ -130,12 +129,12 @@ export function resolveNodePath(list: NodePath): any {
     const item = list.shift()!;
     if (item === 'directive') {
       const index = list.shift()! as number;
-      const lContainer = lView[index + HEADER_OFFSET];
+      const lContainer = lView[index + LVIEW.HEADER_OFFSET];
       const child = list.shift() as number;
-      const viewRef = lContainer[VIEW_REFS][child];
+      const viewRef = lContainer[LVIEW.CONTAINER_VIEW_REFS][child];
       lView = viewRef['_lView'];
     } else {
-      lView = lView[HEADER_OFFSET + item];
+      lView = lView[LVIEW.HEADER_OFFSET + item];
     }
   }
   return lView;
@@ -146,12 +145,12 @@ export function findCurrentElement(lView: LView, list: NodePath = []) {
     const item = list.shift()!;
     if (item === 'directive') {
       const index = list.shift() as number;
-      const lContainer = lView[index + HEADER_OFFSET];
+      const lContainer = lView[index + LVIEW.HEADER_OFFSET];
       const child = list.shift() as number;
-      const viewRef = lContainer[VIEW_REFS][child];
+      const viewRef = lContainer[LVIEW.CONTAINER_VIEW_REFS][child];
       lView = viewRef['_lView'];
     } else {
-      lView = lView[item + HEADER_OFFSET];
+      lView = lView[item + LVIEW.HEADER_OFFSET];
     }
   }
 
@@ -163,7 +162,7 @@ export function lViewLinkToMPComponentRef(ref: any, lView: LView) {
 }
 
 export function cleanWhenDestroy(lView: LView, fn: () => void) {
-  const list: Function[] = (lView[CLEANUP] = lView[CLEANUP] || []);
+  const list: Function[] = (lView[LVIEW.CLEANUP] = lView[LVIEW.CLEANUP] || []);
   list.push(() => cleanAll(lView));
   list.push(fn);
 }
@@ -174,7 +173,7 @@ export function cleanAll(lView: LView) {
 }
 
 export function findPageLView(componentRef: ComponentRef<unknown>) {
-  const lView = (componentRef as any)._rootLView[HEADER_OFFSET];
+  const lView = (componentRef as any)._rootLView[LVIEW.HEADER_OFFSET];
 
   index++;
   pageRegistryMap.set(index, lView);

@@ -19,8 +19,6 @@ import type {
 import { AgentNode } from './agent-node';
 import { ComponentFinderService } from './component-finder.service';
 import {
-  INJECTOR,
-  LVIEW_CONTEXT,
   cleanAll,
   cleanWhenDestroy,
   findCurrentElement,
@@ -33,6 +31,7 @@ import {
   setLViewPath,
   updatePath,
 } from './component-template-hook.factory';
+import { LVIEW } from './lview-layout';
 
 export class MiniProgramCoreFactory {
   public MINIPROGRAM_GLOBAL = wx;
@@ -63,9 +62,9 @@ export class MiniProgramCoreFactory {
   ) {
     mpComponentInstance.__isLink = true;
     const lView: LView = resolveNodePath(list);
-    const injector = lView[INJECTOR]!;
+    const injector = lView[LVIEW.INJECTOR]!;
     mpComponentInstance.__lView = lView;
-    mpComponentInstance.__ngComponentInstance = lView[LVIEW_CONTEXT];
+    mpComponentInstance.__ngComponentInstance = lView[LVIEW.CONTEXT];
     mpComponentInstance.__ngComponentInjector = injector;
     const scheduler = injector.get(ChangeDetectionScheduler);
     mpComponentInstance.__ngChangeDetectionScheduler = scheduler;
