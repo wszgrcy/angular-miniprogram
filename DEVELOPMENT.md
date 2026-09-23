@@ -720,7 +720,7 @@ vite.build() 产出 spec 小程序到磁盘
 
 **当前 webpack 链路完全没动**，两套并存，可以随时回退。
 
-## 节点下标两端等价性（进行中）
+## 节点下标两端等价性（已完成）
 
 ### 问题
 
@@ -752,7 +752,7 @@ wxml 里烧的是绝对下标（`nodeList[0]` / `nodeList[2]` / ...），运行�
 
 3. **Angular 用链式调用 codegen**（本轮新发现，见下）。
 
-### 本轮发现：链式调用 codegen（修复未完成）
+### 根因一：链式调用 codegen（已修复）
 
 `ɵɵelementStart` 的返回类型是 `typeof ɵɵelementStart`（**返回自身**），
 所以 Angular 把连续的同类调用写成链：
@@ -772,7 +772,7 @@ wxml 里烧的是绝对下标（`nodeList[0]` / `nodeList[2]` / ...），运行�
 CustomStructuralDirective / DefaultStructuralDirective / NgContent）
 根视图下标缺口的**根因**。
 
-### 下一步（未完成的修复）
+### 修复一：展开调用链
 
 在 `extractNodeManifest` / `extractViewTree` 的 walk 中展开调用链：
 
@@ -791,13 +791,66 @@ function unwrapCallChain(node: ts.CallExpression): ts.CallExpression[] {
 以 `links[0].callee` 的指令名为准，链上每一环都按同一指令处理，
 各自取首参作为节点下标，并把各环加入 `seen` 避免重复计数。
 
-**注意**：本轮尝试该改法时，直接单测显示链未被正确展开
-（`links=1`、`base=undefined`），未能定位原因即因上下文耗尽而回退。
-下次接手请**先写一个最小单测**（内联一段含链式调用的源码，断言 indices
-完整），确认提取器行为后再改 walk，不要直接改 walk 再跑大测试。
+**踩坑记录**：TypeScript 的 `CallExpression` 表示被调用方是
+**`.expression`**，不是 ESTree 的 `.callee`。第一版写了 `cur.callee`，
+恒得 `undefined`，链完全展不开。在 100+ spec 的大测试里看不出来，
+在单测里一眼就见了。
+
+**流程教训**：先写最小单测（`src/builder/node-manifest-unit.spec.ts`，
+5 条，秒级反馈）确认提取器行为，再改 walk。上一轮直接改 walk 跑大测试，
+在噪音里定位不动，白烧一轮上下文。
+
+另外 `extractNodeManifest` 与 `extractViewTree` 是**两份独立的 walk 实现**，
+只改一处不够（漏改时缺口只从 4 降到 4，补上才到 1）。
+
+### 根因二：非贪婪正则切不开嵌套具名模板（已修复）
+
+`splitWxmlBlocks` 用 `/<template name="x">[\s\S]*?<\/template>/g` 切具名
+模板，但 wxml 里具名模板**可以嵌套**：
+
+```html
+<template name="Case_18_Template">
+  <view>
+    <template name="Case_18_Conditional_1_Template"> ... </template>
+  </view>
+</template>
+```
+
+非贪婪 `*?` 在**第一个** `</template>` 处停下，外层模板的闭合残尾
+`</block></view></template>` 留在"根区"里，把不属于根视图的下标
+算了进来。
+
+修复：`test/util/wxml-blocks.ts` 做**标签深度平衡**扫描，嵌套具名模板
+随父块整体带走。
+
+**关键不变量**：不能断言根区「没有 `</template>`」——
+`<template is="x">` **调用**标签本身就带闭合，那是合法的。
+要防的是**孤儿闭合**，所以断言是开/闭标签**数量平衡**。
 
 ### 当前状态
 
-`KNOWN_ROOT_BLOCK_GAPS` 固化了这 4 个组件，子集断言——只能缩小不能扩大。
-具名模板块（ifBlock / forBlock 等）已 100% 覆盖，且有一条无豁免清单的
-断言锁住。
+| 清单 | 演进 | 现状 |
+|---|---|---|
+| `KNOWN_ROOT_BLOCK_GAPS` | 4 → 1 → **0** | 已清空 |
+| `KNOWN_EXTRACTION_GAPS` | 1 → **0** | 已清空 |
+| `KNOWN_PRECISION_GAPS` | 4 → **1** | 仅 `ControlFlowComponent` |
+
+`KNOWN_PRECISION_GAPS` 保留的那一项是**该测试口径本身的局限**，不是产物
+错误：「按组件精确」把组件所有 wxml 下标拍成并集去比，而
+ControlFlowComponent 的 wxml 含大量具名块（`ifBlock_3` / `forBlock_11` /
+`Case_18` ...），那些下标属于**各自子视图**的 0 基空间，混进组件级并集
+必然串。更精确的「按视图分块」测试已**零缺口**覆盖同一批组件。
+
+所有清单仍是子集断言——只能缩小，不会悄悄扩大。
+
+### 验证矩阵（当前）
+
+| 断言 | 覆盖 |
+|---|---|
+| 下标并集两端一致 | 全部组件 |
+| 按组件精确 | 除 ControlFlow（口径局限，已注释说明） |
+| **按视图分块** | **全部，零缺口** |
+| 具名模板块无豁免 | 全部 |
+| 反向对照（假等价必须被抓） | 3 条 |
+| 分块器单测 | 4 条 |
+| 提取器 codegen 形态单测 | 5 条 |
