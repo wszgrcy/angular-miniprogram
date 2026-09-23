@@ -22,6 +22,7 @@ import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
 import { angularCompilerPromise, literalResolve } from '../util';
 import { ComponentCompilerService } from './component-compiler.service';
+import { recordGeneratedWxml } from './manifest-registry';
 import { MetaCollection } from './meta-collection';
 import { ComponentContext } from './parse-node';
 import {
@@ -200,6 +201,16 @@ export class MiniProgramCompilerService {
       );
       this.resolvedDataGroup.outputContent.set(
         componentKey,
+        componentBuildMeta.content
+      );
+
+      // 同源记录：此刻组件身份（componentKey）与生成的 wxml 同时已知，
+      // 配对关系是权威的。供「节点下标两端等价性」测试按组件精确比对，
+      // 避免事后从制品反推配对（会被 code-splitting 打败）。
+      recordGeneratedWxml(
+        componentKey,
+        classDeclaration.name?.getText() ?? '',
+        fileName,
         componentBuildMeta.content
       );
 

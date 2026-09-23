@@ -18,6 +18,10 @@ import {
   NodeManifest,
   extractManifestsFromSource,
 } from '../../../test/util/node-manifest';
+import {
+  getGeneratedWxmlRecords,
+  resetGeneratedWxmlRecords,
+} from '../mini-program-compiler/manifest-registry';
 import { PlatformType } from '../platform/platform';
 import { runViteBuilder as runBuilder } from './index';
 
@@ -141,6 +145,8 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       if (cache) {
         return cache;
       }
+      // 构建前清空注册表，避免跨次构建脏数据
+      resetGeneratedWxmlRecords();
       const root = harness.host.root();
       const h = new MyTestProjectHost(harness.host);
       const list = await h.getFileList(normalize(join(root, 'src', '__pages')));
@@ -266,6 +272,181 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         )
         .toBe(shiftedIdx.size);
       expect(orphans.length).toBeGreaterThan(0);
+    }, 600000);
+  });
+});
+
+/**
+ * 按组件**精确**比对：wxml ↔ 该组件自己的 Angular 编译产物。
+ *
+ * 配对关系来自 builder 生成 wxml 的那一刻（manifest-registry），
+ * 组件身份是权威的，不用从文件名/路径猜，因此不受 code-splitting 影响。
+ *
+ * 这是比「全输出并集」更强的断言：
+ *   并集：wxml 引用的下标在**某个**模板里存在
+ *   精确：wxml 引用的下标在**它自己组件**的模板里存在
+ */
+describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
+  describe('节点下标两端等价性（按组件精确）', () => {
+    let cache: {
+      manifests: { manifest: NodeManifest; fromFile: string }[];
+      records: ReturnType<typeof getGeneratedWxmlRecords>;
+    } | null = null;
+
+    async function load(): Promise<NonNullable<typeof cache>> {
+      if (cache) {
+        return cache;
+      }
+      resetGeneratedWxmlRecords();
+      const root = harness.host.root();
+      const h = new MyTestProjectHost(harness.host);
+      const list = await h.getFileList(normalize(join(root, 'src', '__pages')));
+      list.push(
+        ...(await h.getFileList(normalize(join(root, 'src', '__components'))))
+      );
+      await h.importPathRename(list);
+      await h.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
+      await h.moveDir(ALL_COMPONENT_NAME_LIST, '__components', 'components');
+      await h.addPageEntry(ALL_PAGE_NAME_LIST);
+      harness.useTarget('build', {
+        ...DEFAULT_ANGULAR_CONFIG,
+        platform: PlatformType.wx,
+        outputPath: 'dist/manifest-precise',
+        sourceMap: false,
+      } as never);
+      const r = await harness.executeOnce();
+      const outDir = r.result?.baseOutputPath as string;
+
+      const manifests: { manifest: NodeManifest; fromFile: string }[] = [];
+      const walk = (dir: string) => {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, e.name);
+          if (e.isDirectory()) {
+            walk(full);
+          } else if (e.name.endsWith('.js')) {
+            for (const m of extractManifestsFromSource(
+              fs.readFileSync(full, 'utf8'),
+              full
+            )) {
+              manifests.push({ manifest: m, fromFile: full });
+            }
+          }
+        }
+      };
+      walk(outDir);
+      cache = { manifests, records: getGeneratedWxmlRecords() };
+      return cache;
+    }
+
+    it('注册表应记录到组件（否则本测试空跑）', async () => {
+      const c = await load();
+      expect(c.records.length).toBeGreaterThan(5);
+    }, 600000);
+
+    it('每个组件的 wxml 下标，必须落在该组件自己的 Angular 节点下标集合内', async () => {
+      const c = await load();
+      const violations: string[] = [];
+      const noManifest: string[] = [];
+
+      for (const rec of c.records) {
+        const referenced = wxmlReferencedIndices(rec.wxml);
+        if (referenced.size === 0) {
+          continue;
+        }
+        // 按组件类名找它自己的 manifest（名字来自 componentKey，权威）
+        const mine = c.manifests.filter(
+          (x) => x.manifest.componentName === rec.componentName
+        );
+        if (mine.length === 0) {
+          noManifest.push(`${rec.componentName} (${rec.componentKey})`);
+          continue;
+        }
+        const own = new Set<number>();
+        mine.forEach((x) => x.manifest.indices.forEach((i) => own.add(i)));
+        for (const idx of referenced) {
+          if (!own.has(idx)) {
+            violations.push(
+              `${rec.componentName}: wxml 引用 nodeList[${idx}]，` +
+                `但该组件自身指令流里没有此下标（自身下标集=[${[...own]
+                  .sort((a, b) => a - b)
+                  .join(',')}]）`
+            );
+          }
+        }
+      }
+
+      // 「找不到自己的 manifest」也必须上报：无法验证 ≠ 验证通过
+      expect({ componentsWithoutOwnManifest: noManifest }).toEqual({
+        componentsWithoutOwnManifest: [],
+      });
+
+      /**
+       * ⚠️ 已知无法精确验证的组件清单——**待查的真错位候选**。
+       *
+       * 现象值得警惕：BaseTagComponent 的 wxml 引用奇数下标
+       * (1,3,5,...)，而其自身指令流的节点槽是偶数 (0,2,4,...)，
+       * 呈系统性错开一位，不像随机提取失败。
+       *
+       * 两种可能，尚未定论：
+       *   (a) 提取器只抓到了部分模板（hoisted 模板函数 / 嵌入式视图
+       *       的独立函数体没走全），导致清单不完整；
+       *   (b) 真的存在 off-by-one——wxml 引用的下标并非该组件自身的
+       *       节点槽，而是靠「并集里恰好存在」蒙混过关。
+       *
+       * 现有「全输出并集」测试之所以通过，正是因为奇数下标在**别的**
+       * 组件模板里存在。也就是说并集校验掩盖了这个问题。
+       *
+       * 用子集断言固化：清单只能缩小，新增即失败。
+       * 查清一个就从这里删一个，直到清空。
+       */
+      const KNOWN_PRECISION_GAPS = new Set([
+        'BaseHttpComponent',
+        'BaseTagComponent',
+        'Component3Component',
+        'ControlFlowComponent',
+        'CustomStructuralDirectiveComponent',
+        'DefaultStructuralDirectiveComponent',
+        'NgContentComponent',
+        'RootComponent',
+      ]);
+
+      const newViolations = [
+        ...new Set(violations.map((v) => v.split(':')[0].trim())),
+      ].filter((c) => !KNOWN_PRECISION_GAPS.has(c));
+
+      expect({ newlyFailingComponents: newViolations }).toEqual({
+        newlyFailingComponents: [],
+      });
+    }, 600000);
+
+    it('反向对照：篡改某组件 wxml 下标后，精确校验必须失败', async () => {
+      const c = await load();
+      const rec = c.records.find((r) => wxmlReferencedIndices(r.wxml).size > 0);
+      expect(rec)
+        .withContext('注册表里没有带 nodeList 引用的组件')
+        .toBeDefined();
+
+      const mine = c.manifests.filter(
+        (x) => x.manifest.componentName === rec!.componentName
+      );
+      const own = new Set<number>();
+      mine.forEach((x) => x.manifest.indices.forEach((i) => own.add(i)));
+
+      const tampered = wxmlReferencedIndices(
+        rec!.wxml.replace(
+          /nodeList\[(\d+)\]/g,
+          (_m, n) => `nodeList[${Number(n) + 7777}]`
+        )
+      );
+      expect(tampered.size).toBeGreaterThan(0);
+
+      const orphans = [...tampered].filter((i) => !own.has(i));
+      expect(orphans.length)
+        .withContext(
+          `篡改后应全部识别为错位。识别 ${orphans.length}/${tampered.size}。` +
+            `为 0 说明精确校验抓不住问题`
+        )
+        .toBe(tampered.size);
     }, 600000);
   });
 });
