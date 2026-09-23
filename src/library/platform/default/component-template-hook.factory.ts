@@ -77,9 +77,30 @@ function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
           itemIndex,
         ];
         lContainerList.push({
-          __templateName: item._lView[LVIEW.CONTEXT]
-            ? item._lView[LVIEW.CONTEXT].__templateName
-            : undefined,
+          /**
+           * wxml 的 `<template is="{{item.__templateName || 'xxxBlock_N'}}">`
+           * 需要运行时模板名。两条来源，按优先级：
+           *
+           * 1. **context.__templateName** —— 自定义结构指令显式传的
+           *    （如 `createEmbeddedView(tpl, {__templateName: name})`）。
+           *    保留它才能不改变现有自定义指令的行为。
+           * 2. **tView.declTNode.localNames[0]** —— 模板声明名
+           *    （`<ng-template #alpha>` → `"alpha"`）。
+           *
+           * 第 2 条是 `ng_if` / `ng_for_of` / `ng_switch` /
+           * `ng_template_outlet` 上那套 AST patch 的**等价替代**：
+           * 实测 `tView.declTNode === TemplateRef._declarationTContainer`
+           * （同一个 TNode），所以 `declTNode.localNames[0]` 与 patch 里
+           * `_declarationTContainer.localNames[0]` 取值必然相同。
+           *
+           * 区别只是：patch 要改 Angular 源码，这里在 fork 自己的
+           * 代码里拿（viewRef 已经握在手上）。
+           */
+          __templateName:
+            (item._lView[LVIEW.CONTEXT] &&
+              item._lView[LVIEW.CONTEXT].__templateName) ||
+            item._lView[1]?.declTNode?.localNames?.[0] ||
+            undefined,
           nodeList: lViewToWXView(item._lView, nodePath),
           nodePath: nodePath,
           index: lContainerList.length,
