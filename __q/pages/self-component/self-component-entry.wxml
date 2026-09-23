@@ -1,0 +1,3 @@
+<import src="/self-template/self.wxml"/><block wx:if="{{hasLoad}}"><block wx:for="{{nodeList[0]}}" wx:key="index">
+      <template is="{{item.__templateName||'$$mp$$__self__$$self1'}}" data="{{...nodeList[0][index] }}"></template>
+      </block><app-component-need-template nodePath="{{nodePath}}" nodeIndex="2" class="{{nodeList[2].class}}" style="{{nodeList[2].style}}" ></app-component-need-template></block>

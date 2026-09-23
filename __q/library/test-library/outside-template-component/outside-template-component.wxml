@@ -1,0 +1,5 @@
+<import src="/library-template/TestLibrary.wxml"/><import src="/library/test-library/self.wxml"/><template name="ngDefault_2"><view  class="{{nodeList[0].class}}" style="{{nodeList[0].style}}" data-node-path="{{nodePath}}" data-node-index="{{0}}" ><block wx:for="{{nodeList[1]}}" wx:key="index">
+      <template is="{{item.__templateName||'ngDefault_2_1'}}" data="{{...nodeList[1][index] }}"></template>
+      </block></view></template><template name="ngDefault_2_1"><block ></block></template><block wx:if="{{hasLoad}}"><view  class="{{nodeList[0].class}}" style="{{nodeList[0].style}}" data-node-path="{{nodePath}}" data-node-index="{{0}}" >下面将传入一个由外部提供的模板</view><block wx:for="{{nodeList[2]}}" wx:key="index">
+      <template is="{{item.__templateName||'ngDefault_2'}}" data="{{...nodeList[2][index] }}"></template>
+      </block></block>

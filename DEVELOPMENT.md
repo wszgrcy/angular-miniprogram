@@ -719,3 +719,85 @@ vite.build() 产出 spec 小程序到磁盘
    `moduleResolution: node10` 认不出来，要在 tsconfig 里加显式类型入口。
 
 **当前 webpack 链路完全没动**，两套并存，可以随时回退。
+
+## 节点下标两端等价性（进行中）
+
+### 问题
+
+wxml 里烧的是绝对下标（`nodeList[0]` / `nodeList[2]` / ...），运行时
+`lViewToWXView` 产出 `nodeList[lViewIndex - HEADER_OFFSET]`。历史上这两套
+下标各自独立计算（构建侧 `declIndex` 自己数），中间没有验证。一旦某侧
+漏算槽位，后续节点整体错位一位 → 整页渲染崩，**且不抛错误**。
+
+### 已建立的验证
+
+- `test/util/node-manifest.ts` — 从 Angular 编译产出的指令流提取节点清单。
+  下标是 `allocateSlots` 算好后烤进每条指令首参的，等价于 Angular 官方口径。
+- `src/builder/mini-program-compiler/manifest-registry.ts` — builder 生成
+  wxml 时同源记录组件身份（此刻 componentKey 权威已知，不受 code-splitting 影响）。
+- `src/builder/vite/node-index-equivalence.spec.ts` — 三层断言 + 三条反向对照
+  （反向对照证明校验真的会咬，不是只会通过的摆设）。
+
+### 关键认知（都验证过）
+
+1. **每个视图的下标各自从 0 开始**。`allocateSlots` 注释：
+   "Slot indices start at 0 for each view (and are not unique between views)"。
+   对应 wxml 的 `<template name="ifBlock_3">` 具名块，块内也是 0 基。
+   → 把整个 wxml 的 nodeList 下标混成一个集合是错的。
+
+2. **本 fork 有 `ɵɵdom*` 系列 patched 指令**：`domElementStart` /
+   `domElement` / `domElementContainer` / `domElementContainerStart` /
+   `domTemplate` 都消耗节点槽。漏了它们曾导致「8 个组件 off-by-one」的误报
+   —— 实际产物是正确的，是提取器不完整。
+
+3. **Angular 用链式调用 codegen**（本轮新发现，见下）。
+
+### 本轮发现：链式调用 codegen（修复未完成）
+
+`ɵɵelementStart` 的返回类型是 `typeof ɵɵelementStart`（**返回自身**），
+所以 Angular 把连续的同类调用写成链：
+
+```js
+ɵɵelementStart(2, "app-content-multi")(3, "div", 0);
+ɵɵelementEnd()();
+```
+
+这**合法且有意**，不是 corruption（webpack 与 Vite 产物中均存在，
+与 CJS/ESM 格式无关，也不经我们任何 transform）。
+
+但对提取器是陷阱：第二个节点没有独立的 `ɵɵelementStart(3,` 文本，
+而是 `)(3, "div", 0)`，按「指令名 + 首参」匹配就漏掉 index 3。
+
+这正是 `KNOWN_ROOT_BLOCK_GAPS` 里 4 个组件（ControlFlow /
+CustomStructuralDirective / DefaultStructuralDirective / NgContent）
+根视图下标缺口的**根因**。
+
+### 下一步（未完成的修复）
+
+在 `extractNodeManifest` / `extractViewTree` 的 walk 中展开调用链：
+
+```ts
+function unwrapCallChain(node: ts.CallExpression): ts.CallExpression[] {
+  const links: ts.CallExpression[] = [];
+  let cur: ts.Expression = node;
+  while (cur && ts.isCallExpression(cur)) {
+    links.unshift(cur);
+    cur = cur.callee;
+  }
+  return links;
+}
+```
+
+以 `links[0].callee` 的指令名为准，链上每一环都按同一指令处理，
+各自取首参作为节点下标，并把各环加入 `seen` 避免重复计数。
+
+**注意**：本轮尝试该改法时，直接单测显示链未被正确展开
+（`links=1`、`base=undefined`），未能定位原因即因上下文耗尽而回退。
+下次接手请**先写一个最小单测**（内联一段含链式调用的源码，断言 indices
+完整），确认提取器行为后再改 walk，不要直接改 walk 再跑大测试。
+
+### 当前状态
+
+`KNOWN_ROOT_BLOCK_GAPS` 固化了这 4 个组件，子集断言——只能缩小不能扩大。
+具名模板块（ifBlock / forBlock 等）已 100% 覆盖，且有一条无豁免清单的
+断言锁住。
