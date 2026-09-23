@@ -622,12 +622,31 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
        *
        * 子集断言：只能缩小，新增即失败。
        */
-      const KNOWN_ROOT_BLOCK_GAPS = new Set([
-        'ControlFlowComponent',
-        'CustomStructuralDirectiveComponent',
-        'DefaultStructuralDirectiveComponent',
-        'NgContentComponent',
-      ]);
+      /**
+       * 已知缺口：只剩 ControlFlowComponent 的 __root__ 块。
+       *
+       * 演进：4 → 1
+       *   - 补 ɵɵdom* 系列指令：修掉一批误报
+       *   - 展开链式 codegen（unwrapCallChain，注意 TS 用 .expression
+       *     不是 ESTree 的 .callee）：NgContent / CustomStructural /
+       *     DefaultStructural 全部通过
+       *
+       * 剩 ControlFlowComponent：根视图提取到
+       *   [0,1,2,3,4,5,6,7,9,10,13,16,17,18,19,20]
+       * 而 __root__ 块引用了 11,12,14,15（forBlock_11 / forEmpty_12 /
+       * forBlock_14 等模板的注册槽）。
+       *
+       * 成因是 (a)：splitWxmlBlocks 用 `wxml.replace(具名模板正则, '')`
+       * 求根区，但 `<template is="...">` 调用标签、嵌套具名模板等
+       * 残留在根区里，把不属于根视图的下标算了进来。
+       *
+       * 下一步：把 splitWxmlBlocks 改成能区分
+       *   - 具名模板**定义** <template name="x">
+       *   - 模板**调用** <template is="x" data="...">
+       * 根区只取 hasLoad 那个 <block> 内、排除所有具名定义后的内容，
+       * 且调用标签引用的下标应映射到对应注册槽而非当作根视图下标。
+       */
+      const KNOWN_ROOT_BLOCK_GAPS = new Set(['ControlFlowComponent']);
 
       const newGaps = [
         ...new Set(violations.map((v) => v.split(' 模板块')[0].trim())),

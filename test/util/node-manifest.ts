@@ -91,6 +91,34 @@ function instructionName(callee: ts.Expression): string | undefined {
   return undefined;
 }
 
+/**
+ * 展开 Angular 的链式调用 codegen。
+ *
+ * `ɵɵelementStart` 的返回类型是 `typeof ɵɵelementStart`（返回自身），
+ * 所以 Angular 把连续的同类调用写成链：
+ *
+ *   ɵɵelementStart(2, "app-content-multi")(3, "div", 0);
+ *
+ * 合法且有意，不是 corruption。但对提取器是陷阱：第二个节点没有独立的
+ * `ɵɵelementStart(3,` 文本，而是 `)(3, "div", 0)`，按「指令名+首参」
+ * 匹配就会漏掉 index 3。
+ *
+ * 返回链上所有环（外→内展开为 [内, ..., 外]），links[0] 是带指令名
+ * 的那一环。
+ */
+function unwrapCallChain(node: ts.CallExpression): ts.CallExpression[] {
+  const links: ts.CallExpression[] = [];
+  let cur: ts.Node = node;
+  while (ts.isCallExpression(cur)) {
+    links.unshift(cur);
+    // 注意：TypeScript 的 CallExpression 用 `.expression` 表示被调用方，
+    // 不是 ESTree 的 `.callee`。用错会恒得 undefined，
+    // 导致链完全展不开（上一轮 base=undefined 就是这个原因）。
+    cur = cur.expression;
+  }
+  return links;
+}
+
 function firstArgAsNumber(call: ts.CallExpression): number | undefined {
   const a = call.arguments[0];
   if (a && ts.isNumericLiteral(a)) {
@@ -127,15 +155,22 @@ export function extractNodeManifest(
     seen.add(node);
 
     if (ts.isCallExpression(node)) {
-      const name = instructionName(node.expression);
-      if (name && NODE_SLOT_INSTRUCTIONS.has(name)) {
-        const index = firstArgAsNumber(node);
-        if (index !== undefined) {
-          entries.push({
-            index,
-            instruction: name,
-            tag: secondArgAsString(node),
-          });
+      const links = unwrapCallChain(node);
+      const baseName = links.length
+        ? instructionName(links[0].expression)
+        : undefined;
+      if (baseName && NODE_SLOT_INSTRUCTIONS.has(baseName)) {
+        for (const link of links) {
+          // 链上每一环都是同一指令的一次调用；标记已见避免重复计数
+          seen.add(link);
+          const index = firstArgAsNumber(link);
+          if (index !== undefined) {
+            entries.push({
+              index,
+              instruction: baseName,
+              tag: secondArgAsString(link),
+            });
+          }
         }
       }
     }
@@ -325,28 +360,37 @@ export function extractViewTree(
       seen.add(node);
 
       if (ts.isCallExpression(node)) {
-        const name = instructionName(node.expression);
+        // 同样要展开链式 codegen（见 unwrapCallChain 注释）
+        const links = unwrapCallChain(node);
+        const name = links.length
+          ? instructionName(links[0].expression)
+          : undefined;
         if (name) {
-          const idx = firstArgAsNumber(node);
-          if (idx !== undefined && NODE_SLOT_INSTRUCTIONS.has(name)) {
-            entries.push({
-              index: idx,
-              instruction: name,
-              tag: secondArgAsString(node),
-            });
-          }
-          // 引用子视图：第二个参数是模板函数标识符
-          if (
-            idx !== undefined &&
-            TEMPLATE_REF_INSTRUCTIONS.has(name) &&
-            node.arguments[1] &&
-            ts.isIdentifier(node.arguments[1])
-          ) {
-            const fnName = node.arguments[1].text;
-            childRefs.push({ slot: idx, fnName });
-            const childFn = fnMap.get(fnName);
-            if (childFn) {
-              buildView(childFn, fnName);
+          for (const link of links) {
+            seen.add(link);
+            const idx = firstArgAsNumber(link);
+            if (idx === undefined) {
+              continue;
+            }
+            if (NODE_SLOT_INSTRUCTIONS.has(name)) {
+              entries.push({
+                index: idx,
+                instruction: name,
+                tag: secondArgAsString(link),
+              });
+            }
+            // 引用子视图：第二个参数是模板函数标识符
+            if (
+              TEMPLATE_REF_INSTRUCTIONS.has(name) &&
+              link.arguments[1] &&
+              ts.isIdentifier(link.arguments[1])
+            ) {
+              const fnName = link.arguments[1].text;
+              childRefs.push({ slot: idx, fnName });
+              const childFn = fnMap.get(fnName);
+              if (childFn) {
+                buildView(childFn, fnName);
+              }
             }
           }
         }
