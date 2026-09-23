@@ -516,3 +516,76 @@ export function extractViewTreesFromSource(
   visit(sf);
   return trees;
 }
+
+/**
+ * 从编译产物提取每个组件的 `decls`（模板声明节点总数）。
+ *
+ * `ɵɵdefineComponent({ type: X, decls: N, vars: V, template: ... })`
+ *
+ * 为什么需要它：运行时 `nodeList.length === bindingStartIndex - HEADER_OFFSET`，
+ * 而 `bindingStartIndex = HEADER_OFFSET + decls`，所以
+ * **nodeList.length === decls**（已由 TestBed 的半运行时测试实测确认）。
+ *
+ * 于是「运行时 nodeList 是否覆盖 wxml 引用的下标」可归结为：
+ *
+ *   max(wxml 引用下标) < decls
+ *
+ * 这条 + TestBed 那条，整链闭合。
+ */
+export function extractDeclsByComponent(
+  source: string,
+  fileName: string
+): Map<string, number> {
+  const sf = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  const out = new Map<string, number>();
+
+  const readNum = (
+    obj: ts.ObjectLiteralExpression,
+    key: string
+  ): number | undefined => {
+    for (const p of obj.properties) {
+      if (
+        ts.isPropertyAssignment(p) &&
+        p.name.getText(sf).replace(/['"]/g, '') === key
+      ) {
+        if (ts.isNumericLiteral(p.initializer)) {
+          return Number(p.initializer.text);
+        }
+      }
+    }
+    return undefined;
+  };
+
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node)) {
+      const name = instructionName(node.expression);
+      if (name === 'defineComponent') {
+        const arg = node.arguments[0];
+        if (arg && ts.isObjectLiteralExpression(arg)) {
+          const typeProp = arg.properties.find(
+            (p) =>
+              ts.isPropertyAssignment(p) &&
+              p.name.getText(sf).replace(/['"]/g, '') === 'type'
+          ) as ts.PropertyAssignment | undefined;
+          const cmpName =
+            typeProp && ts.isIdentifier(typeProp.initializer)
+              ? typeProp.initializer.text
+              : undefined;
+          const decls = readNum(arg, 'decls');
+          if (cmpName && decls !== undefined) {
+            out.set(cmpName, decls);
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sf);
+  return out;
+}

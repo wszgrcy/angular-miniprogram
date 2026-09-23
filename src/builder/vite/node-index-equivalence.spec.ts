@@ -16,6 +16,7 @@ import {
 } from '../../../test/util/file';
 import {
   NodeManifest,
+  extractDeclsByComponent,
   extractManifestsFromSource,
   extractViewTreesFromSource,
 } from '../../../test/util/node-manifest';
@@ -583,6 +584,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     let cache: {
       trees: ReturnType<typeof extractViewTreesFromSource>;
       blocksByComponent: Map<string, Block[]>;
+      declsByComponent: Map<string, number>;
     } | null = null;
 
     async function load() {
@@ -610,15 +612,21 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const outDir = r.result?.baseOutputPath as string;
 
       const trees: ReturnType<typeof extractViewTreesFromSource> = [];
+      const declsByComponent = new Map<string, number>();
       const walk = (dir: string) => {
         for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
           const full = path.join(dir, e.name);
           if (e.isDirectory()) {
             walk(full);
           } else if (e.name.endsWith('.js')) {
-            trees.push(
-              ...extractViewTreesFromSource(fs.readFileSync(full, 'utf8'), full)
-            );
+            const src = fs.readFileSync(full, 'utf8');
+            trees.push(...extractViewTreesFromSource(src, full));
+            for (const [k, v] of extractDeclsByComponent(src, full)) {
+              // 同名组件可能出现在多个 chunk，取首次见到的值
+              if (!declsByComponent.has(k)) {
+                declsByComponent.set(k, v);
+              }
+            }
           }
         }
       };
@@ -628,7 +636,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       for (const rec of getGeneratedWxmlRecords()) {
         blocksByComponent.set(rec.componentName, splitWxmlBlocks(rec.wxml));
       }
-      cache = { trees, blocksByComponent };
+      cache = { trees, blocksByComponent, declsByComponent };
       return cache;
     }
 
@@ -754,6 +762,53 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         uncoveredNamedBlocks: [],
       });
     }, 600000);
+
+    it('运行时 nodeList 长度（=decls）必须严格大于 wxml 根块引用的最大下标', async () => {
+      /**
+       * 这条把「运行时数据是否超出 wxml 索引限制」变成可断言的事实。
+       *
+       * 链条：
+       *   1. 运行时 `nodeList.length === bindingStartIndex - HEADER_OFFSET`
+       *      （`lViewToWXView` 的循环边界）
+       *   2. `bindingStartIndex = HEADER_OFFSET + decls`
+       *      ⇒ **nodeList.length === decls**
+       *      —— 已由 TestBed 半运行时测试**实测**确认（nodeCount === decls）
+       *   3. 所以只要 `max(wxml 根块引用下标) < decls`，
+       *      wxml 引用的每个下标在运行时 nodeList 里都存在，不会越界。
+       *
+       * 只比对**根块**：根块下标直接映射到组件自身的 nodeList。
+       * 具名块（ifBlock_N / forBlock_N）是子视图自己的 0 基空间，
+       * 其 nodeList 是嵌套的，由各自的子视图 decls 决定，不在本条范围。
+       */
+      const c = await load();
+      const violations: string[] = [];
+      let checked = 0;
+
+      for (const [cmp, blocks] of c.blocksByComponent) {
+        const decls = c.declsByComponent.get(cmp);
+        if (decls === undefined) {
+          continue;
+        }
+        const root = blocks.find((b) => b.name === '__root__');
+        if (!root || root.indices.size === 0) {
+          continue;
+        }
+        const max = Math.max(...root.indices);
+        checked++;
+        if (max >= decls) {
+          violations.push(
+            `${cmp}: wxml 根块最大下标 ${max} >= decls ${decls} → ` +
+              `运行时 nodeList(长度 ${decls}) 越界`
+          );
+        }
+      }
+
+      console.log(`根块越界比对组件数: ${checked}`);
+      expect(checked)
+        .withContext('比对数为 0 说明本断言空跑')
+        .toBeGreaterThan(10);
+      expect(violations).toEqual([]);
+    });
 
     it('标签类型对应：wxml 承载某下标的标签，必须等于 Angular 该槽标签经映射', async () => {
       /**
