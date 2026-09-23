@@ -1,5 +1,3 @@
-
-
 import {
   extractManifestsFromSource,
   extractViewTreesFromSource,
@@ -27,11 +25,9 @@ describe('node-manifest 提取器：codegen 形态', () => {
 
   it('基线：普通独立调用', () => {
     const src = wrap(
-      [
-        'ɵɵelementStart(0, "div");',
-        'ɵɵtext(1, "hi");',
-        'ɵɵelementEnd();',
-      ].join('\n')
+      ['ɵɵelementStart(0, "div");', 'ɵɵtext(1, "hi");', 'ɵɵelementEnd();'].join(
+        '\n'
+      )
     );
     const ms = extractManifestsFromSource(src, 't.js');
     expect(ms.length).toBe(1);
@@ -98,5 +94,52 @@ describe('node-manifest 提取器：codegen 形态', () => {
     const trees = extractViewTreesFromSource(src, 't.js');
     expect(trees.length).toBe(1);
     expect(trees[0].views.length).toBe(2);
+  });
+
+  it('repeaterCreate 的锚点槽必须被记入（@for 主模板与 @empty）', () => {
+    // 真实形态：Angular 把主/空模板都作为参数传入，不为锚点单独发指令
+    const src = [
+      'function App_For_11_Template(rf, ctx) {',
+      '  if (rf & 1) { ɵɵelementStart(0, "li"); ɵɵelementEnd(); }',
+      '}',
+      'function App_ForEmpty_12_Template(rf, ctx) {',
+      '  if (rf & 1) { ɵɵelementStart(0, "p"); ɵɵelementEnd(); }',
+      '}',
+      'const c = ɵɵdefineComponent({',
+      '  type: FooComponent,',
+      '  template: function Foo_Template(rf, ctx) {',
+      '    if (rf & 1) {',
+      '      ɵɵelementStart(0, "ul");',
+      '      ɵɵrepeaterCreate(',
+      '        1,',
+      '        App_For_11_Template,',
+      '        2,',
+      '        3,',
+      '        "li",',
+      '        0,',
+      '        ɵɵrepeaterTrackByIdentity,',
+      '        false,',
+      '        App_ForEmpty_12_Template,',
+      '        2,',
+      '        0,',
+      '        "p",',
+      '        1',
+      '      );',
+      '      ɵɵelementEnd();',
+      '    }',
+      '  }',
+      '});',
+    ].join('\n');
+
+    const trees = extractViewTreesFromSource(src, 't.js');
+    expect(trees.length).toBe(1);
+    const all = new Set<number>();
+    for (const v of trees[0].views) {
+      for (const i of v.indices) {
+        all.add(i);
+      }
+    }
+    // 1 = RepeaterMetadata，11/12 = 主/空模板锚点
+    expect([...all].sort((a, b) => a - b)).toEqual([0, 1, 11, 12]);
   });
 });

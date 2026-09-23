@@ -1,0 +1,3 @@
+<import src="/library-template/TestLibrary.wxml"/><import src="/library/test-library/self.wxml"/><block wx:if="{{hasLoad}}"><app-outside-template nodePath="{{nodePath}}" nodeIndex="0" class="{{nodeList[0].class}}" style="{{nodeList[0].style}}" data-node-path="{{nodePath}}" data-node-index="{{0}}" ></app-outside-template><block wx:for="{{nodeList[1]}}" wx:key="index">
+      <template is="{{item.__templateName||'$$mp$$__self__$$libraryFirst'}}" data="{{...nodeList[1][index] }}"></template>
+      </block></block>

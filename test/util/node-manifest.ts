@@ -392,6 +392,46 @@ export function extractViewTree(
                 buildView(childFn, fnName);
               }
             }
+
+            /**
+             * `ɵɵrepeaterCreate` 额外占用的**锚点槽**。
+             *
+             * Angular 把主模板与 @empty 模板都作为**参数**传给
+             * repeaterCreate，不像 @if 那样为锚点单独发一条指令，
+             * 所以按「指令名+首参」提取会漏掉这些槽：
+             *
+             *   repeaterCreate(10, For_11_Template, 2, 3, "div", 8,
+             *                  trackByIdentity, false,
+             *                  ForEmpty_12_Template, 2, 0, "div", 9)
+             *
+             * 槽布局（与 builder 侧 template-definition.ts 的注释一致）：
+             *   10 = RepeaterMetadata（不可渲染但占位）
+             *   11 = 主模板锚点
+             *   12 = @empty 模板锚点（若有）
+             *
+             * 锚点下标直接**编码在模板函数名里**（`For_11_Template` → 11），
+             * 用它比按位置猜更稳，且能与 name 交叉校验。
+             */
+            if (name === 'repeaterCreate') {
+              for (const arg of link.arguments) {
+                if (!ts.isIdentifier(arg)) {
+                  continue;
+                }
+                const m = /_(\d+)_Template$/.exec(arg.text);
+                if (!m) {
+                  continue;
+                }
+                const anchor = Number(m[1]);
+                // 只补比 metadata 槽大的锚点；嵌套视图的下标属于其自身空间
+                if (anchor > idx) {
+                  entries.push({
+                    index: anchor,
+                    instruction: 'templateAnchor',
+                    tag: arg.text,
+                  });
+                }
+              }
+            }
           }
         }
       }

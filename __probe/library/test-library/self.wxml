@@ -1,0 +1,1 @@
+<template name="$$mp$$__self__$$libraryFirst"> library内模板 <app-other nodePath="{{nodePath}}" nodeIndex="1" class="{{nodeList[1].class}}" style="{{nodeList[1].style}}" data-node-path="{{nodePath}}" data-node-index="{{1}}" ></app-other></template>

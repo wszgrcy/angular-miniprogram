@@ -429,6 +429,18 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
        * 更精确的「按视图分块」测试已 **零缺口** 覆盖同一批组件，
        * 所以这里保留一个组件名不代表未验证。
        */
+      /**
+       * 已知缺口：ControlFlowComponent —— **本测试口径的缺陷**，非产物错误。
+       *
+       * 「按组件精确」把组件所有 wxml 下标拍成一个并集，去比该组件
+       * 所有视图下标的并集。但 Angular 的下标是**每视图各自 0 基**
+       * （allocateSlots: "not unique between views"），ControlFlowComponent
+       * 有 13 个视图，并集后只有 0/1 这类小数字，而根区引用到 19，
+       * 必然串。
+       *
+       * 更强的「按视图分块」测试已对同一批组件 **零缺口** 覆盖，
+       * 本项实为被其取代的弱断言。保留只为不丢历史信号。
+       */
       const KNOWN_PRECISION_GAPS = new Set(['ControlFlowComponent']);
 
       const newViolations = [
@@ -637,7 +649,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
        * 根区只取 hasLoad 那个 <block> 内、排除所有具名定义后的内容，
        * 且调用标签引用的下标应映射到对应注册槽而非当作根视图下标。
        */
-      const KNOWN_ROOT_BLOCK_GAPS = new Set(['ControlFlowComponent']);
+      const KNOWN_ROOT_BLOCK_GAPS = new Set<string>([]);
 
       const newGaps = [
         ...new Set(violations.map((v) => v.split(' 模板块')[0].trim())),

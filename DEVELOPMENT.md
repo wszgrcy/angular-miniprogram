@@ -720,7 +720,7 @@ vite.build() 产出 spec 小程序到磁盘
 
 **当前 webpack 链路完全没动**，两套并存，可以随时回退。
 
-## 节点下标两端等价性（大部分完成）
+## 节点下标两端等价性（已完成）
 
 ### 问题
 
@@ -856,22 +856,56 @@ ControlFlowComponent 的 wxml 含大量具名块（`ifBlock_3` / `forBlock_11` /
 | 提取器 codegen 形态单测 | 5 条 |
 
 
-### 仍未解决：ControlFlowComponent 根块
+### 根因三：repeaterCreate 的锚点槽未被记入（已修复）
 
-清空 `KNOWN_ROOT_BLOCK_GAPS` 后仍报 1 项 uncovered。
+`@for` 编译成 `ɵɵrepeaterCreate`，Angular 把**主模板与 @empty 模板都作为
+参数**传入，不像 `@if` 那样为锚点单独发一条指令：
 
-已排除的成因：
-  - 链式 codegen —— 已修，修好另外 3 个组件
-  - 嵌套具名模板切分 —— 已修（平衡匹配）
+```js
+repeaterCreate(10, ControlFlowComponent_For_11_Template, 2, 3, "div", 8,
+               ɵɵrepeaterTrackByIdentity, false,
+               ControlFlowComponent_ForEmpty_12_Template, 2, 0, "div", 9);
+```
 
-剩余怀疑：ControlFlowComponent 有 12 个子视图（Conditional_3..9 /
-For_11,14 / Case_16,17,18 / Case_18_Conditional_1），根区里的
-`<template is="...">` **调用**标签引用的是「模板注册槽」下标，
-而这些下标在根视图指令流里由 `ɵɵtemplate` / `ɵɵrepeaterCreate`
-占用，与 wxml 根区引用的下标集合存在系统性偏移。
+槽布局（与 builder 侧 `template-definition.ts` 注释一致）：
 
-下一步方向：把根区的 `<template is="x">` 调用**映射**到对应注册槽，
-而不是把调用标签里的下标当作根视图节点下标。
+| 槽 | 含义 |
+|---|---|
+| 10 | RepeaterMetadata（不可渲染但占位） |
+| 11 | 主模板锚点 |
+| 12 | @empty 模板锚点（若有） |
 
-诚实说明：我一度以为这里已经清空（清空正则未匹配、实际没生效，
-而当时看到的「通过」是旧清单还在）。已实测确认仍需保留 1 项。
+按「指令名 + 首参」提取只得到 `repeaterCreate@10`，漏掉 11/12。
+wxml 却引用 `nodeList[11]` / `nodeList[12]` → 报未覆盖。
+
+**这是提取器不完整，不是产物错误。**
+
+锚点下标**直接编码在模板函数名里**（`For_11_Template` → 11），
+提取器用它比按位置猜更稳，且能与名字交叉校验。
+
+### 最终状态
+
+| 清单 | 演进 | 现状 |
+|---|---|---|
+| `KNOWN_EXTRACTION_GAPS` | 1 → **0** | 已清空 |
+| `KNOWN_ROOT_BLOCK_GAPS` | 4 → 1 → **0** | 已清空 |
+| `KNOWN_PRECISION_GAPS` | 4 → **1** | 仅 `ControlFlowComponent`（口径缺陷） |
+
+`KNOWN_PRECISION_GAPS` 那一项是**该测试口径本身的缺陷**：组件级并集
+把各视图的 0 基下标空间混在一起，而 Angular 明确「not unique between
+views」。更强的「按视图分块」已零缺口覆盖同一批组件，本项实为被取代的
+弱断言，保留只为不丢历史信号。
+
+### 验证矩阵
+
+| 断言 | 覆盖 |
+|---|---|
+| 下标并集两端一致 | 全部组件 |
+| **按视图分块** | **全部组件，零缺口** |
+| 具名模板块无豁免 | 全部 |
+| 反向对照（假等价必须被抓） | 3 条 |
+| 分块器单测 | 4 条 |
+| 提取器 codegen 形态单测 | 6 条 |
+
+三个根因（链式 codegen / 嵌套具名模板切分 / repeater 锚点槽）
+都是**提取器与分块器**的缺陷，产物本身一直是对的。
