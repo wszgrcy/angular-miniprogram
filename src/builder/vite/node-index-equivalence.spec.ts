@@ -199,6 +199,42 @@ function checkTagCorrespondence(
   return { violations, compared };
 }
 
+/**
+ * nodeList 越界校验（可复用，供正向与反向对照共用同一判定逻辑）。
+ *
+ * 断言：wxml 根块引用的最大下标必须 **严格小于** 组件 decls。
+ * 因为运行时 `nodeList.length === decls`（TestBed 半运行时实测确认），
+ * 若 max >= decls，wxml 会读到 nodeList 之外的位置。
+ *
+ * 只比对根块——具名块是子视图自己的 0 基空间，其 nodeList 是嵌套的。
+ */
+function checkNodeListOverflow(
+  blocksByComponent: Map<string, { name: string; indices: Set<number> }[]>,
+  declsByComponent: Map<string, number>
+): { violations: string[]; checked: number } {
+  const violations: string[] = [];
+  let checked = 0;
+  for (const [cmp, blocks] of blocksByComponent) {
+    const decls = declsByComponent.get(cmp);
+    if (decls === undefined) {
+      continue;
+    }
+    const root = blocks.find((b) => b.name === '__root__');
+    if (!root || root.indices.size === 0) {
+      continue;
+    }
+    const max = Math.max(...root.indices);
+    checked++;
+    if (max >= decls) {
+      violations.push(
+        `${cmp}: wxml 根块最大下标 ${max} >= decls ${decls} → ` +
+          `运行时 nodeList(长度 ${decls}) 越界`
+      );
+    }
+  }
+  return { violations, checked };
+}
+
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('节点下标两端等价性', () => {
     /**
@@ -765,49 +801,76 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
     it('运行时 nodeList 长度（=decls）必须严格大于 wxml 根块引用的最大下标', async () => {
       /**
-       * 这条把「运行时数据是否超出 wxml 索引限制」变成可断言的事实。
-       *
        * 链条：
-       *   1. 运行时 `nodeList.length === bindingStartIndex - HEADER_OFFSET`
-       *      （`lViewToWXView` 的循环边界）
-       *   2. `bindingStartIndex = HEADER_OFFSET + decls`
-       *      ⇒ **nodeList.length === decls**
-       *      —— 已由 TestBed 半运行时测试**实测**确认（nodeCount === decls）
-       *   3. 所以只要 `max(wxml 根块引用下标) < decls`，
-       *      wxml 引用的每个下标在运行时 nodeList 里都存在，不会越界。
+       *   1. 运行时 nodeList.length === bindingStartIndex - HEADER_OFFSET
+       *   2. bindingStartIndex = HEADER_OFFSET + decls
+       *      ⇒ nodeList.length === decls（TestBed 半运行时测试实测确认）
+       *   3. 所以 max(wxml 根块下标) < decls 即不会越界
        *
-       * 只比对**根块**：根块下标直接映射到组件自身的 nodeList。
-       * 具名块（ifBlock_N / forBlock_N）是子视图自己的 0 基空间，
-       * 其 nodeList 是嵌套的，由各自的子视图 decls 决定，不在本条范围。
+       * 判定逻辑抽到 checkNodeListOverflow，与反向对照共用。
        */
       const c = await load();
-      const violations: string[] = [];
-      let checked = 0;
-
-      for (const [cmp, blocks] of c.blocksByComponent) {
-        const decls = c.declsByComponent.get(cmp);
-        if (decls === undefined) {
-          continue;
-        }
-        const root = blocks.find((b) => b.name === '__root__');
-        if (!root || root.indices.size === 0) {
-          continue;
-        }
-        const max = Math.max(...root.indices);
-        checked++;
-        if (max >= decls) {
-          violations.push(
-            `${cmp}: wxml 根块最大下标 ${max} >= decls ${decls} → ` +
-              `运行时 nodeList(长度 ${decls}) 越界`
-          );
-        }
-      }
-
+      const { violations, checked } = checkNodeListOverflow(
+        c.blocksByComponent as never,
+        c.declsByComponent
+      );
       console.log(`根块越界比对组件数: ${checked}`);
       expect(checked)
         .withContext('比对数为 0 说明本断言空跑')
         .toBeGreaterThan(10);
       expect(violations).toEqual([]);
+    });
+
+    it('反向对照：把 wxml 根块下标推到 >= decls，越界校验必须报', async () => {
+      /**
+       * 关键：走的是与正向**同一个** checkNodeListOverflow，
+       * 只是把某个组件根块的下标集合人为放大到 >= decls。
+       * 若这条不失败，说明越界校验是摆设。
+       */
+      const c = await load();
+
+      // 找一个既有 decls 又有非空根块的组件
+      let target: { cmp: string; decls: number } | null = null;
+      for (const [cmp, blocks] of c.blocksByComponent) {
+        const decls = c.declsByComponent.get(cmp);
+        const root = blocks.find((b) => b.name === '__root__');
+        if (decls !== undefined && root && root.indices.size > 0) {
+          target = { cmp, decls };
+          break;
+        }
+      }
+      expect(target)
+        .withContext('没找到可篡改的组件，无法构造反向对照')
+        .not.toBeNull();
+      const t = target as { cmp: string; decls: number };
+
+      // 篡改：给该组件根块加一个越界下标（== decls，即 nodeList 之外第一位）
+      const tampered = new Map<
+        string,
+        { name: string; indices: Set<number> }[]
+      >();
+      for (const [cmp, blocks] of c.blocksByComponent) {
+        tampered.set(
+          cmp,
+          blocks.map((b) =>
+            cmp === t.cmp && b.name === '__root__'
+              ? { ...b, indices: new Set([...b.indices, t.decls]) }
+              : b
+          )
+        );
+      }
+
+      const { violations } = checkNodeListOverflow(
+        tampered as never,
+        c.declsByComponent
+      );
+      const hit = violations.filter((v) => v.includes(t.cmp));
+      expect(hit.length)
+        .withContext(
+          `把 ${t.cmp} 根块最大下标推到 ${t.decls}（decls=${t.decls}）后 ` +
+            `未报越界 → 越界校验是摆设`
+        )
+        .toBeGreaterThan(0);
     });
 
     it('标签类型对应：wxml 承载某下标的标签，必须等于 Angular 该槽标签经映射', async () => {
