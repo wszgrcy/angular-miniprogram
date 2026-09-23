@@ -15,21 +15,42 @@ import { LVIEW } from './lview-layout';
  * **实际安装的** @angular/core，不一致就直接失败并列出差异。
  */
 describe('lview-layout: 与已安装 @angular/core 交叉校验', () => {
-  const fesmDir = path.resolve(
-    __dirname,
-    '../../../../node_modules/@angular/core/fesm2022'
-  );
+  /**
+   * 从**已安装的** @angular/core 解析入口，dirname 直接得到 fesm 目录。
+   *
+   * 不用 `path.resolve(__dirname, '../../../../node_modules/...')`，
+   * 那种写法有三个坑：
+   *
+   * 1. 相对深度写死。本文件刚从 util/ 移到 default/（同深度才侥幸没坏），
+   *    再挪一次就得跟着改，漏改就是路径不存在。
+   * 2. `fesm2022` 写死。Angular 有按 target 递进的习惯（fesm2015→2018→
+   *    2022→2024），哪天只出 fesm2024，这里直接找不到目录。
+   * 3. monorepo / node_modules 提升（hoisting）时，`../../../../node_modules`
+   *    可能根本不存在——包实际装在上层。
+   *
+   * require.resolve 由 Node 按 package.json 的 exports 解析，
+   * 平台无关（Windows 下返回原生 C:\... 路径）、深度无关、
+   * 提升无关，且 fesm 版本自动跟随。
+   */
+  const coreEntry = require.resolve('@angular/core');
+  const fesmDir = path.dirname(coreEntry);
 
   let bundleSource = '';
 
   beforeAll(() => {
     expect(fs.existsSync(fesmDir))
-      .withContext(`找不到 @angular/core fesm2022 目录：${fesmDir}`)
+      .withContext(`解析出的 @angular/core fesm 目录不存在：${fesmDir}`)
       .toBe(true);
 
-    bundleSource = fs
-      .readdirSync(fesmDir)
-      .filter((f) => f.endsWith('.mjs'))
+    const mjsFiles = fs.readdirSync(fesmDir).filter((f) => f.endsWith('.mjs'));
+
+    // 常量声明可能分散在 core.mjs 和内部 chunk（如 _debug_node-chunk.mjs）
+    // 里，所以整目录拼起来再匹配，不能只读 core.mjs。
+    expect(mjsFiles.length)
+      .withContext(`fesm 目录里没有 .mjs 文件：${fesmDir}`)
+      .toBeGreaterThan(0);
+
+    bundleSource = mjsFiles
       .map((f) => fs.readFileSync(path.join(fesmDir, f), 'utf8'))
       .join('\n');
     expect(bundleSource.length).toBeGreaterThan(0);
