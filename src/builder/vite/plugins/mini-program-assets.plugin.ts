@@ -374,7 +374,62 @@ export function miniProgramAssetsPlugin(
       // f 必须过 toPosixPath：Windows 下 chunk fileName 带反斜杠，
       // 直接塞进 `require('...')` 字面量后 `\c` 这类无效转义会被吃掉，
       // 路径变成 ./componentscxs.js，运行时找不到模块。
-      const requireList = emittedOrder
+      /**
+       * app.js 只应该 require「app 引导（main.js）可达的 chunk」。
+       *
+       * 不能把 emittedOrder（全部 chunk）都塞进来：page / component /
+       * library entry 各自会在文件顶层调 Page() / Component()，
+       * 那些必须由小程序运行时在**正确上下文**里加载
+       * （导航到页面时 = page 上下文；注册组件时 = 组件初始化阶段）。
+       * 从 app.js 里 require 它们，等于在 app 上下文调 Page()，微信会报
+       *   "Please do not call Page constructor in files that not
+       *    listed in pages section of app.json"
+       * 和非初始化阶段调 Component()：
+       *   "Component constructors should be called while initialization"
+       *
+       * webpack 侧本来就是这个语义：app.js 用的是 json.scripts，
+       * 只含 app 主入口依赖的那几个 chunk（main/runtime/vendor/...），
+       * 不含 page/component entry。
+       */
+      const isEntryChunk = (fileName: string) => {
+        const posix = toPosixPath(fileName);
+        // page / component / library 的 entry 产物都落在这几个目录下，
+        // 且不是 main.js
+        if (posix === 'main.js') {
+          return false;
+        }
+        return (
+          posix.startsWith('pages/') ||
+          posix.startsWith('components/') ||
+          posix.startsWith('library/')
+        );
+      };
+      // 从 main.js 出发收集可达 chunk（含自身）
+      const reachable = new Set<string>();
+      const collect = (fileName: string) => {
+        const posix = toPosixPath(fileName);
+        if (reachable.has(posix)) {
+          return;
+        }
+        reachable.add(posix);
+        const chunk = byFileName.get(fileName);
+        for (const dep of chunk?.imports ?? []) {
+          collect(dep);
+        }
+      };
+      if (byFileName.has('main.js')) {
+        collect('main.js');
+      }
+      // 保持拓扑顺序（依赖在前）
+      const required = emittedOrder.filter((f) =>
+        reachable.has(toPosixPath(f))
+      );
+      if (!byFileName.has('main.js')) {
+        // 没有 main 引导入口时退化成「排除 entry 类 chunk」，
+        // 至少不会再把 Page()/Component() 拉进 app 上下文
+        required.push(...emittedOrder.filter((f) => !isEntryChunk(f)));
+      }
+      const requireList = required
         .map((f) => `require('./${toPosixPath(f)}')`)
         .join(';');
       emit(

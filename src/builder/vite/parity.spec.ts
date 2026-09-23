@@ -218,6 +218,34 @@ describe('parity: webpack vs vite 产物对等', () => {
     // 顺带确认 webpack 侧本来也是干净的（作为对照，说明这条约束不是新加的怪要求）
     const badInWebpack = ((wApp as string).match(/\\/g) || []).length;
     expect(badInWebpack).toBe(0);
+
+    /**
+     * app.js 不能 require page / component / library entry。
+     *
+     * 这些 entry 在文件顶层调 Page() / Component()，必须由小程序运行时
+     * 在正确上下文加载（导航到页面 = page 上下文；注册组件 = 组件初始化）。
+     * 从 app.js require 它们会触发：
+     *   "Please do not call Page constructor in files that not listed
+     *    in pages section of app.json"
+     *   "Component constructors should be called while initialization"
+     *
+     * webpack 侧的 app.js 用 json.scripts，只含 app 主入口依赖的 chunk，
+     * 天然不含 entry。Vite 侧必须显式守住这条。
+     */
+    const required = [
+      ...(vApp as string).matchAll(/require\('([^']+)'\)/g),
+    ].map((m) => m[1]);
+    const entryRequires = required.filter(
+      (r) =>
+        r.startsWith('./pages/') ||
+        r.startsWith('./components/') ||
+        r.startsWith('./library/')
+    );
+    expect({ entryChunksRequiredByAppJs: entryRequires }).toEqual({
+      entryChunksRequiredByAppJs: [],
+    });
+    // app 引导入口必须在，否则小程序起不来
+    expect(required).toContain('./main.js');
   }, 600000);
 
   it('wxml 内容逐字节一致', async () => {

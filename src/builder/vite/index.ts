@@ -52,6 +52,17 @@ export interface ViteMiniProgramBuildOptions {
   stylePreprocessorOptions?: {
     includePaths?: string[];
   };
+  /**
+   * app 引导入口（src/main.ts），里面是
+   * `platformMiniProgram().bootstrapModule(MainModule)`。
+   *
+   * 之前漏了这个字段（在「schema 接受但 builder 不读」那批里），
+   * 导致产物里没有 app 引导，app.js 只能把所有 chunk 全 require 一遍
+   * 来凑，结果在 app 上下文里调了 Page()/Component()，微信直接报
+   * "Please do not call Page constructor..." /
+   * "Component constructors should be called while initialization"。
+   */
+  main?: string;
 }
 
 /**
@@ -207,14 +218,16 @@ export async function createMiniProgramViteConfig(options: {
       ? {
           preprocessorOptions: {
             scss: {
-              includePaths: viteOptions.stylePreprocessorOptions.includePaths.map(
-                (p) => path.resolve(context.workspaceRoot, p)
-              ),
+              includePaths:
+                viteOptions.stylePreprocessorOptions.includePaths.map((p) =>
+                  path.resolve(context.workspaceRoot, p)
+                ),
             },
             sass: {
-              includePaths: viteOptions.stylePreprocessorOptions.includePaths.map(
-                (p) => path.resolve(context.workspaceRoot, p)
-              ),
+              includePaths:
+                viteOptions.stylePreprocessorOptions.includePaths.map((p) =>
+                  path.resolve(context.workspaceRoot, p)
+                ),
             },
           },
         }
@@ -254,7 +267,16 @@ export async function createMiniProgramViteConfig(options: {
       minify: isProduction,
       assetsInlineLimit: 0,
       rollupOptions: {
-        input: toRollupInput(allEntries),
+        input: {
+          ...toRollupInput(allEntries),
+          // app 引导入口。key 固定叫 main，产物 main.js，
+          // 和 webpack 时代结构一致。
+          ...(viteOptions.main
+            ? {
+                main: path.resolve(context.workspaceRoot, viteOptions.main),
+              }
+            : {}),
+        },
         output: {
           // key 里带目录，Rollup 的 [name] 会把整段展开进来，
           // 于是能产出 `pages/index/index-entry.js` 这种和 webpack 时代
