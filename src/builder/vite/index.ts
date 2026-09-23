@@ -6,11 +6,11 @@ import * as path from 'path';
 import { Observable } from 'rxjs';
 import { Injector } from 'static-injector';
 import type { AliasOptions, InlineConfig } from 'vite';
-import { LibraryTemplateScopeService } from '../application/library-template-scope.service';
 import { changeComponent } from '../component-template-inject/change-component';
 import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
+import { LibraryTemplateScopeService } from '../shared/library-template-scope.service';
 import {
   generateEntryPatterns,
   resolveProjectRoots,

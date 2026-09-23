@@ -8,8 +8,8 @@ import {
 } from '@angular-devkit/core';
 import * as glob from 'glob';
 import * as path from 'path';
-import type { PagePattern } from '../application/type';
 import type { BuildPlatform } from '../platform/platform';
+import type { PagePattern } from '../shared/type';
 import { normalizeAssetPatternsSafe , toPosixPath } from '../util/asset-path';
 
 function globAsync(pattern: string, options: glob.IOptions) {

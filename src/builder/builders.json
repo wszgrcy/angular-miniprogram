@@ -2,9 +2,9 @@
   "$schema": "../../node_modules/@angular-devkit/architect/src/builders-schema.json",
   "builders": {
     "application": {
-      "implementation": "./application",
-      "schema": "./application/schema.json",
-      "description": "小程序构建builder"
+      "implementation": "./vite",
+      "schema": "./vite/schema.json",
+      "description": "小程序构建builder（Vite 版，替代 webpack）"
     },
     "library": {
       "implementation": "./library/builder",
@@ -12,16 +12,6 @@
       "description": "小程序构建library"
     },
     "karma": {
-      "implementation": "./karma",
-      "schema": "./karma/schema.json",
-      "description": "小程序测试"
-    },
-    "application-vite": {
-      "implementation": "./vite",
-      "schema": "./vite/schema.json",
-      "description": "小程序构建builder（Vite 版，替代 webpack）"
-    },
-    "karma-vite": {
       "implementation": "./karma/vite",
       "schema": "./karma/schema.json",
       "description": "小程序测试（Vite 打包 + karma runner，不依赖 webpack）"

@@ -13,7 +13,10 @@
     "lib": [
       "ES2021"
     ],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ]
   },
   "files": [
     "./index.ts"

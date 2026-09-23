@@ -2,11 +2,6 @@ import { dirname, join, normalize, strings } from '@angular-devkit/core';
 import { createCssSelectorForTs } from 'cyia-code-util';
 import ts from 'typescript';
 import type { Plugin } from 'vite';
-import type {
-  LibraryTemplateScopeService,
-  ExtraTemplateData as ScopeExtraTemplateData,
-} from '../../application/library-template-scope.service';
-import type { LibraryTemplateLiteralConvertOptions } from '../../application/type';
 import {
   GLOBAL_TEMPLATE_SUFFIX,
   LIBRARY_COMPONENT_METADATA_SUFFIX,
@@ -17,6 +12,11 @@ import type {
   ExtraTemplateData,
 } from '../../library/type';
 import { BuildPlatform } from '../../platform/platform';
+import type {
+  LibraryTemplateScopeService,
+  ExtraTemplateData as ScopeExtraTemplateData,
+} from '../../shared/library-template-scope.service';
+import type { LibraryTemplateLiteralConvertOptions } from '../../shared/type';
 import { libraryTemplateScopeName, literalResolve } from '../../util';
 import { toPosixPath } from '../../util/asset-path';
 

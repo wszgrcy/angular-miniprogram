@@ -47,23 +47,39 @@ function isRfBitTest(expr: ts.Expression, bit: number): boolean {
 }
 
 /** 只扫函数体顶层，不递归进嵌套的嵌入式模板函数 */
+/**
+ * 取 `if (rf & <bit>) ...` 的 then 部分。
+ *
+ * 两种排版都要认：
+ *   - webpack / 手写：`if (rf & 2) { a(); b(); }`  → Block
+ *   - Vite/esbuild 压缩后：`if (rf & 2) m.propertyChange(m.ɵɵgetCurrentView());`
+ *     → **无花括号的单语句**，then 是 ExpressionStatement 而非 Block
+ *
+ * 只认 Block 会让 vite 产物整体检测不到注入（branch=null → 误报 missed），
+ * 而注入其实是发生了的。
+ */
 function findTopLevelRfBlock(
   fn: ts.FunctionLikeDeclaration,
   bit: number
-): ts.Block | undefined {
+): ts.Statement | undefined {
   const body = fn.body;
   if (!body || !ts.isBlock(body)) {
     return undefined;
   }
   for (const stmt of body.statements) {
     if (ts.isIfStatement(stmt) && isRfBitTest(stmt.expression, bit)) {
-      const then = stmt.thenStatement;
-      if (ts.isBlock(then)) {
-        return then;
-      }
+      return stmt.thenStatement;
     }
   }
   return undefined;
+}
+
+/** Block 取其 statements，单语句视为长度为 1 的数组 */
+function statementsOf(node: ts.Statement | undefined): ts.Statement[] {
+  if (!node) {
+    return [];
+  }
+  return ts.isBlock(node) ? Array.from(node.statements) : [node];
 }
 
 function pickProperty(
@@ -179,7 +195,7 @@ function analyzeDefineComponent(
   const fn: ts.FunctionLikeDeclaration = templateInit;
   const initBlock = findTopLevelRfBlock(fn, 1);
   const updateBlock = findTopLevelRfBlock(fn, 2);
-  const updateStatements = updateBlock?.statements ?? [];
+  const updateStatements = statementsOf(updateBlock);
   const calls = updateBlock
     ? collectPropertyChangeCalls(updateBlock, sf).filter(
         (c) => c.arguments.length > 0

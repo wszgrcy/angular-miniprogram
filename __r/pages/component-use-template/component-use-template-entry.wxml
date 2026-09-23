@@ -1,3 +1,0 @@
-<import src="/self-template/self.wxml"/><block wx:if="{{hasLoad}}"><block wx:for="{{nodeList[0]}}" wx:key="index">
-      <template is="{{item.__templateName||'$$mp$$TestLibrary$$first'}}" data="{{...nodeList[0][index] }}"></template>
-      </block><app-outside-template nodePath="{{nodePath}}" nodeIndex="2" class="{{nodeList[2].class}}" style="{{nodeList[2].style}}" ></app-outside-template><view  class="{{nodeList[3].class}}" style="{{nodeList[3].style}}" >下面的是调用library内组件的其他组件模板</view><app-global-self-template nodePath="{{nodePath}}" nodeIndex="5" class="{{nodeList[5].class}}" style="{{nodeList[5].style}}" ></app-global-self-template></block>

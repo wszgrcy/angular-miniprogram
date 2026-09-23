@@ -6,22 +6,21 @@ import * as path from 'path';
 import { Injector } from 'static-injector';
 import ts from 'typescript';
 import type { Plugin } from 'vite';
-import { LibraryTemplateScopeService } from '../../application/library-template-scope.service';
-import { MiniProgramApplicationAnalysisService } from '../../application/mini-program-application-analysis.service';
+import { CustomStyleSheetProcessor } from '../../library/stylesheet-processor';
+import { BuildPlatform } from '../../platform/platform';
+import { LibraryTemplateScopeService } from '../../shared/library-template-scope.service';
+import { MiniProgramApplicationAnalysisService } from '../../shared/mini-program-application-analysis.service';
 import {
+  COMPILER_HOST,
   OLD_BUILDER,
   PAGE_PATTERN_TOKEN,
   TS_CONFIG_TOKEN,
   TS_SYSTEM,
-  WEBPACK_COMPILATION,
-  WEBPACK_COMPILER,
-} from '../../application/token';
+} from '../../shared/token';
 import type {
   LibraryTemplateLiteralConvertOptions,
   PagePattern,
-} from '../../application/type';
-import { CustomStyleSheetProcessor } from '../../library/stylesheet-processor';
-import { BuildPlatform } from '../../platform/platform';
+} from '../../shared/type';
 import { literalResolve } from '../../util';
 import { toPosixPath } from '../../util/asset-path';
 import { collectAssets } from '../copy-assets';
@@ -138,8 +137,7 @@ export function miniProgramAssetsPlugin(
     const injector = Injector.create({
       providers: [
         { provide: MiniProgramApplicationAnalysisService },
-        { provide: WEBPACK_COMPILATION, useValue: undefined },
-        { provide: WEBPACK_COMPILER, useValue: stubCompiler },
+        { provide: COMPILER_HOST, useValue: stubCompiler },
         { provide: OLD_BUILDER, useValue: undefined },
         { provide: TS_SYSTEM, useValue: system },
         {

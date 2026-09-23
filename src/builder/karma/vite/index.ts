@@ -4,7 +4,7 @@ import type { AssetPattern } from '@angular-devkit/build-angular';
 import * as path from 'path';
 import { Observable } from 'rxjs';
 import type { InlineConfig } from 'vite';
-import { LibraryTemplateScopeService } from '../../application/library-template-scope.service';
+import { LibraryTemplateScopeService } from '../../shared/library-template-scope.service';
 import {
   buildPlatformDefine,
   buildViteAlias,

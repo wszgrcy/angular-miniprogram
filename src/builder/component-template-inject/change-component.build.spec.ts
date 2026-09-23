@@ -12,8 +12,8 @@ import {
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
 import { analyzeFileInjection } from '../../../test/util/template-inject-ast';
-import { runBuilder } from '../application';
 import { PlatformType } from '../platform/platform';
+import { runViteBuilder as runBuilder } from '../vite';
 
 /**
  * 端到端校验 changeComponent 在真实构建产物里对组件 template 函数的改写。

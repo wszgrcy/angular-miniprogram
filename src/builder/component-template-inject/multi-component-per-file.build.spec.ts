@@ -12,8 +12,8 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
-import { runBuilder } from '../application';
 import { PlatformType } from '../platform/platform';
+import { runViteBuilder as runBuilder } from '../vite';
 
 /**
  * 同文件多组件支持。

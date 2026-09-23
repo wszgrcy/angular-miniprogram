@@ -1,2 +1,0 @@
-<import src="/self-template/self.wxml"/><block wx:if="{{hasLoad}}"><app-life-time-component nodePath="{{nodePath}}" nodeIndex="0" class="{{nodeList[0].class}}" style="{{nodeList[0].style}}" ></app-life-time-component> 页面显示
-</block>
