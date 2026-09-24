@@ -6,11 +6,9 @@ import {
   fileBufferToString,
   stringToFileBuffer,
 } from '@code-recycle/cli';
-const templateName = `__templateName`;
 
-function getTemplateNameExpressionStr(templateRefName: string) {
-  return `(${templateRefName} as any)._declarationTContainer.localNames?(${templateRefName} as any)._declarationTContainer.localNames[0]:null`;
-}
+// 注：原先这里的 `templateName` 常量与 `getTemplateNameExpressionStr()`
+// 是给 common 那 4 个指令 patch 拼表达式用的，patch 已移除，故一并删除。
 let fn: ScriptFunction = async (util, rule, host, injector) => {
   let path = util.path;
 
@@ -112,127 +110,19 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
     await completePromise(host.write(path.normalize(key), buffer));
   }
   let list = await util.changeList([
-    {
-      path: './common/src/directives/ng_for_of.ts',
-      list: [
-        {
-          query: `Constructor>CloseParenToken`,
-          insertBefore: true,
-          replace: `public ${templateName}:string`,
-        },
-        {
-          query: `NewExpression:like(new NgForOfContext)>CloseParenToken`,
-          insertBefore: true,
-          replace: `,${getTemplateNameExpressionStr('this._template')}`,
-        },
-      ],
-    },
-    {
-      path: './common/src/directives/ng_if.ts',
-      list: [
-        {
-          query: `IfStatement:has(>PrefixUnaryExpression:like(this._thenViewRef) ) CallExpression:like(this._viewContainer.createEmbeddedView)>OpenParenToken+*::children(2)`,
-          replace: `{...{{''|ctxValue}},${templateName}:${getTemplateNameExpressionStr(
-            'this._thenTemplateRef'
-          )}}`,
-        },
-        {
-          query: `IfStatement:has(>PrefixUnaryExpression:like(this._elseViewRef) ) CallExpression:like(this._viewContainer.createEmbeddedView)>OpenParenToken+*::children(2)`,
-          replace: `{...{{''|ctxValue}},${templateName}:${getTemplateNameExpressionStr(
-            'this._elseTemplateRef'
-          )}}`,
-        },
-        {
-          query: `ClassDeclaration:has(>Identifier[value=NgIfContext])>CloseBraceToken`,
-          insertBefore: true,
-          replace: `public ${templateName}!:string`,
-        },
-      ],
-    },
-    {
-      path: `./common/src/directives/ng_switch.ts`,
-      list: [
-        {
-          query: `CallExpression:like(this._viewContainerRef.createEmbeddedView)>CloseParenToken`,
-          insertBefore: true,
-          replace: `,{${templateName}:${getTemplateNameExpressionStr(
-            'this._templateRef'
-          )}}`,
-        },
-      ],
-    },
-    {
-      path: `./common/src/directives/ng_template_outlet.ts`,
-      list: [
-        {
-          query: `CallExpression:like(viewContainerRef.createEmbeddedView)>OpenParenToken+*::children(2)`,
-          replace: `{...{{''|ctxValue}},${templateName}:${getTemplateNameExpressionStr(
-            'this.ngTemplateOutlet'
-          )}}as any`,
-        },
-      ],
-    },
-    {
-      path: `./common/src/common.ts`,
-      list: [
-        {
-          query: `ExportDeclaration:has(StringLiteral[value*=i18n])`,
-          delete: true,
-          multi: true,
-        },
-        {
-          query: `ExportSpecifier[value^=I18n]:use(*,*+*)`,
-          delete: true,
-          multi: true,
-        },
-        {
-          query: `ExportSpecifier[value=NgComponentOutlet]:use(*,*+*)`,
-          delete: true,
-          multi: true,
-        },
-      ],
-    },
-    {
-      path: `./common/src/pipes/index.ts`,
-      list: [
-        {
-          query: `ImportDeclaration:has(Identifier[value^=I18n])`,
-          multi: true,
-          delete: true,
-        },
-        {
-          query: `ExportSpecifier[value^=I18n]:use(*,*+*)`,
-          delete: true,
-          multi: true,
-        },
-        {
-          query: `ArrayLiteralExpression Identifier[value^=I18n]:use(*,*+*)`,
-          delete: true,
-          multi: true,
-        },
-      ],
-    },
-    {
-      path: `./common/src/directives/index.ts`,
-      list: [
-        {
-          query: `ImportDeclaration:has(Identifier[value=NgComponentOutlet])`,
-          multi: true,
-          delete: true,
-        },
-        {
-          query: `ExportSpecifier[value=NgComponentOutlet]:use(*,*+*)`,
-          delete: true,
-          multi: true,
-        },
-        {
-          query: `ArrayLiteralExpression Identifier[value=NgComponentOutlet]:use(*,*+*)`,
-          delete: true,
-          multi: true,
-        },
-      ],
-    },
-  ]);
+    /**
+     * 原先这里有 7 条针对 `./common/**` 的 AST patch：
+     *   - ng_for_of / ng_if / ng_switch / ng_template_outlet 注入 __templateName
+     *   - common.ts / directives/index.ts / pipes/index.ts 删 i18n 与 NgComponentOutlet
+     *
+     * 已全部移除：`packages/common` 不再 sync（见上方 gitClone 排除列表），
+     * `angular-miniprogram/common` 现为指向官方 @angular/common 的薄再导出。
+     *
+     * __templateName 改由 fork 自己的 lViewToWXView 从
+     * tView.declTNode.localNames[0] 推导（实测与 patch 读的是同一个 TNode），
+     * 覆盖见 src/library/platform/template-name-coverage.spec.ts。
+     */
+])  ]);
   await util.updateChangeList(list);
 };
 export default fn;
