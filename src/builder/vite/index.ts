@@ -1,6 +1,5 @@
 import type { BuilderContext, BuilderOutput } from '@angular-devkit/architect';
 import { createBuilder } from '@angular-devkit/architect';
-import type { AssetPattern } from '@angular-devkit/build-angular';
 import { getSystemPath } from '@angular-devkit/core';
 import * as path from 'path';
 import { Observable } from 'rxjs';
@@ -10,6 +9,7 @@ import { changeComponent } from '../component-template-inject/change-component';
 import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
+import type { AssetPattern } from '../shared/asset-pattern';
 import { LibraryTemplateScopeService } from '../shared/library-template-scope.service';
 import {
   generateEntryPatterns,

@@ -1,5 +1,4 @@
 import type { BuilderContext } from '@angular-devkit/architect';
-import type { AssetPattern } from '@angular-devkit/build-angular';
 import {
   type Path,
   getSystemPath,
@@ -9,6 +8,7 @@ import {
 import * as glob from 'glob';
 import * as path from 'path';
 import type { BuildPlatform } from '../platform/platform';
+import type { AssetPattern } from '../shared/asset-pattern';
 import type { PagePattern } from '../shared/type';
 import { normalizeAssetPatternsSafe , toPosixPath } from '../util/asset-path';
 

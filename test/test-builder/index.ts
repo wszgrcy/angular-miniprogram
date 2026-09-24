@@ -1,31 +1,24 @@
-import { BuilderContext } from '@angular-devkit/architect';
-import {
-  BrowserBuilderOptions,
-  ExecutionTransformer,
-  executeBrowserBuilder,
-  AssetPattern,
-  KarmaBuilderOptions,
-} from '@angular-devkit/build-angular';
 import * as path from 'path';
-import * as webpack from 'webpack';
 import { PlatformType } from '../../src/builder/platform';
+import type { AssetPattern } from '../../src/builder/shared/asset-pattern';
 
-export type CustomWebpackBrowserSchema = BrowserBuilderOptions;
-
-export function buildWebpackBrowserGenerate(
-  webpackConfiguration: (
-    options: BrowserBuilderOptions,
-    context: BuilderContext
-  ) => ExecutionTransformer<webpack.Configuration>
-) {
-  return (
-    options: CustomWebpackBrowserSchema,
-    context: BuilderContext
-  ): ReturnType<typeof executeBrowserBuilder> => {
-    return executeBrowserBuilder(options, context, {
-      webpackConfiguration: webpackConfiguration(options, context),
-    });
-  };
+/**
+ * `DEFAULT_ANGULAR_KARMA_CONFIG` 用到的 karma 选项子集。
+ *
+ * 原本标的是 `@angular-devkit/build-angular` 的 `KarmaBuilderOptions`，
+ * 但迁 Vite 后本仓库已不再依赖该包（它是把整串 webpack 生态拖进
+ * node_modules 的唯一入口）。而且消费方（`karma/vite/build.spec.ts`）
+ * 拿到后立刻 `as KarmaViteBuilderOptions` 转掉，这里的类型只是
+ * 供字面量自检，所以只声明真正用到的字段。
+ */
+interface KarmaConfigFields {
+  karmaConfig: string;
+  main: string;
+  tsConfig: string;
+  watch: boolean;
+  styles: unknown[];
+  assets: AssetPattern[];
+  sourceMap: boolean;
 }
 
 export const BROWSER_BUILDER_INFO = {
@@ -74,7 +67,7 @@ export const DEFAULT_ANGULAR_CONFIG = {
   scripts: [],
   aot: true,
 };
-export const DEFAULT_ANGULAR_KARMA_CONFIG: KarmaBuilderOptions & {
+export const DEFAULT_ANGULAR_KARMA_CONFIG: KarmaConfigFields & {
   pages: AssetPattern[];
 
   components: AssetPattern[];

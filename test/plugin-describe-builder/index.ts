@@ -4,12 +4,7 @@ import type { TestProjectHost } from '@angular-devkit/architect/testing';
 
 import { Path, join, normalize } from '@angular-devkit/core';
 import { virtualFs } from '@angular-devkit/core';
-import type { Configuration } from 'webpack';
 let { fileBufferToString, stringToFileBuffer } = virtualFs;
-
-export interface TestContext {
-  buildSuccess: (webpackConfig: Configuration) => void;
-}
 
 export class MyTestProjectHost {
   constructor(private host: TestProjectHost) {}

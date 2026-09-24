@@ -32,11 +32,6 @@ import {
   mergeMap,
   shareReplay,
 } from 'rxjs/operators';
-import type { Configuration } from 'webpack';
-
-export interface TestContext {
-  buildSuccess: (webpackConfig: Configuration) => void;
-}
 
 export let host: TestProjectHost;
 
@@ -83,7 +78,6 @@ export interface BuilderHarnessExecutionOptions {
   outputLogsOnFailure: boolean;
   outputLogsOnException: boolean;
   useNativeFileWatching: boolean;
-  testContext?: TestContext;
 }
 
 export interface BuilderHarnessExecutionResult<
