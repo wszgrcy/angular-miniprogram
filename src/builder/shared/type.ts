@@ -1,6 +1,6 @@
+import type { AssetPattern } from '@angular-devkit/build-angular';
 import { LibraryComponentEntryMeta } from '../library';
 import { BuildPlatform, PlatformFileExtname } from '../platform';
-import type { AssetPattern } from './asset-pattern';
 
 export interface LibraryTemplateLiteralConvertOptions {
   directivePrefix: string;

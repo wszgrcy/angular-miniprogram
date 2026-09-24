@@ -1,7 +1,7 @@
+import type { AssetPattern } from '@angular-devkit/build-angular';
+import { normalizeAssetPatterns } from '@angular-devkit/build-angular/src/utils';
 import { type Path, getSystemPath, normalize } from '@angular-devkit/core';
 import * as path from 'path';
-import type { AssetPattern } from '../shared/asset-pattern';
-import { normalizeAssetPatterns } from '../shared/normalize-asset-patterns';
 
 /**
  * 剥掉 devkit posix 化 Windows 路径的前导斜杠。

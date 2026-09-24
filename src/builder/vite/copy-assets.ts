@@ -1,8 +1,8 @@
+import type { AssetPattern } from '@angular-devkit/build-angular';
 import { type Path, normalize } from '@angular-devkit/core';
 import * as fs from 'fs';
 import * as glob from 'glob';
 import * as path from 'path';
-import type { AssetPattern } from '../shared/asset-pattern';
 import { normalizeAssetPatternsSafe } from '../util/asset-path';
 
 function globAsync(pattern: string, options: glob.IOptions) {

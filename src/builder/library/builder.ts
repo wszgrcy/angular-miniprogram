@@ -12,11 +12,11 @@ import {
   BuilderOutput,
   createBuilder,
 } from '@angular-devkit/architect';
+import { normalizeCacheOptions } from '@angular-devkit/build-angular/src/utils/normalize-cache';
 import { join, resolve } from 'path';
 import { Observable, from, of } from 'rxjs';
 import { catchError, mapTo, switchMap } from 'rxjs/operators';
 import { ngPackagrFactory } from './ng-packagr-factory';
-import { normalizeCacheOptions } from './normalize-cache';
 
 /**
  * @experimental Direct usage of this function is considered experimental.

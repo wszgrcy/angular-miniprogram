@@ -1,9 +1,9 @@
 import type { BuilderContext, BuilderOutput } from '@angular-devkit/architect';
 import { createBuilder } from '@angular-devkit/architect';
+import type { AssetPattern } from '@angular-devkit/build-angular';
 import * as path from 'path';
 import { Observable } from 'rxjs';
 import type { InlineConfig } from 'vite';
-import type { AssetPattern } from '../../shared/asset-pattern';
 import { LibraryTemplateScopeService } from '../../shared/library-template-scope.service';
 import {
   buildPlatformDefine,

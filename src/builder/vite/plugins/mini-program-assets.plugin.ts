@@ -1,4 +1,5 @@
 import type { BuilderContext } from '@angular-devkit/architect';
+import type { AssetPattern } from '@angular-devkit/build-angular';
 import type { Path } from '@angular-devkit/core';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -7,7 +8,6 @@ import ts from 'typescript';
 import type { Plugin } from 'vite';
 import { CustomStyleSheetProcessor } from '../../library/stylesheet-processor';
 import { BuildPlatform } from '../../platform/platform';
-import type { AssetPattern } from '../../shared/asset-pattern';
 import { LibraryTemplateScopeService } from '../../shared/library-template-scope.service';
 import { MiniProgramApplicationAnalysisService } from '../../shared/mini-program-application-analysis.service';
 import {
