@@ -1,14 +1,17 @@
 /**
  * 构建前置检查：
  *
- * `src/library/common/**` 与 `src/library/forms/src/**`（除少量手写的 value accessor 之外）
- * 都不进版本库（见 src/library/common/.gitignore、src/library/forms/.gitignore），
- * 而是由 `npm run sync`（code-recycle）从 angular/angular@17.3.1 同步生成。
+ * `src/library/forms/src/**`（除少量手写的 value accessor 之外）不进版本库
+ * （见 src/library/forms/.gitignore），而是由 `npm run sync`（code-recycle）
+ * 从 angular/angular 同步生成。
  *
  * 如果没执行过 sync 就直接构建，ng-packagr 会报
- * `TS6053: File '.../src/library/common/http/index.ts' not found`。
+ * `TS6053: File '.../src/library/forms/src/validators.ts' not found`。
  *
  * 这里在构建 library 之前自动检测一次，缺失时自动补跑 `npm run sync`。
+ *
+ * 注：`src/library/common/**` 以前也在这里，现已不再同步也不保留
+ * 转发层——库与测试应用都直接 import 官方 `@angular/common`。
  */
 import { spawnSync } from 'child_process';
 import * as fs from 'fs';
@@ -17,8 +20,8 @@ import * as path from 'path';
 const root = path.resolve(__dirname, '..');
 
 const requiredFiles = [
-  'src/library/common/index.ts',
-  'src/library/common/http/index.ts',
+  // 只有 forms 还走 sync。`common` / `common/http` 已不再同步
+  // （库直接用官方 @angular/common），所以不再要求它们的文件。
   'src/library/forms/src/validators.ts',
 ];
 

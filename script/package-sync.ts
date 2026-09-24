@@ -3,8 +3,6 @@ import {
   type ScriptFunction,
   type FileQueryLayer,
   completePromise,
-  fileBufferToString,
-  stringToFileBuffer,
 } from '@code-recycle/cli';
 
 // 注：原先这里的 `templateName` 常量与 `getTemplateNameExpressionStr()`
@@ -123,43 +121,15 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
     'forms/src/forms.ts',
   ];
 
-  /**
-   * Angular 19 起 `packages/common/http` 内部改用相对路径（如 `../../index`）
-   * 引用 `@angular/common`（18 及以前是直接写 `@angular/common`）。
-   * 直接保留相对路径会让 ng-packagr 跨 entry point 取源码，报
-   * TS6059（不在 rootDir 下），因此统一改写为库的公开入口。
-   */
-  function rewriteCrossEntryPointImports(filePath: string, content: string) {
-    return content.replace(
-      /(from\s+')((?:\.\.\/)+index)(')/g,
-      (match, prefix: string, spec: string, suffix: string) => {
-        const resolved = path
-          .normalize(path.join(path.dirname(filePath), spec))
-          .split('\\')
-          .join('/');
-        if (/^common(\/[^/]+)*\/index$/.test(resolved)) {
-          const entryDir = resolved.replace(/\/index$/, '');
-          return `${prefix}angular-miniprogram/${entryDir}${suffix}`;
-        }
-        return match;
-      }
-    );
-  }
-
   for (const key in data) {
     if (exclude.includes(key)) {
       continue;
     }
-    let buffer = data[key];
-    if (key.startsWith('common')) {
-      let content = fileBufferToString(buffer).replace(
-        /@angular\/common/g,
-        `angular-miniprogram/common`
-      );
-      content = rewriteCrossEntryPointImports(key, content);
-      buffer = stringToFileBuffer(content);
-    }
-    await completePromise(host.write(path.normalize(key), buffer));
+    // 直接写入。原先这里有一个 `key.startsWith('common')` 分支做
+    // `@angular/common` → `angular-miniprogram/common` 的重定根与
+    // 跳 entry point 路径改写，但 `packages/common` 已不再 sync，
+    // 该分支永不命中，已删。
+    await completePromise(host.write(path.normalize(key), data[key]));
   }
   let list = await util.changeList([
     /**

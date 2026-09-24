@@ -1,4 +1,4 @@
-import { CommonModule } from 'angular-miniprogram/common';
+import { CommonModule } from '@angular/common';
 import { LibComp1Module } from 'test-library';
 import { Component3Component } from '../../__components/component3/component3.component';
 import { AppDir1Directive } from './app-dir1.directive';

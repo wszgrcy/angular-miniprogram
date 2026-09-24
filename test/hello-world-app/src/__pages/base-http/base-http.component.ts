@@ -1,7 +1,7 @@
-import { CommonModule } from 'angular-miniprogram/common';
+import { CommonModule } from '@angular/common';
 import { HttpClientModule } from 'angular-miniprogram';
 import { Component, OnInit } from '@angular/core';
-import { HttpClient } from 'angular-miniprogram/common/http';
+import { HttpClient } from '@angular/common/http';
 
 @Component({
   standalone: true,

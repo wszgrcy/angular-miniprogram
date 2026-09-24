@@ -1,6 +1,6 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram';
-import { CommonModule } from 'angular-miniprogram/common';
+import { CommonModule } from '@angular/common';
 
 @Component({
   standalone: true,

@@ -1,4 +1,4 @@
-import { CommonModule } from 'angular-miniprogram/common';
+import { CommonModule } from '@angular/common';
 import { LifeTimeComponent } from '../../__components/life-time/life-time.component';
 import { Component, OnInit } from '@angular/core';
 import { MiniProgramComponentInstance } from 'angular-miniprogram/platform/type';

@@ -1,4 +1,4 @@
-import { CommonModule } from 'angular-miniprogram/common';
+import { CommonModule } from '@angular/common';
 import { ComponentNeedTemplateModule } from '../../__components/component-need-template/component-need-template.module';
 import { Component, OnInit } from '@angular/core';
 

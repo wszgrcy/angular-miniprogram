@@ -1,4 +1,4 @@
-import { CommonModule } from 'angular-miniprogram/common';
+import { CommonModule } from '@angular/common';
 import { Component1Module } from '../../__components/component1/component1.module';
 import { Component2Module } from '../../__components/component2/component2.module';
 import { Component, OnInit } from '@angular/core';

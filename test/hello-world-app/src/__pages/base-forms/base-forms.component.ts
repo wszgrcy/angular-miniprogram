@@ -1,4 +1,4 @@
-import { CommonModule } from 'angular-miniprogram/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from 'angular-miniprogram/forms';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { Component, OnInit } from '@angular/core';
