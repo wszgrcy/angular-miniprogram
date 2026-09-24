@@ -53,8 +53,12 @@ export interface ViteMiniProgramBuildOptions {
     includePaths?: string[];
   };
   /**
-   * app 引导入口（src/main.ts），里面是
-   * `platformMiniProgram().bootstrapModule(MainModule)`。
+   * app 引导入口（src/main.ts），现在是
+   * `bootstrapApplication({ providers: [...] })`。
+   *
+   * （早期是 `platformMiniProgram().bootstrapModule(MainModule)`，
+   * 已随启动 provider 化改造换掉，见 `platform/application.ts`。
+   * 入口这个字段本身的作用没变。）
    *
    * 之前漏了这个字段（在「schema 接受但 builder 不读」那批里），
    * 导致产物里没有 app 引导，app.js 只能把所有 chunk 全 require 一遍

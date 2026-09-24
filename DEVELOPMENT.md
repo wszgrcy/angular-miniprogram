@@ -365,6 +365,8 @@ Options<{}, {}, {}>            ->  Options<{}, {}, {}, []>
 | `createNgModuleRef` 移除            | 改用 `createNgModule`（签名一致）                                                                                                                                                                                                      |
 | `ComponentFactoryResolver` 整体移除 | `NgModuleRef.componentFactoryResolver` 也没了。废弃的 `pageStartup(module, component)` 路径改为用模块 injector 当 `environmentInjector` 走 `createComponent`                                                                           |
 | `@content` 新块                     | 内容查询块，依赖运行时 content query 观察投影内容并重渲染。小程序 slot / self 模板是静态的，对不上，按 `@defer` 先例显式抛错                                                                                                           |
+| **ICU 消息**（`{x, plural/select}`） | 编译成 `ɵɵpipe` + `I18nSelect` 动态切换子模板。**实测该节点会真的出现在 `parseTemplate` 结果里**，而 `visitIcu` 曾是空实现 → 整段内容静默消失 + 后续节点槽位错位且不报错。现显式抛错。注：这**不是「做不到」**——本 fork 已有的 `__templateName`（`<template is="{{item.__templateName}}">`）恰好就是它需要的能力，只是未实现 |
+| **`<ng-content>` fallback 内容**     | 实测空标签与纯空白会被 Angular 归一成 `children = []`，只有写了兜底才有子节点。小程序 `<slot>` 无 fallback 能力，对非空 children 显式抛错（已确认仓内无此用法，不打破现有代码）                                                              |
 | `Object.hasOwn`                     | 同步过来的 `@angular/common` 用到 ES2022 的 `Object.hasOwn`，库的 `lib` 从 es2019 提到 es2022                                                                                                                                          |
 
 ### 升级操作清单（21/22 修订版）
