@@ -1,7 +1,22 @@
 import * as fs from 'fs';
+import { createRequire } from 'module';
 import * as path from 'path';
 
 import { LVIEW } from './lview-layout';
+
+/**
+ * 不能用全局 `require.resolve`。
+ *
+ * `platform-core.ts` 带了 `/// <reference types="miniprogram-api-typings"/>`，
+ * 而该包声明了**全局** `interface Require` + `declare const require: Require`。
+ * 本文件与它同处一个编译单元，全局 `require` 就被小程序那一版接管——
+ * 而小程序的 `require` 只有 `()` 和 `.async()`，**没有 `resolve`**，
+ * 于是 TS2339。
+ *
+ * `createRequire` 由 `@types/node` 完整 typing，不碰全局名字，
+ * 两个类型体系互不干扰。
+ */
+const nodeRequire = createRequire(__filename);
 
 /**
  * 防「静默错位」的守卫。
@@ -32,7 +47,7 @@ describe('lview-layout: 与已安装 @angular/core 交叉校验', () => {
    * 平台无关（Windows 下返回原生 C:\... 路径）、深度无关、
    * 提升无关，且 fesm 版本自动跟随。
    */
-  const coreEntry = require.resolve('@angular/core');
+  const coreEntry = nodeRequire.resolve('@angular/core');
   const fesmDir = path.dirname(coreEntry);
 
   let bundleSource = '';
