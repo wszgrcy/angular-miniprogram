@@ -1,10 +1,8 @@
 import { NgModule } from '@angular/core';
-import { withInterceptorsFromDi } from '@angular/common/http';
-import { provideHttpClient } from './provider';
+import { provideHttpClient } from '@angular/common/http';
+import { withMiniProgramRequest } from './provider';
 
 @NgModule({
-  providers: [
-    provideHttpClient(withInterceptorsFromDi())
-  ]
+  providers: [provideHttpClient(withMiniProgramRequest())],
 })
-export class HttpClientModule { }
+export class HttpClientModule {}

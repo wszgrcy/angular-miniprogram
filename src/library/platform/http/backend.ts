@@ -17,6 +17,7 @@ import {
   ɵNotificationSource as NotificationSource,
   Injectable,
   inject,
+  Service,
 } from '@angular/core';
 import { Observable, Observer } from 'rxjs';
 import {
@@ -61,7 +62,7 @@ export const REQUSET_TOKEN = new HttpContextToken<{
  * 不用 `providedIn: 'root'`：本 backend 由 `provideHttpClient()`
  * 显式装配，保持「用户必须显式提供」的语义。
  */
-@Injectable()
+@Service()
 export class MiniprogramHttpBackend implements HttpBackend {
   private readonly changeDetectionScheduler = inject(ChangeDetectionScheduler);
 
@@ -78,17 +79,11 @@ export class MiniprogramHttpBackend implements HttpBackend {
   }
 
   handle(request: HttpRequest<any>): Observable<HttpEvent<any>> {
-    if (
-      request.method === 'POST' &&
-      request.context.has(UPLOAD_FILE_TOKEN)
-    ) {
+    if (request.method === 'POST' && request.context.has(UPLOAD_FILE_TOKEN)) {
       return this.upload(request);
     }
 
-    if (
-      request.method === 'GET' &&
-      request.context.has(DOWNLOAD_FILE_TOKEN)
-    ) {
+    if (request.method === 'GET' && request.context.has(DOWNLOAD_FILE_TOKEN)) {
       return this.download(request);
     }
 
@@ -102,18 +97,17 @@ export class MiniprogramHttpBackend implements HttpBackend {
   private upload(request: HttpRequest<any>): Observable<HttpEvent<any>> {
     return new Observable((observer: Observer<HttpEvent<any>>) => {
       // The response header event handler
-      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
-        header,
-      }) => {
-        this.runInAngular(() => {
-          observer.next(
-            new HttpHeaderResponse({
-              url: request.url,
-              headers: new HttpHeaders(header),
-            })
-          );
-        });
-      };
+      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback =
+        ({ header }) => {
+          this.runInAngular(() => {
+            observer.next(
+              new HttpHeaderResponse({
+                url: request.url,
+                headers: new HttpHeaders(header),
+              }),
+            );
+          });
+        };
 
       // The upload progress event handler
       const onUpProgressUpdate: WechatMiniprogram.UploadTaskOnProgressUpdateCallback =
@@ -163,7 +157,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
                   body,
                   status,
                   statusText,
-                })
+                }),
               );
               observer.complete();
             } else {
@@ -173,7 +167,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
                   error: body,
                   status,
                   statusText,
-                })
+                }),
               );
             }
           });
@@ -184,7 +178,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
               new HttpErrorResponse({
                 url: request.url,
                 statusText: errMsg,
-              })
+              }),
             );
           });
         },
@@ -215,18 +209,17 @@ export class MiniprogramHttpBackend implements HttpBackend {
   private download(request: HttpRequest<any>): Observable<HttpEvent<any>> {
     return new Observable((observer: Observer<HttpEvent<any>>) => {
       // The response header event handler
-      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
-        header,
-      }) => {
-        this.runInAngular(() => {
-          observer.next(
-            new HttpHeaderResponse({
-              url: request.url,
-              headers: new HttpHeaders(header),
-            })
-          );
-        });
-      };
+      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback =
+        ({ header }) => {
+          this.runInAngular(() => {
+            observer.next(
+              new HttpHeaderResponse({
+                url: request.url,
+                headers: new HttpHeaders(header),
+              }),
+            );
+          });
+        };
 
       // The download progress event handler
       const onDownProgressUpdate: WechatMiniprogram.DownloadTaskOnProgressUpdateCallback =
@@ -265,7 +258,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
                   filePath,
                   tempFilePath,
                   profile,
-                })
+                }),
               );
               observer.complete();
             } else {
@@ -274,7 +267,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
                   url: request.url,
                   status,
                   statusText,
-                })
+                }),
               );
             }
           });
@@ -285,7 +278,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
               new HttpErrorResponse({
                 url: request.url,
                 statusText: errMsg,
-              })
+              }),
             );
           });
         },
@@ -316,23 +309,22 @@ export class MiniprogramHttpBackend implements HttpBackend {
   private request(request: HttpRequest<any>): Observable<HttpEvent<any>> {
     if (['PATCH', 'JSONP'].includes(request.method)) {
       throw Error(
-        'WeChat MiniProgram does not support http method as ' + request.method
+        'WeChat MiniProgram does not support http method as ' + request.method,
       );
     }
     return new Observable((observer: Observer<HttpEvent<any>>) => {
       // The response header event handler
-      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback = ({
-        header,
-      }) => {
-        this.runInAngular(() => {
-          observer.next(
-            new HttpHeaderResponse({
-              url: request.url,
-              headers: new HttpHeaders(header),
-            })
-          );
-        });
-      };
+      const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback =
+        ({ header }) => {
+          this.runInAngular(() => {
+            observer.next(
+              new HttpHeaderResponse({
+                url: request.url,
+                headers: new HttpHeaders(header),
+              }),
+            );
+          });
+        };
       const task = MiniProgramCore.MINIPROGRAM_GLOBAL.request({
         url: request.urlWithParams,
         method: request.method as WechatMiniprogram.RequestOption['method'],
@@ -367,7 +359,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
                   headers,
                   cookies,
                   profile,
-                })
+                }),
               );
               observer.complete();
             } else {
@@ -378,7 +370,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
                   status,
                   statusText,
                   headers,
-                })
+                }),
               );
             }
           });
@@ -389,7 +381,7 @@ export class MiniprogramHttpBackend implements HttpBackend {
               new HttpErrorResponse({
                 url: request.url,
                 statusText: errMsg,
-              })
+              }),
             );
           });
         },
@@ -413,9 +405,12 @@ export class MiniprogramHttpBackend implements HttpBackend {
   }
 
   private buildHeaders(request: HttpRequest<any>): { [key: string]: string } {
-    return request.headers.keys().reduce((headers, name) => {
-      headers[name] = request.headers.getAll(name)!.join(',');
-      return headers;
-    }, {} as { [key: string]: string });
+    return request.headers.keys().reduce(
+      (headers, name) => {
+        headers[name] = request.headers.getAll(name)!.join(',');
+        return headers;
+      },
+      {} as { [key: string]: string },
+    );
   }
 }

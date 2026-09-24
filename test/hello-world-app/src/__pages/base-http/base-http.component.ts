@@ -1,11 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { HttpClientModule } from 'angular-miniprogram';
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 @Component({
   standalone: true,
-  imports: [CommonModule, HttpClientModule],
+  imports: [CommonModule],
   selector: 'app-base-http',
   templateUrl: './base-http.component.html',
   styleUrls: ['./base-http.component.css'],

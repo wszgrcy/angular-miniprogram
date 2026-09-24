@@ -52,34 +52,3 @@ export function withMiniProgramRequest(): HttpFeature<HttpFeatureKind.Xhr> {
     ],
   };
 }
-
-/**
- * 小程序版的 `provideHttpClient`。
- *
- * 与官方同签名，额外做两件事：
- *   - 强制装上 `MiniprogramHttpBackend`（以 feature 形式，排在最后）
- *   - 拒绝 `withFetch()` / `withXhr()`——小程序里没有 `fetch` 也没有
- *     `XMLHttpRequest`，这两个 feature 传进来不可能生效，与其静默覆盖
- *     用户显式写下的配置，不如直接报错。
- */
-export function provideHttpClient(
-  ...features: HttpFeature<HttpFeatureKind>[]
-): EnvironmentProviders {
-  const kinds = new Set(features.map((f) => f.ɵkind));
-  if (
-    kinds.has(HttpFeatureKind.Fetch) ||
-    kinds.has(HttpFeatureKind.Xhr)
-  ) {
-    throw new Error(
-      'provideHttpClient(): 小程序环境没有 fetch / XMLHttpRequest，' +
-        'withFetch() 与 withXhr() 在此不可用。请求一律走 wx.request()，' +
-        '请移除该 feature。',
-    );
-  }
-
-  // 把我们的 backend 作为 feature 交给官方装配，而不是在外面追加 provider。
-  // 这样 backend 的绑定顺序、devMode 校验都由 provideHttpClient 统一管理。
-  return makeEnvironmentProviders([
-    ngProvideHttpClient(...features, withMiniProgramRequest()),
-  ]);
-}

@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import {
   ApplicationModule,
   ErrorHandler,
@@ -11,6 +10,7 @@ import {
   MiniProgramRendererFactory,
 } from 'angular-miniprogram/platform/wx';
 import { PageService } from './page.service';
+import { HttpClientModule } from './http';
 
 function errorHandler(): ErrorHandler {
   return new ErrorHandler();
@@ -18,7 +18,7 @@ function errorHandler(): ErrorHandler {
 
 @NgModule({
   declarations: [],
-  imports: [CommonModule, ApplicationModule],
+  imports: [ApplicationModule, HttpClientModule],
   providers: [
     { provide: ɵINJECTOR_SCOPE, useValue: 'root' },
     { provide: ErrorHandler, useFactory: errorHandler, deps: [] },
@@ -30,7 +30,7 @@ function errorHandler(): ErrorHandler {
     PageService,
     ComponentFinderService,
   ],
-  exports: [CommonModule, ApplicationModule],
+  exports: [ApplicationModule],
 })
 export class MiniProgramModule {
   constructor(pageService: PageService) {

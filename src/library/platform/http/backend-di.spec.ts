@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Injectable, Injector, inject } from '@angular/core';
-import { HttpBackend } from '@angular/common/http';
+import { HttpBackend, provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 
 import { MiniprogramHttpBackend } from './backend';
-import { provideHttpClient } from './provider';
 import { initMiniProgramTestEnv } from '../test-util/init-env';
+import { withMiniProgramRequest } from './provider';
 
 /**
  * `MiniprogramHttpBackend` 的 DI 回归测试。
@@ -61,7 +61,7 @@ describe('MiniprogramHttpBackend 依赖注入', () => {
 
   it('provideHttpClient() 把 HttpBackend 指向 MiniprogramHttpBackend', () => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient()],
+      providers: [provideHttpClient(withMiniProgramRequest())],
     });
 
     const backend = TestBed.inject(HttpBackend);
