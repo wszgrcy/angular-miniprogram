@@ -1,0 +1,96 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { HttpBackend, withFetch, withXhr, withInterceptors } from '@angular/common/http';
+import { TestBed } from '@angular/core/testing';
+
+import { MiniprogramHttpBackend } from './backend';
+import { provideHttpClient, withMiniProgramRequest } from './provider';
+import { initMiniProgramTestEnv } from '../test-util/init-env';
+
+/**
+ * `provideHttpClient` / `withMiniProgramRequest` 的装配语义。
+ *
+ * 官方 `withFetch` 的实现是
+ * `makeHttpFeature(HttpFeatureKind.Fetch, [FetchBackend, {provide: HttpBackend, useExisting: FetchBackend}])`
+ * —— backend 走 **feature 机制**，不是在外面往 providers 里追加。
+ * 本模块必须同构，否则用户显式传的 backend feature 会被静默覆盖，
+ * 且绕过 provideHttpClient 的 devMode 校验。
+ */
+describe('http provider（feature 装配）', () => {
+  beforeEach(() => {
+    initMiniProgramTestEnv();
+  });
+
+  describe('withMiniProgramRequest 是合法的 HttpFeature', () => {
+    it('带 ɵkind 与 ɵproviders 两个字段', () => {
+      const feature: any = withMiniProgramRequest();
+
+      expect(typeof feature.ɵkind).toBe('number');
+      expect(Array.isArray(feature.ɵproviders)).toBe(true);
+      expect(feature.ɵproviders.length).toBe(2);
+    });
+
+    it('providers 内容是把 HttpBackend 指向本类', () => {
+      const providers: any[] = (withMiniProgramRequest() as any).ɵproviders;
+
+      expect(providers).toContain(MiniprogramHttpBackend);
+
+      const backendBinding = providers.find(
+        (p: any) => p?.provide === HttpBackend,
+      );
+      expect(backendBinding).toBeTruthy();
+      expect(backendBinding.useExisting).toBe(MiniprogramHttpBackend);
+    });
+  });
+
+  describe('provideHttpClient 装配结果', () => {
+    it('HttpBackend 解析为 MiniprogramHttpBackend', () => {
+      TestBed.configureTestingModule({
+        providers: [provideHttpClient()],
+      });
+
+      expect(TestBed.inject(HttpBackend) instanceof MiniprogramHttpBackend).toBe(
+        true,
+      );
+    });
+
+    it('其他 feature（如 withInterceptors）照常透传，不干扰 backend', () => {
+      const interceptor: any = (req: any, next: any) => next.handle(req);
+
+      TestBed.configureTestingModule({
+        providers: [provideHttpClient(withInterceptors([interceptor]))],
+      });
+
+      // backend 仍是小程序的，拦截器 feature 没有把覆盖弄丢
+      expect(TestBed.inject(HttpBackend) instanceof MiniprogramHttpBackend).toBe(
+        true,
+      );
+    });
+  });
+
+  describe('拒绝在小程序里用 fetch / xhr', () => {
+    it('withFetch() 抛错，而不是被静默覆盖', () => {
+      expect(() => provideHttpClient(withFetch() as never)).toThrowError(
+        /小程序环境没有 fetch \/ XMLHttpRequest/,
+      );
+    });
+
+    it('withXhr() 同样抛错', () => {
+      expect(() => provideHttpClient(withXhr() as never)).toThrowError(
+        /小程序环境没有 fetch \/ XMLHttpRequest/,
+      );
+    });
+
+    it('抛错发生在装配阶段，不需要等到注入', () => {
+      // 反向对照：旧写法（在 makeEnvironmentProviders 里追加覆盖）
+      // 不会抛错，用户传的 withFetch() 会被无声吃掉。
+      // 现在必须在调用时就报错。
+      let threw = false;
+      try {
+        provideHttpClient(withFetch() as never);
+      } catch {
+        threw = true;
+      }
+      expect(threw).toBe(true);
+    });
+  });
+});
