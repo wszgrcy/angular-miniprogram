@@ -122,7 +122,7 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
      * tView.declTNode.localNames[0] 推导（实测与 patch 读的是同一个 TNode），
      * 覆盖见 src/library/platform/template-name-coverage.spec.ts。
      */
-])  ]);
+  ]);
   await util.updateChangeList(list);
 };
 export default fn;
