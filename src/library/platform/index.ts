@@ -3,7 +3,7 @@ import './util/fake-document'; // 副作用导入：装 Document 占位物，见
 import { MiniProgramCore } from 'angular-miniprogram/platform/wx';
 
 export * from './http';
-export * from './mini-program.module';
+export * from './application';
 export * from './platform-miniprogram';
 export {
   propertyChange,

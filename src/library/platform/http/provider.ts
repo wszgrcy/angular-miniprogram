@@ -1,9 +1,7 @@
-import { EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
 import {
   HttpBackend,
   HttpFeature,
   HttpFeatureKind,
-  provideHttpClient as ngProvideHttpClient,
 } from '@angular/common/http';
 import { MiniprogramHttpBackend } from './backend';
 

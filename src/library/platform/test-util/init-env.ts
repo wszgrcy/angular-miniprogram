@@ -1,18 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  APP_ID,
-  ApplicationModule,
-  ErrorHandler,
-  Injectable,
-  NgModule,
-  RendererFactory2,
-  ɵINJECTOR_SCOPE,
-} from '@angular/core';
+import { APP_ID, Injectable, NgModule } from '@angular/core';
 import { TestBed, TestComponentRenderer } from '@angular/core/testing';
 
-import { ComponentFinderService } from '../default/component-finder.service';
-import { MiniProgramRendererFactory } from '../default/mini-program.renderer.factory';
-import { PageService } from '../page.service';
+import { provideMiniProgramApp } from '../application';
 import { platformMiniProgram } from '../platform-miniprogram';
 
 /**
@@ -43,20 +33,11 @@ export class MiniProgramTestComponentRenderer extends TestComponentRenderer {
 }
 
 @NgModule({
-  // ApplicationInitStatus 等由 ApplicationModule 提供
-  imports: [ApplicationModule],
+  // provider 列表不再手工镜像，直接用库里的 provideMiniProgramApp()，
+  // 避免两边不同步（以前 MiniProgramModule 改一处就要跟着改这里）。
   providers: [
     { provide: APP_ID, useValue: 'mini-program-test' },
-    // 镜像 MiniProgramModule 的 provider 列表，但**不带它的 ctor**。
-    // 少了 ɵINJECTOR_SCOPE 会导致 ApplicationRef 找不到（作用域不对）。
-    { provide: ɵINJECTOR_SCOPE, useValue: 'root' },
-    MiniProgramRendererFactory,
-    { provide: RendererFactory2, useExisting: MiniProgramRendererFactory },
-    PageService,
-    ComponentFinderService,
-    // MiniProgramModule 用 factory 提供 ErrorHandler；TestBed 这条路不
-    // 经过它，这里补一条同语义的。
-    { provide: ErrorHandler, useFactory: () => new ErrorHandler(), deps: [] },
+    provideMiniProgramApp(),
     {
       provide: TestComponentRenderer,
       useClass: MiniProgramTestComponentRenderer,

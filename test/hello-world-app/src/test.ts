@@ -1,6 +1,5 @@
-import { platformMiniProgram } from 'angular-miniprogram';
+import { bootstrapApplication } from 'angular-miniprogram';
 import { startupTest } from 'angular-miniprogram/karma/client';
-import { MainTestModule } from './main-test.module';
 
 let jasmineRequire = require('jasmine-core/lib/jasmine-core/jasmine.js');
 
@@ -21,9 +20,7 @@ for (const key in obj) {
 }
 jasmine.DEFAULT_TIMEOUT_INTERVAL = 10 * 1000;
 
-platformMiniProgram()
-  .bootstrapModule(MainTestModule)
-  .then((e) => {});
+bootstrapApplication().catch((e) => console.error(e));
 // Then we find all the tests.
 // And load the modules.
 // 因为ng修改了test的获取实例的时机,改为拼在最后面,而启动操作要在最后面的后面,所以使用了延时(网页端正常是因为spec=>component,而小程序目前设计是component spec平行)
