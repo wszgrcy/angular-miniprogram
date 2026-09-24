@@ -15,6 +15,8 @@ import { MiniProgramCore } from 'angular-miniprogram/platform/wx';
 import {
   ɵChangeDetectionScheduler as ChangeDetectionScheduler,
   ɵNotificationSource as NotificationSource,
+  Injectable,
+  inject,
 } from '@angular/core';
 import { Observable, Observer } from 'rxjs';
 import {
@@ -42,10 +44,26 @@ export const REQUSET_TOKEN = new HttpContextToken<{
   timeout?: number;
 }>(() => ({}));
 
+/**
+ * 基于 `wx.request()` 的 `HttpBackend`。
+ *
+ * ## 为什么用 `inject()` 字段初始化器而不是构造函数参数
+ *
+ * 本仓库的 `emitDecoratorMetadata` 是关掉的（见 tsconfig.base.json），
+ * Angular 无法从反射拿到构造参数类型，一旦类又缺少 `@Injectable()`，
+ * DI 就会报 NG0204 `Can't resolve all parameters: (?)`。
+ *
+ * 参照官方 `FetchBackend` 的写法：依赖全部用字段初始化器里的
+ * `inject()` 声明，工厂的 `deps` 为空，完全不依赖元数据反射。
+ * （官方 `HttpXhrBackend` 是另一种可行的写法：构造参数 +
+ * `@Injectable({providedIn: 'root'})`，由 ngtsc 从 AST 推导 deps。）
+ *
+ * 不用 `providedIn: 'root'`：本 backend 由 `provideHttpClient()`
+ * 显式装配，保持「用户必须显式提供」的语义。
+ */
+@Injectable()
 export class MiniprogramHttpBackend implements HttpBackend {
-  constructor(
-    private changeDetectionScheduler: ChangeDetectionScheduler
-  ) {}
+  private readonly changeDetectionScheduler = inject(ChangeDetectionScheduler);
 
   /**
    * 小程序回调里执行 Angular 逻辑，并在结束后调度一次变更检测。
