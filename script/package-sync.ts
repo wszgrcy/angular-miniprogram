@@ -20,8 +20,7 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
     process.env.ANGULAR_REPO || 'https://github.com/angular/angular.git';
 
   let data = await rule.os.gitClone(
-    angularRepo,
-    [
+    angularRepo,    [
       '/packages/common',
       '/packages/forms',
       '!/packages/common/test',
@@ -59,6 +58,59 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
     // Angular 21 起 tag 改成带 `v` 前缀（20.x 及以前是裸版本号）
     'v22.1.7'
   );
+
+  /**
+   * 必须校验 data 完整性。
+   *
+   * ## 为什么
+   *
+   * `gitClone` 的缓存跳过条件是「`<gitCloneTmpDir>/<hash>/packages`
+   * 存在且非空」，**不校验内容、也不校验上次 clone 是否成功**：
+   *
+   *   if (!(await exists(u)) || !(await list(u)).length) { ...clone... }
+   *
+   * 于是首次 clone 中途失败（网络问题）时，git 已经把 `packages/`
+   * 目录建出来了。之后每次 sync：
+   *
+   *   1. 看到 `packages/` 存在且非空 → 跳过整个 clone
+   *   2. 从不完整的目录里读出空 / 残缺的 `data`
+   *   3. 下面的 for 循环无东西可写
+   *   4. **秒级完成、退出码 0、不报任何错**
+   *
+   * 实测确认：手动在缓存里建个 `packages/forms` 后，sync 1 秒
+   * 返回 0，完全不访问网络。
+   *
+   * 没有这道校验，sync 的失败是**静默的**——比报错危险得多。
+   */
+  const syncedKeys = Object.keys(data);
+  const REQUIRED_KEYS = [
+    'forms/src/forms.ts',
+    'forms/src/directives.ts',
+    'forms/src/validators.ts',
+  ];
+  const missingKeys = REQUIRED_KEYS.filter((k) => !syncedKeys.includes(k));
+
+  if (syncedKeys.length === 0 || missingKeys.length > 0) {
+    throw new Error(
+      [
+        `sync 数据不完整：共拿到 ${syncedKeys.length} 个文件，缺少 ` +
+          `[${missingKeys.join(', ')}]。`,
+        '',
+        '常见原因：上次 `git clone` 中途失败（网络 / SSL），但',
+        'code-recycle 的缓存目录已经残留了 `packages/` 子目录，',
+        '导致本次 sync 直接跳过 clone 并读到空数据。',
+        '',
+        '修复办法（任选其一）：',
+        '  1. 删掉 code-recycle 的 gitClone 缓存目录后重试。',
+        '     缓存路径形如 <tmp>/<hash>/packages，可用',
+        '     `ls <tmp> | grep -v "."` 或直接清理系统临时目录。',
+        '  2. 用本地已有的 Angular clone：',
+        '     `ANGULAR_REPO=/path/to/angular npm run sync`',
+        '     （脚本已支持，git clone 对本地路径同样有效）',
+      ].join('\n')
+    );
+  }
+
   let exclude = [
     'forms/src/directives/default_value_accessor.ts',
     'forms/src/directives/checkbox_value_accessor.ts',
