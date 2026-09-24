@@ -40,6 +40,17 @@ let fn: ScriptFunction = async (util, rule, host, injector) => {
        * `@angular/common/http`，对外 API 不变，源码不再 vendor。
        */
       '!/packages/common/http',
+      /**
+       * 整个 `packages/common` 也不再同步。
+       *
+       * 逐条实测后确认那些改动全部不必要（详见
+       * src/library/common/public_api.ts 的注释）：DOCUMENT 是 core 的
+       * 同一个 token、官方 22 已无 zone.js、__templateName 可在
+       * fork 的 lViewToWXView 里从 declTNode 等价推导。
+       *
+       * `angular-miniprogram/common` 现为指向 @angular/common 的薄再导出。
+       */
+      '!/packages/common',
       '!**/*.bazel',
       '!**/*spec.ts',
       '!**/*.js',

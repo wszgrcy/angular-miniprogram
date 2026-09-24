@@ -3,6 +3,9 @@
 !ng-package.json
 !/http
 !/http/ng-package.json
-# http 不再由 sync 生成，改为手写薄再导出层，需进版本库
+# common 与 common/http 均不再由 sync 生成，改为手写薄再导出层，
+# 指向官方 @angular/common / @angular/common/http，需进版本库。
+!/index.ts
+!/public_api.ts
 !/http/index.ts
 !/http/public_api.ts
