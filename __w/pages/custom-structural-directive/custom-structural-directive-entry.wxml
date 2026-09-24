@@ -1,5 +1,0 @@
-<import src="/self-template/self.wxml"/><template name="ngDefault_0"><block ></block></template><template name="template1">{{nodeList[0].value}}</template><block wx:if="{{hasLoad}}"><block wx:for="{{nodeList[0]}}" wx:key="index">
-      <template is="{{item.__templateName||'ngDefault_0'}}" data="{{...nodeList[0][index] }}"></template>
-      </block><block wx:for="{{nodeList[1]}}" wx:key="index">
-      <template is="{{item.__templateName||'template1'}}" data="{{...nodeList[1][index] }}"></template>
-      </block></block>

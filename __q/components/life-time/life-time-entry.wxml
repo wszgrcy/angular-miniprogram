@@ -1,2 +1,0 @@
-<import src="/self-template/self.wxml"/><block wx:if="{{hasLoad}}">组件生命周期
-</block>

@@ -1,1 +1,0 @@
-<template name="$$mp$$TestLibrary$$first"> 这个是外部定义模板 引入组件<app-component1 nodePath="{{nodePath}}" nodeIndex="1" class="{{nodeList[1].class}}" style="{{nodeList[1].style}}" ></app-component1></template>
