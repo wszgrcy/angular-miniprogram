@@ -75,6 +75,7 @@
   },
   "dependencies": {
     "@angular/common": "^22.1.7",
+    "abortcontroller-polyfill": "^1.7.8",
     "cyia-code-util": "^1.8.0",
     "nyc": "^15.1.0"
   },
