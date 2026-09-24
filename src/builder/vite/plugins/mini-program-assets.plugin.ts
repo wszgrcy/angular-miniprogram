@@ -427,6 +427,24 @@ export function miniProgramAssetsPlugin(
         // 至少不会再把 Page()/Component() 拉进 app 上下文
         required.push(...emittedOrder.filter((f) => !isEntryChunk(f)));
       }
+      /**
+       * polyfill 必须在最前面。
+       *
+       * 它是独立入口，从 main.js 不可达，上面的可达性分析不会把它
+       * 纳入；而它又必须在任何使用 AbortController 的代码之前执行，
+       * 所以在此显式前置（而不是丢给可达性分析）。
+       *
+       * 顺序：importTemplate（建 obj）→ polyfills（往 obj 装）→ 其余。
+       */
+      const POLYFILL_CHUNK = 'polyfills.js';
+      if (byFileName.has(POLYFILL_CHUNK)) {
+        required.unshift(POLYFILL_CHUNK);
+      } else if (options.watch) {
+        options.context.logger.warn(
+          `[mini-program-assets] 未找到 ${POLYFILL_CHUNK}，` +
+            'AbortController polyfill 将不会被加载',
+        );
+      }
       const requireList = required
         .map((f) => `require('./${toPosixPath(f)}')`)
         .join(';');

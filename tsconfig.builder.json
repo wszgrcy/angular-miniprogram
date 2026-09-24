@@ -8,7 +8,12 @@
       ],
       // vite 的 package.json 没有 main / types 字段，只靠 exports map，
       // moduleResolution: node10 认不出来，这里显式指到类型入口
-      "vite": ["./node_modules/vite/dist/node/index.d.ts"]
+      "vite": ["./node_modules/vite/dist/node/index.d.ts"],
+      // abortcontroller-polyfill 完全没有类型（也无 @types 包），
+      // 用本地最小声明撑住。见该文件顶部说明。
+      "abortcontroller-polyfill/dist/abortcontroller": [
+        "./src/builder/platform/template/abortcontroller-ponyfill.d.ts"
+      ]
     },
     "noImplicitThis": true,
     "outDir": "./dist/builder",

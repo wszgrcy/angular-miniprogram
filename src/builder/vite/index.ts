@@ -103,6 +103,11 @@ export function buildPlatformDefine(
     wx: g,
     miniProgramPlatform: `"${g}"`,
     queueMicrotask: `${p}.queueMicrotask`,
+    // AbortController / AbortSignal 微信没有。源码里的裸引用全部重定向到
+    // 全局能力表，表里的值由 polyfill-entry.js 手动导出。
+    // 两侧必须配套，见 polyfill-entry.ts 顶部说明。
+    AbortController: `${p}.AbortController`,
+    AbortSignal: `${p}.AbortSignal`,
   };
   if (!isProduction) {
     define['ngDevMode'] = `${g}.__global.ngDevMode`;
@@ -279,6 +284,13 @@ export async function createMiniProgramViteConfig(options: {
       assetsInlineLimit: 0,
       rollupOptions: {
         input: {
+          // 全局 polyfill 入口。必须排在 require 列表最前面，
+          // 保证 AbortController 等在任何业务 chunk 之前装好。
+          // 模板是纯文本内联、不过 bundler，所以 polyfill 只能走入口。
+          polyfills: path.resolve(
+            __dirname,
+            '../platform/template/polyfill-entry.js'
+          ),
           ...toRollupInput(allEntries),
           // app 引导入口。key 固定叫 main，产物 main.js，
           // 和 webpack 时代结构一致。
