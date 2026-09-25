@@ -1,7 +1,9 @@
 import {
   MpAppConfig,
+  findSubPackageByPath,
   generateAppJson,
   getSubPackages,
+  resolveSubPackages,
   validateAppConfig,
 } from './app-config';
 
@@ -182,6 +184,42 @@ describe('app-config: 校验', () => {
     };
     expect(getSubPackages(config).length).toBe(1);
     expect(validateAppConfig(config, builtPages)).toEqual([]);
+  });
+});
+
+describe('app-config: 分包解析', () => {
+  it('resolveSubPackages 拼全页面路径并归一化 independent', () => {
+    const config: MpAppConfig = {
+      pages: ['pages/index/index'],
+      subpackages: [
+        { root: 'packageA', pages: ['pages/a/a', { path: 'pages/b/b' }] },
+        { root: 'packageB/', pages: ['c/c'], independent: true },
+      ],
+    };
+    const subs = resolveSubPackages(config);
+    expect(subs.length).toBe(2);
+    expect(subs[0].root).toBe('packageA');
+    expect(subs[0].independent).toBe(false);
+    expect(subs[0].fullPages).toEqual([
+      'packageA/pages/a/a',
+      'packageA/pages/b/b',
+    ]);
+    // 尾部斜杠被剥掉
+    expect(subs[1].root).toBe('packageB');
+    expect(subs[1].independent).toBe(true);
+    expect(subs[1].fullPages).toEqual(['packageB/c/c']);
+  });
+
+  it('findSubPackageByPath 按 root 前缀归属', () => {
+    const subs = resolveSubPackages({
+      pages: ['pages/index/index'],
+      subpackages: [{ root: 'packageA', pages: ['a/a'] }],
+    });
+    expect(findSubPackageByPath(subs, 'packageA/a/a')?.root).toBe('packageA');
+    expect(findSubPackageByPath(subs, 'packageA')?.root).toBe('packageA');
+    expect(findSubPackageByPath(subs, 'pages/index/index')).toBeUndefined();
+    // packageAX 不应误命中 packageA
+    expect(findSubPackageByPath(subs, 'packageAX/x')).toBeUndefined();
   });
 });
 

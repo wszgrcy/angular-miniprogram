@@ -200,3 +200,47 @@ export function validateAppConfig(
 export function generateAppJson(config: MpAppConfig): string {
   return `${JSON.stringify(config, null, 2)}\n`;
 }
+
+/** 归一化后的分包描述 */
+export interface ResolvedSubPackage {
+  /** 分包根目录（产物相对路径，如 `packageA`） */
+  root: string;
+  /** 是否独立分包 */
+  independent: boolean;
+  /** 分包内页面路径（相对产物根，已拼上 root，不含扩展名） */
+  fullPages: string[];
+}
+
+/**
+ * 从 app 配置解析出分包列表（归一化 subpackages/subPackages + 拼全路径）。
+ *
+ * 供分包产物改写插件消费：判断某个产物路径属于哪个分包、是否独立分包。
+ */
+export function resolveSubPackages(config: MpAppConfig): ResolvedSubPackage[] {
+  return getSubPackages(config).map((sub) => {
+    const root = sub.root.replace(/\/+$/, '');
+    const fullPages = (sub.pages ?? []).map((page) => {
+      const p = typeof page === 'string' ? page : page.path;
+      return `${root}/${p}`;
+    });
+    return {
+      root,
+      independent: !!sub.independent,
+      fullPages,
+    };
+  });
+}
+
+/**
+ * 判断一个产物路径（不含扩展名，posix）属于哪个分包。
+ * 返回 undefined 表示属于主包。
+ */
+export function findSubPackageByPath(
+  subPackages: ResolvedSubPackage[],
+  posixPath: string
+): ResolvedSubPackage | undefined {
+  return subPackages.find(
+    (sp) =>
+      posixPath === sp.root || posixPath.startsWith(`${sp.root}/`)
+  );
+}

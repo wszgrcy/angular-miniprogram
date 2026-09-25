@@ -2,6 +2,7 @@ import type { BuilderContext, BuilderOutput } from '@angular-devkit/architect';
 import { createBuilder } from '@angular-devkit/architect';
 import type { AssetPattern } from '@angular-devkit/build-angular';
 import { getSystemPath } from '@angular-devkit/core';
+import * as fs from 'fs';
 import * as path from 'path';
 import { Observable } from 'rxjs';
 import { Injector } from 'static-injector';
@@ -20,7 +21,12 @@ import { miniProgramComponentTransformPlugin } from './plugins/component-transfo
 import { libraryTemplatePlugin } from './plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from './plugins/mini-program-assets.plugin';
 import { platformFileResolvePlugin } from './plugins/platform-file-resolve.plugin';
+import {
+  readAppConfig,
+  subpackageChunkPlugin,
+} from './plugins/subpackage-chunk.plugin';
 import { platformConditionDefine } from './platform-flags';
+import { getSubPackages } from './app-config';
 import { tsConfigPathsToAliases } from './tsconfig-paths';
 import {
   type SourceWatcher,
@@ -209,6 +215,26 @@ export async function createMiniProgramViteConfig(options: {
   // 前者读后者注册的 useComponents / templateList
   const templateScope = new LibraryTemplateScopeService();
 
+  // 分包：从 appJson 解析分包配置，有分包时才挂分包插件
+  let subpackagePlugin: import('vite').Plugin[] = [];
+  if (viteOptions.appJson) {
+    const appConfigPath = path.resolve(
+      context.workspaceRoot,
+      viteOptions.appJson
+    );
+    if (fs.existsSync(appConfigPath)) {
+      const appConfig = readAppConfig(appConfigPath);
+      if (getSubPackages(appConfig).length) {
+        subpackagePlugin = [
+          subpackageChunkPlugin({
+            appConfig,
+            sourceRoot: getSystemPath(absoluteProjectSourceRoot),
+          }),
+        ];
+      }
+    }
+  }
+
   // 该包是 ESM，esModuleInterop 下命名空间的 default 就是工厂函数；
   // 但类型声明里模块本身就是函数类型，这里运行时兜两种形态、类型上收敛成函数。
   const angularPluginModule: unknown = await import(
@@ -287,6 +313,7 @@ export async function createMiniProgramViteConfig(options: {
         absoluteProjectRoot,
         absoluteProjectSourceRoot,
       }),
+      ...subpackagePlugin,
       ...(options.extraPlugins || []),
     ],
     build: {
