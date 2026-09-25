@@ -201,4 +201,177 @@ describe('diffNodeData: 优化后正确性与性能', () => {
     // eslint-disable-next-line no-console
     console.log(`[diff bench] 单点变更 N=${N} 耗时 ${elapsed}ms`);
   });
+
+  /**
+   * 新旧算法同输入直接对比：
+   *  - 正确性平价：两者输出必须逐字相等（确定性断言）
+   *  - 加速比：在能触发旧算法 O(N^2) spread 的负载上，新算法应明显更快
+   *
+   * 触发旧算法二次方的负载：同一层 N 个对象，每个只改一个字段（部分
+   * 变更）。旧实现每层每个变更都 `{...changeObject, ...result.object}`
+   * 拷贝不断变大的累加对象 → O(N^2)；新实现子累加器收集 + 一次
+   * Object.assign → O(N)。
+   */
+  it('新旧对比：结果逐字相等，且新算法在 O(N^2) 负载上更快', () => {
+    const N = 3000;
+    const from: any = {};
+    const to: any = {};
+    for (let i = 0; i < N; i++) {
+      from['n' + i] = { a: 1, b: 1 };
+      to['n' + i] = { a: 2, b: 1 }; // 只改 a → 每个子项部分变更
+    }
+
+    const oldResult = diffNodeDataOld(from, to);
+    const newResult = diffNodeData(from, to);
+
+    // 正确性平价：新旧输出必须完全一致
+    expect(newResult).toEqual(oldResult);
+
+    // 计时：各自跑多轮取最小值，降低噪声
+    const time = (fn: () => unknown) => {
+      let min = Infinity;
+      for (let r = 0; r < 3; r++) {
+        const t = Date.now();
+        fn();
+        min = Math.min(min, Date.now() - t);
+      }
+      return min;
+    };
+    const oldMs = time(() => diffNodeDataOld(from, to));
+    const newMs = time(() => diffNodeData(from, to));
+    // eslint-disable-next-line no-console
+    console.log(
+      `[diff 对比] N=${N}  旧=${oldMs}ms  新=${newMs}ms  加速≈${(
+        oldMs / Math.max(newMs, 1)
+      ).toFixed(1)}x`
+    );
+
+    // 新算法绝不应比旧算法慢（宽松断言，避免机器噪声误报）
+    expect(newMs).toBeLessThanOrEqual(oldMs);
+  });
 });
+
+/**
+ * 旧版 diff 算法（重写前的实现），仅用于上述对比测试。
+ * 保留原样以作为性能/正确性对照。
+ */
+function diffNodeDataOld(
+  from: Record<string, unknown>,
+  to: Record<string, unknown>
+): Record<string, unknown> {
+  function _diff(
+    count: number,
+    prefix: string,
+    fromItem: unknown,
+    toItem: unknown,
+    changeObject: Record<string, unknown>
+  ) {
+    if (fromItem instanceof Array && toItem instanceof Array) {
+      const result = arr(fromItem, toItem, prefix);
+      if (result.allChange || result.object) {
+        if (result.allChange) {
+          count++;
+          changeObject[prefix] = toItem;
+        } else {
+          changeObject = { ...changeObject, ...result.object };
+        }
+      }
+      return { count, changeObject };
+    } else if (
+      typeof fromItem === 'object' &&
+      fromItem !== null &&
+      typeof toItem === 'object' &&
+      toItem !== null
+    ) {
+      const result = obj(
+        fromItem as Record<string, unknown>,
+        toItem as Record<string, unknown>,
+        prefix
+      );
+      if (result.allChange || result.object) {
+        if (result.allChange) {
+          count++;
+          changeObject[prefix] = toItem;
+        } else {
+          changeObject = { ...changeObject, ...result.object };
+        }
+      }
+      return { count, changeObject };
+    } else if (fromItem !== toItem) {
+      changeObject[prefix] = toItem === undefined ? null : toItem;
+      count++;
+      return { count, changeObject };
+    }
+    return { count, changeObject };
+  }
+  function obj(
+    from: Record<string, unknown>,
+    to: Record<string, unknown>,
+    prefix: string
+  ) {
+    const toKeyList = Object.keys(to);
+    let changeObject: Record<string, unknown> = {};
+    const point = prefix ? '.' : '';
+    let count = 0;
+    if (Object.keys(from).length !== toKeyList.length) {
+      return { allChange: true } as { allChange: boolean; object?: any };
+    }
+    for (let index = 0; index < toKeyList.length; index++) {
+      const key = toKeyList[index];
+      const r = _diff(
+        count,
+        `${prefix}${point}${key}`,
+        from[key],
+        to[key],
+        changeObject
+      );
+      count = r.count;
+      changeObject = r.changeObject;
+    }
+    if (count === toKeyList.length && toKeyList.length !== 0) {
+      return { allChange: true };
+    }
+    return { allChange: false, object: changeObject };
+  }
+  function arr(from: unknown[], to: unknown[], prefix: string) {
+    let changeObject: Record<string, unknown> = {};
+    if (from.length !== to.length) {
+      return { allChange: true } as { allChange: boolean; object?: any };
+    }
+    let count = 0;
+    for (let i = 0; i < to.length; i++) {
+      const r = _diff(count, `${prefix}[${i}]`, from[i], to[i], changeObject);
+      count = r.count;
+      changeObject = r.changeObject;
+    }
+    if (count === to.length && to.length !== 0) {
+      return { allChange: true };
+    }
+    return { allChange: false, object: changeObject };
+  }
+  function sanitize<T>(value: T, seen = new Set<unknown>()): T {
+    if (value === undefined) {
+      return null as unknown as T;
+    }
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+    if (seen.has(value)) {
+      return value;
+    }
+    seen.add(value);
+    if (Array.isArray(value)) {
+      return value.map((item) => sanitize(item, seen)) as unknown as T;
+    }
+    const out: Record<string, unknown> = {};
+    Object.keys(value as Record<string, unknown>).forEach((k) => {
+      out[k] = sanitize((value as Record<string, unknown>)[k], seen);
+    });
+    return out as unknown as T;
+  }
+  const result = obj(from, to, '');
+  if (result.allChange) {
+    return sanitize(to) as Record<string, unknown>;
+  }
+  return sanitize(result.object!) as Record<string, unknown>;
+}
