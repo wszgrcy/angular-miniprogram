@@ -19,6 +19,17 @@ npm run lint       # eslint --max-warnings 0
 npm run sync       # 手动从 angular/angular@17.3.1 同步源码（需要网络）
 ```
 
+## 🔴 开工前先读这一条
+
+**进 `setData` 的数据里绝不允许 `undefined`，无值一律用 `null`。**
+
+微信对 `setData` 里的 `undefined` 直接拒掉**整个调用**，界面从此冻结；
+而且它**只在第二次及以后的 diff 更新才暴露**（首次走整体 setData 会被
+JSON 序列化丢掉），所以「首次渲染通过」的测试完全测不到。
+
+完整规则、历史回归案例、检查清单见文末
+**《⚠️ 铁律：进 `setData` 的数据里绝不允许 `undefined`》**。
+
 ## 两个必须知道的坑（已在本仓库修好）
 
 ### 1. `src/library/common` 与 `src/library/forms/src` 是生成代码
@@ -1098,3 +1109,167 @@ DI，走的是另一套元数据，Angular 的 JIT 读不到）。
    `nodeList` 与 wxml 比对，天然完整。需要小程序模拟器环境。
 
 **推荐 2** —— 那条路已经在跑，且测的是真实运行时而非模拟装配。
+
+---
+
+# ⚠️ 铁律：进 `setData` 的数据里**绝不允许 `undefined`**
+
+> 这是本仓库最容易反复踩的坑，且**只在第二次及以后的更新才暴露**。
+> 写任何往 `setData` 送的东西之前，先读完这一节。
+
+## 现象
+
+微信开发者工具里报：
+
+```
+Setting data field "nodeList.11.0.__templateName" to undefined is invalid.
+```
+
+**关键：不是只丢那一个字段，而是整个 `setData` 调用被拒绝。**
+后果是界面从此**完全不再更新** —— 用户看到「点一下动一次，之后就冻住」。
+
+## 三种「没有值」的区别
+
+| 写法 | `setData` 接受？ | wxml `{{x \|\| '兜底'}}` | 说明 |
+|---|---|---|---|
+| `undefined` | ❌ **整次调用失败** | — | 绝对禁止 |
+| `null` | ✅ | 走兜底（`null` 是 falsy） | **无值时的正确表示** |
+| 字段不存在 | ✅ | 走兜底 | 但会让 diff 误判「key 数量变了」→ 退化成全量 |
+
+**结论：无值一律用 `null`，不要用 `undefined`，也不要省字段。**
+
+## 为什么「第一次正常，之后就坏」
+
+这是它最难查的地方：
+
+- **首次渲染**走**整体** `setData`，对象里的 `undefined` 在 JSON
+  序列化时被直接丢掉 → 看不出任何问题
+- **后续更新**走 **diff**，产出的是**路径式 key**：
+
+  ```js
+  { "nodeList.11.0.__templateName": undefined }
+  ```
+
+  路径式 key 上的 `undefined` **不会被序列化丢掉**，直接撞上微信的
+  参数校验 → 整次 `setData` 被拒 → 冻结
+
+所以「首次渲染通过」的测试**完全测不到这个坑**。必须测
+「改状态 → 再渲染 → diff → setData」。
+
+## 真实触发案例：`*ngIf` 切换
+
+```html
+<div *ngIf="flag; else ngIfElseTemplate">默认if为显示</div>
+<ng-template #ngIfElseTemplate><div>else时显示</div></ng-template>
+```
+
+`__templateName` 取自模板声明名 `tView.declTNode.localNames[0]`：
+
+| 分支 | 模板 | 有无 `#ref` | 名字 |
+|---|---|---|---|
+| `if` | `*ngIf` 脱糖出的 `<ng-template>` | **无** | 取不到 |
+| `else` | `<ng-template #ngIfElseTemplate>` | 有 | `'ngIfElseTemplate'` |
+
+于是：
+
+```
+第一次点（if → else）   diff 送出字符串        → 正常 ✅
+第二次点（else → if）   diff 送出 undefined    → 整次 setData 被拒 ❌
+```
+
+「只能点击一次」就是这么来的。
+
+## 历史回归：旧实现本来是 `null`，被改成了 `undefined`
+
+**旧实现**（`script/package-sync.ts` 里的 AST patch，改 Angular 的
+`ng_if.ts` / `ng_for_of.ts` / `ng_switch.ts` / `ng_template_outlet.ts`，
+把 `__templateName` 注入到 `createEmbeddedView` 的 context）：
+
+```js
+// getTemplateNameExpressionStr()
+(tpl as any)._declarationTContainer.localNames
+  ? (tpl as any)._declarationTContainer.localNames[0]
+  : null                    // ★ 兼底是 null
+```
+
+因为内置结构指令**全被 patch 过**，`context.__templateName` 一定存在，
+值是**名字或 `null`**，走不到 `undefined`。
+
+**改写后**（`c290628`，改为在 fork 自己代码里推导、不再 patch Angular）：
+
+```js
+__templateName:
+  (item._lView[LVIEW.CONTEXT] && item._lView[LVIEW.CONTEXT].__templateName) ||
+  item._lView[1]?.declTNode?.localNames?.[0] ||
+  undefined,              // ★ 兼底写成了 undefined
+```
+
+patch 删掉后，`*ngIf` 这种脱糖无 `#ref` 的模板一路 fall through 到
+`undefined` —— **回归就是这么引入的**。
+
+| 版本 | 无名模板的值 | 结果 |
+|---|---|---|
+| 旧（patch） | `null` | ✅ |
+| `c290628` | `undefined` | ❌ 切换两次即坏 |
+| `492876b` | `null` | ✅ 恢复旧语义 |
+
+### 一个把判断带偏的细节
+
+旧代码的类型声明是 `__templateName: string | undefined`，
+但实际值一直是 `null` —— **类型与实际值本来就不一致**。
+看类型会以为 `undefined` 是正常态，于是照着写了。
+
+**教训：改「等价替代」时，兼底值也要逐一对齐，不能只验证主路径取值相同。
+类型声明与实际值不一致时，以实际值（跑一遍看产物）为准。**
+
+## 现在的两道防线
+
+### ① 源头：兼底用 `null`
+
+`src/library/platform/default/component-template-hook.factory.ts`
+
+```js
+__templateName:
+  (item._lView[LVIEW.CONTEXT] && item._lView[LVIEW.CONTEXT].__templateName) ||
+  item._lView[1]?.declTNode?.localNames?.[0] ||
+  null,
+```
+
+类型同步改为 `MPView.__templateName: string | null`。
+
+### ② 出口：diff 统一净化
+
+`src/library/platform/default/diff-node-data.ts` 的 `sanitizeUndefined()`，
+在 `diffNodeData` 出口把**任意深度**的 `undefined` 换成 `null`。
+
+**两条返回路径都要处理** —— 只改逐字段那处不够：当所有 key 都变了会走
+`allChange` 分支直接返回整个 `to`，那里同样带着 `undefined`
+（第一次修的时候就漏在这）。
+
+这层是防住**整类**问题：`value` / `class` / `property.*` 任何一个字段
+变 `undefined`，都会引发同样的「整次 setData 被拒 → 冻结」。
+
+## 写代码时的检查清单
+
+往 `setData`（或任何会进 diff 的数据结构）里塞东西前：
+
+1. **可能为空的字段，兼底写 `null`，不要写 `undefined`**
+2. **不要靠「省掉字段」表达无值** —— 会让 diff 误判 key 数量变化，
+   退化成全量 setData
+3. **类型声明要和实际值一致** —— 别写 `string | undefined` 而实际给 `null`
+4. **测试必须覆盖「第二次更新」** —— 只测首次渲染等于没测这个坑。
+   至少断言 `diffNodeData(from, to)` 的产出里
+   **不存在任何 `undefined` 值**
+5. 新增 `MPView` / `MPElementData` / `MPTextData` 字段时，
+   回头再看一遍这一节
+
+## 相关测试
+
+| 位置 | 覆盖 |
+|---|---|
+| `diff-node-data.spec.ts` →「绝不产出 undefined 值」 | 顶层/嵌套/数组变 `undefined` → 转 `null`；复现 `nodeList.N.0.__templateName` 有名→无名；**反向对照**（朴素实现确实会漏出） |
+| `template-name-coverage.spec.ts` | 断言容器项 `__templateName` 是 `null` 或 `string`（**不是** `undefined`） |
+
+> 注：`template-name-coverage.spec.ts` 原先的断言写的是
+> 「值可为 `undefined`，但字段必须存在」—— **这个断言本身就是错的**，
+> 正是它让这个 bug 过了测试。已修正。
