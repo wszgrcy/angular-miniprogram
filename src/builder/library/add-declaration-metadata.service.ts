@@ -12,6 +12,7 @@ import {
   LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX,
 } from './const';
 import { getComponentOutputPath } from './get-library-path';
+import { recordLibraryMetaMarker } from './library-meta-marker';
 import { ENTRY_POINT_TOKEN } from './token';
 
 @Injectable()
@@ -31,11 +32,16 @@ export class AddDeclarationMetaDataService {
     const list = createCssSelectorForTs(data).queryAll(
       `ClassDeclaration`
     ) as ts.ClassDeclaration[];
-    return (
-      data +
+    const markers =
       this.addComponentMetaDataDeclaration(list) +
-      this.addDirectiveMetaDataDeclaration(list)
-    );
+      this.addDirectiveMetaDataDeclaration(list);
+    /**
+     * 这些标记写进中间 d.ts 后会被 ng-packagr 22 的扁平化 tree-shake 掉，
+     * 所以同时暂存一份，由 `flushLibraryMetaMarkers()` 在构建结束后补写
+     * 到最终的 `dist/types/*.d.ts`。详见 `library-meta-marker.ts`。
+     */
+    recordLibraryMetaMarker(this.entryPoint, markers);
+    return data + markers;
   }
   private addComponentMetaDataDeclaration(list: ts.ClassDeclaration[]) {
     const metaList = ['\n'];
