@@ -128,3 +128,77 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
     expect(d).toEqual({});
   });
 });
+
+/**
+ * 本轮 diff 算法优化的正确性与性能。
+ */
+describe('diffNodeData: 优化后正确性与性能', () => {
+  /** 构造一棵 depth 层、每层 width 个分支的嵌套对象 */
+  function buildTree(depth: number, width: number, leaf: number): any {
+    if (depth === 0) {
+      return leaf;
+    }
+    const node: any = {};
+    for (let i = 0; i < width; i++) {
+      node['k' + i] = buildTree(depth - 1, width, leaf);
+    }
+    return node;
+  }
+
+  it('深层多变更：只改一个叶子，diff 只含该路径', () => {
+    const from = { nodeList: [buildTree(4, 3, 1)] };
+    const to = { nodeList: [buildTree(4, 3, 1)] };
+    // 改最深处一个叶子
+    to.nodeList[0].k1.k2.k0.k1 = 999;
+    const d = diffNodeData(from, to);
+    expect(d).toEqual({ 'nodeList[0].k1.k2.k0.k1': 999 });
+  });
+
+  it('引用相同子树被短路（不进入递归）', () => {
+    const shared = { deep: { x: 1 } };
+    const from = { a: shared, b: 1 };
+    const to = { a: shared, b: 2 }; // a 是同一引用
+    const d = diffNodeData(from, to);
+    // 只报 b，a 因引用相等被跳过
+    expect(d).toEqual({ b: 2 });
+  });
+
+  it('性能基准：大量变更下耗时线性（非 O(N^2) 爆炸）', () => {
+    // 构造 N 个并列节点，每个节点改一个字段
+    const N = 2000;
+    const from: any = { nodeList: [] };
+    const to: any = { nodeList: [] };
+    for (let i = 0; i < N; i++) {
+      from.nodeList.push({ class: 'c' + i, property: { v: i } });
+      to.nodeList.push({ class: 'c' + i, property: { v: i + 1 } }); // 每个都改
+    }
+    const t0 = Date.now();
+    const d = diffNodeData(from, to);
+    const elapsed = Date.now() - t0;
+    // 每个节点 property 全变（1 个 key）→ 折叠为整体 property；class 未变
+    expect(Object.keys(d).length).toBe(N);
+    // 宽松阈值：线性实现应远小于 O(N^2)。N=2000 全变更应在百毫秒级。
+    expect(elapsed).toBeLessThan(1500);
+    // eslint-disable-next-line no-console
+    console.log(`[diff bench] N=${N} 全变更耗时 ${elapsed}ms`);
+  });
+
+  it('性能基准：单点变更在大树上应极快', () => {
+    const N = 5000;
+    const from: any = { nodeList: [] };
+    const to: any = { nodeList: [] };
+    for (let i = 0; i < N; i++) {
+      from.nodeList.push({ class: 'c', property: { v: 1 } });
+      to.nodeList.push({ class: 'c', property: { v: 1 } });
+    }
+    // 只改最后一个
+    to.nodeList[N - 1].property.v = 2;
+    const t0 = Date.now();
+    const d = diffNodeData(from, to);
+    const elapsed = Date.now() - t0;
+    expect(Object.keys(d).length).toBe(1);
+    expect(elapsed).toBeLessThan(500);
+    // eslint-disable-next-line no-console
+    console.log(`[diff bench] 单点变更 N=${N} 耗时 ${elapsed}ms`);
+  });
+});
