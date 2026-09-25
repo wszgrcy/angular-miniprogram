@@ -41,6 +41,12 @@ export interface ViteMiniProgramBuildOptions {
   /** 监听模式：对应小程序的开发方式（微信开发者工具盯着 dist 目录） */
   watch?: boolean;
   /**
+   * 结构化 app 配置源文件（相对 workspaceRoot，如 src/app.config.json）。
+   * 配置后由构建器编译生成 app.json（含页面/tabBar/分包校验），
+   * 与 assets 里的静态 app.json 互斥。不配则维持旧行为。
+   */
+  appJson?: string;
+  /**
    * 文件替换，CLI 标准形状：[{ replace: 'src/environments/environment.ts',
    * with: 'src/environments/environment.prod.ts' }]
    */
@@ -267,6 +273,7 @@ export async function createMiniProgramViteConfig(options: {
         watch: !!viteOptions.watch,
         templateScope,
         assets: viteOptions.assets,
+        appJson: viteOptions.appJson,
         styles: viteOptions.styles,
         absoluteProjectRoot,
         absoluteProjectSourceRoot,

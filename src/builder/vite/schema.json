@@ -400,6 +400,10 @@
         "type": "string"
       },
       "default": []
+    },
+    "appJson": {
+      "type": "string",
+      "description": "结构化 app 配置源文件（相对 workspaceRoot）。配置后由构建器编译生成 app.json（含页面/tabBar/分包校验），与 assets 中的静态 app.json 互斥。"
     }
   },
   "additionalProperties": false,

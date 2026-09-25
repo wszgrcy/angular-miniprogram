@@ -247,7 +247,11 @@
     "i18nMissingTranslation": {
       "type": "string",
       "description": "How to handle missing translations for i18n.",
-      "enum": ["warning", "error", "ignore"],
+      "enum": [
+        "warning",
+        "error",
+        "ignore"
+      ],
       "default": "warning"
     },
     "localize": {
@@ -283,7 +287,12 @@
       "type": "string",
       "description": "Define the output filename cache-busting hashing mode.",
       "default": "none",
-      "enum": ["none", "all", "media", "bundles"]
+      "enum": [
+        "none",
+        "all",
+        "media",
+        "bundles"
+      ]
     },
     "poll": {
       "type": "number",
@@ -355,7 +364,9 @@
               "description": "The output path of the application's generated HTML index file. The full provided path will be used and will be considered relative to the application's configured output path."
             }
           },
-          "required": ["input"]
+          "required": [
+            "input"
+          ]
         }
       ]
     },
@@ -394,7 +405,11 @@
       "type": "string",
       "description": "Define the crossorigin attribute setting of elements that provide CORS support.",
       "default": "none",
-      "enum": ["none", "anonymous", "use-credentials"]
+      "enum": [
+        "none",
+        "anonymous",
+        "use-credentials"
+      ]
     },
     "experimentalRollupPass": {
       "type": "boolean",
@@ -408,10 +423,19 @@
         "type": "string"
       },
       "default": []
+    },
+    "appJson": {
+      "type": "string",
+      "description": "结构化 app 配置源文件（相对 workspaceRoot）。配置后由构建器编译生成 app.json（含页面/tabBar/分包校验），与 assets 中的静态 app.json 互斥。"
     }
   },
   "additionalProperties": false,
-  "required": ["outputPath", "index", "main", "tsConfig"],
+  "required": [
+    "outputPath",
+    "index",
+    "main",
+    "tsConfig"
+  ],
   "definitions": {
     "assetPattern": {
       "oneOf": [
@@ -444,7 +468,11 @@
             }
           },
           "additionalProperties": false,
-          "required": ["glob", "input", "output"]
+          "required": [
+            "glob",
+            "input",
+            "output"
+          ]
         },
         {
           "type": "string"
@@ -466,7 +494,10 @@
             }
           },
           "additionalProperties": false,
-          "required": ["src", "replaceWith"]
+          "required": [
+            "src",
+            "replaceWith"
+          ]
         },
         {
           "type": "object",
@@ -481,7 +512,10 @@
             }
           },
           "additionalProperties": false,
-          "required": ["replace", "with"]
+          "required": [
+            "replace",
+            "with"
+          ]
         }
       ]
     },
@@ -506,7 +540,9 @@
             }
           },
           "additionalProperties": false,
-          "required": ["input"]
+          "required": [
+            "input"
+          ]
         },
         {
           "type": "string",
@@ -564,7 +600,9 @@
         }
       },
       "additionalProperties": false,
-      "required": ["type"]
+      "required": [
+        "type"
+      ]
     }
   }
 }

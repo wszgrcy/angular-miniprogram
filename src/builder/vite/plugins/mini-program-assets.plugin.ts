@@ -24,6 +24,11 @@ import type {
 import { literalResolve } from '../../util';
 import { toPosixPath } from '../../util/asset-path';
 import { collectAssets } from '../copy-assets';
+import {
+  MpAppConfig,
+  generateAppJson,
+  validateAppConfig,
+} from '../app-config';
 
 /**
  * 一个纯 node fs 的 ts.System。
@@ -98,6 +103,11 @@ export interface MiniProgramAssetsPluginOptions {
   templateScope?: LibraryTemplateScopeService;
   /** builder 配置里的 assets，app.json / project.config.json 从这里来 */
   assets?: AssetPattern[];
+  /**
+   * 结构化 app 配置源文件（相对 workspaceRoot）。
+   * 配置后由构建器编译生成 app.json，与 assets 里的静态 app.json 互斥。
+   */
+  appJson?: string;
   /** builder 配置里的全局样式，产出 app.wxss */
   styles?: (string | { input: string })[];
   absoluteProjectRoot?: Path;
@@ -316,7 +326,7 @@ export function miniProgramAssetsPlugin(
         emit(key, content);
       }
 
-      // 8. builder 配置里的 assets（app.json / project.config.json 等）
+      // 8. builder 配置里的 assets（project.config.json 等）
       if (
         options.assets?.length &&
         options.absoluteProjectRoot &&
@@ -327,9 +337,56 @@ export function miniProgramAssetsPlugin(
           absoluteProjectRoot: options.absoluteProjectRoot,
           absoluteProjectSourceRoot: options.absoluteProjectSourceRoot,
         });
+        const appJsonName = `app${options.buildPlatform.fileExtname.config}`;
+        const hasStaticAppJson = copied.some(
+          (item) => toPosixPath(item.outputRelPath) === appJsonName
+        );
+        if (options.appJson && hasStaticAppJson) {
+          this.error(
+            `appJson 配置与 assets 中的 ${appJsonName} 冲突：` +
+              `app 配置只能有一个来源，请删除 assets 里的 ${appJsonName} 或改用 appJson`
+          );
+        }
         for (const item of copied) {
           emit(item.outputRelPath, fs.readFileSync(item.sourcePath, 'utf8'));
         }
+      }
+
+      // 8.5 app.json 编译生成（#1）：结构化配置 + 编译期校验。
+      // 之前 app.json 是静态拷贝，页面不存在 / tabBar 野路径等错误
+      // 全部延后到开发者工具才能发现，这里前置拦截。
+      if (options.appJson) {
+        const appJsonName = `app${options.buildPlatform.fileExtname.config}`;
+        const appJsonPath = path.resolve(
+          options.workspaceRoot,
+          options.appJson
+        );
+        if (!fs.existsSync(appJsonPath)) {
+          this.error(`appJson 配置文件不存在: ${options.appJson}`);
+        }
+        let appConfig: MpAppConfig;
+        try {
+          appConfig = JSON.parse(
+            fs.readFileSync(appJsonPath, 'utf8')
+          ) as MpAppConfig;
+        } catch (e) {
+          this.error(
+            `appJson 配置 JSON 解析失败 ${options.appJson}: ${String(
+              (e as Error)?.message ?? e
+            )}`
+          );
+        }
+        const builtPagePaths = options.entryPatterns
+          .filter((p) => p.type === 'page')
+          .map((p) => toPosixPath(p.outputFiles.path));
+        const errors = validateAppConfig(appConfig, builtPagePaths);
+        if (errors.length) {
+          this.error(
+            `app 配置校验失败（${options.appJson}）:\n  - ` +
+              errors.join('\n  - ')
+          );
+        }
+        emit(appJsonName, generateAppJson(appConfig));
       }
 
       // 9. app.js：小程序没有模块系统，靠 app.js 里一串 require 把启动
