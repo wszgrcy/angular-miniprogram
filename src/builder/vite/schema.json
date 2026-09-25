@@ -404,6 +404,10 @@
     "appJson": {
       "type": "string",
       "description": "结构化 app 配置源文件（相对 workspaceRoot）。配置后由构建器编译生成 app.json（含页面/tabBar/分包校验），与 assets 中的静态 app.json 互斥。"
+    },
+    "nativeComponentsDir": {
+      "type": "string",
+      "description": "原生小程序自定义组件目录（相对 workspaceRoot，如 wxcomponents）。配置后整个目录拷进产物，模板命中原生标签自动注入 usingComponents。"
     }
   },
   "additionalProperties": false,

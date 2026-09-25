@@ -21,6 +21,7 @@ import { miniProgramComponentTransformPlugin } from './plugins/component-transfo
 import { libraryTemplatePlugin } from './plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from './plugins/mini-program-assets.plugin';
 import { platformFileResolvePlugin } from './plugins/platform-file-resolve.plugin';
+import { nativeComponentsPlugin } from './plugins/native-components.plugin';
 import {
   readAppConfig,
   subpackageChunkPlugin,
@@ -54,6 +55,11 @@ export interface ViteMiniProgramBuildOptions {
    * 与 assets 里的静态 app.json 互斥。不配则维持旧行为。
    */
   appJson?: string;
+  /**
+   * 原生小程序自定义组件目录（相对 workspaceRoot，如 wxcomponents）。
+   * 配置后整个目录拷进产物，模板里命中原生标签自动注入 usingComponents。
+   */
+  nativeComponentsDir?: string;
   /**
    * 文件替换，CLI 标准形状：[{ replace: 'src/environments/environment.ts',
    * with: 'src/environments/environment.prod.ts' }]
@@ -314,6 +320,15 @@ export async function createMiniProgramViteConfig(options: {
         absoluteProjectSourceRoot,
       }),
       ...subpackagePlugin,
+      ...(viteOptions.nativeComponentsDir
+        ? [
+            nativeComponentsPlugin({
+              nativeComponentsDir: viteOptions.nativeComponentsDir,
+              workspaceRoot: context.workspaceRoot,
+              fileExtname: buildPlatform.fileExtname,
+            }),
+          ]
+        : []),
       ...(options.extraPlugins || []),
     ],
     build: {
