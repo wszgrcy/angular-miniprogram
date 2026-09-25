@@ -19,6 +19,8 @@ import {
 import { miniProgramComponentTransformPlugin } from './plugins/component-transform.plugin';
 import { libraryTemplatePlugin } from './plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from './plugins/mini-program-assets.plugin';
+import { platformFileResolvePlugin } from './plugins/platform-file-resolve.plugin';
+import { platformConditionDefine } from './platform-flags';
 import { tsConfigPathsToAliases } from './tsconfig-paths';
 import {
   type SourceWatcher,
@@ -223,7 +225,11 @@ export async function createMiniProgramViteConfig(options: {
     configFile: false,
     mode: isProduction ? 'production' : 'development',
     logLevel: 'warn',
-    define: buildPlatformDefine(buildPlatform, isProduction),
+    define: {
+      ...buildPlatformDefine(buildPlatform, isProduction),
+      // 条件编译：__MP_WX__ 等布尔常量，死分支由 bundler DCE 移除
+      ...platformConditionDefine(viteOptions.platform),
+    },
     resolve: {
       alias: buildViteAlias(
         buildPlatform,
@@ -252,6 +258,9 @@ export async function createMiniProgramViteConfig(options: {
         }
       : {},
     plugins: [
+      // 文件级条件编译（foo.wx.ts 优先），必须 enforce: 'pre' 抢在
+      // 其他 resolver 前，故放数组首位
+      platformFileResolvePlugin({ platform: viteOptions.platform }),
       ...angular({
         tsconfig: viteOptions.tsConfig,
         workspaceRoot: context.workspaceRoot,

@@ -5,6 +5,8 @@ import * as path from 'path';
 import { Observable } from 'rxjs';
 import type { InlineConfig } from 'vite';
 import { LibraryTemplateScopeService } from '../../shared/library-template-scope.service';
+import { platformFileResolvePlugin } from '../../vite/plugins/platform-file-resolve.plugin';
+import { platformConditionDefine } from '../../vite/platform-flags';
 import {
   buildPlatformDefine,
   buildViteAlias,
@@ -106,6 +108,7 @@ export async function createKarmaViteConfig(options: {
     logLevel: 'warn',
     define: {
       ...buildPlatformDefine(buildPlatform, false),
+      ...platformConditionDefine(karmaOptions.platform),
       ...jasmineGlobalDefine(buildPlatform),
       ...karmaClientDefine({
         clientConfig: karmaOptions.client ?? { captureConsole: true },
@@ -131,6 +134,7 @@ export async function createKarmaViteConfig(options: {
       ],
     },
     plugins: [
+      platformFileResolvePlugin({ platform: karmaOptions.platform }),
       ...angular({
         tsconfig: derivedTs.path,
         workspaceRoot: context.workspaceRoot,

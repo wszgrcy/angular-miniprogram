@@ -9,7 +9,7 @@
     "test:jasmine": "tsc -p ./script/tsconfig.startup-jasmine.json && node ./script/startup-jasmine.js",
     "prebuild": "rimraf ./dist",
     "build": " npm run build:library && npm run build:builder && npm run copy:assets && npm run build:karma",
-    "copy:assets": "cpx \"./src/builder/**/*.json\" ./dist/builder && cpx \"./src/builder/**/*.js\" ./dist/builder && cpx ./readme.md ./dist",
+    "copy:assets": "cpx \"./src/builder/**/*.json\" ./dist/builder && cpx \"./src/builder/**/*.d.ts\" ./dist/builder && cpx \"./src/builder/**/*.js\" ./dist/builder && cpx ./readme.md ./dist",
     "build:library": "tsx ./script/ensure-sync.ts && node ./script/start-build-library",
     "build:builder": "tsx ./script/build.ts ./tsconfig.builder.json",
     "build:karma": "tsx ./script/build.ts ./src/builder/karma/client/tsconfig.json && tsx ./script/build.ts ./src/builder/karma/plugin/tsconfig.json",
