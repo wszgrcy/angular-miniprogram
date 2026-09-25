@@ -15,22 +15,7 @@ export class AgentNode {
   value!: string;
   children: AgentNode[] = [];
   listener: Record<string, Function> = {};
-  /**
-   * 脏标记 + 上次序列化缓存（#6 setData 记录式优化）。
-   *
-   * 之前每次刷新都对整棵树每个节点重新 toView()（大量临时对象）再深
-   * diff。改为：节点变更时标脏，toView() 对未脏节点直接返回上次缓存的
-   * 视图对象（引用相等），diff 遇到引用相同即跳过，只重序列化脏节点。
-   *
-   * 初始为 true：首次渲染必须完整序列化。
-   */
-  private dirty = true;
-  private lastView?: MPTextData | MPElementData;
   constructor(public type: 'element' | 'comment' | 'text') {}
-  /** 标记本节点已变更，下次 toView() 需重新序列化 */
-  markDirty() {
-    this.dirty = true;
-  }
   appendChild(child: AgentNode) {
     const lastChildIndex = this.children.length - 1;
     this.children.push(child);
@@ -79,16 +64,6 @@ export class AgentNode {
     child.parent = undefined;
   }
   toView(): MPTextData | MPElementData {
-    // 未脏且已有缓存 → 直接复用同一对象，引用相等让上层 diff 跳过
-    if (!this.dirty && this.lastView) {
-      return this.lastView;
-    }
-    const view = this.computeView();
-    this.lastView = view;
-    this.dirty = false;
-    return view;
-  }
-  private computeView(): MPTextData | MPElementData {
     if (this.type === 'text') {
       return { value: this.value };
     } else {

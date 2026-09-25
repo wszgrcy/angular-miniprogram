@@ -69,19 +69,15 @@ export class MiniProgramRenderer implements Renderer2 {
     namespace?: string | null
   ) {
     el.attribute[name] = value;
-    el.markDirty();
   }
   removeAttribute(el: AgentNode, name: string, namespace?: string | null) {
     delete el.attribute[name];
-    el.markDirty();
   }
   addClass(el: AgentNode, name: string) {
     el.classList.add(name);
-    el.markDirty();
   }
   removeClass(el: AgentNode, name: string) {
     el.classList.delete(name);
-    el.markDirty();
   }
   setStyle(
     el: AgentNode,
@@ -90,19 +86,15 @@ export class MiniProgramRenderer implements Renderer2 {
     flags?: RendererStyleFlags2
   ) {
     el.style[style] = value;
-    el.markDirty();
   }
   removeStyle(el: AgentNode, style: string, flags?: RendererStyleFlags2) {
     delete el.style[style];
-    el.markDirty();
   }
   setProperty(el: AgentNode, name: string, value: unknown) {
     el.property[name] = value;
-    el.markDirty();
   }
   setValue(node: AgentNode, value: string) {
     node.value = value;
-    node.markDirty();
   }
   listen(
     target: AgentNode,
