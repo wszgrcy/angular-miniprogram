@@ -96,11 +96,26 @@ function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
            * 区别只是：patch 要改 Angular 源码，这里在 fork 自己的
            * 代码里拿（viewRef 已经握在手上）。
            */
+          /**
+           * 兼底用 `null` 而不是 `undefined`。
+           *
+           * 微信 `setData` 对 **路径式 key** 的 `undefined` 值直接拒绝：
+           *   Setting data field "nodeList.11.0.__templateName" to
+           *   undefined is invalid.
+           *
+           * 首次渲染走整体 setData，对象里的 `undefined` 会被 JSON
+           * 序列化丢掉，所以看不出问题；一旦走 diff（路径式），
+           * `else`（有名）→ `if`（无名）就会送出 `undefined`，
+           * **整个 setData 被拒**，界面从此不再更新。
+           *
+           * `null` 是合法 setData 值，且在 wxml 里仍为 falsy，
+           * `{{item.__templateName || 'xxxBlock_N'}}` 行为不变。
+           */
           __templateName:
             (item._lView[LVIEW.CONTEXT] &&
               item._lView[LVIEW.CONTEXT].__templateName) ||
             item._lView[1]?.declTNode?.localNames?.[0] ||
-            undefined,
+            null,
           nodeList: lViewToWXView(item._lView, nodePath),
           nodePath: nodePath,
           index: lContainerList.length,

@@ -41,7 +41,21 @@ function _arrayOrObjectItemDiff(
     }
     return { count: count, changeObject };
   } else if (fromItem !== toItem) {
-    changeObject[prefix] = toItem;
+    /**
+     * 微信 `setData` 不接受路径式 key 上的 `undefined`：
+     *
+     *   Setting data field "nodeList.11.0.__templateName" to
+     *   undefined is invalid.
+     *
+     * 这里把 `undefined` 统一换成 `null`：语义上 diff 的「无值」
+     * 就是 `null`，且 `null` 是合法 setData 值，在 wxml 里仍为 falsy，
+     * `{{item.x || 'fallback'}}` 行为不变。
+     *
+     * 这是除源头之外的第二道防线 —— 任何一个字段（`value` /
+     * `class` / `property.*`）只要变成 `undefined` 都会触发同样的
+     * 「整个 setData 被拒 → 界面冻结」。
+     */
+    changeObject[prefix] = toItem === undefined ? null : toItem;
     count++;
     return { count: count, changeObject };
   }
@@ -112,13 +126,43 @@ function diffDataArray(
   }
   return { allChange: false, object: changeObject };
 }
+/**
+ * 把数据里所有 `undefined` 换成 `null`。
+ *
+ * 微信 `setData` 不接受 `undefined`（报
+ * "Setting data field ... to undefined is invalid"），且不是只丢那一个
+ * 字段，而是**整个 setData 调用失败** → 界面从此不再更新。
+ *
+ * `null` 是合法值，且在 wxml 里仍为 falsy，
+ * `{{item.x || 'fallback'}}` 行为不变。
+ */
+function sanitizeUndefined<T>(value: T, seen = new Set<unknown>()): T {
+  if (value === undefined) {return null as unknown as T;}
+  if (!value || typeof value !== 'object') {return value;}
+  if (seen.has(value)) {return value;}
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeUndefined(item, seen)) as unknown as T;
+  }
+  const out: Record<string, unknown> = {};
+  Object.keys(value as Record<string, unknown>).forEach((k) => {
+    out[k] = sanitizeUndefined((value as Record<string, unknown>)[k], seen);
+  });
+  return out as unknown as T;
+}
+
 export function diffNodeData(
   from: Record<string, unknown>,
   to: Record<string, unknown>
 ) {
   const result = diffDataObject(from, to, '');
   if (result.allChange) {
-    return to;
+    /**
+     * allChange 会把整个 `to` 直接送进 setData。它可能含 `undefined`
+     * （顶层或任意深度），必须净化，否则整次 setData 被拒。
+     */
+    return sanitizeUndefined(to);
   }
-  return result.object!;
+  return sanitizeUndefined(result.object!);
 }

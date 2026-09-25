@@ -147,12 +147,13 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
     expect(containers.length)
       .withContext('没找到容器，说明 ngIf 没建出嵌入视图')
       .toBeGreaterThan(0);
-    // 每个容器项都应有 __templateName 字段（值可为 undefined，
-    // 但字段必须存在，wxml 的 `item.__templateName||'X'` 才能取到）
+    // 每个容器项都应有 __templateName 字段，且**不得为 `undefined`**。
+    // 微信 `setData` 对路径式 key 上的 `undefined` 直接拒掉整个调用，
+    // 无名时用 `null`（wxml 的 `item.__templateName||'X'` 仍走兼底）。
     containers.forEach((c) =>
       c.names.forEach((n) =>
-        expect(n === undefined || typeof n === 'string')
-          .withContext(`slot${c.slot}`)
+        expect(n === null || typeof n === 'string')
+          .withContext(`slot${c.slot} 不得为 undefined`)
           .toBeTrue()
       )
     );

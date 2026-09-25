@@ -64,7 +64,13 @@ export interface MiniProgramComponentMethod {
 
 export interface MPView {
   nodeList: (MPView[] | MPElementData | MPTextData)[];
-  __templateName: string | undefined;
+  /**
+   * 运行时模板名。无名字时用 `null`，**不能用 `undefined`**
+   * —— 微信 `setData` 对路径式 key 上的 `undefined` 直接拒绝，
+   * 会让整个 setData 调用失败、界面冻结。
+   * 详见 `component-template-hook.factory.ts` 里的推导注释。
+   */
+  __templateName: string | null;
   nodePath: NodePath;
   index: number;
   hasLoad?: boolean;
