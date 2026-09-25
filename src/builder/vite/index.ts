@@ -86,7 +86,7 @@ export interface ViteMiniProgramBuildOptions {
  */
 export function buildPlatformDefine(
   buildPlatform: BuildPlatform,
-  isProduction: boolean
+  isProduction: boolean,
 ): Record<string, string> {
   const p = buildPlatform.globalVariablePrefix;
   const g = buildPlatform.globalObject;
@@ -94,14 +94,7 @@ export function buildPlatformDefine(
     global: `${g}.__global`,
     window: `${p}`,
     globalThis: `${p}`,
-    setTimeout: `${p}.setTimeout`,
-    clearTimeout: `${p}.clearTimeout`,
-    setInterval: `${p}.setInterval`,
-    clearInterval: `${p}.clearInterval`,
-    Promise: `${p}.Promise`,
-    Reflect: `${p}.Reflect`,
-    requestAnimationFrame: `${p}.requestAnimationFrame`,
-    cancelAnimationFrame: `${p}.cancelAnimationFrame`,
+
     performance: `${p}.performance`,
     navigator: `${p}.navigator`,
     wx: g,
@@ -127,7 +120,7 @@ export function buildPlatformDefine(
  * 写 `.../wx$` 会被当字面量处，根本匹不上。
  */
 export function platformReplacementAlias(
-  buildPlatform: BuildPlatform
+  buildPlatform: BuildPlatform,
 ): { find: RegExp; replacement: string }[] {
   return [
     {
@@ -139,7 +132,7 @@ export function platformReplacementAlias(
 
 export function buildAlias(
   buildPlatform: BuildPlatform,
-  extra: Record<string, string> = {}
+  extra: Record<string, string> = {},
 ): AliasOptions {
   return { ...extra };
 }
@@ -159,10 +152,10 @@ export type ViteAliasEntry = {
 export function buildViteAlias(
   buildPlatform: BuildPlatform,
   tsConfigPath: string,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): ViteAliasEntry[] {
   const tsAliases = tsConfigPathsToAliases(
-    path.resolve(workspaceRoot, tsConfigPath)
+    path.resolve(workspaceRoot, tsConfigPath),
   );
   const list: ViteAliasEntry[] = [
     ...platformReplacementAlias(buildPlatform),
@@ -229,7 +222,7 @@ export async function createMiniProgramViteConfig(options: {
       alias: buildViteAlias(
         buildPlatform,
         viteOptions.tsConfig,
-        context.workspaceRoot
+        context.workspaceRoot,
       ),
     },
     // scss / sass 的 includePaths。不接的话项目里 `@import 'variables'`
@@ -240,13 +233,13 @@ export async function createMiniProgramViteConfig(options: {
             scss: {
               includePaths:
                 viteOptions.stylePreprocessorOptions.includePaths.map((p) =>
-                  path.resolve(context.workspaceRoot, p)
+                  path.resolve(context.workspaceRoot, p),
                 ),
             },
             sass: {
               includePaths:
                 viteOptions.stylePreprocessorOptions.includePaths.map((p) =>
-                  path.resolve(context.workspaceRoot, p)
+                  path.resolve(context.workspaceRoot, p),
                 ),
             },
           },
@@ -293,7 +286,7 @@ export async function createMiniProgramViteConfig(options: {
           // 模板是纯文本内联、不过 bundler，所以 polyfill 只能走入口。
           polyfills: path.resolve(
             __dirname,
-            '../platform/template/polyfill-entry.js'
+            '../platform/template/polyfill-entry.js',
           ),
           ...toRollupInput(allEntries),
           // app 引导入口。key 固定叫 main，产物 main.js，
@@ -337,7 +330,7 @@ export function getBuildPlatform(platform: PlatformType): BuildPlatform {
 
 export function runViteBuilder(
   options: ViteMiniProgramBuildOptions,
-  context: BuilderContext
+  context: BuilderContext,
 ): Observable<BuilderOutput> {
   return new Observable<BuilderOutput>((observer) => {
     let watcher: SourceWatcher | undefined;
@@ -345,7 +338,7 @@ export function runViteBuilder(
 
     const baseOutputPath = path.resolve(
       context.workspaceRoot,
-      options.outputPath
+      options.outputPath,
     );
     const emitSuccess = () => {
       if (!closed) {
@@ -466,8 +459,8 @@ export function runViteBuilder(
 export default createBuilder(
   runViteBuilder as unknown as (
     options: ViteMiniProgramBuildOptions,
-    context: BuilderContext
-  ) => Observable<BuilderOutput>
+    context: BuilderContext,
+  ) => Observable<BuilderOutput>,
 );
 
 export { changeComponent, LIBRARY_OUTPUT_ROOTDIR };
