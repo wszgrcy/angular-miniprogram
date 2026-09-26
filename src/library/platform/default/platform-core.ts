@@ -79,7 +79,9 @@ export class MiniProgramCoreFactory {
     setLViewPath(lView, list);
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__waitLinkResolve();
-    const initValue = getPageRefreshContext(lView);
+    // 传 mpComponentInstance：这次全量序列化会顺手给每个 AgentNode 打上
+    // 路径前缀 + setData 目标，之后的叶子变更就能直接发路径。
+    const initValue = getPageRefreshContext(lView, mpComponentInstance);
     const diffData = getDiffData(lView, initValue);
     if (Object.keys(diffData).length) {
       mpComponentInstance.setData(diffData);
@@ -169,7 +171,7 @@ export class MiniProgramCoreFactory {
       findPageLView(componentRef);
     setLViewPath(lView, [id]);
     mpComponentInstance.__completePath = [id];
-    const initValue = getPageRefreshContext(lView);
+    const initValue = getPageRefreshContext(lView, mpComponentInstance);
     const diffData = getDiffData(lView, initValue);
     if (Object.keys(diffData).length) {
       mpComponentInstance.setData(diffData);

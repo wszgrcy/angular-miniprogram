@@ -24,6 +24,81 @@ let index = 0;
 const pageRegistryMap = new Map<number, LView>();
 const lViewLastDataMap = new Map<LView, Record<string, any>>();
 let waitingRefreshLViewList: (() => void)[] = [];
+
+/**
+ * 路径式 setData 总开关。
+ *
+ * 关掉后 `endRender()` 完全退回旧的「全量序列化 + diffNodeData」行为，
+ * 用于灰度 / 排障 / 回退。运行时可用 {@link setPathDataEnabled} 切。
+ */
+let pathDataEnabled = true;
+/** 本周期内是否发生过结构性变更（增 / 删 / 移动节点） */
+let structuralChange = false;
+/** 本周期内按 MP 实例分桶的路径式变更 */
+let pendingPathData = new Map<any, Record<string, unknown>>();
+
+/** @internal 仅测试用：读 / 改开关状态 */
+export function setPathDataEnabled(enabled: boolean): void {
+  pathDataEnabled = enabled;
+  if (!enabled) {
+    pendingPathData.clear();
+    structuralChange = false;
+  }
+}
+/** @internal 仅测试用 */
+export function isPathDataEnabled(): boolean {
+  return pathDataEnabled;
+}
+
+/**
+ * 标记「本周期发生过结构性变更」。
+ *
+ * 结构性变更（`appendChild` / `insertBefore` / `removeChild`）会让
+ * 容器内 view 序号漂移，进而让**其他节点**的路径前缀整体失效。
+ * 所以只要出现过一次，本周期就放弃路径式，走全量序列化 + diff。
+ *
+ * 注意：节点创建必然伴随 `appendChild`，所以「新节点」天然会触发这里，
+ * 不存在「叶子写入打到一个还没被 stamp 的新节点上」的窗口。
+ */
+export function markStructuralChange(): void {
+  structuralChange = true;
+}
+
+/**
+ * 记一条路径式变更。
+ *
+ * 同一 key 本周期内多次写 → 后写覆盖前写（与 setData 语义一致）。
+ * `undefined` 统一转 `null`：微信对**路径式 key** 上的 `undefined`
+ * 是整次 `setData` 拒绝，不是只丢那一个字段。
+ */
+export function pushPathData(
+  mpRef: unknown,
+  key: string,
+  value: unknown
+): void {
+  if (!mpRef) {
+    return;
+  }
+  let bucket = pendingPathData.get(mpRef);
+  if (!bucket) {
+    bucket = {};
+    pendingPathData.set(mpRef, bucket);
+  }
+  bucket[key] = value === undefined ? null : value;
+}
+
+/** @internal 仅测试用：窥探本周期待发的桶 */
+export function peekPendingPathData(): Map<any, Record<string, unknown>> {
+  return pendingPathData;
+}
+
+/** @internal 仅测试用：清空周期状态 */
+export function resetCycleState(): void {
+  pendingPathData = new Map();
+  structuralChange = false;
+  waitingRefreshLViewList = [];
+}
+
 /** @internal */
 export function propertyChange(lView: LView) {
   if (linkMap.has(lView)) {
@@ -32,7 +107,7 @@ export function propertyChange(lView: LView) {
       if (!instance) {
         return;
       }
-      const currentData = getPageRefreshContext(lView);
+      const currentData = getPageRefreshContext(lView, instance);
       const diffData = getDiffData(lView, currentData);
       if (Object.keys(diffData).length) {
         instance.setData(diffData);
@@ -41,15 +116,41 @@ export function propertyChange(lView: LView) {
   }
 }
 export function endRender() {
-  for (const fn of waitingRefreshLViewList) {
-    fn();
+  // 快速通道不可用（开关关闭 / 本周期有结构性变更）：
+  // 完全走旧的全量序列化 + diff 管线，行为与改造前逐字一致。
+  if (!pathDataEnabled || structuralChange) {
+    pendingPathData.clear();
+    structuralChange = false;
+    const list = waitingRefreshLViewList;
+    waitingRefreshLViewList = [];
+    for (const fn of list) {
+      fn();
+    }
+    return;
   }
+
+  // 纯叶子变更：直接发路径式 key，跳过整树序列化与深 diff。
+  if (pendingPathData.size) {
+    const buckets = pendingPathData;
+    pendingPathData = new Map();
+    waitingRefreshLViewList = [];
+    for (const [mpRef, data] of buckets) {
+      if (Object.keys(data).length) {
+        mpRef.setData(data);
+      }
+    }
+    return;
+  }
+
+  // 无结构变更、也无叶子写入 → 本周期无需 setData。
+  // 这是相对旧实现最大的那笔节省：view 被 check 过但什么都没变，
+  // 旧管线仍会整棵序列化 + 深 diff，这里直接跳过。
   waitingRefreshLViewList = [];
 }
 
-export function getPageRefreshContext(lView: LView) {
+export function getPageRefreshContext(lView: LView, mpRef?: unknown) {
   const lviewPath = getLViewPath(lView);
-  const nodeList = lViewToWXView(lView, lviewPath);
+  const nodeList = lViewToWXView(lView, lviewPath, 'nodeList', mpRef);
   const ctx: Partial<MPView> = {
     nodeList: nodeList,
     nodePath: lviewPath || [],
@@ -58,24 +159,49 @@ export function getPageRefreshContext(lView: LView) {
   return ctx;
 }
 
-function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
+/**
+ * lView → wxml `nodeList` 序列化，同时给每个 AgentNode 打上路径前缀。
+ *
+ * @param lView       要序列化的视图
+ * @param parentNodePath 事件路由用的 nodePath（`data-node-path`），与数据路径无关
+ * @param dataPrefix  本视图 `nodeList` 相对所属 MP 实例数据根的 dotted 前缀
+ * @param mpRef       `setData` 的目标；不传则不改写节点上已有的 `__mpRef`
+ *
+ * 路径规则（与 `wx-container.ts` 生成的 wxml 严格对齐）：
+ *
+ *   组件自身节点   `nodeList[<M>].<field>`
+ *   嵌套模板节点   `nodeList[<cIdx>][<viewIdx>].nodeList[<M>].<field>`
+ *
+ * 数组下标统一用**方括号**，与 `diffNodeData` 已经跑通的 key 形式逐字一致，
+ * 不赌「点号下标」在微信上的兼容性。
+ *
+ * 依据：`<template is="..." data="{{...nodeList[N][index]}}">` 把容器项
+ * 展开成子模板的作用域，子模板里的 `nodeList` 就是 `item.nodeList`。
+ */
+function lViewToWXView(
+  lView: LView,
+  parentNodePath: any[] = [],
+  dataPrefix = 'nodeList',
+  mpRef?: unknown
+) {
   const tView = lView[1];
   const end = tView.bindingStartIndex;
   const nodeList: MPView['nodeList'] = [];
   for (let index = LVIEW.HEADER_OFFSET; index < end; index++) {
+    const rel = index - LVIEW.HEADER_OFFSET;
     const item = lView[index];
     if (item instanceof AgentNode) {
-      nodeList[index - LVIEW.HEADER_OFFSET] = item.toView();
+      // 顺手打路径前缀：这次遍历本来就要经过每个节点
+      item.__pathPrefix = `${dataPrefix}[${rel}]`;
+      if (mpRef) {
+        item.__mpRef = mpRef;
+      }
+      nodeList[rel] = item.toView();
     } else if (item && item[1] === true) {
       const lContainerList: MPView[] = [];
       const viewRefList: any[] = item[LVIEW.CONTAINER_VIEW_REFS] || [];
-      viewRefList.forEach((item, itemIndex) => {
-        const nodePath = [
-          ...parentNodePath,
-          'directive',
-          index - LVIEW.HEADER_OFFSET,
-          itemIndex,
-        ];
+      viewRefList.forEach((viewRef, itemIndex) => {
+        const nodePath = [...parentNodePath, 'directive', rel, itemIndex];
         lContainerList.push({
           /**
            * wxml 的 `<template is="{{item.__templateName || 'xxxBlock_N'}}">`
@@ -112,19 +238,24 @@ function lViewToWXView(lView: LView, parentNodePath: any[] = []) {
            * `{{item.__templateName || 'xxxBlock_N'}}` 行为不变。
            */
           __templateName:
-            (item._lView[LVIEW.CONTEXT] &&
-              item._lView[LVIEW.CONTEXT].__templateName) ||
-            item._lView[1]?.declTNode?.localNames?.[0] ||
+            (viewRef._lView[LVIEW.CONTEXT] &&
+              viewRef._lView[LVIEW.CONTEXT].__templateName) ||
+            viewRef._lView[1]?.declTNode?.localNames?.[0] ||
             null,
-          nodeList: lViewToWXView(item._lView, nodePath),
+          nodeList: lViewToWXView(
+            viewRef._lView,
+            nodePath,
+            `${dataPrefix}[${rel}][${itemIndex}].nodeList`,
+            mpRef
+          ),
           nodePath: nodePath,
           index: lContainerList.length,
         });
       });
-      nodeList[index - LVIEW.HEADER_OFFSET] = lContainerList;
+      nodeList[rel] = lContainerList;
     } else {
       // todo
-      nodeList[index - LVIEW.HEADER_OFFSET] = {} as any;
+      nodeList[rel] = {} as any;
     }
   }
   return nodeList;
@@ -203,6 +334,12 @@ export function cleanWhenDestroy(lView: LView, fn: () => void) {
   list.push(fn);
 }
 export function cleanAll(lView: LView) {
+  // 销毁时把该实例尚未发出的路径式变更丢掉，否则 pendingPathData 会
+  // 持有已销毁的 MP 实例（泄漏 + 之后往已销毁实例上 setData）。
+  const mpRef = linkMap.get(lView);
+  if (mpRef) {
+    pendingPathData.delete(mpRef);
+  }
   linkMap.delete(lView);
   nodePathMap.delete(lView);
   lViewLastDataMap.delete(lView);
