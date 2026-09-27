@@ -12,22 +12,22 @@ import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
 import { LibraryTemplateScopeService } from '../shared/library-template-scope.service';
+import { getSubPackages } from './app-config';
 import {
   generateEntryPatterns,
   resolveProjectRoots,
   toRollupInput,
 } from './entry-patterns';
+import { platformConditionDefine } from './platform-flags';
 import { miniProgramComponentTransformPlugin } from './plugins/component-transform.plugin';
 import { libraryTemplatePlugin } from './plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from './plugins/mini-program-assets.plugin';
-import { platformFileResolvePlugin } from './plugins/platform-file-resolve.plugin';
 import { nativeComponentsPlugin } from './plugins/native-components.plugin';
+import { platformFileResolvePlugin } from './plugins/platform-file-resolve.plugin';
 import {
   readAppConfig,
   subpackageChunkPlugin,
 } from './plugins/subpackage-chunk.plugin';
-import { platformConditionDefine } from './platform-flags';
-import { getSubPackages } from './app-config';
 import { tsConfigPathsToAliases } from './tsconfig-paths';
 import {
   type SourceWatcher,

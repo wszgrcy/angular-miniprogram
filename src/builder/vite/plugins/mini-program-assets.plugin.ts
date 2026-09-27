@@ -23,12 +23,12 @@ import type {
 } from '../../shared/type';
 import { literalResolve } from '../../util';
 import { toPosixPath } from '../../util/asset-path';
-import { collectAssets } from '../copy-assets';
 import {
   MpAppConfig,
   generateAppJson,
   validateAppConfig,
 } from '../app-config';
+import { collectAssets } from '../copy-assets';
 
 /**
  * 一个纯 node fs 的 ts.System。
@@ -125,6 +125,49 @@ export interface MiniProgramAssetsPluginOptions {
  *   5. library 模板          -> 经 literalResolve 转换后落盘
  *   6. metaMap.selfTemplate   -> self template
  */
+/**
+ * 样式编译器。一轮构建里复用同一个实例，避免每个文件重建 sass 环境。
+ */
+function createStyleProcessor(
+  options: MiniProgramAssetsPluginOptions
+): CustomStyleSheetProcessor {
+  return new CustomStyleSheetProcessor(
+    options.workspaceRoot,
+    options.workspaceRoot,
+    undefined,
+    undefined,
+    undefined,
+    false,
+    !!options.watch
+  );
+}
+
+/**
+ * 逐个编译样式源文件，返回 path -> css 文本。
+ * 单个文件编译失败只记警告并落空串，不中断整轮构建。
+ */
+async function compileStyleSources(
+  options: MiniProgramAssetsPluginOptions,
+  styleProcessor: CustomStyleSheetProcessor,
+  styleSourcePaths: Set<string>
+): Promise<Map<string, string>> {
+  const compiled = new Map<string, string>();
+  for (const stylePath of styleSourcePaths) {
+    try {
+      const result = await styleProcessor.bundleFile(stylePath);
+      compiled.set(path.normalize(stylePath), result.contents ?? '');
+    } catch (error) {
+      options.context.logger.warn(
+        `样式编译失败 ${stylePath}: ${String(
+          (error as Error)?.message ?? error
+        )}`
+      );
+      compiled.set(path.normalize(stylePath), '');
+    }
+  }
+  return compiled;
+}
+
 export function miniProgramAssetsPlugin(
   options: MiniProgramAssetsPluginOptions
 ): Plugin {
@@ -166,35 +209,16 @@ export function miniProgramAssetsPlugin(
     return metaMap;
   };
 
-  /** 编译样式源文件，返回 path -> css 文本 */
+  /**
+   * 编译样式源文件，返回 path -> css 文本。
+   * processor 需要跳轮复用，所以由闭包持有，具体编译在模块级函数里。
+   */
   const compileStyles = async (styleSourcePaths: Set<string>) => {
     if (!styleSourcePaths.size) {
       return new Map<string, string>();
     }
-    styleProcessor ??= new CustomStyleSheetProcessor(
-      options.workspaceRoot,
-      options.workspaceRoot,
-      undefined,
-      undefined,
-      undefined,
-      false,
-      !!options.watch
-    );
-    const compiled = new Map<string, string>();
-    for (const stylePath of styleSourcePaths) {
-      try {
-        const result = await styleProcessor.bundleFile(stylePath);
-        compiled.set(path.normalize(stylePath), result.contents ?? '');
-      } catch (error) {
-        options.context.logger.warn(
-          `样式编译失败 ${stylePath}: ${String(
-            (error as Error)?.message ?? error
-          )}`
-        );
-        compiled.set(path.normalize(stylePath), '');
-      }
-    }
-    return compiled;
+    styleProcessor ??= createStyleProcessor(options);
+    return compileStyleSources(options, styleProcessor, styleSourcePaths);
   };
 
   return {

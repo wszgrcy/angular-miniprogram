@@ -5,8 +5,6 @@ import * as path from 'path';
 import { Observable } from 'rxjs';
 import type { InlineConfig } from 'vite';
 import { LibraryTemplateScopeService } from '../../shared/library-template-scope.service';
-import { platformFileResolvePlugin } from '../../vite/plugins/platform-file-resolve.plugin';
-import { platformConditionDefine } from '../../vite/platform-flags';
 import {
   buildPlatformDefine,
   buildViteAlias,
@@ -16,8 +14,10 @@ import {
   generateEntryPatterns,
   toRollupInput,
 } from '../../vite/entry-patterns';
+import { platformConditionDefine } from '../../vite/platform-flags';
 import { miniProgramComponentTransformPlugin } from '../../vite/plugins/component-transform.plugin';
 import { libraryTemplatePlugin } from '../../vite/plugins/library-template.plugin';
+import { platformFileResolvePlugin } from '../../vite/plugins/platform-file-resolve.plugin';
 import { jasmineGlobalDefine, karmaClientDefine } from '../jasmine-define';
 import { writeDerivedTsConfig } from './derived-tsconfig';
 import { setViteKarmaFrameworkHooks } from './karma-framework';
