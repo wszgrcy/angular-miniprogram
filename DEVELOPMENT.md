@@ -19,6 +19,39 @@ npm run lint       # eslint --max-warnings 0
 npm run sync       # 手动从 angular/angular@17.3.1 同步源码（需要网络）
 ```
 
+## 🔴 发布产物形态：包必须是 `type: commonjs`
+
+`src/library/package.json` 里显式写了 `"type": "commonjs"`，**不要删**。
+
+ng-packagr 生成产物时是 `packageJson.type ??= 'module'`——你没写它就给你 `module`。
+而 `builder/**` 和 `karma/**` 是 `script/build.ts` 用 CommonJS 编出来的
+（`require` / `exports` + 无扩展名的相对 import）。一旦包顶层是 `type: module`，
+Node 会把所有 `.js` 当 ESM，于是：
+
+```
+require('angular-miniprogram/karma/plugin')
+  → exports is not defined in ES module scope
+  → Cannot find module './main'   // ESM 解析要求带扩展名
+```
+
+库自己的产物是 `.mjs`（扩展名优先，永远是 ESM），所以顶层写 `commonjs`
+**不影响 ESM 消费方**，只是让 `builder/` 和 `karma/` 的 CJS 能正常加载。
+线上 1.5.2 没有 `type` 字段（等价 commonjs），就是同一个道理。
+
+发布前自检（`npm run build` 之后）：
+
+```bash
+cd dist && npm pack && cd /tmp && mkdir s && cd s && npm init -y
+npm i <绝对路径>/dist/angular-miniprogram-1.5.2.tgz @angular-devkit/architect --legacy-peer-deps
+node -e "console.log(Object.keys(require('angular-miniprogram/karma/plugin')))"
+# 期望：[ 'framework:@angular-devkit/build-angular', 'launcher:miniprogram' ]
+```
+
+另：`src/builder/karma/plugin/tsconfig.json` 的 `outDir` 是 `dist/karma` 而不是
+`dist/karma/plugin`——因为 `index.ts` import 了 `../vite/karma-framework`，
+TS 把 rootDir 推断到 `src/builder/karma`，outDir 多写一层会让产物变成
+`karma/plugin/plugin/index.js`，与 `exports["./karma/plugin"]` 对不上。
+
 ## 🔴 开工前先读这一条
 
 **进 `setData` 的数据里绝不允许 `undefined`，无值一律用 `null`。**
