@@ -10,6 +10,25 @@ function toPosix(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
+/**
+ * 归属判定专用的路径归一化：posix 分隔符 + 小写盘符。
+ *
+ * Windows 下 `sourceRoot` 走 `getSystemPath()` 拿到的是 `C:\...`（大写盘符），
+ * 而 bundler 回传的 moduleIds 盘符大小写并不保证一致（取决于解析入口是谁给的）。
+ * 归属判定是 `startsWith` 前缀匹配，**大小写敏感**，一旦两侧盘符大小写不同就
+ * 全线失配，而且失配是静默的：
+ *  - `chunkFileNames` 不再把分包 chunk 归进分包目录（分包代码全落主包，白拆）；
+ *  - 跨分包 / 独立分包校验全部漏报（该拦的拦不住）。
+ *
+ * Windows 文件系统本身大小写不敏感，所以统一小写盘符不会引入误判；
+ * posix 下路径不带盘符，这个 replace 是 no-op，不影响大小写敏感的 Linux。
+ */
+function normalizeId(p: string): string {
+  return toPosix(p).replace(/^([A-Za-z]):/, (_m, drive: string) =>
+    drive.toLowerCase()
+  );
+}
+
 export interface SubpackageChunkPluginOptions {
   /** 已解析的 app 配置（含 subpackages） */
   appConfig: MpAppConfig;
@@ -42,13 +61,13 @@ export function subpackageChunkPlugin(
     .map((sp) => ({
       root: sp.root,
       independent: sp.independent,
-      srcDir: `${sourceRoot}/${sp.root}`,
+      srcDir: normalizeId(`${sourceRoot}/${sp.root}`),
     }))
     .sort((a, b) => b.srcDir.length - a.srcDir.length);
 
   /** 一个模块源路径属于哪个分包（源码目录前缀匹配），undefined=主包 */
   const zoneOfModule = (moduleId: string) => {
-    const id = toPosix(moduleId);
+    const id = normalizeId(moduleId);
     return subSrcDirs.find((d) => id.startsWith(`${d.srcDir}/`));
   };
 
