@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - master
-env:
-  REPOSITORY_PATH: https://${{secrets.ACCESS_TOKEN}}@github.com/
+      - alpha
+permissions:
+  id-token: write
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,7 +23,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24.x
-          cache: "npm"
+          cache: 'npm'
       - name: install-dependencies
         run: |
           npm ci --legacy-peer-deps
@@ -37,15 +39,26 @@ jobs:
       - name: build
         run: |
           npm run build
+      - name: dist-tag
+        id: dist-tag
+        run: |
+          # master -> latest，其它分支（alpha 等）-> 分支同名 tag
+          if [ "${GITHUB_REF_NAME}" = "master" ]; then
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
       - id: publish
         name: publish
-        uses: JS-DevTools/npm-publish@v3
-        if: ${{ github.repository_owner	== 'wszgrcy' }}
+        uses: JS-DevTools/npm-publish@v4
+        if: ${{ github.repository_owner == 'wszgrcy' }}
         with:
-          token: ${{ secrets.NPM_PUBLISH_TOKEN }}
           package: ./dist/package.json
-      - if: ${{ github.repository_owner	== 'wszgrcy' && steps.publish.outputs.type  }}
+          tag: ${{ steps.dist-tag.outputs.tag }}
+          provenance: true
+          access: public
+      - if: ${{ github.repository_owner == 'wszgrcy' && steps.publish.outputs.type }}
         run: |
-          echo "[${{ steps.publish.outputs.type }}]Version changed: ${{ steps.publish.outputs.old-version }} => ${{ steps.publish.outputs.version }}"
+          echo "[${{ steps.publish.outputs.type }}]Version changed: ${{ steps.publish.outputs.old-version }} => ${{ steps.publish.outputs.version }} (dist-tag: ${{ steps.dist-tag.outputs.tag }})"
           git tag v${{steps.publish.outputs.version}}
           git push origin v${{steps.publish.outputs.version}}

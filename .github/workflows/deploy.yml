@@ -4,9 +4,8 @@ on:
   push:
     branches:
       - master
-env:
-  REPOSITORY_PATH: https://${{secrets.ACCESS_TOKEN}}@github.com/
-  # GITHUB_TOKEN: ${{secrets.ACCESS_TOKEN}}
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,7 +20,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24.x
-          cache: "npm"
+          cache: 'npm'
       - name: install-dependencies
         run: |
           npm ci --legacy-peer-deps
@@ -45,5 +44,5 @@ jobs:
           git status
           git add -A
           HUSKY=0 git commit -m 'build: 页面构建'
-          HUSKY=0 git push --force "${REPOSITORY_PATH}${GITHUB_REPOSITORY}.git" gh-pages
+          HUSKY=0 git push --force origin gh-pages
           # git pull
