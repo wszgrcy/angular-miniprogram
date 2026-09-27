@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'app-global-self-template',
   templateUrl: './global-self-template.component.html',
   styleUrls: ['./global-self-template.component.css'],

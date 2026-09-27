@@ -51,6 +51,7 @@ export const NUMBER_VALUE_ACCESSOR: any = {
  * @publicApi
  */
 @Directive({
+  standalone: false,
   selector: 'slider[formControlName],slider[formControl],slider[ngModel]',
   host: { '(bindchange)': 'valueChange($event.detail.value)' },
   providers: [NUMBER_VALUE_ACCESSOR],

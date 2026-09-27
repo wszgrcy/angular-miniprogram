@@ -3,20 +3,19 @@ import type {
   ParsedConfiguration,
 } from '@angular/compiler-cli';
 import { dirname, normalize } from '@angular-devkit/core';
-import { BuildGraph } from 'ng-packagr/lib/graph/build-graph';
+import { BuildGraph } from 'ng-packagr/src/lib/graph/build-graph';
 import {
   EntryPointNode,
   PackageNode,
   isEntryPointInProgress,
   isPackage,
-} from 'ng-packagr/lib/ng-package/nodes';
-import { StylesheetProcessor } from 'ng-packagr/lib/styles/stylesheet-processor';
+} from 'ng-packagr/src/lib/ng-package/nodes';
+import { StylesheetProcessor } from 'ng-packagr/src/lib/styles/stylesheet-processor';
 import {
   augmentProgramWithVersioning,
   cacheCompilerHost,
-} from 'ng-packagr/lib/ts/cache-compiler-host';
-import { ngCompilerCli } from 'ng-packagr/lib/utils/load-esm';
-import * as log from 'ng-packagr/lib/utils/log';
+} from 'ng-packagr/src/lib/ts/cache-compiler-host';
+import * as log from 'ng-packagr/src/lib/utils/log';
 import { join } from 'node:path';
 import path from 'path';
 import { Injector } from 'static-injector';
@@ -33,6 +32,14 @@ import {
   ENTRY_POINT_TOKEN,
   RESOLVED_DATA_GROUP_TOKEN,
 } from './token';
+
+/**
+ * ng-packagr 21 删掉了 `src/lib/utils/load-esm`，改成直接 require compiler-cli。
+ * 这里自己保留一个懒加载入口，避免在模块顶层就把 compiler-cli 拉进来。
+ */
+async function ngCompilerCli() {
+  return import('@angular/compiler-cli');
+}
 
 export async function compileSourceFiles(
   graph: BuildGraph,
@@ -67,6 +74,9 @@ export async function compileSourceFiles(
   augmentLibraryMetadata(tsCompilerHost);
   const cache = entryPoint.cache;
   const sourceFileCache = cache.sourcesFileCache;
+  // ng-packagr 19: Angular 诊断缓存从 FileCache 中拆出，
+  // 改为 entryPoint.cache.angularDiagnosticCache（get/update）
+  const angularDiagnosticsCache = cache.angularDiagnosticCache;
 
   // Create the Angular specific program that contains the Angular compiler
   const angularProgram = new NgtscProgram(
@@ -221,9 +231,8 @@ export async function compileSourceFiles(
       !ignoreForDiagnostics.has(sourceFile)
     ) {
       // Use cached Angular diagnostics for unchanged and unaffected files
-      const angularDiagnostics =
-        sourceFileCache.getAngularDiagnostics(sourceFile);
-      if (angularDiagnostics?.length) {
+      const angularDiagnostics = angularDiagnosticsCache.get(sourceFile);
+      if (angularDiagnostics.length) {
         allDiagnostics.push(...angularDiagnostics);
       }
     }
@@ -237,7 +246,7 @@ export async function compileSourceFiles(
     );
 
     allDiagnostics.push(...angularDiagnostics);
-    sourceFileCache.updateAngularDiagnostics(affectedFile, angularDiagnostics);
+    angularDiagnosticsCache.update(affectedFile, angularDiagnostics);
   }
 
   const otherDiagnostics = [];

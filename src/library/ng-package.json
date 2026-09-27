@@ -4,7 +4,6 @@
   "deleteDestPath": true,
   "allowedNonPeerDependencies": [
     "cyia-code-util",
-    "webpack-bootstrap-assets-plugin",
     "static-injector"
   ],
   "lib": {

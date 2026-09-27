@@ -6,6 +6,7 @@ import { LifeTimeComponent } from '../../spec-component/life-time/life-time.comp
 import { nodeExist } from '../util';
 
 @Component({
+  standalone: false,
   selector: 'app-life-time-spec',
   template: `<app-life-time #instance></app-life-time>`,
 })

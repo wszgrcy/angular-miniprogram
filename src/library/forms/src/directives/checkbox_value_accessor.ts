@@ -30,6 +30,7 @@ export const CHECKBOX_VALUE_ACCESSOR: any = {
 };
 
 @Directive({
+  standalone: false,
   selector:
     'checkbox-group[formControlName],checkbox-group[formControl],checkbox-group[ngModel]',
   host: {
@@ -83,6 +84,7 @@ export class CheckBoxGroupValueAccessor
  * @publicApi
  */
 @Directive({
+  standalone: false,
   selector: 'checkbox',
   host: {},
 })

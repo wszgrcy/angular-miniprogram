@@ -1,5 +1,0 @@
-*
-!.gitignore
-!ng-package.json
-!/http
-!/http/ng-package.json

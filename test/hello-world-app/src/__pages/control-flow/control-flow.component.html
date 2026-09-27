@@ -1,0 +1,55 @@
+<div class="control-flow-page">
+  <div class="before">before</div>
+
+  @if (show) {
+    <div class="if-yes">yes</div>
+  } @else if (other) {
+    <div class="if-other">other</div>
+  } @else {
+    <div class="if-no">no</div>
+  }
+
+  @if (show; as s) {
+    <div class="if-alias">{{ s }}</div>
+  }
+
+  @if (flag$ | json) {
+    <div class="if-pipe">pipe</div>
+  } @else {
+    <div class="if-pipe-else">pipe-else</div>
+  }
+
+  @for (item of list; track item; let i = $index, f = $first) {
+    <div class="for-item">{{ i }}:{{ item }}:{{ f }}</div>
+  } @empty {
+    <div class="for-empty">empty</div>
+  }
+
+  @for (item of emptyList; track item) {
+    <div class="for-real-empty">never</div>
+  } @empty {
+    <div class="for-real-empty-tip">
+      @if (nested) {
+        <span class="nested-in-empty">nested</span>
+      }
+    </div>
+  }
+
+  @switch (mode) {
+    @case ("a") {
+      <div class="case-a">A</div>
+    }
+    @case ("b") {
+      <div class="case-b">B</div>
+    }
+    @default {
+      <div class="case-default">
+        @if (nested) {
+          <span class="nested-in-case">nested-case</span>
+        }
+      </div>
+    }
+  }
+
+  <div class="after">after</div>
+</div>

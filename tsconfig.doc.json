@@ -19,9 +19,7 @@
       "angular-miniprogram/platform/default": ["./platform/default/index.ts"],
       "angular-miniprogram/platform/wx": ["./platform/wx/index.ts"],
       "angular-miniprogram/platform/type": ["./platform/type/index.ts"],
-      "angular-miniprogram/platform": ["./platform/index.ts"],
-      "angular-miniprogram/common": ["./common/index.ts"],
-      "angular-miniprogram/common/http": ["./common/http/index.ts"]
+      "angular-miniprogram/platform": ["./platform/index.ts"]
     }
   },
   "exclude": [

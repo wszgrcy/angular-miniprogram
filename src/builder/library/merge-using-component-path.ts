@@ -15,11 +15,14 @@ export function getUseComponents(
       return item;
     })
   );
-  return list.reduce((pre, cur) => {
-    pre[cur.selector] = resolve(
-      normalize('/'),
-      join(normalize(LIBRARY_OUTPUT_ROOTDIR), cur.path)
-    );
-    return pre;
-  }, {} as Record<string, string>);
+  return list.reduce(
+    (pre, cur) => {
+      pre[cur.selector] = resolve(
+        normalize('/'),
+        join(normalize(LIBRARY_OUTPUT_ROOTDIR), cur.path)
+      );
+      return pre;
+    },
+    {} as Record<string, string>
+  );
 }

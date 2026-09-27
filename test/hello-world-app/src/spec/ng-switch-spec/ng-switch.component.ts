@@ -6,6 +6,7 @@ import { NgSwitchComponent } from '../../spec-component/ng-switch/ng-switch.comp
 import { nodeExist } from '../util';
 
 @Component({
+  standalone: false,
   selector: 'app-ng-switch-spec',
   template: `<app-ng-switch #instance></app-ng-switch>`,
 })

@@ -29,6 +29,8 @@ title: 注意事项
 - 当使用`createEmbeddedView`进行插入时,需要在上下文中的对象传递`__templateName`属性,这个属性为小程序的实际对应模板名
 - 此模板名也可以访问`TemplateRef`实例的私有变量获得`(this.templateRef as any)._declarationTContainer.localNames[0]`
 
+> **更新（#5 模板名内部化）**：运行时已能从模板声明名（`#autoTpl` → `declTNode.localNames[0]`）**自动推导** `__templateName`。因此**同组件内**使用 `createEmbeddedView` 时，`__templateName` 现在是**可选**的——不传即自动用声明名。下面的显式传参写法仍然有效（context 优先，向后兼容），仅在需要覆盖默认名或跨组件传模板时才必要。
+
 ```ts
 @Directive({
   selector: '[appStructural1]',
@@ -38,9 +40,12 @@ export class Structural1Directive {
   @Input() appStructural1Name: string;
   constructor(private viewContainerRef: ViewContainerRef) {}
   ngOnInit(): void {
-    this.viewContainerRef.createEmbeddedView(this.appStructural1, {
-      __templateName: this.appStructural1Name,
-    });
+    // 同组件内可省略 __templateName，运行时自动用声明名：
+    this.viewContainerRef.createEmbeddedView(this.appStructural1);
+    // 需要覆盖默认名时才显式传：
+    // this.viewContainerRef.createEmbeddedView(this.appStructural1, {
+    //   __templateName: this.appStructural1Name,
+    // });
   }
 }
 

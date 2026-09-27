@@ -1,10 +1,11 @@
 /// <reference types="miniprogram-api-typings"/>
 import {
   ApplicationRef,
+  ɵChangeDetectionScheduler as ChangeDetectionScheduler,
   ChangeDetectorRef,
   ComponentRef,
   NgModuleRef,
-  NgZone,
+  ɵNotificationSource as NotificationSource,
   Type,
 } from '@angular/core';
 import type {
@@ -18,8 +19,6 @@ import type {
 import { AgentNode } from './agent-node';
 import { ComponentFinderService } from './component-finder.service';
 import {
-  INJECTOR,
-  LVIEW_CONTEXT,
   cleanAll,
   cleanWhenDestroy,
   findCurrentElement,
@@ -32,6 +31,7 @@ import {
   setLViewPath,
   updatePath,
 } from './component-template-hook.factory';
+import { LVIEW } from './lview-layout';
 
 export class MiniProgramCoreFactory {
   public MINIPROGRAM_GLOBAL = wx;
@@ -62,12 +62,12 @@ export class MiniProgramCoreFactory {
   ) {
     mpComponentInstance.__isLink = true;
     const lView: LView = resolveNodePath(list);
-    const injector = lView[INJECTOR]!;
+    const injector = lView[LVIEW.INJECTOR]!;
     mpComponentInstance.__lView = lView;
-    mpComponentInstance.__ngComponentInstance = lView[LVIEW_CONTEXT];
+    mpComponentInstance.__ngComponentInstance = lView[LVIEW.CONTEXT];
     mpComponentInstance.__ngComponentInjector = injector;
-    const ngZone = injector.get(NgZone);
-    mpComponentInstance.__ngZone = ngZone;
+    const scheduler = injector.get(ChangeDetectionScheduler);
+    mpComponentInstance.__ngChangeDetectionScheduler = scheduler;
     const componentFinderService = injector.get(ComponentFinderService);
     componentFinderService.set(
       mpComponentInstance.__ngComponentInstance,
@@ -79,13 +79,13 @@ export class MiniProgramCoreFactory {
     setLViewPath(lView, list);
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__waitLinkResolve();
-    ngZone.runOutsideAngular(() => {
-      const initValue = getPageRefreshContext(lView);
-      const diffData = getDiffData(lView, initValue);
-      if (Object.keys(diffData).length) {
-        mpComponentInstance.setData(diffData);
-      }
-    });
+    // 传 mpComponentInstance：这次全量序列化会顺手给每个 AgentNode 打上
+    // 路径前缀 + setData 目标，之后的叶子变更就能直接发路径。
+    const initValue = getPageRefreshContext(lView, mpComponentInstance);
+    const diffData = getDiffData(lView, initValue);
+    if (Object.keys(diffData).length) {
+      mpComponentInstance.setData(diffData);
+    }
   }
   /** 监听事件 */
   protected listenerEvent() {
@@ -115,11 +115,16 @@ export class MiniProgramCoreFactory {
           _this
             .getListenerEventMapping(cur.prefix, eventName)
             .forEach((name) => {
-              this.__ngZone.run(() => {
+              try {
                 if (el.listener[name]) {
                   el.listener[name](event);
                 }
-              });
+              } finally {
+                // zoneless：回调可能修改了应用状态，显式调度一次变更检测
+                this.__ngChangeDetectionScheduler?.notify(
+                  NotificationSource.Listener
+                );
+              }
             });
         } else {
           throw new Error('未绑定lView');
@@ -153,83 +158,97 @@ export class MiniProgramCoreFactory {
   protected linkNgComponentWithPage(
     mpComponentInstance: MiniProgramComponentInstance,
     componentRef: ComponentRef<unknown>,
-    ngModuleRef: NgModuleRef<unknown>
+    /** standalone 页面没有 NgModule */
+    ngModuleRef?: NgModuleRef<unknown>
   ) {
     mpComponentInstance.__isLink = true;
     mpComponentInstance.__ngComponentHostView = componentRef.hostView;
     mpComponentInstance.__ngComponentInstance = componentRef.instance;
     mpComponentInstance.__ngComponentInjector = componentRef.injector;
-    const ngZone = componentRef.injector.get(NgZone);
-    mpComponentInstance.__ngZone = ngZone;
+    const scheduler = componentRef.injector.get(ChangeDetectionScheduler);
+    mpComponentInstance.__ngChangeDetectionScheduler = scheduler;
     const { lView, id }: { lView: LView; id: number } =
       findPageLView(componentRef);
     setLViewPath(lView, [id]);
     mpComponentInstance.__completePath = [id];
-    ngZone.runOutsideAngular(() => {
-      const initValue = getPageRefreshContext(lView);
-      const diffData = getDiffData(lView, initValue);
-      if (Object.keys(diffData).length) {
-        mpComponentInstance.setData(diffData);
-      }
-    });
+    const initValue = getPageRefreshContext(lView, mpComponentInstance);
+    const diffData = getDiffData(lView, initValue);
+    if (Object.keys(diffData).length) {
+      mpComponentInstance.setData(diffData);
+    }
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__lView = lView;
     mpComponentInstance.__ngDestroy = () => {
-      ngModuleRef.destroy();
+      ngModuleRef?.destroy();
       componentRef.destroy();
       removePageLViewLink(id);
       cleanAll(lView);
     };
   }
 
-  public pageStartup = (
-    module: Type<unknown>,
+  /**
+   * 页面启动的公共实现。
+   *
+   * @param component 页面组件
+   * @param startPage 真正创建组件的方式（standalone / NgModule）
+   */
+  protected createPageBootstrap = (
     component: Type<unknown>,
+    startPage: (instance: MiniProgramComponentInstance) => {
+      componentRef: ComponentRef<unknown>;
+      ngModuleRef?: NgModuleRef<unknown>;
+    },
     pageOptions?: { useComponent: boolean }
   ) => {
     const _this = this;
     if (pageOptions?.useComponent) {
       const options = this.getComponentOptions<true>(component) || {};
-      const config: WechatMiniprogram.Component.Options<{}, {}, {}, {}, true> =
-        {
-          ...options,
-          data: { hasLoad: false },
-          options: { ...options?.options, multipleSlots: true },
-          methods: {
-            ...options.methods,
-            ...this.listenerEvent(),
-            onHide: async function (this: MiniProgramComponentInstance) {
-              if (options.methods?.onHide) {
-                await options.methods.onHide.bind(this)();
-              }
-              _this.pageStatus.detachView.bind(this)();
-            },
-            onUnload: async function (this: MiniProgramComponentInstance) {
-              if (options.methods?.onUnload) {
-                await options.methods.onUnload.bind(this)();
-              }
-              _this.pageStatus.destroy.bind(this)();
-            },
-
-            onShow: async function (this: MiniProgramComponentInstance) {
-              if (options.methods?.onShow) {
-                await options.methods.onShow.bind(this)();
-              }
-              return _this.pageStatus.attachView.bind(this)();
-            },
+      const config: WechatMiniprogram.Component.Options<
+        {},
+        {},
+        {},
+        [],
+        {},
+        true
+      > = {
+        ...options,
+        data: { hasLoad: false },
+        options: { ...options?.options, multipleSlots: true },
+        methods: {
+          ...options.methods,
+          ...this.listenerEvent(),
+          onHide: async function (this: MiniProgramComponentInstance) {
+            if (options.methods?.onHide) {
+              await options.methods.onHide.bind(this)();
+            }
+            _this.pageStatus.detachView.bind(this)();
           },
-        };
+          onUnload: async function (this: MiniProgramComponentInstance) {
+            if (options.methods?.onUnload) {
+              await options.methods.onUnload.bind(this)();
+            }
+            _this.pageStatus.destroy.bind(this)();
+          },
+
+          onShow: async function (this: MiniProgramComponentInstance) {
+            if (options.methods?.onShow) {
+              await options.methods.onShow.bind(this)();
+            }
+            return _this.pageStatus.attachView.bind(this)();
+          },
+        },
+      };
       config.lifetimes = config.lifetimes || {};
       const oldCreated = config.lifetimes.created;
       let componentRef: ComponentRef<unknown>,
-        ngModuleRef: NgModuleRef<unknown>;
+        ngModuleRef: NgModuleRef<unknown> | undefined;
       config.lifetimes.created = function (this: MiniProgramComponentInstance) {
         const app = getApp<AppOptions>();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.__lifeTimePromiseObject = {} as any;
         return (this.__lifeTimePromiseObject['created'] =
           app.__ngStartPagePromise.then(() => {
-            const result = app.__ngStartPage(module, component, this);
+            const result = startPage(this);
             componentRef = result.componentRef;
             ngModuleRef = result.ngModuleRef;
             if (oldCreated) {
@@ -274,11 +293,7 @@ export class MiniProgramCoreFactory {
         this.__lifeTimePromiseObject = {} as any;
         return (this.__lifeTimePromiseObject['onLoad'] =
           app.__ngStartPagePromise.then(() => {
-            const { componentRef, ngModuleRef } = app.__ngStartPage(
-              module,
-              component,
-              this
-            );
+            const { componentRef, ngModuleRef } = startPage(this);
             _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
             if (options.onLoad) {
               return options.onLoad.bind(this)(query);
@@ -303,8 +318,50 @@ export class MiniProgramCoreFactory {
       },
     });
   };
+
+  /**
+   * 启动一个 standalone 组件作为小程序页面，不需要 NgModule。
+   *
+   * ```ts
+   * // foo.entry.ts
+   * import { bootstrapPage } from 'angular-miniprogram';
+   * import { FooComponent } from './foo.component';
+   * bootstrapPage(FooComponent);
+   * ```
+   */
+  public bootstrapPage = (
+    component: Type<unknown>,
+    pageOptions?: { useComponent: boolean }
+  ) => {
+    return this.createPageBootstrap(
+      component,
+      (instance) => getApp<AppOptions>().__ngStartPage(component, instance),
+      pageOptions
+    );
+  };
+
+  /**
+   * @deprecated 请改用 `bootstrapPage(StandaloneComponent)`，
+   * 页面组件直接用 `standalone: true`，不再需要 NgModule。
+   */
+  public pageStartup = (
+    module: Type<unknown>,
+    component: Type<unknown>,
+    pageOptions?: { useComponent: boolean }
+  ) => {
+    return this.createPageBootstrap(
+      component,
+      (instance) =>
+        getApp<AppOptions>().__ngStartPageWithModule(
+          module,
+          component,
+          instance
+        ),
+      pageOptions
+    );
+  };
   protected addNgComponentLinkLogic(
-    config: WechatMiniprogram.Component.Options<{}, {}, {}>
+    config: WechatMiniprogram.Component.Options<{}, {}, {}, []>
   ) {
     config.lifetimes = config.lifetimes || {};
     const oldCreate = config.lifetimes.created;
@@ -359,7 +416,7 @@ export class MiniProgramCoreFactory {
   }
   public componentRegistry = (component: Type<unknown>) => {
     const options = this.getComponentOptions(component) || {};
-    let config: WechatMiniprogram.Component.Options<{}, {}, {}> = {
+    let config: WechatMiniprogram.Component.Options<{}, {}, {}, []> = {
       ...options,
       data: { hasLoad: false },
       options: { ...options?.options, multipleSlots: true },
@@ -382,6 +439,7 @@ export class MiniProgramCoreFactory {
       {},
       {},
       {},
+      [],
       {},
       T
     >;

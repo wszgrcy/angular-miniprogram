@@ -6,6 +6,7 @@ import { NgIfComponent } from '../../spec-component/ng-if/ng-if.component';
 import { nodeExist } from '../util';
 
 @Component({
+  standalone: false,
   selector: 'app-ng-if-spec',
   template: `<app-ng-if #instance></app-ng-if>`,
 })

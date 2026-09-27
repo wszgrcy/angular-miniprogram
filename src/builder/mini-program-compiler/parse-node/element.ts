@@ -1,4 +1,5 @@
 import type { Element } from '../../angular-internal/ast.type';
+import { mapAngularTagToWxml } from '../tag-mapping';
 import { ComponentContext } from './component-context';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
 import type { MatchedComponent, MatchedDirective } from './type';
@@ -44,13 +45,9 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     }
   }
   private getTagName() {
-    const originTagName = this.node.name;
-    this.tagName = originTagName;
-    if (/^(div|p|h1|h2|h3|h4|h5|h6|span)$/.test(originTagName)) {
-      this.tagName = 'view';
-    } else if (originTagName === 'ng-container') {
-      this.tagName = 'block';
-    }
+    // 映射规则抽到 tag-mapping.ts 作为唯一真相源，
+    // 等价性测试要用同一套规则交叉校验两端标签。
+    this.tagName = mapAngularTagToWxml(this.node.name);
   }
 
   appendNgNodeChild(child: ParsedNode<NgNodeMeta>) {

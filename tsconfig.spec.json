@@ -2,7 +2,23 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "sourceMap": true,
+    // 与 tsconfig.library.json 对齐：小程序运行时不是 DOM，但代码大量
+    // **使用 DOM 类型**（Document / HTMLElement / Node 等），
+    // base 的 ES2019 没有这些，spec 侧必须补上，否则类型对不上。
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "types": ["jasmine", "node"],
     "paths": {
+      // @angular/core/testing 只靠 exports map，moduleResolution: node10
+      // 认不出来（与 vite 同因），显式指到类型入口
+      "@angular/core/testing": [
+        "./node_modules/@angular/core/types/testing.d.ts"
+      ],
+      "@angular/build/private": [
+        "./node_modules/@angular/build/src/private.d.ts"
+      ],
+      // vite 的 package.json 没有 main / types 字段，只靠 exports map，
+      // moduleResolution: node10 认不出来，这里显式指到类型入口
+      "vite": ["./node_modules/vite/dist/node/index.d.ts"],
       "angular-miniprogram/platform/default": [
         "./src/library/platform/default/index.ts"
       ],
@@ -11,8 +27,10 @@
         "./src/library/platform/type/index.ts"
       ],
       "angular-miniprogram/platform": ["./src/library/platform/index.ts"],
-      "angular-miniprogram/common": ["./src/library/common/index.ts"],
-      "angular-miniprogram/common/http": ["./src/library/common/http/index.ts"]
+      // 同 tsconfig.library.json：Angular 22 子路径只靠 exports map，
+      // moduleResolution: node 认不出来。
+      "@angular/common/http": ["./node_modules/@angular/common/types/http.d.ts"],
+      "@angular/common": ["./node_modules/@angular/common/types/common.d.ts"]
     }
   },
   "exclude": ["**/fixture/**"],

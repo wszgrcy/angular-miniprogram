@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'app-ng-if',
   templateUrl: './ng-if.component.html',
 })

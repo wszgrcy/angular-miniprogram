@@ -1,6 +1,7 @@
 import { Component, Input, OnInit, TemplateRef } from '@angular/core';
 
 @Component({
+  standalone: false,
   selector: 'app-outside-template',
   templateUrl: './outside-template.component.html',
   styleUrls: ['./outside-template.component.css'],

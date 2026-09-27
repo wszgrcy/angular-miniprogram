@@ -2,17 +2,17 @@
 import {
   Transform,
   transformFromPromise,
-} from 'ng-packagr/lib/graph/transform';
+} from 'ng-packagr/src/lib/graph/transform';
 import {
   EntryPointNode,
   PackageNode,
   isEntryPoint,
   isEntryPointInProgress,
   isPackage,
-} from 'ng-packagr/lib/ng-package/nodes';
-import { NgPackagrOptions } from 'ng-packagr/lib/ng-package/options.di';
-import { StylesheetProcessor as StylesheetProcessorClass } from 'ng-packagr/lib/styles/stylesheet-processor';
-import { setDependenciesTsConfigPaths } from 'ng-packagr/lib/ts/tsconfig';
+} from 'ng-packagr/src/lib/ng-package/nodes';
+import { NgPackagrOptions } from 'ng-packagr/src/lib/ng-package/options.di';
+import { StylesheetProcessor as StylesheetProcessorClass } from 'ng-packagr/src/lib/styles/stylesheet-processor';
+import { setDependenciesTsConfigPaths } from 'ng-packagr/src/lib/ts/tsconfig';
 import ora from 'ora';
 import * as path from 'path';
 import ts from 'typescript';
@@ -60,7 +60,10 @@ export const myCompileNgcTransformFactory = (
         basePath,
         cssUrl,
         styleIncludePaths,
-        options.cacheEnabled && options.cacheDirectory
+        // ng-packagr 19 在 cacheDirectory 之前新增了 `sass` 参数
+        undefined,
+        options.cacheEnabled && options.cacheDirectory,
+        options.watch
       );
 
       await compileSourceFiles(

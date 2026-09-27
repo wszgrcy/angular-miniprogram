@@ -1,5 +1,14 @@
 {
-  "compilerOptions": {},
+  "compilerOptions": {
+    // 这个文件本身是个 solution-style 配置（只有 references），但 `code-recycle`
+    // 跑 sync 脚本时 ts-node 会从 cwd 往上找到它并直接拿来用，空 compilerOptions
+    // 会让 TS 6.0 用默认的 target=ES5 并因缺少 rootDir 报 TS5107 / TS5011。
+    "target": "ES2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "rootDir": ".",
+    "ignoreDeprecations": "6.0"
+  },
   "include": [],
   "files": [],
   "references": [

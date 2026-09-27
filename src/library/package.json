@@ -1,13 +1,14 @@
 {
   "name": "angular-miniprogram",
   "version": "1.5.2",
+  "type": "commonjs",
   "description": "使用Angular开发小程序",
   "keywords": [
     "Angular",
     "miniprogram",
     "wechat",
     "weixin",
-    "Angular 17"
+    "Angular 22"
   ],
   "repository": {
     "type": "git",
@@ -21,12 +22,12 @@
   "homepage": "https://github.com/wszgrcy/angular-miniprogram#readme",
   "dependencies": {
     "cyia-code-util": "1.8.0",
-    "webpack-bootstrap-assets-plugin": "2.0.3",
     "static-injector": "4.0.2"
   },
   "peerDependencies": {
-    "ng-packagr": "^17.3.0",
-    "@angular/core": "^17.3.1",
+    "ng-packagr": "^22.1.1",
+    "@angular/core": "^22.1.7",
+    "@angular/common": "^22.1.7",
     "jasmine-core": "5.1.2"
   },
   "exports": {

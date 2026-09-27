@@ -6,6 +6,7 @@ import { SelfTemplateComponent } from '../../spec-component/self-template/self-t
 import { nodeExist } from '../util';
 
 @Component({
+  standalone: false,
   selector: 'app-self-template-spec',
   template: ` <ng-template #$$mp$$__self__$$self1
       ><div class="content-1">content-1</div></ng-template

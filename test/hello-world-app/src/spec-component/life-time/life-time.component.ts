@@ -2,11 +2,17 @@ import { Component, OnInit } from '@angular/core';
 import { MiniProgramComponentInstance } from 'angular-miniprogram/platform/type';
 
 @Component({
+  standalone: false,
   selector: 'app-life-time',
   template: '',
 })
 export class LifeTimeComponent implements OnInit {
-  static mpComponentOptions: WechatMiniprogram.Component.Options<{}, {}, {}> = {
+  static mpComponentOptions: WechatMiniprogram.Component.Options<
+    {},
+    {},
+    {},
+    []
+  > = {
     lifetimes: {
       created: function (this: MiniProgramComponentInstance) {
         console.log('created', this.__isLink);

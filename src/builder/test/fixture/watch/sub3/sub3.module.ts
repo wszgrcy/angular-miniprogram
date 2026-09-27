@@ -1,5 +1,5 @@
 import { NgModule } from '@angular/core';
-import { CommonModule } from 'angular-miniprogram/common';
+import { CommonModule } from '@angular/common';
 import { Sub3Component } from './sub3.component';
 
 @NgModule({

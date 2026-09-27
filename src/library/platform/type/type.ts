@@ -1,16 +1,27 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type {
+  ɵChangeDetectionScheduler as ChangeDetectionScheduler,
   ComponentRef,
   Injector,
   NgModuleRef,
-  NgZone,
   Type,
   ViewRef,
 } from '@angular/core';
 import type { LView } from './internal-type';
 
 export interface AppOptions {
-  __ngStartPage<M, C>(
+  /** 启动一个 standalone 组件作为页面 */
+  __ngStartPage<C>(
+    component: Type<C>,
+    miniProgramComponentInstance: any
+  ): {
+    componentRef: ComponentRef<C>;
+  };
+  /**
+   * @deprecated 仍用于 `pageStartup(module, component)` 的 NgModule 启动方式，
+   * 新代码请用 `bootstrapPage(StandaloneComponent)`。
+   */
+  __ngStartPageWithModule<M, C>(
     module: Type<M>,
     component: Type<C>,
     miniProgramComponentInstance: any
@@ -28,7 +39,8 @@ export interface MiniProgramComponentVariable<NG_COMPONENT_INSTANCE = unknown> {
   /** page使用 */
   __ngComponentHostView: ViewRef;
   __ngComponentInjector: Injector;
-  __ngZone: NgZone;
+  /** zoneless 变更检测调度器，取代原来的 `__ngZone` */
+  __ngChangeDetectionScheduler: ChangeDetectionScheduler;
   /** 小程序组件是否与lview链接成功 */
   __isLink: boolean;
   __lView: LView;
@@ -52,7 +64,13 @@ export interface MiniProgramComponentMethod {
 
 export interface MPView {
   nodeList: (MPView[] | MPElementData | MPTextData)[];
-  __templateName: string | undefined;
+  /**
+   * 运行时模板名。无名字时用 `null`，**不能用 `undefined`**
+   * —— 微信 `setData` 对路径式 key 上的 `undefined` 直接拒绝，
+   * 会让整个 setData 调用失败、界面冻结。
+   * 详见 `component-template-hook.factory.ts` 里的推导注释。
+   */
+  __templateName: string | null;
   nodePath: NodePath;
   index: number;
   hasLoad?: boolean;

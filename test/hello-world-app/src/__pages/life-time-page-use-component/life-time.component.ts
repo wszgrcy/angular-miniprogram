@@ -1,7 +1,11 @@
+import { CommonModule } from '@angular/common';
+import { LifeTimeComponent } from '../../__components/life-time/life-time.component';
 import { Component, OnInit } from '@angular/core';
 import { MiniProgramComponentInstance } from 'angular-miniprogram/platform/type';
 
 @Component({
+  standalone: true,
+  imports: [CommonModule, LifeTimeComponent],
   selector: 'app-life-time',
   templateUrl: './life-time.component.html',
 })
@@ -10,6 +14,7 @@ export class LifeTimePage implements OnInit {
     {},
     {},
     {},
+    [],
     {},
     true
   > = {

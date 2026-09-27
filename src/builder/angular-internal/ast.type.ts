@@ -5,6 +5,7 @@ import type {
   TmplAstContent,
   TmplAstElement,
   TmplAstIcu,
+  TmplAstLetDeclaration,
   TmplAstNode,
   TmplAstRecursiveVisitor,
   TmplAstReference,
@@ -28,4 +29,6 @@ export type BoundEvent = TmplAstBoundEvent;
 export type Text = TmplAstText;
 export type BoundText = TmplAstBoundText;
 export type Icu = TmplAstIcu;
+/** Angular 18 新增的 `@let` 声明节点 */
+export type LetDeclaration = TmplAstLetDeclaration;
 export type Node = TmplAstNode;

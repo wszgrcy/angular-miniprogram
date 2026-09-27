@@ -1,6 +1,9 @@
+import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 
 @Component({
+  standalone: true,
+  imports: [CommonModule],
   selector: 'app-default-structural-directive',
   templateUrl: './default-structural-directive.component.html',
   styleUrls: ['./default-structural-directive.component.css'],

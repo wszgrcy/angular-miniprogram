@@ -1,11 +1,11 @@
 import fs from 'fs-extra';
-import { transformFromPromise } from 'ng-packagr/lib/graph/transform';
-import { WRITE_PACKAGE_TRANSFORM } from 'ng-packagr/lib/ng-package/entry-point/write-package.di';
+import { transformFromPromise } from 'ng-packagr/src/lib/graph/transform';
+import { WRITE_PACKAGE_TRANSFORM } from 'ng-packagr/src/lib/ng-package/entry-point/write-package.di';
 import {
   EntryPointNode,
   isEntryPointInProgress,
-} from 'ng-packagr/lib/ng-package/nodes';
-import { NgPackagrOptions } from 'ng-packagr/lib/ng-package/options.di';
+} from 'ng-packagr/src/lib/ng-package/nodes';
+import { NgPackagrOptions } from 'ng-packagr/src/lib/ng-package/options.di';
 import path from 'path';
 import { of } from 'rxjs';
 

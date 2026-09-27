@@ -1,4 +1,4 @@
-import { HttpHeaders, HttpResponse } from 'angular-miniprogram/common/http';
+import { HttpHeaders, HttpResponse } from '@angular/common/http';
 
 export class MiniProgramHttpResponse<T> extends HttpResponse<T> {
   /**

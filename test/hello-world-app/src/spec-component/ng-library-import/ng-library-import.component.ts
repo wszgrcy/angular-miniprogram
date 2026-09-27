@@ -1,6 +1,7 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { LibComp1Component } from 'test-library';
 @Component({
+  standalone: false,
   selector: 'app-ng-library-import',
   templateUrl: './ng-library-import.component.html',
 })

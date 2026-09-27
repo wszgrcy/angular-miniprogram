@@ -1,9 +1,7 @@
 {
   "extends": "./tsconfig.base.json",
   // "files": ["./src/library/index.ts"],
-  "include": [
-    "./src/library"
-  ],
+  "include": ["./src/library"],
   "compilerOptions": {
     "baseUrl": "./src/library",
     "noImplicitThis": true,
@@ -13,35 +11,19 @@
     "module": "esnext",
     "strict": true,
     "useUnknownInCatchVariables": false,
-    "lib": [
-      "es2019",
-      "dom"
-    ],
-    "typeRoots": [
-      "./src/library"
-    ],
-    "types": [
-      "declaration"
-    ],
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "typeRoots": ["./src/library", "./node_modules"],
+    "types": ["declaration", "miniprogram-api-typings"],
     "paths": {
-      "angular-miniprogram/platform/default": [
-        "./platform/default/index.ts"
-      ],
-      "angular-miniprogram/platform/wx": [
-        "./platform/wx/index.ts"
-      ],
-      "angular-miniprogram/platform/type": [
-        "./platform/type/index.ts"
-      ],
-      "angular-miniprogram/platform": [
-        "./platform/index.ts"
-      ],
-      "angular-miniprogram/common": [
-        "./common/index.ts"
-      ],
-      "angular-miniprogram/common/http": [
-        "./common/http/index.ts"
-      ],
+      "angular-miniprogram/platform/default": ["./platform/default/index.ts"],
+      "angular-miniprogram/platform/wx": ["./platform/wx/index.ts"],
+      "angular-miniprogram/platform/type": ["./platform/type/index.ts"],
+      "angular-miniprogram/platform": ["./platform/index.ts"],
+      // Angular 22 的 `@angular/common/http` 只靠 exports map 暴露子路径，
+      // 不再提供 node10 兼容的 `http/` 目录，moduleResolution: node 认不出来，
+      // 这里显式指到类型入口。
+      "@angular/common/http": ["../../node_modules/@angular/common/types/http.d.ts"],
+      "@angular/common": ["../../node_modules/@angular/common/types/common.d.ts"]
     }
   },
   "exclude": [
@@ -52,6 +34,12 @@
   ],
   "angularCompilerOptions": {
     "enableIvy": true,
-    "compilationMode": "full"
+    "compilationMode": "full",
+    // Angular 21 开始会对 @HostBinding 做 schema 校验（typeCheckHostBindings 默认 true）。
+    // 本库的表单 accessor 绑的是小程序自定义元素（checkbox / switch / radio / slider /
+    // picker / picker-view），这些永远不在 Angular 的 DOM schema 里，会全部报 NG8002。
+    // 这些绑定最终由本库的模板编译器翻译成 wxml，不会真的去 set DOM property，
+    // 所以这里关掉 host binding 的类型检查。
+    "typeCheckHostBindings": false
   }
 }
