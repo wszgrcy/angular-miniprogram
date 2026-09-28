@@ -6,7 +6,8 @@ import { TagViewConvertComponent } from '../../spec-component/tag-view-convert/t
 import { nodeExist } from '../util';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [TagViewConvertComponent],
   selector: 'app-tag-view-convert-spec',
   template: `<app-tag-view-convert #instance></app-tag-view-convert>`,
 })
@@ -15,7 +16,7 @@ export class TagViewConvertSpecComponent {
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
     onReady: function (
       this: WechatMiniprogram.Page.Instance<{}, {}> &
-        MiniProgramComponentInstance<TagViewConvertSpecComponent>
+        MiniProgramComponentInstance<TagViewConvertSpecComponent>,
     ) {
       this.__ngComponentInstance.componentFinderService
         .get(this.__ngComponentInstance.instance)
@@ -24,14 +25,14 @@ export class TagViewConvertSpecComponent {
             item: WechatMiniprogram.Page.Instance<
               WechatMiniprogram.IAnyObject,
               WechatMiniprogram.IAnyObject
-            >
+            >,
           ) => {
             let query = item.createSelectorQuery();
             expect(await nodeExist(query, '.tag-name-div')).toBe(true);
             expect(await nodeExist(query, '.tag-name-span')).toBe(true);
 
             this.__ngComponentInstance.testFinish$$.complete();
-          }
+          },
         );
     },
   };

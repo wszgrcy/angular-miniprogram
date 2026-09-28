@@ -1,5 +1,4 @@
-import { pageStartup } from 'angular-miniprogram';
-import { NgTemplateOutletSpecModule } from './ng-template-outlet.module';
+import { bootstrapPage } from 'angular-miniprogram';
 import { NgTemplateOutletSPecComponent } from './ng-template-outlet.component';
 
-pageStartup(NgTemplateOutletSpecModule, NgTemplateOutletSPecComponent);
+bootstrapPage(NgTemplateOutletSPecComponent);

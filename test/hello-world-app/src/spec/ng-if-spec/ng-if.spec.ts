@@ -2,7 +2,7 @@ import { componentTestComplete, getComponent, openComponent } from '../util';
 import { NgIfSPecComponent } from './ng-if.component';
 describe('NgIfSPecComponent', () => {
   beforeEach(async () => {
-    await openComponent(`/spec/ng-if-spec/ng-if-spec-entry`);
+    await openComponent(`/pages/ng-if-spec/ng-if-spec-entry`);
   });
   it('run', (done) => {
     let pages = getCurrentPages();

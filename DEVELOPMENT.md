@@ -19,6 +19,259 @@ npm run lint       # eslint --max-warnings 0
 npm run sync       # 手动从 angular/angular@17.3.1 同步源码（需要网络）
 ```
 
+> **上面都是 Node 侧用例**。还有一层「在真·微信开发者工具里跑」的
+> 小程序 karma 用例，见下面 [微信真机 karma 测试](#微信真机-karma-测试)。
+> 那层需要开发者工具 + 真实 AppID + 手动登录，不能纯命令行无人值守。
+
+---
+
+## 微信真机 karma 测试
+
+### 两层测试的分工
+
+|                | Node jasmine（`npm test`）     | 小程序 karma（`npm run test:wechat`） |
+| -------------- | ------------------------------ | ------------------------------------- |
+| 跑在哪         | Node 进程，`wx` 用 Proxy 桩    | 真·微信开发者工具里的小程序运行时     |
+| 覆盖           | 编译器、纯函数、可 mock 的逻辑 | 渲染、生命周期、`wx.*` 真实行为       |
+| 需要开发者工具 | 否                             | **是**                                |
+| 需要真实 AppID | 否                             | **是**（游客模式不行）                |
+| 需要手动登录   | 否                             | **是**（见下）                        |
+| 速度           | 全量约 4 分钟                  | 13 个 spec 约 17 秒                   |
+
+两层不能互相替代。典型例子：内建控制流 `@if` 的 `nodeList` 填充 bug，
+Node 侧合成 lView 测不出来，只有真机跑才暴露。
+
+### 前置条件（四条，缺一不可）
+
+**1. 微信开发者工具已安装，且服务端口已开启**
+
+IDE → 设置 → 安全设置 → **服务端口：开**。
+没开会直接报：
+
+```
+工具的服务端口已关闭。要使用命令行调用，请手动打开工具 -> 设置 -> 安全设置，将服务端口开启。
+```
+
+**2. 必须手动启动 IDE 并登录 —— CLI 拉不起来登录态**
+
+这是最容易踩的一条。CLI **能**拉起 IDE 进程（`--port` 会让它启动并监听），
+但**那个实例是登出状态**，且等多久都不会恢复：
+
+```
+# 已登录状态下 cli quit，再让 CLI 从零拉起：
+cli --port 40710 islogin   →  {"login":false}
+等待 40s 再查             →  {"login":false}
+
+# 且 profile 是同一个（--debug 实测）：
+userDirPath  C:\Users\<user>\AppData\Local\微信开发者工具\User Data\<hash>\Default
+```
+
+同 profile、同机器，CLI 拉起的实例就是 `login:false`。
+
+**所以正确顺序是：你手动打开 IDE → 扫码登录 → 再跑测试。**
+
+登录没上的表现很坑，**不会报错**：
+
+```
+cli auto  →  ✔ auto          ← 假成功
+# 然后小程序永远不连 karma，脚本干等到超时
+```
+
+**3. AppID 用游客的就行**
+
+> ⚠️ **两次纠正**。早先记的两条都是错的：
+>
+> 1. 「游客模式网络被掐」—— 错，当时把「未登录」归因到了 appid 上
+> 2. 「游客模式 `cli auto` 不可靠」—— 也错，当时把「会话互斥」归因到了 appid 上
+>
+> **游客 appid 可以跑测试，实测 13/13 SUCCESS 且可复现。**
+
+网络硬证据（带唯一标记的服务器，验证**内容真的回来了**，不是只看状态码）：
+
+```
+loopback >> status=200 marker回传=true
+           body={"marker":"FX-TOURIST-OK-9911","echo":"/hello","host":"127.0.0.1:9901"}
+LAN      >> status=200 marker回传=true
+           body={"marker":"FX-TOURIST-OK-9911","echo":"/lan","host":"192.168.31.198:9901"}
+```
+
+标记串、echo 路径、host 头全部原样返回 —— 真实往返，不是缓存也不是假应答。
+
+**之前反复失败的真正原因：会话互斥。**
+
+DevTools 的自动化会话**同一时刻只能有一个**。上一轮跑完脚本只杀了
+node/karma，**项目窗口还开在 IDE 里**；新一轮 `cli auto` 去抢会话，
+旧连接被强制关掉，karma 那边刚连上就断：
+
+```
+Connected on socket
+WARN [小程序]: Disconnected (0 times) reconnect failed before timeout of 2000ms (transport close)
+Executed 0 of null
+```
+
+干净 A/B（同代码、同机器、同游客 appid）：
+
+| 前置动作            | 结果                                         |
+| ------------------- | -------------------------------------------- |
+| 先 `cli close` 再跑 | ✅ `Executed 13 of null SUCCESS`（连复两次） |
+| 不 close 直接跑     | ❌ `transport close` → `Executed 0`          |
+
+**脚本已修**：跑之前自动 `cli close --project <产物>` 并等 8 秒，
+不用手动干预。修后连跑两次均全自动 PASS。
+
+**唯一真正需要真实 AppID 的场景**：`cli open`。游客 appid 走 `open`
+会报 `code: 10 不存在此 AppID`。但测试链路走的是 `auto`，不是 `open`，
+所以碰不到这个限制。
+
+**4. `urlCheck: false`（就是 IDE 里那个「不校验合法域名」勾选）**
+
+IDE → 详情 → 本地设置 →
+**「不校验合法域名、web-view（业务域名）、TLS 版本以及 HTTPS 证书」**
+
+这个勾选对应 `project.config.json` 里的 `setting.urlCheck`（**反逻辑**：
+勾选 = `false`）：
+
+```json
+// test/hello-world-app/src/project.config.json
+{ "setting": { "urlCheck": false } }
+```
+
+**游客模式下这个是必需的，不是可选的。** 原因：
+
+> 域名白名单是挂在 AppID 上的。**游客模式没有 AppID → 没有任何白名单
+> 上下文 → 所有域名都不合法**。不关掉校验，连 `127.0.0.1` 都过不了。
+
+所以「游客 + 本地开发」的正确组合是：
+
+| 项             | 值                                                    |
+| -------------- | ----------------------------------------------------- |
+| AppID          | `touristappid`                                        |
+| 不校验合法域名 | **勾选**（`urlCheck: false`）                         |
+| 登录           | **需要**（未登录时 `wx.request` 直接 `request:fail`） |
+
+注意最后一行：**游客模式免的是 AppID，不免登录。** 开发者工具本身
+仍然要扫码登录，否则请求根本发不出去。
+
+这个设置没开的典型报错：
+
+```
+request:fail url not in domain list
+```
+
+而登录没上的报错长得不一样（没有 `url not in domain list`）：
+
+```
+request:fail        status: undefined     ← 请求根本没发出
+```
+
+两个报错能用来快速区分是「域名校验没关」还是「没登录」。
+
+### 怎么跑
+
+```bash
+# 1. 手动打开微信开发者工具并扫码登录
+# 2. 跑（游客 appid 直接可用，不用 --appid）
+npm run test:wechat
+# 或显式：
+node script/wechat-karma.cjs \
+  --project ./test/hello-world-app \
+  --dist    ./test/hello-world-app/dist/karma/app
+```
+
+仓库里 `src/project.config.json` 提交的就是 `touristappid`，**直接就能跑
+测试**，不用换真实 AppID。想换成自己的也可以，用 `--appid` 注入，不进版本库。
+
+脚本做的事：**登录态预检** → **自动 close 残留项目窗口** → 起 karma
+→ 等 server ready → `cli auto` → 轮询日志里的 `Executed X of Y`
+→ 杀进程 → 按结果 exit 0/1（可直接进 CI）。
+
+**两个预检为什么重要**（都是踩过坑换来的）：
+
+- **登录态**：未登录时 `cli auto` 会假成功，不预检就得干等 180s
+  超时且看不出原因。现在几秒内直接告诉你：
+
+```
+[wechat-karma] 失败: 开发者工具未登录。
+CLI 拉起的 IDE 实例是登出状态（实测同 profile 也不带登录态，等待也不会恢复），
+必须手动打开微信开发者工具并扫码登录后再跑。
+EXIT=1
+```
+
+- **残留窗口**：不先 close 上一轮，会话互斥会导致 `transport close`，
+  表现是 `Executed 0`。脚本现在自动 close + 等 8 秒。
+
+IDE 服务端口与 `.ide` 记录不一致时，用 `--ide-port <端口>` 直接指定，
+不用去改文件。
+
+### 端口机制（`.ide` 文件）
+
+CLI **不直接问 IDE 端口**，而是读一个状态文件：
+
+```
+%LOCALAPPDATA%\微信开发者工具\User Data\<hash>\Default\
+  ├── .ide          ← IDE 服务端口
+  ├── .ide-status   ← 服务端口开关（"On" / "Off"）
+  └── .cli          ← CLI 自己的端口
+```
+
+IDE 每次启动**随机挑端口**，而 `.ide` 只在 IDE 自己的启动流程里写。
+用 `taskkill /F` 强杀、或直接双击 exe 启动，都会让 `.ide` 与实际端口脱节：
+
+```
+.ide = 40710（陈旧）
+实际监听 = 41994
+→ CLI 读 40710 → ECONNREFUSED → 判定「IDE 没启动」→ 去拉新实例
+→ 但已有实例占着 → 40710 永远开不出来 → wait IDE port timeout
+```
+
+**`--port` 的关键限制**（实测确认）：
+
+> `--port` 只在「CLI 亲自拉起 IDE」那一次生效。
+> 要连**已经在跑**的 IDE，CLI 仍然只认 `.ide` 文件。
+
+所以 IDE 已在跑但端口对不上时，直接把真实端口写回去最快：
+
+```bash
+echo 41994 > "$LOCALAPPDATA/微信开发者工具/User Data/<hash>/Default/.ide"
+```
+
+### 故障速查表
+
+| 现象                                              | 原因                                   | 解法                                                  |
+| ------------------------------------------------- | -------------------------------------- | ----------------------------------------------------- |
+| `不存在此 AppID (code 10)`                        | 用了 `touristappid` 走 `cli open`      | 换真实 AppID                                          |
+| `需要重新登录 (code 10)`                          | IDE 登录态丢了                         | 手动登录 IDE                                          |
+| `✔ auto` 但无测试结果，最后超时                  | 登录态为 `false`（假成功）             | `islogin` 预检，登录后重跑                            |
+| `wait IDE port timeout`                           | `.ide` 与实际端口不一致                | 写回真实端口，或干净退出后 `--port` 重拉              |
+| `工具的服务端口已关闭`                            | IDE 安全设置里服务端口没开             | 设置 → 安全设置 → 服务端口 开                         |
+| `Connected on socket` 后 `no message in 30000 ms` | 上一轮 DevTools 实例还在，把新会话挤掉 | 脚本已自动 `cli close`；手动跑就先 close 旧项目等几秒 |
+| `Disconnected ... transport close` → `Executed 0` | 同上，**会话互斥**（不是 appid 问题）  | 同上                                                  |
+| `Executed N of null`                              | karma adapter 的 `total` 竞态（已知）  | 脚本已按日志静默判定，不影响结果                      |
+
+### 已验证的网络矩阵
+
+```
+目标                              真实 AppID    游客 appid
+loopback  http://127.0.0.1:9901     ✅           ✅（标记串回传验证）
+LAN       http://192.168.31.198:9901 ✅           ✅（标记串回传验证）
+external  https://registry.npmjs.org  ✅           ✅
+```
+
+**局域网可通**：手机连同 WiFi 就能打本机 dev server，真机联调不用改代码
+（把 karma 的 `clientHost` 指到本机局域网 IP 即可）。
+
+游客与真实 AppID 在网络上**没有区别**，两者都需要：已登录 + `urlCheck:false`。
+
+### 为什么 http spec 打本地服务而不是外部 API
+
+原来打的是 `https://api.realworld.io/api/articles`，该域名已返
+**HTTP 530**（Cloudflare 源站不在，宿主机 `curl` 同样 530），测试会
+长期红且与代码无关。现在由 `karma.conf.js` 起一个本地 fixture 服务，
+请求仍是真的 `wx.request → 127.0.0.1`，**适配层链路一字不变**，
+只是响应可控、可重复。见 `src/spec/util/fixture-server.ts`。
+
+---
+
 ## 🔴 发布产物形态：包必须是 `type: commonjs`
 
 `src/library/package.json` 里显式写了 `"type": "commonjs"`，**不要删**。
@@ -399,19 +652,19 @@ Options<{}, {}, {}>            ->  Options<{}, {}, {}, []>
 
 ### 21 → 22
 
-| 项目                                | 说明                                                                                                                                                                                                                                   |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 版本                                | `@angular/*` 22.1.7 / `@angular-devkit/*` 22.1.8 / ng-packagr 22.1.1 / TS 6.0.3 / webpack 5.109.2                                                                                                                                      |
-| **TS 6.0：strict 默认开启**         | 空 tsconfig 也会开 `noImplicitAny`。本仓库 `tsconfig.base.json` 已显式 `strict: false`，但 fixture 的没写，直接继承新默认值，冒出成堆 TS7006 / TS7008 / TS2564。显式补 `strict: false`（单独设置的 `strictNullChecks` 不受影响）       |
-| TS 6.0：废弃项变硬错误              | `baseUrl` / `moduleResolution=node10` / `downlevelIteration` / `target=ES5` 全部报错，加 `"ignoreDeprecations": "6.0"`                                                                                                                 |
-| TS 6.0：根 tsconfig                 | 根 `tsconfig.json` 是 solution-style（只有 references），但 `code-recycle` 跑 sync 时 ts-node 会拿它直接用。空 `compilerOptions` 让 TS 6 用默认 `target=ES5` 并因缺 `rootDir` 报 TS5107 / TS5011，补上 `target` / `module` / `rootDir` |
-| TS 6.0：@types 不再自动全量注入     | karma client 的 tsconfig 显式声明 `typeRoots` 与 `types`（`jasmine` 命名空间、`node` 的 `Console`）                                                                                                                                    |
-| `createNgModuleRef` 移除            | 改用 `createNgModule`（签名一致）                                                                                                                                                                                                      |
-| `ComponentFactoryResolver` 整体移除 | `NgModuleRef.componentFactoryResolver` 也没了。废弃的 `pageStartup(module, component)` 路径改为用模块 injector 当 `environmentInjector` 走 `createComponent`                                                                           |
-| `@content` 新块                     | 内容查询块，依赖运行时 content query 观察投影内容并重渲染。小程序 slot / self 模板是静态的，对不上，按 `@defer` 先例显式抛错                                                                                                           |
+| 项目                                 | 说明                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 版本                                 | `@angular/*` 22.1.7 / `@angular-devkit/*` 22.1.8 / ng-packagr 22.1.1 / TS 6.0.3 / webpack 5.109.2                                                                                                                                                                                                                            |
+| **TS 6.0：strict 默认开启**          | 空 tsconfig 也会开 `noImplicitAny`。本仓库 `tsconfig.base.json` 已显式 `strict: false`，但 fixture 的没写，直接继承新默认值，冒出成堆 TS7006 / TS7008 / TS2564。显式补 `strict: false`（单独设置的 `strictNullChecks` 不受影响）                                                                                             |
+| TS 6.0：废弃项变硬错误               | `baseUrl` / `moduleResolution=node10` / `downlevelIteration` / `target=ES5` 全部报错，加 `"ignoreDeprecations": "6.0"`                                                                                                                                                                                                       |
+| TS 6.0：根 tsconfig                  | 根 `tsconfig.json` 是 solution-style（只有 references），但 `code-recycle` 跑 sync 时 ts-node 会拿它直接用。空 `compilerOptions` 让 TS 6 用默认 `target=ES5` 并因缺 `rootDir` 报 TS5107 / TS5011，补上 `target` / `module` / `rootDir`                                                                                       |
+| TS 6.0：@types 不再自动全量注入      | karma client 的 tsconfig 显式声明 `typeRoots` 与 `types`（`jasmine` 命名空间、`node` 的 `Console`）                                                                                                                                                                                                                          |
+| `createNgModuleRef` 移除             | 改用 `createNgModule`（签名一致）                                                                                                                                                                                                                                                                                            |
+| `ComponentFactoryResolver` 整体移除  | `NgModuleRef.componentFactoryResolver` 也没了。废弃的 `pageStartup(module, component)` 路径改为用模块 injector 当 `environmentInjector` 走 `createComponent`                                                                                                                                                                 |
+| `@content` 新块                      | 内容查询块，依赖运行时 content query 观察投影内容并重渲染。小程序 slot / self 模板是静态的，对不上，按 `@defer` 先例显式抛错                                                                                                                                                                                                 |
 | **ICU 消息**（`{x, plural/select}`） | 编译成 `ɵɵpipe` + `I18nSelect` 动态切换子模板。**实测该节点会真的出现在 `parseTemplate` 结果里**，而 `visitIcu` 曾是空实现 → 整段内容静默消失 + 后续节点槽位错位且不报错。现显式抛错。注：这**不是「做不到」**——本 fork 已有的 `__templateName`（`<template is="{{item.__templateName}}">`）恰好就是它需要的能力，只是未实现 |
-| **`<ng-content>` fallback 内容**     | 实测空标签与纯空白会被 Angular 归一成 `children = []`，只有写了兜底才有子节点。小程序 `<slot>` 无 fallback 能力，对非空 children 显式抛错（已确认仓内无此用法，不打破现有代码）                                                              |
-| `Object.hasOwn`                     | 同步过来的 `@angular/common` 用到 ES2022 的 `Object.hasOwn`，库的 `lib` 从 es2019 提到 es2022                                                                                                                                          |
+| **`<ng-content>` fallback 内容**     | 实测空标签与纯空白会被 Angular 归一成 `children = []`，只有写了兜底才有子节点。小程序 `<slot>` 无 fallback 能力，对非空 children 显式抛错（已确认仓内无此用法，不打破现有代码）                                                                                                                                              |
+| `Object.hasOwn`                      | 同步过来的 `@angular/common` 用到 ES2022 的 `Object.hasOwn`，库的 `lib` 从 es2019 提到 es2022                                                                                                                                                                                                                                |
 
 ### 升级操作清单（21/22 修订版）
 
@@ -804,7 +1057,7 @@ wxml 里烧的是绝对下标（`nodeList[0]` / `nodeList[2]` / ...），运行�
 所以 Angular 把连续的同类调用写成链：
 
 ```js
-ɵɵelementStart(2, "app-content-multi")(3, "div", 0);
+ɵɵelementStart(2, 'app-content-multi')(3, 'div', 0);
 ɵɵelementEnd()();
 ```
 
@@ -875,11 +1128,11 @@ function unwrapCallChain(node: ts.CallExpression): ts.CallExpression[] {
 
 ### 当前状态
 
-| 清单 | 演进 | 现状 |
-|---|---|---|
+| 清单                    | 演进      | 现状                      |
+| ----------------------- | --------- | ------------------------- |
 | `KNOWN_ROOT_BLOCK_GAPS` | 4 → **1** | 剩 `ControlFlowComponent` |
-| `KNOWN_EXTRACTION_GAPS` | 1 → **0** | 已清空 |
-| `KNOWN_PRECISION_GAPS` | 4 → **1** | 仅 `ControlFlowComponent` |
+| `KNOWN_EXTRACTION_GAPS` | 1 → **0** | 已清空                    |
+| `KNOWN_PRECISION_GAPS`  | 4 → **1** | 仅 `ControlFlowComponent` |
 
 `KNOWN_PRECISION_GAPS` 保留的那一项是**该测试口径本身的局限**，不是产物
 错误：「按组件精确」把组件所有 wxml 下标拍成并集去比，而
@@ -891,16 +1144,15 @@ ControlFlowComponent 的 wxml 含大量具名块（`ifBlock_3` / `forBlock_11` /
 
 ### 验证矩阵（当前）
 
-| 断言 | 覆盖 |
-|---|---|
-| 下标并集两端一致 | 全部组件 |
-| 按组件精确 | 除 ControlFlow（口径局限，已注释说明） |
-| **按视图分块** | 除 ControlFlow 根块（具名块下标串扰） |
-| 具名模板块无豁免 | 全部 |
-| 反向对照（假等价必须被抓） | 3 条 |
-| 分块器单测 | 4 条 |
-| 提取器 codegen 形态单测 | 5 条 |
-
+| 断言                       | 覆盖                                   |
+| -------------------------- | -------------------------------------- |
+| 下标并集两端一致           | 全部组件                               |
+| 按组件精确                 | 除 ControlFlow（口径局限，已注释说明） |
+| **按视图分块**             | 除 ControlFlow 根块（具名块下标串扰）  |
+| 具名模板块无豁免           | 全部                                   |
+| 反向对照（假等价必须被抓） | 3 条                                   |
+| 分块器单测                 | 4 条                                   |
+| 提取器 codegen 形态单测    | 5 条                                   |
 
 ### 根因三：repeaterCreate 的锚点槽未被记入（已修复）
 
@@ -908,18 +1160,30 @@ ControlFlowComponent 的 wxml 含大量具名块（`ifBlock_3` / `forBlock_11` /
 参数**传入，不像 `@if` 那样为锚点单独发一条指令：
 
 ```js
-repeaterCreate(10, ControlFlowComponent_For_11_Template, 2, 3, "div", 8,
-               ɵɵrepeaterTrackByIdentity, false,
-               ControlFlowComponent_ForEmpty_12_Template, 2, 0, "div", 9);
+repeaterCreate(
+  10,
+  ControlFlowComponent_For_11_Template,
+  2,
+  3,
+  'div',
+  8,
+  ɵɵrepeaterTrackByIdentity,
+  false,
+  ControlFlowComponent_ForEmpty_12_Template,
+  2,
+  0,
+  'div',
+  9,
+);
 ```
 
 槽布局（与 builder 侧 `template-definition.ts` 注释一致）：
 
-| 槽 | 含义 |
-|---|---|
-| 10 | RepeaterMetadata（不可渲染但占位） |
-| 11 | 主模板锚点 |
-| 12 | @empty 模板锚点（若有） |
+| 槽  | 含义                               |
+| --- | ---------------------------------- |
+| 10  | RepeaterMetadata（不可渲染但占位） |
+| 11  | 主模板锚点                         |
+| 12  | @empty 模板锚点（若有）            |
 
 按「指令名 + 首参」提取只得到 `repeaterCreate@10`，漏掉 11/12。
 wxml 却引用 `nodeList[11]` / `nodeList[12]` → 报未覆盖。
@@ -931,11 +1195,11 @@ wxml 却引用 `nodeList[11]` / `nodeList[12]` → 报未覆盖。
 
 ### 最终状态
 
-| 清单 | 演进 | 现状 |
-|---|---|---|
-| `KNOWN_EXTRACTION_GAPS` | 1 → **0** | 已清空 |
-| `KNOWN_ROOT_BLOCK_GAPS` | 4 → 1 → **0** | 已清空 |
-| `KNOWN_PRECISION_GAPS` | 4 → **1** | 仅 `ControlFlowComponent`（口径缺陷） |
+| 清单                    | 演进          | 现状                                  |
+| ----------------------- | ------------- | ------------------------------------- |
+| `KNOWN_EXTRACTION_GAPS` | 1 → **0**     | 已清空                                |
+| `KNOWN_ROOT_BLOCK_GAPS` | 4 → 1 → **0** | 已清空                                |
+| `KNOWN_PRECISION_GAPS`  | 4 → **1**     | 仅 `ControlFlowComponent`（口径缺陷） |
 
 `KNOWN_PRECISION_GAPS` 那一项是**该测试口径本身的缺陷**：组件级并集
 把各视图的 0 基下标空间混在一起，而 Angular 明确「not unique between
@@ -944,16 +1208,16 @@ views」。更强的「按视图分块」已零缺口覆盖同一批组件，本
 
 ### 验证矩阵
 
-| 断言 | 覆盖 | 抓到什么 |
-|---|---|---|
-| 下标并集两端一致 | 全部组件 | 下标整体漂移 |
-| **按视图分块** | **全部组件，零缺口** | 视图级下标错位 |
-| 具名模板块无豁免 | 全部 | 漏验某个具名块 |
-| **标签类型对应** | **115 对** | 下标对但节点类型错 |
-| **运行时 lView→nodeList** | **4 条** | HEADER_OFFSET 用错 / 漏算槽 |
-| 反向对照（假等价必须被抓） | 5 条 | 校验本身失效 |
-| 分块器单测 | 4 条 | 嵌套具名模板切分 |
-| 提取器 codegen 形态单测 | 6 条 | 链式调用 / repeater 锚点 |
+| 断言                       | 覆盖                 | 抓到什么                    |
+| -------------------------- | -------------------- | --------------------------- |
+| 下标并集两端一致           | 全部组件             | 下标整体漂移                |
+| **按视图分块**             | **全部组件，零缺口** | 视图级下标错位              |
+| 具名模板块无豁免           | 全部                 | 漏验某个具名块              |
+| **标签类型对应**           | **115 对**           | 下标对但节点类型错          |
+| **运行时 lView→nodeList**  | **4 条**             | HEADER_OFFSET 用错 / 漏算槽 |
+| 反向对照（假等价必须被抓） | 5 条                 | 校验本身失效                |
+| 分块器单测                 | 4 条                 | 嵌套具名模板切分            |
+| 提取器 codegen 形态单测    | 6 条                 | 链式调用 / repeater 锚点    |
 
 ### 「一一对应」的澄清
 
@@ -984,7 +1248,7 @@ wxml 里没有对应元素是正常的。
 在 Node 里 boot 真实组件，拿 `getPageRefreshContext` 产出的**真实
 `nodeList`**，与页面 wxml 的下标需求比对：
 
-  nodeList.length  必须 >  wxml 里最大的 nodeList[k]
+nodeList.length 必须 > wxml 里最大的 nodeList[k]
 
 现有 `lview-to-node-list.spec.ts` 用的是**合成** lView（N 是编的），
 只验证下标算术，没跟真实 wxml 比对。这条补上后，「运行时数据是否
@@ -992,9 +1256,9 @@ wxml 里没有对应元素是正常的。
 
 ### 已铺好的前置（已提交 4d5bf73）
 
-| 障碍 | 解法 |
-|---|---|
-| 50 处包自引用 Node 运行时解析不了 | `tsconfig-paths` 挂 `Module._resolveFilename` |
+| 障碍                                   | 解法                                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| 50 处包自引用 Node 运行时解析不了      | `tsconfig-paths` 挂 `Module._resolveFilename`                           |
 | `MINIPROGRAM_GLOBAL = wx` 直接引用全局 | Proxy 兜底装 `wx` + `App`/`Page`/`Component`/`getApp`/`getCurrentPages` |
 
 ### 关于 zone 的澄清
@@ -1002,7 +1266,7 @@ wxml 里没有对应元素是正常的。
 项目**就是 zoneless**，zone.js 连装都没装。真实配置在 app 的 NgModule：
 
 ```ts
-providers: [provideZonelessChangeDetection()]
+providers: [provideZonelessChangeDetection()];
 ```
 
 spike 一度撞 NG0908 是因为用了裸 `createEnvironmentInjector` 且试图
@@ -1010,14 +1274,14 @@ import `NG_ZONE_CONFIG`（`ɵ` 私有 token，非公开 API）。
 
 ### spike 进展（逐关打通）
 
-| 关卡 | 结果 |
-|---|---|
-| 包自引用解析 | ✅ 通 |
-| `wx` / `App` 全局 | ✅ 通 |
-| zone（NG0908） | ✅ 用 `provideZonelessChangeDetection()` 后消失 |
-| `RendererFactory2`（NG0407） | ✅ 提供 `MiniProgramRendererFactory` 后解决 |
-| `ChangeDetectionSchedulerImpl`（NG0201） | ✅ 见下 |
-| 真实 boot | ✅ **已跑通**，拿到真实 lView / nodeList |
+| 关卡                                     | 结果                                            |
+| ---------------------------------------- | ----------------------------------------------- |
+| 包自引用解析                             | ✅ 通                                           |
+| `wx` / `App` 全局                        | ✅ 通                                           |
+| zone（NG0908）                           | ✅ 用 `provideZonelessChangeDetection()` 后消失 |
+| `RendererFactory2`（NG0407）             | ✅ 提供 `MiniProgramRendererFactory` 后解决     |
+| `ChangeDetectionSchedulerImpl`（NG0201） | ✅ 见下                                         |
+| 真实 boot                                | ✅ **已跑通**，拿到真实 lView / nodeList        |
 
 ### 打通最后两关的做法
 
@@ -1033,13 +1297,13 @@ import { ɵChangeDetectionScheduler } from '@angular/core';
 
 const env = createEnvironmentInjector(
   [
-    ...flattenZonelessProviders(),   // 摊平 ɵproviders（含一层嵌套）
-    ɵChangeDetectionScheduler,      // 实现类要自己补
+    ...flattenZonelessProviders(), // 摊平 ɵproviders（含一层嵌套）
+    ɵChangeDetectionScheduler, // 实现类要自己补
     MiniProgramRendererFactory,
     { provide: RendererFactory2, useExisting: MiniProgramRendererFactory },
   ],
   platform.injector,
-  'spike'
+  'spike',
 );
 const ref = createComponent(SpikeComponent, {
   elementInjector: env,
@@ -1047,7 +1311,7 @@ const ref = createComponent(SpikeComponent, {
 });
 ref.changeDetectorRef.detectChanges();
 const lView = (ref.hostView as any)._lView;
-const ctx = getPageRefreshContext(lView);   // 真实 nodeList
+const ctx = getPageRefreshContext(lView); // 真实 nodeList
 ```
 
 注意**不要**在 spec 文件里内联 `@NgModule` 并 import `MiniProgramModule`
@@ -1058,19 +1322,19 @@ NG0202。直接提供 renderer 绕开。
 
 boot 出来的数据：
 
-| 量 | 值 |
-|---|---|
-| `ɵcmp.decls` | 6（模板 `<div>hello<span>x</span><p>y</p></div>`，编译正确） |
-| `tView.bindingStartIndex` | 28 |
-| `LVIEW.HEADER_OFFSET` | 27（已对 Angular 交叉验证） |
-| `nodeList.length` | **1** |
+| 量                        | 值                                                           |
+| ------------------------- | ------------------------------------------------------------ |
+| `ɵcmp.decls`              | 6（模板 `<div>hello<span>x</span><p>y</p></div>`，编译正确） |
+| `tView.bindingStartIndex` | 28                                                           |
+| `LVIEW.HEADER_OFFSET`     | 27（已对 Angular 交叉验证）                                  |
+| `nodeList.length`         | **1**                                                        |
 
 `bindingStartIndex(28) - HEADER_OFFSET(27) = 1`，但 `decls = 6`。
 两种可能：
 
-  (a) `ref.hostView._lView` 取的是**宿主视图**而非模板视图，
-      模板节点在子 lView 里；
-  (b) `detectChanges()` 没跑完 create pass，`bindingStartIndex` 是中间态。
+(a) `ref.hostView._lView` 取的是**宿主视图**而非模板视图，
+模板节点在子 lView 里；
+(b) `detectChanges()` 没跑完 create pass，`bindingStartIndex` 是中间态。
 
 **这个差异正是该测试要抓的东西** —— 如果真实运行时 nodeList 真的比
 模板声明的节点少，wxml 引用高位下标就会越界。所以这不是「测试没写好」，
@@ -1113,7 +1377,7 @@ DI，走的是另一套元数据，Angular 的 JIT 读不到）。
 
 `node_modules/@angular/core/fesm2022/_pending_tasks-chunk.mjs`:
 
-  const HEADER_OFFSET = 27
+const HEADER_OFFSET = 27
 
 **我们的 `LVIEW.HEADER_OFFSET = 27` 是对的**，之前怀疑它错了可以排除。
 
@@ -1126,10 +1390,10 @@ DI，走的是另一套元数据，Angular 的 JIT 读不到）。
 
 于是形成闭环死结：
 
-| 路径 | 缺什么 |
-|---|---|
-| 裸 injector | 缺 `ApplicationRef` → create pass 不完整 |
-| 真实 `bootstrapModule` | JIT 元数据缺失 → NG0202 |
+| 路径                   | 缺什么                                   |
+| ---------------------- | ---------------------------------------- |
+| 裸 injector            | 缺 `ApplicationRef` → create pass 不完整 |
+| 真实 `bootstrapModule` | JIT 元数据缺失 → NG0202                  |
 
 ### 若要继续，两条可选路（都需要新增件）
 
@@ -1163,11 +1427,11 @@ Setting data field "nodeList.11.0.__templateName" to undefined is invalid.
 
 ## 三种「没有值」的区别
 
-| 写法 | `setData` 接受？ | wxml `{{x \|\| '兜底'}}` | 说明 |
-|---|---|---|---|
-| `undefined` | ❌ **整次调用失败** | — | 绝对禁止 |
-| `null` | ✅ | 走兜底（`null` 是 falsy） | **无值时的正确表示** |
-| 字段不存在 | ✅ | 走兜底 | 但会让 diff 误判「key 数量变了」→ 退化成全量 |
+| 写法        | `setData` 接受？    | wxml `{{x \|\| '兜底'}}`  | 说明                                         |
+| ----------- | ------------------- | ------------------------- | -------------------------------------------- |
+| `undefined` | ❌ **整次调用失败** | —                         | 绝对禁止                                     |
+| `null`      | ✅                  | 走兜底（`null` 是 falsy） | **无值时的正确表示**                         |
+| 字段不存在  | ✅                  | 走兜底                    | 但会让 diff 误判「key 数量变了」→ 退化成全量 |
 
 **结论：无值一律用 `null`，不要用 `undefined`，也不要省字段。**
 
@@ -1198,10 +1462,10 @@ Setting data field "nodeList.11.0.__templateName" to undefined is invalid.
 
 `__templateName` 取自模板声明名 `tView.declTNode.localNames[0]`：
 
-| 分支 | 模板 | 有无 `#ref` | 名字 |
-|---|---|---|---|
-| `if` | `*ngIf` 脱糖出的 `<ng-template>` | **无** | 取不到 |
-| `else` | `<ng-template #ngIfElseTemplate>` | 有 | `'ngIfElseTemplate'` |
+| 分支   | 模板                              | 有无 `#ref` | 名字                 |
+| ------ | --------------------------------- | ----------- | -------------------- |
+| `if`   | `*ngIf` 脱糖出的 `<ng-template>`  | **无**      | 取不到               |
+| `else` | `<ng-template #ngIfElseTemplate>` | 有          | `'ngIfElseTemplate'` |
 
 于是：
 
@@ -1240,11 +1504,11 @@ __templateName:
 patch 删掉后，`*ngIf` 这种脱糖无 `#ref` 的模板一路 fall through 到
 `undefined` —— **回归就是这么引入的**。
 
-| 版本 | 无名模板的值 | 结果 |
-|---|---|---|
-| 旧（patch） | `null` | ✅ |
-| `c290628` | `undefined` | ❌ 切换两次即坏 |
-| `492876b` | `null` | ✅ 恢复旧语义 |
+| 版本        | 无名模板的值 | 结果            |
+| ----------- | ------------ | --------------- |
+| 旧（patch） | `null`       | ✅              |
+| `c290628`   | `undefined`  | ❌ 切换两次即坏 |
+| `492876b`   | `null`       | ✅ 恢复旧语义   |
 
 ### 一个把判断带偏的细节
 
@@ -1298,10 +1562,10 @@ __templateName:
 
 ## 相关测试
 
-| 位置 | 覆盖 |
-|---|---|
+| 位置                                                | 覆盖                                                                                                                       |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `diff-node-data.spec.ts` →「绝不产出 undefined 值」 | 顶层/嵌套/数组变 `undefined` → 转 `null`；复现 `nodeList.N.0.__templateName` 有名→无名；**反向对照**（朴素实现确实会漏出） |
-| `template-name-coverage.spec.ts` | 断言容器项 `__templateName` 是 `null` 或 `string`（**不是** `undefined`） |
+| `template-name-coverage.spec.ts`                    | 断言容器项 `__templateName` 是 `null` 或 `string`（**不是** `undefined`）                                                  |
 
 > 注：`template-name-coverage.spec.ts` 原先的断言写的是
 > 「值可为 `undefined`，但字段必须存在」—— **这个断言本身就是错的**，

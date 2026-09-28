@@ -3,7 +3,7 @@ import { StyleClassSpecComponent } from './style-class-spec.component';
 
 describe('StyleClassSpecComponent', () => {
   beforeEach(async () => {
-    await openComponent(`/spec/style-class-spec/style-class-spec-entry`);
+    await openComponent(`/pages/style-class-spec/style-class-spec-entry`);
   });
   it('run', (done) => {
     let pages = getCurrentPages();

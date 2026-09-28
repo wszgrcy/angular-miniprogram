@@ -50,6 +50,14 @@ export interface ViteMiniProgramBuildOptions {
   /** 监听模式：对应小程序的开发方式（微信开发者工具盯着 dist 目录） */
   watch?: boolean;
   /**
+   * 强制单例的包，直接透传给 Vite 的 `resolve.dedupe`。
+   *
+   * 默认空。只有 `file:` / `npm link` 接入本库时才需要：link 的
+   * 那份副本自带 node_modules，里面还有一份 @angular/core，不去重
+   * 就会被打成两份，运行时表现为 `No provider for xxx`。
+   */
+  dedupe?: string[];
+  /**
    * 结构化 app 配置源文件（相对 workspaceRoot，如 src/app.config.json）。
    * 配置后由构建器编译生成 app.json（含页面/tabBar/分包校验），
    * 与 assets 里的静态 app.json 互斥。不配则维持旧行为。
@@ -226,7 +234,7 @@ export async function createMiniProgramViteConfig(options: {
   if (viteOptions.appJson) {
     const appConfigPath = path.resolve(
       context.workspaceRoot,
-      viteOptions.appJson
+      viteOptions.appJson,
     );
     if (fs.existsSync(appConfigPath)) {
       const appConfig = readAppConfig(appConfigPath);
@@ -268,6 +276,10 @@ export async function createMiniProgramViteConfig(options: {
         viteOptions.tsConfig,
         context.workspaceRoot,
       ),
+      // 单例包由消费者在 angular.json 里显式声明（`dedupe` 选项）。
+      // 默认空——不往模块解析里注入任何东西。link 接入时才需要，
+      // 详见下面两处 angular.json 里的写法。
+      dedupe: viteOptions.dedupe ?? [],
     },
     // scss / sass 的 includePaths。不接的话项目里 `@import 'variables'`
     // 这种写法会直接编译失败。

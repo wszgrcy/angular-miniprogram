@@ -10,7 +10,7 @@ import type { BuildPlatform } from '../platform/platform';
  * 都是编译期文本替换。这里抽成一份，两条链路共用，避免以后改漏。
  */
 export function jasmineGlobalDefine(
-  buildPlatform: BuildPlatform
+  buildPlatform: BuildPlatform,
 ): Record<string, string> {
   const p = buildPlatform.globalVariablePrefix;
 
@@ -48,9 +48,12 @@ export function jasmineGlobalDefine(
 export function karmaClientDefine(options: {
   clientConfig: unknown;
   port: number | string;
+  host?: string;
 }): Record<string, string> {
   return {
     KARMA_CLIENT_CONFIG: JSON.stringify(options.clientConfig),
     KARMA_PORT: JSON.stringify(options.port),
+    // 微信模拟器解不了 localhost，默认直接给 127.0.0.1
+    KARMA_HOST: JSON.stringify(options.host ?? '127.0.0.1'),
   };
 }

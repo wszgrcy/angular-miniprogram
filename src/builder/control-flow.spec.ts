@@ -55,19 +55,19 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const root = harness.host.root();
       const myTestProjectHost = new MyTestProjectHost(harness.host);
       const list = await myTestProjectHost.getFileList(
-        normalize(path.join(root, 'src', '__pages'))
+        normalize(path.join(root, 'src', '__pages')),
       );
       list.push(
         ...(await myTestProjectHost.getFileList(
-          normalize(path.join(root, 'src', '__components'))
-        ))
+          normalize(path.join(root, 'src', '__components')),
+        )),
       );
       await myTestProjectHost.importPathRename(list);
       await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
       await myTestProjectHost.moveDir(
         ALL_COMPONENT_NAME_LIST,
         '__components',
-        'components'
+        'components',
       );
       await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
       harness.useTarget('build', angularConfig);
@@ -78,22 +78,11 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const base = result.result?.baseOutputPath as string;
       const wxml = fs.readFileSync(
         path.join(base, 'pages/control-flow/control-flow-entry.wxml'),
-        'utf8'
+        'utf8',
       );
       const compiled = fs.readFileSync(
         path.join(base, 'pages/control-flow/control-flow-entry.js'),
-        'utf8'
-      );
-      console.log(
-        'CFPROBE repeaterCreateCount=' +
-          (compiled.match(/repeaterCreate/g) || []).length +
-          ' templateNames=' +
-          JSON.stringify(
-            (compiled.match(/function [A-Za-z0-9_]*Template/g) || []).slice(
-              0,
-              30
-            )
-          )
+        'utf8',
       );
       return { wxml, compiled };
     });
@@ -102,14 +91,14 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const { wxml } = await load();
       const anchors = collectAnchorsFromWxml(wxml);
       expect([...anchors.keys()].sort()).toEqual(
-        [...CONTROL_FLOW_TEMPLATE_KINDS].sort()
+        [...CONTROL_FLOW_TEMPLATE_KINDS].sort(),
       );
     });
 
     it('同一个 wxml 内模板名不能重复', async () => {
       const { wxml } = await load();
       const names = [...wxml.matchAll(/<template name="([^"]+)">/g)].map(
-        (m) => m[1]
+        (m) => m[1],
       );
       expect(names.length).toBeGreaterThan(0);
       expect(new Set(names).size).toBe(names.length);
@@ -120,8 +109,8 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const anchors = collectAnchorsFromWxml(wxml);
       const declared = new Set(
         [...compiled.matchAll(/\((\d+),\s*[A-Za-z0-9_]+_Template/g)].map((m) =>
-          parseInt(m[1], 10)
-        )
+          parseInt(m[1], 10),
+        ),
       );
       // bundler 无关：webpack 产出 `["ɵɵrepeaterCreate"](11,`，
       // Vite/Rolldown 产出 `ɵɵrepeaterCreate(11,`。
@@ -130,7 +119,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         ...compiled.matchAll(/repeaterCreate(?:"])?\((\d+),/g),
       ].map((m) => parseInt(m[1], 10));
       const repeaterSlots = new Set<number>(
-        repeaters.flatMap((start) => [start, start + 1, start + 2])
+        repeaters.flatMap((start) => [start, start + 1, start + 2]),
       );
 
       for (const kind of ['ifBlock', 'switchCase']) {
@@ -159,13 +148,13 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       //   ControlFlowComponent_ForEmpty_12_Template  @empty 模板
       const expectedMain = new Set<number>(
         [...compiled.matchAll(/_For_(\d+)_Template/g)].map((m) =>
-          parseInt(m[1], 10)
-        )
+          parseInt(m[1], 10),
+        ),
       );
       const expectedEmpty = new Set<number>(
         [...compiled.matchAll(/_ForEmpty_(\d+)_Template/g)].map((m) =>
-          parseInt(m[1], 10)
-        )
+          parseInt(m[1], 10),
+        ),
       );
       // 先确认确实抓到了，否则两个空 Set 相等会假通过
       expect(expectedMain.size).toBeGreaterThan(0);

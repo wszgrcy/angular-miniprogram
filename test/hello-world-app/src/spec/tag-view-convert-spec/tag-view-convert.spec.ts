@@ -4,7 +4,7 @@ import { TagViewConvertSpecComponent } from './tag-view-convert.component';
 describe('TagViewConvertSpecComponent', () => {
   beforeEach(async () => {
     await openComponent(
-      `/spec/tag-view-convert-spec/tag-view-convert-spec-entry`
+      `/pages/tag-view-convert-spec/tag-view-convert-spec-entry`,
     );
   });
   it('run', (done) => {

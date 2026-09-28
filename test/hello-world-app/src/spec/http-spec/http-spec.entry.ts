@@ -1,5 +1,4 @@
-import { pageStartup } from 'angular-miniprogram';
-import { HttpSpecModule } from './http.module';
+import { bootstrapPage } from 'angular-miniprogram';
 import { HttpSpecComponent } from './http.component';
 
-pageStartup(HttpSpecModule, HttpSpecComponent);
+bootstrapPage(HttpSpecComponent);

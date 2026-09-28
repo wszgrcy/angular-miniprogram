@@ -4,7 +4,14 @@
   "deleteDestPath": true,
   "allowedNonPeerDependencies": [
     "cyia-code-util",
-    "static-injector"
+    "static-injector",
+    "@analogjs/vite-plugin-angular",
+    "abortcontroller-polyfill",
+    "fs-extra",
+    "glob",
+    "ora",
+    "vite",
+    "weapp.socket.io"
   ],
   "lib": {
     "entryFile": "./platform/index.ts"

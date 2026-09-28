@@ -1,5 +1,20 @@
 {
-  "pages": [],
+  "pages": [
+    "pages/control-flow-spec/control-flow-spec-entry",
+    "pages/empty/empty-entry",
+    "pages/http-spec/http-spec-entry",
+    "pages/life-time-spec/life-time-spec-entry",
+    "pages/ng-content-spec/ng-content-spec-entry",
+    "pages/ng-for-spec/ng-for-spec-entry",
+    "pages/ng-if-spec/ng-if-spec-entry",
+    "pages/ng-library-import-spec/ng-library-import-spec-entry",
+    "pages/ng-switch-spec/ng-switch-spec-entry",
+    "pages/ng-template-outlet-spec/ng-template-outlet-spec-entry",
+    "pages/self-template-spec/self-template-spec-entry",
+    "pages/signal-io-spec/signal-io-spec-entry",
+    "pages/style-class-spec/style-class-spec-entry",
+    "pages/tag-view-convert-spec/tag-view-convert-spec-entry"
+  ],
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#fff",

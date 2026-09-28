@@ -6,7 +6,8 @@ import { LifeTimeComponent } from '../../spec-component/life-time/life-time.comp
 import { nodeExist } from '../util';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [LifeTimeComponent],
   selector: 'app-life-time-spec',
   template: `<app-life-time #instance></app-life-time>`,
 })
@@ -21,7 +22,7 @@ export class LifeTimeSPecComponent {
     },
     onReady: function (
       this: WechatMiniprogram.Page.Instance<{}, {}> &
-        MiniProgramComponentInstance<LifeTimeSPecComponent>
+        MiniProgramComponentInstance<LifeTimeSPecComponent>,
     ) {
       console.log('test-onReady');
       this.__ngComponentInstance.testFinish$$.complete();
@@ -30,7 +31,7 @@ export class LifeTimeSPecComponent {
   @ViewChild('instance', { static: true }) instance: LifeTimeComponent;
   constructor(
     private componentFinderService: ComponentFinderService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
   ) {}
   ngOnInit(): void {
     console.log('test-ngOnInit');

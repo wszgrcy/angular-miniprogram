@@ -74,7 +74,7 @@ export function markStructuralChange(): void {
 export function pushPathData(
   mpRef: unknown,
   key: string,
-  value: unknown
+  value: unknown,
 ): void {
   if (!mpRef) {
     return;
@@ -178,11 +178,38 @@ export function getPageRefreshContext(lView: LView, mpRef?: unknown) {
  * 依据：`<template is="..." data="{{...nodeList[N][index]}}">` 把容器项
  * 展开成子模板的作用域，子模板里的 `nodeList` 就是 `item.nodeList`。
  */
+/**
+ * 取出容器里已嵌入的子 lView。
+ *
+ * 为什么不能读 `LVIEW.CONTAINER_VIEW_REFS`：见
+ * {@link LVIEW.CONTAINER_HEADER_OFFSET} 的详细说明——一句话版：
+ * `VIEW_REFS` 只存惰创建的 ViewRef 包装，内建控制流
+ * `@if`/`@for`/`@switch` 不创建它，恒为 `null`。
+ *
+ * 识别「是 lView」用 Angular 自己的判据
+ * （`isLView`：`Array` 且 `value[TYPE=1]` 是 tView 对象），
+ * 不自己发明条件。
+ */
+function readEmbeddedLViews(container: unknown[]): unknown[] {
+  const views: unknown[] = [];
+  for (let i = LVIEW.CONTAINER_HEADER_OFFSET; i < container.length; i++) {
+    const value = container[i];
+    if (
+      Array.isArray(value) &&
+      typeof value[1] === 'object' &&
+      value[1] !== null
+    ) {
+      views.push(value);
+    }
+  }
+  return views;
+}
+
 function lViewToWXView(
   lView: LView,
   parentNodePath: any[] = [],
   dataPrefix = 'nodeList',
-  mpRef?: unknown
+  mpRef?: unknown,
 ) {
   const tView = lView[1];
   const end = tView.bindingStartIndex;
@@ -199,8 +226,11 @@ function lViewToWXView(
       nodeList[rel] = item.toView();
     } else if (item && item[1] === true) {
       const lContainerList: MPView[] = [];
-      const viewRefList: any[] = item[LVIEW.CONTAINER_VIEW_REFS] || [];
-      viewRefList.forEach((viewRef, itemIndex) => {
+      // 读 CONTAINER_HEADER_OFFSET 起的裸 lView，不读 VIEW_REFS。
+      // 后者对 `*ngIf` 有值、对内建 `@if` 恒为 null，
+      // 用它会导致内建控制流整块渲染为空。
+      const childLViews = readEmbeddedLViews(item);
+      childLViews.forEach((childLView, itemIndex) => {
         const nodePath = [...parentNodePath, 'directive', rel, itemIndex];
         lContainerList.push({
           /**
@@ -238,15 +268,15 @@ function lViewToWXView(
            * `{{item.__templateName || 'xxxBlock_N'}}` 行为不变。
            */
           __templateName:
-            (viewRef._lView[LVIEW.CONTEXT] &&
-              viewRef._lView[LVIEW.CONTEXT].__templateName) ||
-            viewRef._lView[1]?.declTNode?.localNames?.[0] ||
+            ((childLView as any[])[LVIEW.CONTEXT] &&
+              (childLView as any[])[LVIEW.CONTEXT].__templateName) ||
+            (childLView as any[])[1]?.declTNode?.localNames?.[0] ||
             null,
           nodeList: lViewToWXView(
-            viewRef._lView,
+            childLView as LView,
             nodePath,
             `${dataPrefix}[${rel}][${itemIndex}].nodeList`,
-            mpRef
+            mpRef,
           ),
           nodePath: nodePath,
           index: lContainerList.length,

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  standalone: false,
+  standalone: true,
   selector: 'app-style-class',
   templateUrl: './style-class.component.html',
 })

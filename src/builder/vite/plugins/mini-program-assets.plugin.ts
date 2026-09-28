@@ -23,11 +23,7 @@ import type {
 } from '../../shared/type';
 import { literalResolve } from '../../util';
 import { toPosixPath } from '../../util/asset-path';
-import {
-  MpAppConfig,
-  generateAppJson,
-  validateAppConfig,
-} from '../app-config';
+import { MpAppConfig, generateAppJson, validateAppConfig } from '../app-config';
 import { collectAssets } from '../copy-assets';
 
 /**
@@ -37,7 +33,7 @@ import { collectAssets } from '../copy-assets';
  * Vite 侧没有那层，直接拿 node fs 拼一个够用的实现。
  */
 export function createNodeTsSystem(
-  getCurrentDirectory: () => string
+  getCurrentDirectory: () => string,
 ): ts.System {
   return {
     ...ts.sys,
@@ -110,6 +106,15 @@ export interface MiniProgramAssetsPluginOptions {
   appJson?: string;
   /** builder 配置里的全局样式，产出 app.wxss */
   styles?: (string | { input: string })[];
+  /**
+   * app.js 从哪个 chunk 出发做可达性分析。
+   *
+   * 应用构建是 `main.js`；karma 链路的应用入口叫 `test.js`，
+   * 不把它说清楚的话 app.js 会认为「没有引导入口」，
+   * 退化成「除 entry 类 chunk 外全 require」，
+   * 引导 chunk 反而进不了 app.js，小程序启动时什公都不会发生。
+   */
+  bootstrapChunk?: string;
   absoluteProjectRoot?: Path;
   absoluteProjectSourceRoot?: Path;
 }
@@ -129,7 +134,7 @@ export interface MiniProgramAssetsPluginOptions {
  * 样式编译器。一轮构建里复用同一个实例，避免每个文件重建 sass 环境。
  */
 function createStyleProcessor(
-  options: MiniProgramAssetsPluginOptions
+  options: MiniProgramAssetsPluginOptions,
 ): CustomStyleSheetProcessor {
   return new CustomStyleSheetProcessor(
     options.workspaceRoot,
@@ -138,7 +143,7 @@ function createStyleProcessor(
     undefined,
     undefined,
     false,
-    !!options.watch
+    !!options.watch,
   );
 }
 
@@ -149,7 +154,7 @@ function createStyleProcessor(
 async function compileStyleSources(
   options: MiniProgramAssetsPluginOptions,
   styleProcessor: CustomStyleSheetProcessor,
-  styleSourcePaths: Set<string>
+  styleSourcePaths: Set<string>,
 ): Promise<Map<string, string>> {
   const compiled = new Map<string, string>();
   for (const stylePath of styleSourcePaths) {
@@ -159,8 +164,8 @@ async function compileStyleSources(
     } catch (error) {
       options.context.logger.warn(
         `样式编译失败 ${stylePath}: ${String(
-          (error as Error)?.message ?? error
-        )}`
+          (error as Error)?.message ?? error,
+        )}`,
       );
       compiled.set(path.normalize(stylePath), '');
     }
@@ -169,7 +174,7 @@ async function compileStyleSources(
 }
 
 export function miniProgramAssetsPlugin(
-  options: MiniProgramAssetsPluginOptions
+  options: MiniProgramAssetsPluginOptions,
 ): Plugin {
   const libraryTemplateScopeService =
     options.templateScope ?? new LibraryTemplateScopeService();
@@ -182,7 +187,7 @@ export function miniProgramAssetsPlugin(
   let styleProcessor: CustomStyleSheetProcessor | undefined;
 
   const runAnalysis = async (
-    entryPatterns: PagePattern[] = options.entryPatterns
+    entryPatterns: PagePattern[] = options.entryPatterns,
   ) => {
     const system = createNodeTsSystem(() => options.workspaceRoot);
     const stubCompiler = createStubWebpackCompiler(!!options.watch);
@@ -293,7 +298,7 @@ export function miniProgramAssetsPlugin(
               pre[cur.selector] = cur.path;
               return pre;
             },
-            {} as Record<string, string>
+            {} as Record<string, string>,
           ),
         };
         emit(outPath, JSON.stringify(config));
@@ -303,7 +308,7 @@ export function miniProgramAssetsPlugin(
       //    这一步必须在 exportLibraryTemplate() 之前，否则 templateList 是空的，
       //    library-template/*.wxml 会产出一个空文件。
       for (const [key, element] of Object.entries(
-        resolved.otherMetaCollectionGroup
+        resolved.otherMetaCollectionGroup,
       )) {
         libraryTemplateScopeService.setScopeExtraUseComponents(key, {
           useComponents: {
@@ -312,7 +317,7 @@ export function miniProgramAssetsPlugin(
                 pre[cur.selector] = cur.path;
                 return pre;
               },
-              {} as Record<string, string>
+              {} as Record<string, string>,
             ),
           },
           templateList: element.templateList.map((item) => item.content),
@@ -340,8 +345,8 @@ export function miniProgramAssetsPlugin(
               templateInterpolation:
                 options.buildPlatform.templateTransform.templateInterpolation,
               fileExtname: options.buildPlatform.fileExtname,
-            }
-          )
+            },
+          ),
         );
       }
 
@@ -363,12 +368,12 @@ export function miniProgramAssetsPlugin(
         });
         const appJsonName = `app${options.buildPlatform.fileExtname.config}`;
         const hasStaticAppJson = copied.some(
-          (item) => toPosixPath(item.outputRelPath) === appJsonName
+          (item) => toPosixPath(item.outputRelPath) === appJsonName,
         );
         if (options.appJson && hasStaticAppJson) {
           this.error(
             `appJson 配置与 assets 中的 ${appJsonName} 冲突：` +
-              `app 配置只能有一个来源，请删除 assets 里的 ${appJsonName} 或改用 appJson`
+              `app 配置只能有一个来源，请删除 assets 里的 ${appJsonName} 或改用 appJson`,
           );
         }
         for (const item of copied) {
@@ -383,7 +388,7 @@ export function miniProgramAssetsPlugin(
         const appJsonName = `app${options.buildPlatform.fileExtname.config}`;
         const appJsonPath = path.resolve(
           options.workspaceRoot,
-          options.appJson
+          options.appJson,
         );
         if (!fs.existsSync(appJsonPath)) {
           this.error(`appJson 配置文件不存在: ${options.appJson}`);
@@ -391,13 +396,13 @@ export function miniProgramAssetsPlugin(
         let appConfig: MpAppConfig;
         try {
           appConfig = JSON.parse(
-            fs.readFileSync(appJsonPath, 'utf8')
+            fs.readFileSync(appJsonPath, 'utf8'),
           ) as MpAppConfig;
         } catch (e) {
           this.error(
             `appJson 配置 JSON 解析失败 ${options.appJson}: ${String(
-              (e as Error)?.message ?? e
-            )}`
+              (e as Error)?.message ?? e,
+            )}`,
           );
         }
         const builtPagePaths = options.entryPatterns
@@ -407,7 +412,7 @@ export function miniProgramAssetsPlugin(
         if (errors.length) {
           this.error(
             `app 配置校验失败（${options.appJson}）:\n  - ` +
-              errors.join('\n  - ')
+              errors.join('\n  - '),
           );
         }
         emit(appJsonName, generateAppJson(appConfig));
@@ -424,9 +429,11 @@ export function miniProgramAssetsPlugin(
         imports: string[];
       }
       const jsChunks = Object.values(bundle).filter(
-        (item) => item.type === 'chunk' && item.fileName.endsWith('.js')
+        (item) => item.type === 'chunk' && item.fileName.endsWith('.js'),
       ) as unknown as JsChunk[];
       const byFileName = new Map(jsChunks.map((c) => [c.fileName, c]));
+      // app.js 的引导 chunk（应用 = main.js，karma = test.js）
+      const bootstrapChunk = options.bootstrapChunk ?? 'main.js';
       const emittedOrder: string[] = [];
       const visiting = new Set<string>();
       const visited = new Set<string>();
@@ -473,8 +480,8 @@ export function miniProgramAssetsPlugin(
       const isEntryChunk = (fileName: string) => {
         const posix = toPosixPath(fileName);
         // page / component / library 的 entry 产物都落在这几个目录下，
-        // 且不是 main.js
-        if (posix === 'main.js') {
+        // 且不是引导入口
+        if (posix === bootstrapChunk) {
           return false;
         }
         return (
@@ -496,14 +503,14 @@ export function miniProgramAssetsPlugin(
           collect(dep);
         }
       };
-      if (byFileName.has('main.js')) {
-        collect('main.js');
+      if (byFileName.has(bootstrapChunk)) {
+        collect(bootstrapChunk);
       }
       // 保持拓扑顺序（依赖在前）
       const required = emittedOrder.filter((f) =>
-        reachable.has(toPosixPath(f))
+        reachable.has(toPosixPath(f)),
       );
-      if (!byFileName.has('main.js')) {
+      if (!byFileName.has(bootstrapChunk)) {
         // 没有 main 引导入口时退化成「排除 entry 类 chunk」，
         // 至少不会再把 Page()/Component() 拉进 app 上下文
         required.push(...emittedOrder.filter((f) => !isEntryChunk(f)));
@@ -531,7 +538,7 @@ export function miniProgramAssetsPlugin(
         .join(';');
       emit(
         'app.js',
-        `${options.buildPlatform.importTemplate};\n${requireList};`
+        `${options.buildPlatform.importTemplate};\n${requireList};`,
       );
 
       // 10. 全局样式（app 级）。对应 builder 配置里的 styles
@@ -542,7 +549,7 @@ export function miniProgramAssetsPlugin(
           .filter((s) => fs.existsSync(path.resolve(options.workspaceRoot, s)))
           .map((s) => path.resolve(options.workspaceRoot, s));
         const compiledGlobal = await compileStyles(
-          new Set(globalStyleSources.map((s) => path.normalize(s)))
+          new Set(globalStyleSources.map((s) => path.normalize(s))),
         );
         const globalCss = globalStyleSources
           .map((s) => compiledStyles.get(path.normalize(s)) ?? '')

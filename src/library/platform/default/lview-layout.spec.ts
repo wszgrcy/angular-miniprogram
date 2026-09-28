@@ -74,7 +74,7 @@ describe('lview-layout: 与已安装 @angular/core 交叉校验', () => {
   /** 从 bundle 里抓 `const NAME = <number>` 的字面量值 */
   function readConstFromBundle(name: string): number | undefined {
     const m = new RegExp(`(?:const|var|let)\\s+${name}\\s*=\\s*(\\d+)\\b`).exec(
-      bundleSource
+      bundleSource,
     );
     return m ? Number(m[1]) : undefined;
   }
@@ -85,6 +85,10 @@ describe('lview-layout: 与已安装 @angular/core 交叉校验', () => {
     { key: 'INJECTOR', angularName: 'INJECTOR' },
     { key: 'HEADER_OFFSET', angularName: 'HEADER_OFFSET' },
     { key: 'CONTAINER_VIEW_REFS', angularName: 'VIEW_REFS' },
+    {
+      key: 'CONTAINER_HEADER_OFFSET',
+      angularName: 'CONTAINER_HEADER_OFFSET',
+    },
   ];
 
   for (const { key, angularName } of cases) {
@@ -95,7 +99,7 @@ describe('lview-layout: 与已安装 @angular/core 交叉校验', () => {
         .withContext(
           `在已安装的 @angular/core fesm 里没找到 \`const ${angularName} = <n>\`。` +
             `可能 Angular 改了声明形式或常量名——此时不能想当然沿用旧值，` +
-            `去 packages/core/src/render3/interfaces/{view,container}.ts 核对后再更新 lview-layout.ts`
+            `去 packages/core/src/render3/interfaces/{view,container}.ts 核对后再更新 lview-layout.ts`,
         )
         .toBeDefined();
 

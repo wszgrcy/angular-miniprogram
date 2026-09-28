@@ -1,4 +1,4 @@
-import { pageStartup } from 'angular-miniprogram';
-import { EmptyModule } from './empty.module';
+import { bootstrapPage } from 'angular-miniprogram';
 import { EmptyComponent } from './empty.component';
-pageStartup(EmptyModule, EmptyComponent);
+
+bootstrapPage(EmptyComponent);

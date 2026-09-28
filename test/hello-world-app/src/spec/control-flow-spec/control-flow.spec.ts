@@ -3,7 +3,7 @@ import { ControlFlowSPecComponent } from './control-flow.component';
 
 describe('ControlFlowSPecComponent', () => {
   beforeEach(async () => {
-    await openComponent(`/spec/control-flow-spec/control-flow-spec-entry`);
+    await openComponent(`/pages/control-flow-spec/control-flow-spec-entry`);
   });
   it('run', (done) => {
     const pages = getCurrentPages();

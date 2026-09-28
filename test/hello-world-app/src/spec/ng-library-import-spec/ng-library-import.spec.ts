@@ -3,7 +3,7 @@ import { NgLibraryImportSPecComponent } from './ng-library-import.component';
 describe('NgLibraryImportSPecComponent', () => {
   beforeEach(async () => {
     await openComponent(
-      `/spec/ng-library-import-spec/ng-library-import-spec-entry`
+      `/pages/ng-library-import-spec/ng-library-import-spec-entry`,
     );
   });
   it('run', (done) => {

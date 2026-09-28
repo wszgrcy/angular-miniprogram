@@ -3,7 +3,7 @@ import { NgTemplateOutletSPecComponent } from './ng-template-outlet.component';
 describe('NgTemplateOutletSPecComponent', () => {
   beforeEach(async () => {
     await openComponent(
-      `/spec/ng-template-outlet-spec/ng-template-outlet-spec-entry`
+      `/pages/ng-template-outlet-spec/ng-template-outlet-spec-entry`,
     );
   });
   it('run', (done) => {

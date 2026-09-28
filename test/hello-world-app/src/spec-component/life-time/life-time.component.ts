@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { MiniProgramComponentInstance } from 'angular-miniprogram/platform/type';
 
 @Component({
-  standalone: false,
+  standalone: true,
   selector: 'app-life-time',
   template: '',
 })

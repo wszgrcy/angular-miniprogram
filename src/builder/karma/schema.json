@@ -29,6 +29,14 @@
       "type": "string",
       "description": "The name of the main entry-point file."
     },
+    "outputPath": {
+      "type": "string",
+      "description": "测试产物输出目录（相对 workspaceRoot）。不填默认 dist/karma/<project>；不要指向 dist 根，emptyOutDir 会把应用产物一并删掉。"
+    },
+    "clientHost": {
+      "type": "string",
+      "description": "小程序内 karma 客户端回连的宿主地址，默认 127.0.0.1（微信模拟器解不了 localhost）。真机调试改成开发机局域网 IP。"
+    },
     "tsConfig": {
       "type": "string",
       "description": "The name of the TypeScript configuration file."
@@ -139,6 +147,14 @@
     "preserveSymlinks": {
       "type": "boolean",
       "description": "Do not use the real path when resolving modules. If unset then will default to `true` if NodeJS option --preserve-symlinks is set."
+    },
+    "dedupe": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Forced single-instance packages, passed straight to Vite's `resolve.dedupe`. Empty by default: nothing is injected into your module resolution. Only needed when the library is consumed via `file:` / `npm link`, where the linked copy's own node_modules holds a second @angular/core."
     },
     "browsers": {
       "type": "string",

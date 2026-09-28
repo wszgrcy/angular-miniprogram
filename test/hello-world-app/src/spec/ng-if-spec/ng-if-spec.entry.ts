@@ -1,5 +1,4 @@
-import { pageStartup } from 'angular-miniprogram';
-import { NgIfSpecModule } from './ng-if.module';
+import { bootstrapPage } from 'angular-miniprogram';
 import { NgIfSPecComponent } from './ng-if.component';
 
-pageStartup(NgIfSpecModule, NgIfSPecComponent);
+bootstrapPage(NgIfSPecComponent);

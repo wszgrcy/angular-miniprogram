@@ -3,7 +3,7 @@ import { SignalIoSPecComponent } from './signal-io.component';
 
 describe('SignalIoSPecComponent', () => {
   beforeEach(async () => {
-    await openComponent(`/spec/signal-io-spec/signal-io-spec-entry`);
+    await openComponent(`/pages/signal-io-spec/signal-io-spec-entry`);
   });
   it('run', (done) => {
     const pages = getCurrentPages();

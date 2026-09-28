@@ -6,7 +6,8 @@ import { NgContentComponent } from '../../spec-component/ng-content/ng-content.c
 import { nodeExist, nodeNotEmpty } from '../util';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [NgContentComponent],
   selector: 'app-ng-content-spec',
   template: `<app-ng-content #instance
     ><div class="container">container</div></app-ng-content
@@ -17,7 +18,7 @@ export class NgContentSpecComponent {
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
     onReady: function (
       this: WechatMiniprogram.Page.Instance<{}, {}> &
-        MiniProgramComponentInstance<NgContentSpecComponent>
+        MiniProgramComponentInstance<NgContentSpecComponent>,
     ) {
       this.__ngComponentInstance.componentFinderService
         .get(this.__ngComponentInstance.instance)
@@ -26,7 +27,7 @@ export class NgContentSpecComponent {
             item: WechatMiniprogram.Page.Instance<
               WechatMiniprogram.IAnyObject,
               WechatMiniprogram.IAnyObject
-            >
+            >,
           ) => {
             let query = item.createSelectorQuery();
             expect(await nodeExist(query, '.wrapper-1'))
@@ -40,7 +41,7 @@ export class NgContentSpecComponent {
               .withContext('wrapper-2')
               .toBe(false);
             this.__ngComponentInstance.testFinish$$.complete();
-          }
+          },
         );
     },
   };

@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 
 @Component({
-  standalone: false,
+  standalone: true,
   selector: 'app-tag-view-convert',
   templateUrl: './tag-view-convert.component.html',
 })

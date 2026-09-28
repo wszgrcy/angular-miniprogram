@@ -6,7 +6,8 @@ import { SelfTemplateComponent } from '../../spec-component/self-template/self-t
 import { nodeExist } from '../util';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [SelfTemplateComponent],
   selector: 'app-self-template-spec',
   template: ` <ng-template #$$mp$$__self__$$self1
       ><div class="content-1">content-1</div></ng-template
@@ -21,7 +22,7 @@ export class SelfTemplateSPecComponent {
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
     onReady: function (
       this: WechatMiniprogram.Page.Instance<{}, {}> &
-        MiniProgramComponentInstance<SelfTemplateSPecComponent>
+        MiniProgramComponentInstance<SelfTemplateSPecComponent>,
     ) {
       this.__ngComponentInstance.componentFinderService
         .get(this.__ngComponentInstance.instance)
@@ -30,15 +31,15 @@ export class SelfTemplateSPecComponent {
             item: WechatMiniprogram.Page.Instance<
               WechatMiniprogram.IAnyObject,
               WechatMiniprogram.IAnyObject
-            >
+            >,
           ) => {
             let query = item.createSelectorQuery();
 
             expect(await nodeExist(query, '.container-1 .content-1')).toBe(
-              true
+              true,
             );
             this.__ngComponentInstance.testFinish$$.complete();
-          }
+          },
         );
     },
   };

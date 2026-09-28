@@ -28,7 +28,7 @@ export class ComponentContext {
     const name: string = node.name;
     const selector = createCssSelector(
       name,
-      getAttrsForDirectiveMatching(node)
+      getAttrsForDirectiveMatching(node),
     );
     const result: MatchedMeta[] = [];
     this.directiveMatcher.match(
@@ -43,15 +43,36 @@ export class ComponentContext {
           componentMeta: R3ComponentMetadata<any>;
           directiveMeta: R3DirectiveMetadata;
           libraryMeta: MetaFromLibrary;
-        }
+        },
       ) => {
         let item: Partial<MatchedMeta>;
         const isComponent: boolean = !!meta.directive.isComponent;
+        /**
+         * 组件源文件。
+         *
+         * importedFile 只在「从另一个模块 import 进来的指令」上有值；
+         * 同一编译单元内的指令（典型场景：测试工程里 spec 直接
+         * 从源码 public-api 引入组件）它是 null，直接取 .fileName 会
+         * TypeError: Cannot read properties of null。
+         * 拿不到就退回到 AST 上的 SourceFile，两者语义一致。
+         */
+        const sourceFile: ts.SourceFile | undefined =
+          (meta.directive.importedFile as ts.SourceFile | null) ??
+          (meta.directive.ref?.node?.getSourceFile() as
+            | ts.SourceFile
+            | undefined) ??
+          undefined;
         if (isComponent) {
+          if (!sourceFile) {
+            throw new Error(
+              `无法确定组件 ${meta.directive.selector} 的源文件：` +
+                'importedFile 为空且拿不到 AST SourceFile',
+            );
+          }
           item = {
             isComponent,
             outputs: meta.directive.outputs,
-            filePath: (meta.directive.importedFile as ts.SourceFile).fileName,
+            filePath: sourceFile.fileName,
             selector: meta.directive.selector,
             className: meta.directive.ref.node.name!.getText(),
             listeners:
@@ -83,7 +104,7 @@ export class ComponentContext {
           }
         }
         result.push(item as MatchedMeta);
-      }
+      },
     );
     return result;
   }

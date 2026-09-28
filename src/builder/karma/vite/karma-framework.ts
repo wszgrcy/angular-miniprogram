@@ -31,7 +31,7 @@ interface KarmaEmitterLike {
 }
 
 export function createViteKarmaFramework(
-  hooks: ViteKarmaFrameworkHooks
+  hooks: ViteKarmaFrameworkHooks,
 ): (config: ConfigOptions, emitter: KarmaEmitterLike) => void | Promise<void> {
   return async (config: ConfigOptions, emitter: KarmaEmitterLike) => {
     // Vite 已经产好了，这里不能再去碰 webpack。
@@ -57,25 +57,52 @@ export function createViteKarmaFramework(
  *
  * karma 通过 `plugins: [require('...')]` 加载，要求导出形如
  * `{ 'framework:<name>': ['factory', fn], 'launcher:<name>': ['type', cls] }`。
- * hooks 是运行时才知道的，所以这里用一个模块级可写引用，
+ * hooks 是运行时才知道的，所以这里用一个可写引用，
  * builder 在起 karma 之前先把它填上。
+ *
+ * ## 为什么挂 global 而不是模块级变量
+ *
+ * 本文件会被**两份不同的产物**同时 require：
+ *
+ *   - builder 侧：`dist/builder/karma/vite/karma-framework.js`
+ *     （`tsconfig.builder.json` 编的）
+ *   - karma 插件侧：`dist/karma/vite/karma-framework.js`
+ *     （`karma/plugin/tsconfig.json` 因为 import 了本文件，rootDir 上提，
+ *     详见那个 tsconfig 里的注释）
+ *
+ * 两个绝对路径 = 两个模块实例 = 两份 `pendingHooks`。builder 写它自己那份，
+ * karma 插件读它自己那份，永远是 null，报「framework 未初始化」。
+ * 仓库内跑 fixture 时两边都是 ts-node 直读 src，恰好是同一个实例，
+ * 所以这个坑只在外部工程（从 dist 消费）才会踩到。
+ *
+ * 挂到 globalThis 上就跟模块身份无关了，几份副本都读写同一个槽。
  */
-const pendingHooks: { current: ViteKarmaFrameworkHooks | null } = {
-  current: null,
-};
+const HOOKS_GLOBAL_KEY = '__angularMiniprogramViteKarmaHooks__';
+
+interface HooksStore {
+  current: ViteKarmaFrameworkHooks | null;
+}
+
+function hooksStore(): HooksStore {
+  const g = globalThis as unknown as Record<string, HooksStore | undefined>;
+  if (!g[HOOKS_GLOBAL_KEY]) {
+    g[HOOKS_GLOBAL_KEY] = { current: null };
+  }
+  return g[HOOKS_GLOBAL_KEY];
+}
 
 export function setViteKarmaFrameworkHooks(hooks: ViteKarmaFrameworkHooks) {
-  pendingHooks.current = hooks;
+  hooksStore().current = hooks;
 }
 
 export function viteKarmaFrameworkFactory(
   config: ConfigOptions,
-  emitter: KarmaEmitterLike
+  emitter: KarmaEmitterLike,
 ): void | Promise<void> {
-  const hooks = pendingHooks.current;
+  const hooks = hooksStore().current;
   if (!hooks) {
     throw new Error(
-      'Vite karma framework 未初始化：builder 必须先调用 setViteKarmaFrameworkHooks'
+      'Vite karma framework 未初始化：builder 必须先调用 setViteKarmaFrameworkHooks',
     );
   }
   return createViteKarmaFramework(hooks)(config, emitter);

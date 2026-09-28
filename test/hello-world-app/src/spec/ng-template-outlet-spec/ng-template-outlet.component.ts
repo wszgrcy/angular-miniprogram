@@ -6,7 +6,8 @@ import { NgTemplateOutletComponent } from '../../spec-component/ng-template-outl
 import { nodeExist } from '../util';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [NgTemplateOutletComponent],
   selector: 'app-ng-template-outlet-spec',
   template: `<app-ng-template-outlet #instance></app-ng-template-outlet>`,
 })
@@ -15,7 +16,7 @@ export class NgTemplateOutletSPecComponent {
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
     onReady: function (
       this: WechatMiniprogram.Page.Instance<{}, {}> &
-        MiniProgramComponentInstance<NgTemplateOutletSPecComponent>
+        MiniProgramComponentInstance<NgTemplateOutletSPecComponent>,
     ) {
       this.__ngComponentInstance.componentFinderService
         .get(this.__ngComponentInstance.instance)
@@ -24,14 +25,14 @@ export class NgTemplateOutletSPecComponent {
             item: WechatMiniprogram.Page.Instance<
               WechatMiniprogram.IAnyObject,
               WechatMiniprogram.IAnyObject
-            >
+            >,
           ) => {
             let query = item.createSelectorQuery();
 
             expect(await nodeExist(query, '.template-content-1')).toBe(true);
             expect(await nodeExist(query, '.template-content-2')).toBe(false);
             this.__ngComponentInstance.testFinish$$.complete();
-          }
+          },
         );
     },
   };

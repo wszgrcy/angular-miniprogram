@@ -13,3 +13,8 @@ deploy/api-doc
 __q
 __w
 __decl
+
+# karma builder 派生出的临时 tsconfig（derived-tsconfig.ts 生成），
+# 里面带 typeRoots 的**机器绝对路径**，提交上去既泄本地路径、
+# 又在别的机器上直接不对。模板仓已有同名规则，库仓补齐。
+**/.tsconfig.generated-*.json

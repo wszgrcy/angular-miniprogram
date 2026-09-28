@@ -1,5 +1,4 @@
-import { pageStartup } from 'angular-miniprogram';
-import { NgSwitchSpecModule } from './ng-switch.module';
+import { bootstrapPage } from 'angular-miniprogram';
 import { NgSwitchSPecComponent } from './ng-switch.component';
 
-pageStartup(NgSwitchSpecModule, NgSwitchSPecComponent);
+bootstrapPage(NgSwitchSPecComponent);

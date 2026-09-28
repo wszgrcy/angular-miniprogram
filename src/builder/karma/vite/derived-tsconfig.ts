@@ -1,6 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import ts from 'typescript';
 import { resolveNative, toNativePath } from '../../util/asset-path';
+
+/** 派生时要读写的 tsconfig 形状（其余字段原样透传） */
+interface TsConfigShape {
+  compilerOptions?: {
+    types?: string[];
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
 
 /**
  * 找 @types 到底在哪。
@@ -54,14 +64,39 @@ export function writeDerivedTsConfig(options: {
   // baseTsConfig 可能是 devkit posix 化的 Windows 绝对路径（/C:/...），
   // 直接 path.resolve 会拼出 C:\C:\... 双盘符。走 toNativePath 统一掉。
   const basePath = resolveNative(options.workspaceRoot, options.baseTsConfig);
-  const raw = fs
-    .readFileSync(basePath, 'utf8')
-    // tsconfig 允许注释，JSON.parse 之前去掉
-    .replace(/^\s*\/\/.*$/gm, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '');
-  const base = JSON.parse(raw);
+  // tsconfig 不是严格的 JSON：允许注释、允许尾逗号。自己拿正则剔注释再
+  // JSON.parse 的话，一个尾逗号就能把整条测试链路炸掉（报 `is not valid
+  // JSON`，且完全看不出是哪个文件）。直接用 TS 自己的解析器：它只读单文件、
+  // 不会把 extends 展开，正好是我们要的形状。
+  const parsed = ts.readConfigFile(basePath, (p) => {
+    try {
+      return fs.readFileSync(p, 'utf8');
+    } catch {
+      return undefined;
+    }
+  }) as {
+    config?: TsConfigShape;
+    error?: ts.Diagnostic;
+    // 运行时会给整集诊断，但 d.ts 只声明了单个 error，这里手动收拢
+    errors?: ts.Diagnostic[];
+  };
+  const syntaxErrors = [
+    ...(parsed.errors ?? []),
+    ...(parsed.error ? [parsed.error] : []),
+  ].filter((e) => e.category === ts.DiagnosticCategory.Error);
+  if (syntaxErrors.length) {
+    throw new Error(
+      `无法解析 tsconfig: ${basePath}\n` +
+        ts.formatDiagnosticsWithColorAndContext(syntaxErrors, {
+          getCurrentDirectory: () => path.dirname(basePath),
+          getCanonicalFileName: (f) => f,
+          getNewLine: () => '\n',
+        }),
+    );
+  }
+  const base = parsed.config ?? {};
 
-  const derived: Record<string, unknown> = {
+  const derived: TsConfigShape = {
     ...base,
     compilerOptions: {
       ...base.compilerOptions,
@@ -77,7 +112,7 @@ export function writeDerivedTsConfig(options: {
 
   const outPath = path.join(
     path.dirname(basePath),
-    `.tsconfig.generated-${path.basename(basePath, '.json')}.json`
+    `.tsconfig.generated-${path.basename(basePath, '.json')}.json`,
   );
   fs.writeFileSync(outPath, JSON.stringify(derived, null, 2), 'utf8');
 

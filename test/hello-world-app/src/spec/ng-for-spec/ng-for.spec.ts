@@ -2,7 +2,7 @@ import { componentTestComplete, getComponent, openComponent } from '../util';
 import { NgForSPecComponent } from './ng-for.component';
 describe('NgForSPecComponent', () => {
   beforeEach(async () => {
-    await openComponent(`/spec/ng-for-spec/ng-for-spec-entry`);
+    await openComponent(`/pages/ng-for-spec/ng-for-spec-entry`);
   });
   it('run', (done) => {
     let pages = getCurrentPages();

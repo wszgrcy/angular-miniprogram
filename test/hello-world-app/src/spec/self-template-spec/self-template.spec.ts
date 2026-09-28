@@ -2,7 +2,7 @@ import { componentTestComplete, getComponent, openComponent } from '../util';
 import { SelfTemplateSPecComponent } from './self-template.component';
 describe('SelfTemplateSPecComponent', () => {
   beforeEach(async () => {
-    await openComponent(`/spec/self-template-spec/self-template-spec-entry`);
+    await openComponent(`/pages/self-template-spec/self-template-spec-entry`);
   });
   it('run', (done) => {
     let pages = getCurrentPages();

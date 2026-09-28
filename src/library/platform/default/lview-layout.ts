@@ -71,8 +71,41 @@ export const LVIEW = {
    * 注意这是 **LContainer** 的下标，不是 LView 的。
    * 与 `LVIEW.CONTEXT`（也是 8）数值相同但语义无关，别混用。
    * 来源：`packages/core/src/render3/interfaces/container.ts`
+   *
+   * ⚠️ **不要拿它当「容器里有几个视图」的唯一依据**，
+   * 见下面 `CONTAINER_HEADER_OFFSET` 的说明。
    */
   CONTAINER_VIEW_REFS: 8,
+
+  /**
+   * `LContainer[CONTAINER_HEADER_OFFSET]`：嵌入视图（裸 lView）的起始下标。
+   *
+   * 与 `VIEW_REFS` 的区别是本质性的，不是「多一个可选来源」：
+   *
+   * - `VIEW_REFS`（8）存 **ViewRef / ComponentRef 包装对象**，
+   *   且是**惰性创建**的。只有走公开 `ViewContainerRef` API
+   *   （`createEmbeddedView` / `insert`）才会填——`*ngIf`、`*ngFor`
+   *   这些结构指令就是走这条路。
+   * - 内建控制流 `@if` / `@for` / `@switch` 由 `ɵɵif` /
+   *   `ɵɵrepeater` 等指令**直接**往 `CONTAINER_HEADER_OFFSET`（10）
+   *   起塞**裸 lView**，全程不创建 ViewRef，于是 `VIEW_REFS` 恒为
+   *   `null`。
+   *
+   * 实测（@angular/core 22.1.7，微信开发者工具，`@for (item of ['x','y'])`）：
+   *   container[10] = lView('x')
+   *   container[11] = lView('y')
+   *   container[8]  = null
+   *
+   * 只读 `VIEW_REFS` 会让所有内建控制流分支渲染成空数组——
+   * 节点全丢且不报错，是最难查的一类 bug。
+   *
+   * 读这里的裸 lView 是两条路径的**共同上游**（ViewContainerRef
+   * 最终也是把 lView 插到本下标），所以以它为准，
+   * 同时覆盖 `*ngIf` 与 `@if`。
+   *
+   * 来源：`packages/core/src/render3/interfaces/container.ts`
+   */
+  CONTAINER_HEADER_OFFSET: 10,
 } as const;
 
 /** `LVIEW` 里所有键的字面量联合类型 */

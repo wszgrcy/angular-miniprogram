@@ -126,9 +126,7 @@ describe('路径式 setData 快速通道', () => {
     renderer.setProperty(nodes[1], 'foo', 42);
 
     const calls = countToView(() => endRender());
-    expect(calls)
-      .withContext('快路径不应调用任何 toView()')
-      .toBe(0);
+    expect(calls).withContext('快路径不应调用任何 toView()').toBe(0);
     expect(mp.calls).toEqual([{ 'nodeList[1].property.foo': 42 }]);
   });
 
@@ -268,9 +266,7 @@ describe('路径式 setData 快速通道', () => {
     renderer.setProperty(orphan, 'x', 1);
 
     const calls = countToView(() => endRender());
-    expect(calls)
-      .withContext('拿不到前缀必须回退')
-      .toBeGreaterThan(0);
+    expect(calls).withContext('拿不到前缀必须回退').toBeGreaterThan(0);
     const merged = Object.assign({}, ...mp.calls);
     expect(merged['nodeList[0].property.x']).toBeUndefined();
   });
@@ -283,9 +279,7 @@ describe('路径式 setData 快速通道', () => {
     propertyChange(lView as any);
     renderer.setProperty(nodes[0], 'x', 1);
     const calls = countToView(() => endRender());
-    expect(calls)
-      .withContext('关掉开关后必须走全量')
-      .toBeGreaterThan(0);
+    expect(calls).withContext('关掉开关后必须走全量').toBeGreaterThan(0);
     /**
      * 旧管线在 `property` key 数变化时「整体送出」该对象；
      * 开关打开后同一变更只发 `'nodeList[0].property.x'` 一个叶子。
@@ -314,7 +308,16 @@ describe('路径式 setData 快速通道', () => {
     const parentLView: any[] = [];
     parentLView[1] = { bindingStartIndex: LVIEW.HEADER_OFFSET + 2 };
     const container: any = [null, true];
-    container[LVIEW.CONTAINER_VIEW_REFS] = [{ _lView: childLView }];
+    /**
+     * 真实 Angular 布局：嵌入的**裸 lView** 从 CONTAINER_HEADER_OFFSET 起。
+     *
+     * 旧写法是 `container[CONTAINER_VIEW_REFS] = [{ _lView: childLView }]`，
+     * 那只对应 `*ngIf` 这类走 `ViewContainerRef.createEmbeddedView()`
+     * 的路径；内建 `@if`/`@for`/`@switch` 根本不填 VIEW_REFS（恒为
+     * null），所以旧实现下内建控制流全部渲染为空——就是被修掉的那个 bug。
+     * 合成数据要跟真实布局一致，否则测试在验一个不存的结构。
+     */
+    container[LVIEW.CONTAINER_HEADER_OFFSET] = childLView;
     parentLView[LVIEW.HEADER_OFFSET + 0] = container;
     const parentNode = new AgentNode('element');
     parentLView[LVIEW.HEADER_OFFSET + 1] = parentNode;
@@ -332,9 +335,7 @@ describe('路径式 setData 快速通道', () => {
     propertyChange(parentLView as any);
     renderer.setProperty(childNodes[1], 'v', 7);
     countToView(() => endRender());
-    expect(mp.calls).toEqual([
-      { 'nodeList[0][0].nodeList[1].property.v': 7 },
-    ]);
+    expect(mp.calls).toEqual([{ 'nodeList[0][0].nodeList[1].property.v': 7 }]);
   });
 
   // ───────────── 7. 销毁清理 ─────────────
@@ -364,16 +365,16 @@ describe('路径式 setData 快速通道', () => {
     }
     const fastNs = Number(process.hrtime.bigint() - t1) / ITER;
 
-    expect(toViewTotal)
-      .withContext('快路径一个 toView 都不能有')
-      .toBe(0);
+    expect(toViewTotal).withContext('快路径一个 toView 都不能有').toBe(0);
     expect(fastNs)
-      .withContext(`快路径(${fastNs.toFixed(0)}ns) 应明显快于全量(${fullNs.toFixed(0)}ns)`)
+      .withContext(
+        `快路径(${fastNs.toFixed(0)}ns) 应明显快于全量(${fullNs.toFixed(0)}ns)`,
+      )
       .toBeLessThan(fullNs);
 
     console.log(
       `[path bench] ${N} 节点单点变更：全量 ${fullNs.toFixed(0)}ns / ` +
-        `快路径 ${fastNs.toFixed(0)}ns / 加速 ${(fullNs / fastNs).toFixed(1)}x`
+        `快路径 ${fastNs.toFixed(0)}ns / 加速 ${(fullNs / fastNs).toFixed(1)}x`,
     );
   });
 
@@ -394,10 +395,12 @@ describe('路径式 setData 快速通道', () => {
     const big = measure(1000);
     // 允许 3 倍浮动（GC / 噪声），但绝不能随节点数线性增长到数量级
     expect(big)
-      .withContext(`1000 节点(${big.toFixed(0)}ns) 不应比 100 节点(${small.toFixed(0)}ns) 贵一个量级`)
+      .withContext(
+        `1000 节点(${big.toFixed(0)}ns) 不应比 100 节点(${small.toFixed(0)}ns) 贵一个量级`,
+      )
       .toBeLessThan(small * 3);
     console.log(
-      `[path bench] 快路径 100 节点 ${small.toFixed(0)}ns vs 1000 节点 ${big.toFixed(0)}ns`
+      `[path bench] 快路径 100 节点 ${small.toFixed(0)}ns vs 1000 节点 ${big.toFixed(0)}ns`,
     );
   });
 
