@@ -1,7 +1,6 @@
 import { Directive, OnInit, input, output } from '@angular/core';
 
 @Directive({
-  standalone: false,
   selector: '[libInputOutput]',
 })
 export class InputOutputDirective implements OnInit {

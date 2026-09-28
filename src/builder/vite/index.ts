@@ -9,6 +9,10 @@ import { Injector } from 'static-injector';
 import type { AliasOptions, InlineConfig } from 'vite';
 import { changeComponent } from '../component-template-inject/change-component';
 import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
+import {
+  clearLibraryMetaMisses,
+  formatLibraryMetaSummary,
+} from '../library/library-meta-diagnostics';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
 import { LibraryTemplateScopeService } from '../shared/library-template-scope.service';
@@ -426,6 +430,8 @@ export function runViteBuilder(
         const vite = await import('vite');
 
         const runOnce = async () => {
+          // 每轮开头清空上一轮的库元数据缺失记录，否则汇总会跨轮累加
+          clearLibraryMetaMisses();
           // 每轮重新生成 config，入口 glob 重新展开，
           // 这样 watch 期间新增的入口文件能被拉进来
           const config = await createMiniProgramViteConfig({
@@ -434,6 +440,12 @@ export function runViteBuilder(
             buildPlatform,
           });
           await vite.build(config);
+          // 把「哪些指令没拿到库元数据」显式报出来。
+          // 旧行为是静默返回空 listeners，wxml 丢事件绑定且零报错。
+          const metaSummary = formatLibraryMetaSummary();
+          if (metaSummary) {
+            context.logger.warn(`[library-meta] ${metaSummary}`);
+          }
         };
 
         await runOnce();

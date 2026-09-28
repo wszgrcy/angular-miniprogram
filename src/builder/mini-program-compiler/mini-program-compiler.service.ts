@@ -9,18 +9,18 @@ import type {
   ClassRecord,
   TraitCompiler,
 } from '@angular/compiler-cli/src/ngtsc/transform';
-import { createCssSelectorForTs } from 'cyia-code-util';
 import path from 'path';
 import { Injectable, Injector } from 'static-injector';
 import ts, { ClassDeclaration } from 'typescript';
+import { recordLibraryMetaMiss } from '../library/library-meta-diagnostics';
+import { lookupLibraryMeta } from '../library/library-meta-reader';
 import {
-  LIBRARY_COMPONENT_OUTPUT_PATH_SUFFIX,
-  LIBRARY_DIRECTIVE_LISTENERS_SUFFIX,
-  LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX,
-} from '../library';
+  LibraryComponentMetaRecord,
+  safeStringList,
+} from '../library/library-meta-schema';
 import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
-import { angularCompilerPromise, literalResolve } from '../util';
+import { angularCompilerPromise } from '../util';
 import { ComponentCompilerService } from './component-compiler.service';
 import { recordGeneratedWxml } from './manifest-registry';
 import { MetaCollection } from './meta-collection';
@@ -45,7 +45,7 @@ const R3_TEMPLATE_DEPENDENCY_KIND_NG_MODULE = 2;
  */
 function toBindingNameList(
   mapping: unknown,
-  reverseKey: 'reverseMap'
+  reverseKey: 'reverseMap',
 ): string[] {
   if (mapping == null) {
     return [];
@@ -85,7 +85,7 @@ export class MiniProgramCompilerService {
   constructor(
     private ngTscProgram: NgtscProgram,
     private injector: Injector,
-    private buildPlatform: BuildPlatform
+    private buildPlatform: BuildPlatform,
   ) {}
   init() {
     this.ngCompiler = this.ngTscProgram.compiler;
@@ -100,7 +100,7 @@ export class MiniProgramCompilerService {
     for (const [classDeclaration, classRecord] of classes) {
       const fileName = classDeclaration.getSourceFile().fileName;
       const componentTraits = classRecord.traits.filter(
-        (trait) => trait.handler.name === 'ComponentDecoratorHandler'
+        (trait) => trait.handler.name === 'ComponentDecoratorHandler',
       );
       if (componentTraits.length > 1) {
         throw new Error('组件装饰器异常');
@@ -116,20 +116,20 @@ export class MiniProgramCompilerService {
         this.resolvedDataGroup.style.set(
           makeComponentKey(
             path.normalize(fileName),
-            classDeclaration.name?.getText() ?? ''
+            classDeclaration.name?.getText() ?? '',
           ),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ((trait as any)?.analysis?.styleUrls || []).map(
-            (item: { url: string }) => this.resolveStyleUrl(fileName, item.url)
-          )
+            (item: { url: string }) => this.resolveStyleUrl(fileName, item.url),
+          ),
         );
         this.componentMap.set(
           ts.getOriginalNode(classDeclaration) as ts.ClassDeclaration,
-          meta
+          meta,
         );
       });
       const directiveTraits = classRecord.traits.filter(
-        (trait) => trait.handler.name === 'DirectiveDecoratorHandler'
+        (trait) => trait.handler.name === 'DirectiveDecoratorHandler',
       );
       if (directiveTraits.length > 1) {
         throw new Error('指令装饰器异常');
@@ -138,7 +138,7 @@ export class MiniProgramCompilerService {
         this.directiveMap.set(
           ts.getOriginalNode(classDeclaration) as ts.ClassDeclaration,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (trait as any).analysis?.meta
+          (trait as any).analysis?.meta,
         );
       });
     }
@@ -148,12 +148,12 @@ export class MiniProgramCompilerService {
     const { SelectorMatcher, CssSelector } = await angularCompilerPromise;
     for (const [classDeclaration, meta] of this.componentMap) {
       const fileName = path.normalize(
-        classDeclaration.getSourceFile().fileName
+        classDeclaration.getSourceFile().fileName,
       );
       let directiveMatcher: SelectorMatcher | undefined;
       const declarations = this.resolveTemplateDeclarations(
         classDeclaration,
-        meta
+        meta,
       );
       if (declarations.length > 0) {
         const matcher = new SelectorMatcher();
@@ -161,25 +161,25 @@ export class MiniProgramCompilerService {
           const selector = directive.selector;
           const directiveClassDeclaration = ts.getOriginalNode(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (directive as any).ref.node
+            (directive as any).ref.node,
           ) as ts.ClassDeclaration;
           const directiveMeta = this.directiveMap.get(
-            directiveClassDeclaration
+            directiveClassDeclaration,
           );
           const componentMeta = this.componentMap.get(
-            directiveClassDeclaration
+            directiveClassDeclaration,
           );
           let libraryMeta: MetaFromLibrary | undefined;
           if (directive.isComponent) {
             libraryMeta = this.getLibraryComponentMeta(
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (directive as any).ref.node
+              (directive as any).ref.node,
             );
           }
           if (!directive.isComponent && !directiveMeta) {
             libraryMeta = this.getLibraryDirectiveMeta(
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (directive as any).ref.node
+              (directive as any).ref.node,
             );
           }
           matcher.addSelectables(CssSelector.parse(selector), {
@@ -193,15 +193,15 @@ export class MiniProgramCompilerService {
       }
       const componentBuildMeta = this.buildComponentMeta(
         directiveMatcher,
-        meta
+        meta,
       );
       const componentKey = makeComponentKey(
         fileName,
-        classDeclaration.name?.getText() ?? ''
+        classDeclaration.name?.getText() ?? '',
       );
       this.resolvedDataGroup.outputContent.set(
         componentKey,
-        componentBuildMeta.content
+        componentBuildMeta.content,
       );
 
       // 同源记录：此刻组件身份（componentKey）与生成的 wxml 同时已知，
@@ -211,18 +211,18 @@ export class MiniProgramCompilerService {
         componentKey,
         classDeclaration.name?.getText() ?? '',
         fileName,
-        componentBuildMeta.content
+        componentBuildMeta.content,
       );
 
       this.resolvedDataGroup.useComponentPath.set(
         componentKey,
-        componentBuildMeta.useComponentPath
+        componentBuildMeta.useComponentPath,
       );
       for (const key in componentBuildMeta.otherMetaGroup) {
         if (
           Object.prototype.hasOwnProperty.call(
             componentBuildMeta.otherMetaGroup,
-            key
+            key,
           )
         ) {
           const element = componentBuildMeta.otherMetaGroup[key];
@@ -255,12 +255,29 @@ export class MiniProgramCompilerService {
   private resolveTemplateDeclarations(
     classDeclaration: ts.ClassDeclaration,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    meta: R3ComponentMetadata<any>
+    meta: R3ComponentMetadata<any>,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): any[] {
-    const declarations = meta.declarations as unknown[] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const rawDeclarations = meta.declarations as unknown;
+    if (!Array.isArray(rawDeclarations)) {
+      // `meta.declarations` 缺失 = 这个组件的 Angular 分析根本没跑成
+      // （典型诱因：上游还有编译错误，比如 standalone 指令被 NgModule
+      // declarations；或者组件 meta 因错被降级）。
+      // 以前这里直接 `declarations.some(...)`，抛出来的是
+      // “Cannot read properties of undefined (reading 'some')”，
+      // 看不出是哪个组件、为什么，排查成本极高。改成带身份的报错。
+      throw new Error(
+        `[mini-program-compiler] 组件 ${
+          classDeclaration.name?.getText() ?? '?'
+        }（${path.normalize(
+          classDeclaration.getSourceFile().fileName,
+        )}）的 meta.declarations 缺失，Angular 组件分析未完成。` +
+          `这通常是上游编译错误的连带结果，先把真正的报错修掉再来。`,
+      );
+    }
+    const declarations = rawDeclarations as unknown[] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
     const importsNgModule = declarations.some(
-      (item) => item.kind === R3_TEMPLATE_DEPENDENCY_KIND_NG_MODULE
+      (item) => item.kind === R3_TEMPLATE_DEPENDENCY_KIND_NG_MODULE,
     );
     if (!importsNgModule) {
       return declarations;
@@ -282,11 +299,11 @@ export class MiniProgramCompilerService {
         importedFile: node.getSourceFile(),
         inputs: toBindingNameList(
           (dep as { inputs?: unknown }).inputs,
-          'reverseMap'
+          'reverseMap',
         ),
         outputs: toBindingNameList(
           (dep as { outputs?: unknown }).outputs,
-          'reverseMap'
+          'reverseMap',
         ),
       };
     });
@@ -295,7 +312,7 @@ export class MiniProgramCompilerService {
   private buildComponentMeta(
     directiveMatcher: SelectorMatcher | undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    componentMeta: R3ComponentMetadata<any>
+    componentMeta: R3ComponentMetadata<any>,
   ) {
     const injector = Injector.create({
       parent: this.injector,
@@ -323,45 +340,63 @@ export class MiniProgramCompilerService {
     return this.componentMap;
   }
   private getLibraryDirectiveMeta(
-    classDeclaration: ts.ClassDeclaration
+    classDeclaration: ts.ClassDeclaration,
   ): DirectiveMetaFromLibrary | undefined {
-    let listeners: string[] = [];
-    let properties: string[] = [];
-    const directiveName = classDeclaration.name!.getText();
-    const selector = createCssSelectorForTs(classDeclaration.getSourceFile());
-    const listenersNode = selector.queryOne(
-      `VariableDeclaration[name=${directiveName}_${LIBRARY_DIRECTIVE_LISTENERS_SUFFIX}]`
-    ) as ts.VariableDeclaration;
-    if (listenersNode) {
-      listeners = literalResolve(listenersNode.type!.getText());
+    const className = classDeclaration.name?.getText();
+    if (!className) {
+      return undefined;
     }
-    const propertiesNode = selector.queryOne(
-      `VariableDeclaration[name=${directiveName}_${LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX}]`
-    ) as ts.VariableDeclaration;
-    if (propertiesNode) {
-      properties = literalResolve(propertiesNode.type!.getText());
+    const sourceFile = classDeclaration.getSourceFile();
+
+    /**
+     * 唯一来源：库构建产出的 sidecar（`<库根>/mp-library-meta.json`）。
+     *
+     * 不做任何版本兼容 —— 旧版把 `declare const X_Listeners` 内联在 d.ts
+     * 里的格式已废弃，不再读。
+     */
+    const lookup = lookupLibraryMeta(sourceFile.fileName, className);
+    if (lookup.record) {
+      return {
+        isComponent: false,
+        listeners: safeStringList(lookup.record.listeners),
+        properties: safeStringList(lookup.record.properties),
+      };
     }
+
+    // 查不到：**不再静默返回空数组而不留痕迹**。
+    // 旧行为在这里直接 `{listeners: []}` 覆盖掉 host.listeners，
+    // wxml 一个事件绑定都没有且零报错。现在登记下来，
+    // 由构建器在每轮结束时打汇总日志。
+    recordLibraryMetaMiss({
+      className,
+      sourceFile: sourceFile.fileName,
+      reason: lookup.entry ? 'sidecar-missing-class' : 'no-sidecar',
+    });
     return {
       isComponent: false,
-      listeners: listeners,
-      properties: properties,
+      listeners: [],
+      properties: [],
     };
   }
   private getLibraryComponentMeta(
-    classDeclaration: ts.ClassDeclaration
+    classDeclaration: ts.ClassDeclaration,
   ): ComponentMetaFromLibrary | undefined {
-    const directiveName = classDeclaration.name!.getText();
-    const selector = createCssSelectorForTs(classDeclaration.getSourceFile());
-    const exportPathNode = selector.queryOne(
-      `VariableDeclaration[name=${directiveName}_${LIBRARY_COMPONENT_OUTPUT_PATH_SUFFIX}]`
-    ) as ts.VariableDeclaration;
-    if (!exportPathNode) {
+    const className = classDeclaration.name?.getText();
+    if (!className) {
       return undefined;
     }
-    const exportPath = exportPathNode.type!.getText();
+    const lookup = lookupLibraryMeta(
+      classDeclaration.getSourceFile().fileName,
+      className,
+    );
+    if (lookup.kind !== 'component' || !lookup.record) {
+      return undefined;
+    }
+    const record = lookup.record as LibraryComponentMetaRecord;
     return {
-      exportPath: literalResolve(exportPath),
-      ...this.getLibraryDirectiveMeta(classDeclaration)!,
+      exportPath: record.outputPath,
+      listeners: safeStringList(record.listeners),
+      properties: safeStringList(record.properties),
       isComponent: true,
     };
   }

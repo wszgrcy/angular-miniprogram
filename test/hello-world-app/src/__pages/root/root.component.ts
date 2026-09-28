@@ -79,4 +79,9 @@ export class RootComponent implements OnInit {
       url: '/pages/life-time-page-use-component/life-time-page-use-component-entry',
     });
   }
+  libraryMetaDemo() {
+    this.global.navigateTo({
+      url: '/pages/library-meta-demo/library-meta-demo-entry',
+    });
+  }
 }

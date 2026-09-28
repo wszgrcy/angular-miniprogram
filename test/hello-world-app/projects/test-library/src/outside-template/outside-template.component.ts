@@ -1,7 +1,8 @@
+import { CommonModule } from '@angular/common';
 import { Component, Input, OnInit, TemplateRef } from '@angular/core';
 
 @Component({
-  standalone: false,
+  imports: [CommonModule],
   selector: 'app-outside-template',
   templateUrl: './outside-template.component.html',
   styleUrls: ['./outside-template.component.css'],
@@ -9,6 +10,5 @@ import { Component, Input, OnInit, TemplateRef } from '@angular/core';
 export class OutsideTemplateComponent implements OnInit {
   @Input() template: TemplateRef<any>;
   constructor() {}
-
   ngOnInit() {}
 }

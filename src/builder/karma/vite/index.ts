@@ -5,6 +5,10 @@ import { getSystemPath } from '@angular-devkit/core';
 import * as path from 'path';
 import { Observable } from 'rxjs';
 import type { InlineConfig } from 'vite';
+import {
+  clearLibraryMetaMisses,
+  formatLibraryMetaSummary,
+} from '../../library/library-meta-diagnostics';
 import { LibraryTemplateScopeService } from '../../shared/library-template-scope.service';
 import {
   buildPlatformDefine,
@@ -332,7 +336,13 @@ export function runKarmaViteBuilder(
           buildPlatform,
         });
 
+        clearLibraryMetaMisses();
         await vite.build(config);
+        // 与 application-vite builder 对齐：把「哪些指令没拿到库元数据」报出来
+        const metaSummary = formatLibraryMetaSummary();
+        if (metaSummary) {
+          context.logger.warn(`[library-meta] ${metaSummary}`);
+        }
 
         const karma = await import('karma');
         const karmaOptions: Record<string, unknown> = {
