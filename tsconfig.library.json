@@ -3,7 +3,6 @@
   // "files": ["./src/library/index.ts"],
   "include": ["./src/library"],
   "compilerOptions": {
-    "baseUrl": "./src/library",
     "noImplicitThis": true,
     "outDir": "dist",
     "declaration": true,
@@ -15,15 +14,21 @@
     "typeRoots": ["./src/library", "./node_modules"],
     "types": ["declaration", "miniprogram-api-typings"],
     "paths": {
-      "angular-miniprogram/platform/default": ["./platform/default/index.ts"],
-      "angular-miniprogram/platform/wx": ["./platform/wx/index.ts"],
-      "angular-miniprogram/platform/type": ["./platform/type/index.ts"],
-      "angular-miniprogram/platform": ["./platform/index.ts"],
+      "angular-miniprogram/platform/default": [
+        "./src/library/platform/default/index.ts"
+      ],
+      "angular-miniprogram/platform/wx": ["./src/library/platform/wx/index.ts"],
+      "angular-miniprogram/platform/type": [
+        "./src/library/platform/type/index.ts"
+      ],
+      "angular-miniprogram/platform": ["./src/library/platform/index.ts"],
       // Angular 22 的 `@angular/common/http` 只靠 exports map 暴露子路径，
       // 不再提供 node10 兼容的 `http/` 目录，moduleResolution: node 认不出来，
       // 这里显式指到类型入口。
-      "@angular/common/http": ["../../node_modules/@angular/common/types/http.d.ts"],
-      "@angular/common": ["../../node_modules/@angular/common/types/common.d.ts"]
+      "@angular/common/http": [
+        "./node_modules/@angular/common/types/http.d.ts"
+      ],
+      "@angular/common": ["./node_modules/@angular/common/types/common.d.ts"]
     }
   },
   "exclude": [
