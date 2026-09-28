@@ -665,6 +665,7 @@ Options<{}, {}, {}>            ->  Options<{}, {}, {}, []>
 | **ICU 消息**（`{x, plural/select}`） | 编译成 `ɵɵpipe` + `I18nSelect` 动态切换子模板。**实测该节点会真的出现在 `parseTemplate` 结果里**，而 `visitIcu` 曾是空实现 → 整段内容静默消失 + 后续节点槽位错位且不报错。现显式抛错。注：这**不是「做不到」**——本 fork 已有的 `__templateName`（`<template is="{{item.__templateName}}">`）恰好就是它需要的能力，只是未实现 |
 | **`<ng-content>` fallback 内容**     | 实测空标签与纯空白会被 Angular 归一成 `children = []`，只有写了兜底才有子节点。小程序 `<slot>` 无 fallback 能力，对非空 children 显式抛错（已确认仓内无此用法，不打破现有代码）                                                                                                                                              |
 | `Object.hasOwn`                      | 同步过来的 `@angular/common` 用到 ES2022 的 `Object.hasOwn`，库的 `lib` 从 es2019 提到 es2022                                                                                                                                                                                                                                |
+| **CLI workspace schema**             | 发布包自带 `lib/config/schema.json`（`npm run build:schema` → `script/build-cli-schema.ts`），让 `angular.json` 的 `$schema` 指到本包时也能拿到 `angular-miniprogram:application / library / karma` 的补全与校验。基底直接读 devDependencies 里的 `@angular/cli/lib/config/schema.json`（不入库也不缓存），**跟的也就是 `package.json` 里钉住的那个 CLI 版本**，升 CLI 时产物自动跟着走。拼装逻辑对齐 CLI 的 `tools/ng_cli_schema_generator.js`（内联时剥掉 `required` / `$schema` / `x-prompt`，内部 `$ref` 命名空间化），并把本包 builder 加进兜底分支的 `not.enum`——漏了会让 `oneOf` 同时命中两条而校验失败 |
 
 ### 升级操作清单（21/22 修订版）
 
