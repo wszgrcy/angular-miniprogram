@@ -3,7 +3,6 @@
   "files": ["./src/library/platform/index.ts"],
 
   "compilerOptions": {
-    "baseUrl": "./src/library",
     "noImplicitThis": true,
     "outDir": "dist",
     "declaration": true,
@@ -16,10 +15,14 @@
     "typeRoots": ["./src/library"],
     "types": ["declaration"],
     "paths": {
-      "angular-miniprogram/platform/default": ["./platform/default/index.ts"],
-      "angular-miniprogram/platform/wx": ["./platform/wx/index.ts"],
-      "angular-miniprogram/platform/type": ["./platform/type/index.ts"],
-      "angular-miniprogram/platform": ["./platform/index.ts"]
+      "angular-miniprogram/platform/default": [
+        "./src/library/platform/default/index.ts"
+      ],
+      "angular-miniprogram/platform/wx": ["./src/library/platform/wx/index.ts"],
+      "angular-miniprogram/platform/type": [
+        "./src/library/platform/type/index.ts"
+      ],
+      "angular-miniprogram/platform": ["./src/library/platform/index.ts"]
     }
   },
   "exclude": [

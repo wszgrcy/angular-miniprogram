@@ -1,7 +1,6 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@angular/build/private": [
         "./node_modules/@angular/build/src/private.d.ts"
