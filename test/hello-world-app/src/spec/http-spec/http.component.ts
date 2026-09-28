@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { HttpClientModule } from 'angular-miniprogram';
-import { FIXTURE_ARTICLES_URL } from '../util/fixture-server';
+import { FIXTURE_ARTICLES_URL } from '../util/fixture-url';
 
 @Component({
   standalone: true,

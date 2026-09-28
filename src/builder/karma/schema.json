@@ -37,6 +37,10 @@
       "type": "string",
       "description": "小程序内 karma 客户端回连的宿主地址，默认 127.0.0.1（微信模拟器解不了 localhost）。真机调试改成开发机局域网 IP。"
     },
+    "port": {
+      "type": "number",
+      "description": "karma 服务端口，默认 9876。这个值会同时用于：① 编译期 define 进产物的 KARMA_PORT；② karma server 实际监听的端口。两边必须同源，否则产物里写的是一个端口、server 绑的是另一个，客户端永远连不上。"
+    },
     "tsConfig": {
       "type": "string",
       "description": "The name of the TypeScript configuration file."

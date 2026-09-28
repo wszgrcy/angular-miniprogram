@@ -338,6 +338,21 @@ export function runKarmaViteBuilder(
         const karmaOptions: Record<string, unknown> = {
           singleRun: options.watch ? false : true,
         };
+        /**
+         * 把端口作为 override 传下去，让 server 绑的端口和编译期 define
+         * 进产物的 `KARMA_PORT` 是**同一个来源**。
+         *
+         * 不传的话，server 用的是 karma.conf.js 里的 `port`，而产物用的是
+         * `karmaOptions.port ?? 9876`——两个独立源头。现在两边都是 9876 只是
+         * 碰巧（schema 里原本连 `port` 字段都没有），一旦谁改了就不一致：
+         * 产物去连 9911、server 还在 9876，表现为客户端永远连不上。
+         *
+         * `karma.config.parseConfig(file, cliOptions, ...)` 的第二参就是用来
+         * 覆盖配置文件里的值的，优先级高于 karma.conf.js。
+         */
+        if (options.port) {
+          karmaOptions.port = options.port;
+        }
         if (options.browsers) {
           karmaOptions.browsers = options.browsers.split(',');
         }

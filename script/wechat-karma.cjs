@@ -68,15 +68,6 @@ function parseArgs(argv) {
       case '--ng-target':
         out.ngTarget = next();
         break;
-      case '--close-extra':
-        // 逗号分隔的额外要关的项目路径（自动发现没覆盖到的）
-        out.closeExtra = (out.closeExtra || []).concat(
-          String(next() || '')
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean),
-        );
-        break;
       case '--timeout':
         out.timeout = Number(next());
         break;
@@ -312,9 +303,8 @@ function lastParsedSummary(log) {
  *   <项目>/X/dist/karma/<t>
  *   <兄弟项目>/dist/karma/<t>
  *   <兄弟项目>/Y/dist/karma/<t>
- * 盖不到的用 --close-extra 手动补。
  */
-function collectAutomationDists(projectDir, distDir, extra) {
+function collectAutomationDists(projectDir, distDir) {
   const found = new Set();
   const SKIP = new Set([
     'node_modules',
@@ -409,9 +399,6 @@ function collectAutomationDists(projectDir, distDir, extra) {
     }
   }
 
-  for (const p of extra || []) {
-    found.add(path.resolve(p));
-  }
   if (distDir) {
     found.add(path.resolve(distDir));
   }
@@ -616,11 +603,7 @@ async function main() {
    * CLI 没有「列出已打开项目」的命令，只能按路径 close，所以只能把
    * 候选目录扫出来逐个关。项目没开时 close 会报错，忽略即可。
    */
-  const automationDists = collectAutomationDists(
-    projectDir,
-    distDir,
-    opt.closeExtra,
-  );
+  const automationDists = collectAutomationDists(projectDir, distDir);
   console.log(
     `[precheck] 关闭可能残留的项目窗口（${automationDists.length} 个候选）` +
       (automationDists.length ? '\n  ' + automationDists.join('\n  ') : ''),
@@ -635,9 +618,8 @@ async function main() {
     timeoutMs: 20_000,
     heartbeatMs: 1500,
     hint:
-      `端口 ${opt.autoPort} 一直占着 = 有个项目窗口没关掉。` +
-      '手动在开发者工具里关掉所有项目窗口，或用 --close-extra 指定要关的目，' +
-      '或换个 --auto-port。',
+      `端口 ${opt.autoPort} 一直占着 = 有项目窗口没关掉。` +
+      '在开发者工具里把它关掉，或换个 --auto-port。',
     check: async () => {
       const busy = await portInUse(opt.autoPort);
       return busy
@@ -657,8 +639,7 @@ async function main() {
         '端口没释放就 auto，本轮根本绑不上；日志里那个 "Connected" 是' +
         '上一个窗口的客户端，拿它等结果只会误报「零推进」。',
       怎么办:
-        `1) 开发者工具里关掉所有项目窗口；2) --close-extra <那个项目路径>；` +
-        `3) --auto-port 换一个端口`,
+        '开发者工具里把占着的项目窗口关掉；实在关不掉就 --auto-port 换一个端口',
     });
     process.exit(1);
   }

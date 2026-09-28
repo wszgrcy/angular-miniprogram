@@ -1,4 +1,4 @@
 export * from './open-component';
 export * from './node-query';
 export * from './page-info';
-export * from './fixture-server';
+export * from './fixture-url';
