@@ -6,7 +6,7 @@
  * `script/` 下的脚本（`package-sync.ts`、`ensure-sync.ts` 等）**不在任何
  * 构建/类型检查路径里**：
  *
- *   - `npm run build` 走 `tsc -p ./tsconfig.builder.json` / `start-build-library`，
+ *   - `npm run build` 走 `tsc -p ./tsconfig.builder.json` / `tsx ./script/build-ng-package.ts`，
  *     不会去类型检查 `package-sync.ts`
  *   - `script/tsconfig.json` 有既有 rootDir 问题，不能当门禁
  *   - `package-sync.ts` 只在 `npm run sync` 时由 ts-node 现场编译
