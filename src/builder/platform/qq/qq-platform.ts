@@ -10,6 +10,7 @@ export class QqBuildPlatform extends BuildPlatform {
     style: '.qss',
     logic: '.js',
     content: '.qml',
+    wxs: '.qs',
     contentTemplate: '.qml',
   };
   importTemplate = `${fs

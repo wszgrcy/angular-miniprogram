@@ -1,3 +1,4 @@
+import type { WxsDeclaration } from '../wxs/wxs-declare';
 import { MetaCollection } from './meta-collection';
 
 export interface ComponentMetaFromLibrary {
@@ -58,6 +59,15 @@ export interface ResolvedDataGroup {
   style: Map<string, string[]>;
   /** key: `源文件#组件类名` */
   outputContent: Map<string, string>;
+  /**
+   * key: `源文件#组件类名`，value: 该组件模板里的 wxs 声明（module + src）。
+   *
+   * 存**声明**而非光一个模块名：`src` 是相对组件源文件解析的，
+   * 只有带着它才能支持共享脚本（`../common/format.wxs`）。
+   * 来自主动改写阶段的返回值，而不是事后从 wxml 反推 ——
+   * 前者是权威信息，后者要靠字符串解析，经不起格式变化。
+   */
+  wxsModules: Map<string, WxsDeclaration[]>;
   /** key: `源文件#组件类名` */
   useComponentPath: Map<
     string,

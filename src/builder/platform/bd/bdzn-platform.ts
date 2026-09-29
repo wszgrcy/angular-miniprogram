@@ -10,6 +10,7 @@ export class BdZnBuildPlatform extends BuildPlatform {
     style: '.css',
     logic: '.js',
     content: '.swan',
+    wxs: '.sjs',
     contentTemplate: '.swan',
   };
   importTemplate = `${fs

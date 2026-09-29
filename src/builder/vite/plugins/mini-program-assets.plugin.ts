@@ -169,6 +169,30 @@ async function compileStyleSources(
   return compiled;
 }
 
+/**
+ * wxs 落盘 + watch 登记。
+ *
+ * wxs 不是 ES module，没有任何 import 指向它，Vite 的模块图看不见。
+ * 不显式 addWatchFile 的话，watch 模式下改 .wxs 根本不会触发重建。
+ *
+ * 语法已在分析阶段由 parseWxsSource 把关，这里原样落盘不转译。
+ */
+export function emitWxs(
+  resolved: {
+    wxsSources?: Map<string, string>;
+    wxsSourceFiles?: string[];
+  },
+  emit: (fileName: string, source: string) => void,
+  addWatchFile: (srcPath: string) => void,
+) {
+  resolved.wxsSources?.forEach((source, outPath) => {
+    emit(outPath, source);
+  });
+  resolved.wxsSourceFiles?.forEach((srcPath) => {
+    addWatchFile(srcPath);
+  });
+}
+
 export function miniProgramAssetsPlugin(
   options: MiniProgramAssetsPluginOptions,
 ): Plugin {
@@ -271,6 +295,9 @@ export function miniProgramAssetsPlugin(
       resolved.outputContent.forEach((content, outPath) => {
         emit(outPath, content);
       });
+
+      // 1.5 wxs：渲染层脚本原样落盘 + watch 登记
+      emitWxs(resolved, emit, (p) => this.addWatchFile(p));
 
       // 2. wxss：按组件把编译后的样式拼起来
       resolved.style.forEach((sourceList, outPath) => {

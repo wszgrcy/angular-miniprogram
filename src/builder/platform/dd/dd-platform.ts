@@ -10,6 +10,7 @@ export class DdBuildPlatform extends BuildPlatform {
     style: '.acss',
     logic: '.js',
     content: '.axml',
+    wxs: '.sjs',
     contentTemplate: '.axml',
   };
   importTemplate = `${fs

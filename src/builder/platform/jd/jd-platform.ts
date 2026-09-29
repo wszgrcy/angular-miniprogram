@@ -10,6 +10,7 @@ export class JdBuildPlatform extends BuildPlatform {
     style: '.jxss',
     logic: '.js',
     content: '.jxml',
+    wxs: '.jds',
     contentTemplate: '.jxml',
   };
   importTemplate = `${fs

@@ -1,10 +1,16 @@
 import { capitalize } from '@angular-devkit/core/src/utils/strings';
-import { WxTransformLike } from '../template-transform-strategy/wx-like/wx-transform.base';
+import {
+  WXS_DIALECT_ALIPAY,
+  WxTransformLike,
+} from '../template-transform-strategy/wx-like/wx-transform.base';
 
 const BIND_PREFIX_REGEXP = /^(bind|mut-bind|capture-bind)(.*)/;
 const CATCH_PREFIX_REGEXP = /^(catch|capture-catch)(.*)/;
 export class ZfbTransform extends WxTransformLike {
   directivePrefix = 'a';
+  override wxsExtname = '.sjs';
+  // 支付宝属性名不同：name/from 而非 module/src
+  override wxsDialect = WXS_DIALECT_ALIPAY;
   override eventNameConvert(name: string) {
     let result = name.match(BIND_PREFIX_REGEXP);
     if (result) {

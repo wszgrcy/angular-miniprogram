@@ -3,6 +3,7 @@ import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
 import { join, normalize, resolve } from '@angular-devkit/core';
 import { createHash } from 'crypto';
 import { createCssSelectorForTs } from 'cyia-code-util';
+import * as fs from 'fs';
 import * as path from 'path';
 import { Injector, inject } from 'static-injector';
 import ts from 'typescript';
@@ -14,6 +15,8 @@ import {
 } from '../mini-program-compiler';
 import { BuildPlatform } from '../platform/platform';
 import { angularCompilerCliPromise } from '../util/load_esm';
+import { planSharedWxsEmit } from '../wxs/wxs-declare';
+import { parseWxsSource } from '../wxs/wxs-source';
 import {
   COMPILER_HOST,
   OLD_BUILDER,
@@ -126,6 +129,44 @@ export class MiniProgramApplicationAnalysisService {
       contentMap.set(entryPattern.outputFiles.content, value);
     });
 
+    const wxsSources = new Map<string, string>();
+    const wxsSourceFiles: string[] = [];
+    const wxsExtname = this.buildPlatform.fileExtname.wxs;
+    const sharedDir = this.buildPlatform.templateTransform.wxsSharedDir;
+
+    /** 先把所有组件的声明解析成「模块 + 源绝对路径」 */
+    const resolvedEntries: Array<{ module: string; resolvedSource: string }> =
+      [];
+    metaMap.wxsModules?.forEach((decls, key) => {
+      const { sourceFile } = splitComponentKey(key);
+      for (const decl of decls) {
+        // src 相对**组件源文件**解析，所以共享脚本写 ../common/format.wxs 即可
+        const srcPath = path.resolve(path.dirname(sourceFile), decl.src);
+        if (!fs.existsSync(srcPath)) {
+          throw new Error(
+            `wxs 模块 "${decl.module}" 声明的 src="${decl.src}" 解析后不存在：${srcPath}`,
+          );
+        }
+        resolvedEntries.push({
+          module: decl.module,
+          resolvedSource: srcPath,
+        });
+      }
+    });
+
+    /** 归并：每个源只落一份，同名不同源报错 */
+    for (const item of planSharedWxsEmit(
+      resolvedEntries,
+      sharedDir,
+      wxsExtname,
+    )) {
+      const source = fs.readFileSync(item.source, 'utf8');
+      // 语法白名单在落盘前把关，把非法写法扣在编译期而不是真机上
+      parseWxsSource(source, item.module, item.source);
+      wxsSources.set(item.outPath, source);
+    }
+    wxsSourceFiles.push(...resolvedEntries.map((e) => e.resolvedSource));
+
     metaMap.style = styleMap;
     const config = new Map<
       string,
@@ -192,6 +233,8 @@ export class MiniProgramApplicationAnalysisService {
     return {
       style: styleMap,
       outputContent: contentMap,
+      wxsSources,
+      wxsSourceFiles,
       config: config,
       otherMetaCollectionGroup: metaMap.otherMetaCollectionGroup,
       selfTemplate,

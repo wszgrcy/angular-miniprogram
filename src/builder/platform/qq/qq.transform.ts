@@ -2,4 +2,6 @@ import { WxTransformLike } from '../template-transform-strategy/wx-like/wx-trans
 
 export class QqTransform extends WxTransformLike {
   directivePrefix = 'qq';
+  override wxsExtname = '.qs';
+  override wxsDialect = { tag: 'qs', moduleAttr: 'module', srcAttr: 'src' };
 }

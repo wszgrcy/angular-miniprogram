@@ -32,6 +32,11 @@ import {
   updatePath,
 } from './component-template-hook.factory';
 import { LVIEW } from './lview-layout';
+import {
+  collectWxsCallMethods,
+  createWxsCallMethodForwarders,
+  flushPendingCallMethods,
+} from './wxs-runtime';
 
 export class MiniProgramCoreFactory {
   public MINIPROGRAM_GLOBAL = wx;
@@ -79,6 +84,9 @@ export class MiniProgramCoreFactory {
     setLViewPath(lView, list);
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__waitLinkResolve();
+    // 链接完成，把首屏期间暂存的 callMethod 补发出去。
+    // 渲染层的 wxs 事件可能在链接前就触发，不补发就永久滞留。
+    flushPendingCallMethods(mpComponentInstance);
     // 传 mpComponentInstance：这次全量序列化会顺手给每个 AgentNode 打上
     // 路径前缀 + setData 目标，之后的叶子变更就能直接发路径。
     const initValue = getPageRefreshContext(lView, mpComponentInstance);
@@ -134,6 +142,20 @@ export class MiniProgramCoreFactory {
       return pre;
     }, {});
   }
+  /**
+   * 渲染层 `callMethod` 的转发器。
+   *
+   * 小程序要求 `ownerInstance.callMethod(name)` 的 `name` 必须已在
+   * `Component({methods})` 里存在，所以方法名必须在启动时就铺好 ——
+   * 这正是编译期要从 `.wxs` 源静态提取 callMethod 名单的原因。
+   *
+   * 全局铺（所有已注册模块的并集）而非按组件铺：组件与模块的对应关系
+   * 在运行时不可知，多铺几个只是占位，不影响行为。
+   */
+  protected wxsCallMethodEvent() {
+    return createWxsCallMethodForwarders(collectWxsCallMethods());
+  }
+
   protected pageStatus = {
     destroy: function (this: MiniProgramComponentInstance) {
       if (this.__ngDestroy) {
@@ -217,6 +239,7 @@ export class MiniProgramCoreFactory {
         methods: {
           ...options.methods,
           ...this.listenerEvent(),
+          ...this.wxsCallMethodEvent(),
           onHide: async function (this: MiniProgramComponentInstance) {
             if (options.methods?.onHide) {
               await options.methods.onHide.bind(this)();
@@ -273,6 +296,7 @@ export class MiniProgramCoreFactory {
     return Page({
       ...options,
       ...this.listenerEvent(),
+      ...this.wxsCallMethodEvent(),
       data: { hasLoad: false },
 
       onHide: async function (this: MiniProgramComponentInstance) {
@@ -422,6 +446,7 @@ export class MiniProgramCoreFactory {
       options: { ...options?.options, multipleSlots: true },
       methods: {
         ...this.listenerEvent(),
+        ...this.wxsCallMethodEvent(),
       },
     };
 

@@ -10,6 +10,7 @@ export class ZjBuildPlatform extends BuildPlatform {
     style: '.ttss',
     logic: '.js',
     content: '.ttml',
+    wxs: '.sjs',
     contentTemplate: '.ttml',
     config: '.json',
   };

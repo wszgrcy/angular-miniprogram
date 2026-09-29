@@ -7,6 +7,7 @@ import type {
   NgTextMeta,
 } from '../../../mini-program-compiler';
 import { MetaCollection } from '../../../mini-program-compiler';
+import { type WxsExprPlan, wxmlLiteral } from '../../../wxs/wxs-expr';
 import {
   isNgBoundTextMeta,
   isNgContentMeta,
@@ -20,6 +21,26 @@ export interface WxContainerGlobalConfig {
   directivePrefix: string;
   eventListConvert: (name: string[]) => string;
   templateInterpolation: [string, string];
+  /**
+   * 把模板事件名（`tap` / `catch:tap`）映射成小程序属性名（`bind:tap`）。
+   * wxs 事件旁路需要自己拼属性值，但属性名必须与普通事件一致。
+   */
+  eventAttrName: (name: string) => string;
+}
+
+/**
+ * 把翻译计划里的 `@@n@@` 占位换成实际物化路径。
+ *
+ * 逻辑层只负责把枝叶数组写到 `base` 上，wxs 在渲染层按下标取。
+ * 这是「逻辑层→渲染层」单向数据通道的具体形态：
+ * 渲染层拿得到枝叶，但它的返回值逻辑层永远拿不到。
+ */
+function wxsSubstitute(wxml: string, base: string): string {
+  return wxml.replace(/@@(\d+)@@/g, (_, n) => `${base}[${n}]`);
+}
+
+function useWxsPlanModules(plan: WxsExprPlan, use: (m: string) => void): void {
+  plan.modules.forEach(use);
 }
 export class WxContainer {
   private templateStr: string = '';
@@ -79,6 +100,13 @@ export class WxContainer {
     }>${children.join('')}</${node.tagName}>`;
   }
   private ngBoundTextTransform(node: NgBoundTextMeta): string {
+    const plan = node.wxsText;
+    if (plan) {
+      useWxsPlanModules(plan, (m) => this.useWxsModule(m));
+      // plan.wxml 已是完整 wxml 文本（含 {{}} 块与前后缀字面文本），
+      // 只需把占位换成路径，不再走框架默认的 {{nodeList[i].value}}。
+      return wxsSubstitute(plan.wxml, `nodeList[${node.index}].value`);
+    }
     return this.interp(`nodeList[${node.index}].value`);
   }
   private ngContentTransform(node: NgContentMeta): string {
@@ -170,8 +198,66 @@ export class WxContainer {
   private elementPropertyAndEvent(node: NgElementMeta, index: number) {
     const propertyMap = new Map<string, string>();
     const attributeMap = new Map<string, string>();
-    propertyMap.set('class', `nodeList[${index}].class`);
-    propertyMap.set('style', `nodeList[${index}].style`);
+    const wxsProps = node.wxsProps || {};
+
+    /**
+     * 属性值表达式：命中下推时走渲染层翻译结果，否则走物化路径。
+     *
+     * 下推后 `property.<key>` 存的是**枝叶数组**而不是最终值
+     * （最终值在渲染层算），所以同一个 key 只会走一条路，不冲突。
+     * 框架的 `diffNodeData` 对数组做结构化比较，数组未变则不重发。
+     */
+    const propExpr = (key: string): string => {
+      const plan = wxsProps[key];
+      if (plan) {
+        useWxsPlanModules(plan, (m) => this.useWxsModule(m));
+        // 只返回裸表达式，`{{ }}` 由容器统一包，与普通路径一致。
+        return wxsSubstitute(plan.wxml, `nodeList[${index}].property.${key}`);
+      }
+      return `nodeList[${index}].property.${key}`;
+    };
+
+    /**
+     * class / style 下推。
+     *
+     * `[class]` / `[style]` 整体绑定在 Angular 里本来就是 type=0 Property
+     * （name 就是 `class`/`style`），走的是和 `foo` 完全相同的
+     * `setProperty` 通道——所以改写层根本不需要为它们特事特办，
+     * 只是容器原先把这两个 key 硬编码成了 AgentNode 的聚合串。
+     *
+     * 静态部分按 uni-app 的方式合并：class 进数组，style 用 `+ ';' +` 串。
+     */
+    const classPlan = wxsProps['class'];
+    if (classPlan) {
+      useWxsPlanModules(classPlan, (m) => this.useWxsModule(m));
+      const expr = wxsSubstitute(
+        classPlan.wxml,
+        `nodeList[${index}].property.class`,
+      );
+      propertyMap.set(
+        'class',
+        node.staticClass ? `[${expr}, ${wxmlLiteral(node.staticClass)}]` : expr,
+      );
+    } else {
+      propertyMap.set('class', `nodeList[${index}].class`);
+    }
+
+    const stylePlan = wxsProps['style'];
+    if (stylePlan) {
+      useWxsPlanModules(stylePlan, (m) => this.useWxsModule(m));
+      const expr = wxsSubstitute(
+        stylePlan.wxml,
+        `nodeList[${index}].property.style`,
+      );
+      propertyMap.set(
+        'style',
+        node.staticStyle
+          ? `${expr} + ';' + ${wxmlLiteral(node.staticStyle)}`
+          : expr,
+      );
+    } else {
+      propertyMap.set('style', `nodeList[${index}].style`);
+    }
     Object.entries(node.attributes)
       .filter(([key, value]) => value !== '')
       .forEach(([key, value]) => {
@@ -191,7 +277,7 @@ export class WxContainer {
       )
       .filter((key) => !/^(class\.?|style\.?)/.test(key))
       .forEach((key) => {
-        propertyMap.set(key, `nodeList[${index!}].property.${key}`);
+        propertyMap.set(key, propExpr(key));
       });
     [
       ...(node.directiveMeta?.properties || []),
@@ -199,8 +285,9 @@ export class WxContainer {
     ]
       .filter((key) => !/^(class\.?|style\.?)/.test(key))
       .forEach((key) => {
-        propertyMap.set(key, `nodeList[${index!}].property.${key}`);
+        propertyMap.set(key, propExpr(key));
       });
+    const wxsEvents = node.wxsEvents || {};
     const eventList: string[] = [
       ...node.outputs.filter(
         (item) =>
@@ -211,13 +298,28 @@ export class WxContainer {
       ),
       ...(node.directiveMeta?.listeners || []),
       ...(node.componentMeta?.isComponent ? node.componentMeta.listeners : []),
-    ];
+    ].filter((item) => !wxsEvents[item]);
 
     const result = WxContainer.globalConfig.eventListConvert(eventList);
     if (result) {
       propertyMap.set(`data-node-path`, `nodePath`);
       propertyMap.set(`data-node-index`, `${index}`);
     }
+
+    /**
+     * 下推到渲染层的事件：直接绑 wxs 函数，不生成 `data-node-*`，
+     * 也就不进 `bindEvent` 的反查链路。整条事件在视图层闭环。
+     */
+    const wxsEventAttrs = Object.keys(wxsEvents)
+      .map((eventName) => {
+        const handler = wxsEvents[eventName];
+        this.useWxsModule(handler.module);
+        return `${WxContainer.globalConfig.eventAttrName(
+          eventName,
+        )}="{{${handler.module}.${handler.fn}}}"`;
+      })
+      .join(' ');
+
     return [
       ...Array.from(attributeMap.entries()).map(
         ([key, value]) => `${key}="${value}"`,
@@ -226,8 +328,29 @@ export class WxContainer {
         ([key, value]) => `${key}="${this.interp(value)}"`,
       ),
       result,
+      wxsEventAttrs,
     ];
   }
+  /**
+   * 本模板用到的 wxs 模块名。
+   *
+   * 由产出过程收集，最后由 transform 负贡在 wxml 头部补
+   * `<wxs module="x" src="./x.wxs"/>`，并驱动资源产出。
+   */
+  usedWxsModules = new Set<string>();
+
+  private useWxsModule(name: string): void {
+    this.usedWxsModules.add(name);
+    this.childContainerList.forEach((c) => c.usedWxsModules.add(name));
+  }
+
+  /** 含子容器汇总，供头部注入使用 */
+  collectWxsModules(into: Set<string> = new Set<string>()): Set<string> {
+    this.usedWxsModules.forEach((m) => into.add(m));
+    this.childContainerList.forEach((c) => c.collectWxsModules(into));
+    return into;
+  }
+
   static globalConfig: WxContainerGlobalConfig;
   static initWxContainerFactory(globalConfig: WxContainerGlobalConfig) {
     this.globalConfig = globalConfig;

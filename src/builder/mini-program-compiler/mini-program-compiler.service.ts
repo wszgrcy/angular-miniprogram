@@ -21,6 +21,8 @@ import {
 import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
 import { angularCompilerPromise } from '../util';
+import type { WxsDeclaration } from '../wxs/wxs-declare';
+import { getDeclaredWxs, rewriteWxsTemplates } from '../wxs/wxs-rewrite';
 import { ComponentCompilerService } from './component-compiler.service';
 import { recordGeneratedWxml } from './manifest-registry';
 import { MetaCollection } from './meta-collection';
@@ -72,6 +74,7 @@ export class MiniProgramCompilerService {
   private resolvedDataGroup: ResolvedDataGroup = {
     style: new Map<string, string[]>(),
     outputContent: new Map<string, string>(),
+    wxsModules: new Map<string, WxsDeclaration[]>(),
     useComponentPath: new Map<
       string,
       {
@@ -145,6 +148,33 @@ export class MiniProgramCompilerService {
 
   async exportComponentBuildMetaMap() {
     const { SelectorMatcher, CssSelector } = await angularCompilerPromise;
+
+    // wxs 改写必须赶在任何模板 walk 之前跑完。
+    // walk 阶段读到的表达式和最终 emit 用的必须是同一份，
+    // 否则下标和 wxml 会对不上。
+    // 同时把每个组件用到的模块记下来，驱动后续 .wxs 产物落盘。
+    const wxsModules = new Map<string, WxsDeclaration[]>();
+    for (const [classDeclaration, meta] of this.componentMap) {
+      const componentSourceFile = path.normalize(
+        classDeclaration.getSourceFile().fileName,
+      );
+      const { declarations } = await rewriteWxsTemplates(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (meta as any)?.template?.nodes ?? [],
+        // 记下源文件：walk 阶段的事件下推要靠它反查声明集合
+        componentSourceFile,
+      );
+      if (declarations.length) {
+        wxsModules.set(
+          makeComponentKey(
+            componentSourceFile,
+            classDeclaration.name?.getText() ?? '',
+          ),
+          declarations,
+        );
+      }
+    }
+
     for (const [classDeclaration, meta] of this.componentMap) {
       const fileName = path.normalize(
         classDeclaration.getSourceFile().fileName,
@@ -193,6 +223,7 @@ export class MiniProgramCompilerService {
       const componentBuildMeta = this.buildComponentMeta(
         directiveMatcher,
         meta,
+        fileName,
       );
       const componentKey = makeComponentKey(
         fileName,
@@ -237,6 +268,8 @@ export class MiniProgramCompilerService {
       value.libraryPath = Array.from(new Set(value.libraryPath));
       value.localPath = Array.from(new Set(value.localPath));
     });
+
+    this.resolvedDataGroup.wxsModules = wxsModules;
 
     return this.resolvedDataGroup;
   }
@@ -312,6 +345,7 @@ export class MiniProgramCompilerService {
     directiveMatcher: SelectorMatcher | undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     componentMeta: R3ComponentMetadata<any>,
+    sourceFile?: string,
   ) {
     const injector = Injector.create({
       parent: this.injector,
@@ -321,7 +355,11 @@ export class MiniProgramCompilerService {
         {
           provide: ComponentContext,
           useFactory: () => {
-            return new ComponentContext(directiveMatcher);
+            const ctx = new ComponentContext(directiveMatcher);
+            // 事件下推在 walk 阶段发生，而事件不改写（没 plan 可挂），
+            // 所以识别集合要从改写阶段带到 walk 阶段
+            ctx.declaredWxsModules = getDeclaredWxs(sourceFile);
+            return ctx;
           },
         },
       ],

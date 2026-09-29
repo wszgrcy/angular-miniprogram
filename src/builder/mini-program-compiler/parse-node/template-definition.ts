@@ -154,6 +154,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       componentMeta,
       nodeIndex,
       directiveMeta,
+      this.componentContext?.declaredWxsModules,
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);

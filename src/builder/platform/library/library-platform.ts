@@ -8,6 +8,7 @@ export class LibraryBuildPlatform extends BuildPlatform {
     style: '${fileExtname.style}',
     logic: '${fileExtname.logic}',
     content: '${fileExtname.content}',
+    wxs: '${fileExtname.wxs}',
     contentTemplate: '${fileExtname.contentTemplate}',
   };
   importTemplate = ERROR_VALUE;

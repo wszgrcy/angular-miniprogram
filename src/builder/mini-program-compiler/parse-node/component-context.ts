@@ -14,10 +14,26 @@ import ts from 'typescript';
 import * as t from '../../angular-internal/ast.type';
 import { createCssSelector } from '../../angular-internal/template';
 import { getAttrsForDirectiveMatching } from '../../angular-internal/util';
+import type { DeclaredWxsModules } from '../../wxs/wxs-call';
 import type { DirectiveMetaFromLibrary, MetaFromLibrary } from '../type';
 import type { MatchedDirective, MatchedMeta } from './type';
 
 export class ComponentContext {
+  /**
+   * 当前组件模板声明的 wxs 模块集合。
+   *
+   * 挂在 context 而不是构造参数上：TemplateDefinition 递归建子模板时
+   * 会把 context 原样传下去，声明也就自动穿过 ng-template / 延迟块，
+   * 不用改任何构造签名。
+   *
+   * 默认值必须每次新建，不能拿一个空集常量共用来当默认：
+   * `ReadonlySet` 只挡编译期，`Object.freeze(new Set())` 也挡不住
+   * `.add()`（数据存在内部槽，不是自有属性）。共享实例一旦被写入，
+   * 所有组件都会以为自己有 wxs —— 跳组件污染，极难查。
+   * 本类每组件只创建一次，新建集合的成本可忽略。
+   */
+  declaredWxsModules: DeclaredWxsModules = new Set<string>();
+
   constructor(private directiveMatcher: SelectorMatcher | undefined) {}
   matchDirective(node: t.Element): MatchedMeta[] {
     if (!this.directiveMatcher) {

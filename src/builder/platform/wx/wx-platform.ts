@@ -10,6 +10,7 @@ export class WxBuildPlatform extends BuildPlatform {
     style: '.wxss',
     logic: '.js',
     content: '.wxml',
+    wxs: '.wxs',
     contentTemplate: '.wxml',
   };
   importTemplate = `${fs

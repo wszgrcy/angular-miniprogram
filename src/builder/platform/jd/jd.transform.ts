@@ -2,4 +2,6 @@ import { WxTransformLike } from '../template-transform-strategy/wx-like/wx-trans
 
 export class JdTransform extends WxTransformLike {
   directivePrefix = 'jd';
+  override wxsExtname = '.jds';
+  override wxsDialect = { tag: 'jds', moduleAttr: 'module', srcAttr: 'src' };
 }
