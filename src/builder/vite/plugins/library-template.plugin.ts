@@ -4,15 +4,15 @@ import { detectComponentNames } from '../../component-template-inject/change-com
 import { LIBRARY_OUTPUT_ROOTDIR } from '../../library';
 import { readLibraryMetaForModule } from '../../library/library-meta-reader';
 import {
-  createLibraryTemplateRenderer,
-  LibraryTemplateValues,
-} from '../../library/mp-template';
-import {
   LIBRARY_META_FILE_NAME,
   LIBRARY_META_SCHEMA_VERSION,
   LibraryMetaEntry,
   assertLibraryTemplatePayload,
 } from '../../library/library-meta-schema';
+import {
+  LibraryTemplateValues,
+  createLibraryTemplateRenderer,
+} from '../../library/mp-template';
 import { BuildPlatform } from '../../platform/platform';
 import type {
   LibraryTemplateScopeService,

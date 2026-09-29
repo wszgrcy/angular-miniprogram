@@ -23,17 +23,17 @@ import {
   assertLibraryTemplatePayload,
 } from './library-meta-schema';
 import {
-  createLibraryTemplateRenderer,
-  LibraryTemplateValues,
-  renderLibraryTemplate,
-} from './mp-template';
-import {
   clearLibraryMetaStore,
   recordLibraryComponentMeta,
   recordLibraryDirectiveMeta,
   registerLibraryMetaEntry,
   writeLibraryMetaFile,
 } from './library-meta-store';
+import {
+  LibraryTemplateValues,
+  createLibraryTemplateRenderer,
+  renderLibraryTemplate,
+} from './mp-template';
 
 describe('library-meta-store（写侧）', () => {
   let tmp: string;
