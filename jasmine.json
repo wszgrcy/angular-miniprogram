@@ -1,7 +1,7 @@
 {
   "spec_dir": "src",
   "jsLoader": "require",
-  "spec_files": ["**/*.spec.ts"],
+  "spec_files": ["builder/library/library.spec.ts", "**/*.spec.ts"],
   "failSpecWithNoExpectations": true,
   "stopSpecOnExpectationFailure": true,
   "stopOnSpecFailure": true,
