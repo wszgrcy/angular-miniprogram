@@ -3,7 +3,7 @@ import type {
   R3DirectiveMetadata,
 } from '@angular/compiler';
 import { createCssSelectorForTs } from 'cyia-code-util';
-import { Inject, Injectable } from 'static-injector';
+import { inject } from 'static-injector';
 import ts from 'typescript';
 import { MiniProgramCompilerService } from '../mini-program-compiler';
 import { getComponentOutputPath } from './get-library-path';
@@ -27,16 +27,14 @@ import { ENTRY_POINT_TOKEN } from './token';
  * 现在 `.d.ts` 原样返回，元数据走 `mp-library-meta.json` sidecar，
  * 扁平化爱怎么 shake 怎么 shake，与我们无关。
  */
-@Injectable()
 export class AddDeclarationMetaDataService {
+  private entryPoint = inject(ENTRY_POINT_TOKEN);
   private directiveMap: Map<ts.ClassDeclaration, R3DirectiveMetadata>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private componentMap: Map<ts.ClassDeclaration, R3ComponentMetadata<any>>;
 
-  constructor(
-    @Inject(ENTRY_POINT_TOKEN) private entryPoint: string,
-    miniProgramCompilerService: MiniProgramCompilerService,
-  ) {
+  constructor() {
+    const miniProgramCompilerService = inject(MiniProgramCompilerService);
     this.directiveMap = miniProgramCompilerService.getDirectiveMap();
     this.componentMap = miniProgramCompilerService.getComponentMap();
   }

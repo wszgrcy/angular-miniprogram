@@ -1,9 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Injectable } from 'static-injector';
 import type { NgNodeMeta } from '../../mini-program-compiler';
 import { MetaCollection, UseComponent } from '../../mini-program-compiler';
 
-@Injectable()
 export abstract class TemplateTransformBase {
   abstract init(): any;
   abstract compile(nodes: NgNodeMeta[]): {

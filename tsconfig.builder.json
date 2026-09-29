@@ -12,9 +12,19 @@
       // 用本地最小声明撑住。见该文件顶部说明。
       "abortcontroller-polyfill/dist/abortcontroller": [
         "./src/builder/platform/template/abortcontroller-ponyfill.d.ts"
-      ]
+      ],
+      // static-injector 7 只靠 exports map 暴露类型（types: ./import/index.d.ts），
+      // moduleResolution: node10 认不出来（与 vite / @angular/* 同因）。
+      // 不映射的话 strict 下会报 TS7016 隐式 any，inject() 也丢类型。
+      "static-injector": ["./node_modules/static-injector/import/index.d.ts"]
     },
     "noImplicitThis": true,
+    // 原先进程是 script/build.ts（为了挂 static-injector transformer），它会先把
+    // 所有诊断跑完再决定要不要 emit。改成直接 tsc 后，这两项必须显式声明，
+    // 否则类型报错仍会把脏 JS 写进 dist/。
+    "noEmitOnError": true,
+    // TS 6.0 CLI 会报 TS5011（程序化 API 不报），必须显式声明 rootDir。
+    "rootDir": "./src/builder",
     "outDir": "./dist/builder",
     "declaration": false,
     "strict": true

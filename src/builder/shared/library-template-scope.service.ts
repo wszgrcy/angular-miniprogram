@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Injectable } from 'static-injector';
 
 export type TemplateScopeOutside = Omit<
   LibraryTemplateScopeService,
@@ -16,7 +15,6 @@ export interface ExtraTemplateData {
   templatePath?: string;
 }
 
-@Injectable()
 export class LibraryTemplateScopeService {
   private scopeExtraUseComponentsMap = new Map<string, ExtraTemplateData>();
   private scopeLibraryUseComponentsMap = new Map<string, ExtraTemplateData[]>();

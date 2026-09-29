@@ -1,5 +1,5 @@
 import { join, normalize, resolve } from '@angular-devkit/core';
-import { Inject, Injectable } from 'static-injector';
+import { inject } from 'static-injector';
 import { MetaCollection, ResolvedDataGroup } from '../mini-program-compiler';
 import { LIBRARY_OUTPUT_ROOTDIR } from './const';
 import {
@@ -23,16 +23,12 @@ import {
  * 捞回来。现在直接进 `mp-library-meta.json` 的 `selfTemplate` / `scopeTemplates`，
  * 库 JS 一个字都不改。
  */
-@Injectable()
 export class OutputTemplateMetadataService {
+  private entryFile = inject(ENTRY_FILE_TOKEN);
+  private dataGroup = inject<ResolvedDataGroup>(RESOLVED_DATA_GROUP_TOKEN);
+  private entryPoint = inject(ENTRY_POINT_TOKEN);
   private selfUseComponents!: Record<string, string>;
   private selfMetaCollection!: MetaCollection;
-  constructor(
-    @Inject(ENTRY_FILE_TOKEN) private entryFile: string,
-    @Inject(RESOLVED_DATA_GROUP_TOKEN)
-    private dataGroup: ResolvedDataGroup,
-    @Inject(ENTRY_POINT_TOKEN) private entryPoint: string,
-  ) {}
 
   /** 返回原样 `data`；副作用是把全局模板登记进 sidecar。 */
   run(fileName: string, data: string): string {

@@ -12,9 +12,7 @@ import {
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
 import { PlatformType } from '../platform/platform';
-import { WxBuildPlatform } from '../platform/wx/wx-platform';
-import { WxTransform } from '../platform/wx/wx.transform';
-import { buildPlatformDefine, runViteBuilder } from './index';
+import { buildPlatformDefine, getBuildPlatform, runViteBuilder } from './index';
 
 /**
  * AbortController polyfill 的接入验证。
@@ -37,7 +35,9 @@ import { buildPlatformDefine, runViteBuilder } from './index';
 describe('AbortController polyfill 接入', () => {
   describe('define 重定向（单元）', () => {
     const define = buildPlatformDefine(
-      new WxBuildPlatform(new WxTransform()),
+      // static-injector 7 下 BuildPlatform.templateTransform 靠 inject() 解析，
+      // 不能再 `new WxBuildPlatform(new WxTransform())`，走真实的 provider 配置。
+      getBuildPlatform(PlatformType.wx),
       false,
     );
 

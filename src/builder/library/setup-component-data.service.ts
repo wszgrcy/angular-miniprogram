@@ -1,6 +1,6 @@
 import { join, normalize, resolve, strings } from '@angular-devkit/core';
 import * as path from 'path';
-import { Inject, Injectable } from 'static-injector';
+import { inject } from 'static-injector';
 import { detectComponentNames } from '../component-template-inject/change-component';
 import { ResolvedDataGroup, makeComponentKey } from '../mini-program-compiler';
 import { BuildPlatform } from '../platform/platform';
@@ -30,15 +30,11 @@ import { ENTRY_POINT_TOKEN, RESOLVED_DATA_GROUP_TOKEN } from './token';
  * （`vite/plugins/component-transform.plugin.ts` /
  * `vite/plugins/library-template.plugin.ts`）。
  */
-@Injectable()
 export class SetupComponentDataService {
-  constructor(
-    @Inject(RESOLVED_DATA_GROUP_TOKEN)
-    private dataGroup: ResolvedDataGroup,
-    @Inject(ENTRY_POINT_TOKEN) private entryPoint: string,
-    private addGlobalTemplateService: OutputTemplateMetadataService,
-    private buildPlatform: BuildPlatform,
-  ) {}
+  private dataGroup = inject<ResolvedDataGroup>(RESOLVED_DATA_GROUP_TOKEN);
+  private entryPoint = inject(ENTRY_POINT_TOKEN);
+  private addGlobalTemplateService = inject(OutputTemplateMetadataService);
+  private buildPlatform = inject(BuildPlatform);
 
   /** 返回原样 `data`；副作用是把本文件的组件载荷登记进 sidecar。 */
   run(

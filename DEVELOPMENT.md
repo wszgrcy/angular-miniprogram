@@ -277,7 +277,7 @@ external  https://registry.npmjs.org  ✅           ✅
 `src/library/package.json` 里显式写了 `"type": "commonjs"`，**不要删**。
 
 ng-packagr 生成产物时是 `packageJson.type ??= 'module'`——你没写它就给你 `module`。
-而 `builder/**` 和 `karma/**` 是 `script/build.ts` 用 CommonJS 编出来的
+而 `builder/**` 和 `karma/**` 是 `tsc -p ./tsconfig.builder.json` 用 CommonJS 编出来的
 （`require` / `exports` + 无扩展名的相对 import）。一旦包顶层是 `type: module`，
 Node 会把所有 `.js` 当 ESM，于是：
 

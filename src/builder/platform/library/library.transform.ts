@@ -1,4 +1,3 @@
-import { Injectable } from 'static-injector';
 import { WxTransformLike } from '../template-transform-strategy/wx-like/wx-transform.base';
 
 /**
@@ -21,7 +20,6 @@ import { WxTransformLike } from '../template-transform-strategy/wx-like/wx-trans
  *
  * 于是同一份库产物能通吃 wx / zfb / bd / qq —— 平台相关的东西一个都不烘进库里。
  */
-@Injectable()
 export class LibraryTransform extends WxTransformLike {
   directivePrefix = '${directivePrefix}';
 

@@ -22,7 +22,7 @@
   "homepage": "https://github.com/wszgrcy/angular-miniprogram#readme",
   "dependencies": {
     "cyia-code-util": "1.8.0",
-    "static-injector": "4.0.2",
+    "static-injector": "7.0.0",
     "@analogjs/vite-plugin-angular": "^2.7.2",
     "abortcontroller-polyfill": "^1.7.8",
     "fs-extra": "11.2.0",

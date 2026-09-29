@@ -10,7 +10,6 @@ import type {
   ImportedFile,
   Reference,
 } from '@angular/compiler-cli/src/ngtsc/imports';
-import { Injectable } from 'static-injector';
 import ts from 'typescript';
 import * as t from '../../angular-internal/ast.type';
 import { createCssSelector } from '../../angular-internal/template';
@@ -18,7 +17,6 @@ import { getAttrsForDirectiveMatching } from '../../angular-internal/util';
 import type { DirectiveMetaFromLibrary, MetaFromLibrary } from '../type';
 import type { MatchedDirective, MatchedMeta } from './type';
 
-@Injectable()
 export class ComponentContext {
   constructor(private directiveMatcher: SelectorMatcher | undefined) {}
   matchDirective(node: t.Element): MatchedMeta[] {

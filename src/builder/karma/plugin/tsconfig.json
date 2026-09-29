@@ -1,5 +1,12 @@
 {
   "compilerOptions": {
+    // 原先走 script/build.ts（为了挂 static-injector transformer），它会先把所有
+    // 诊断跑完再决定要不要 emit。改成直接 tsc 后这两项必须显式声明。
+    "noEmitOnError": true,
+    // rootDir 必须是 src/builder/karma（不是本目录）：index.ts import 了
+    // ../vite/karma-framework，公共源目录在上一层。跟下面 outDir 的注
+    // 释是同一件事——rootDir 错了产物层级就错了。
+    "rootDir": "../",
     // outDir 是 `dist/karma` 而不是 `dist/karma/plugin`：
     // index.ts 里 import 了 `../vite/karma-framework`，TS 把 rootDir 推断到
     // `src/builder/karma`，输出按 rootDir 的相对路径展开。outDir 写成
@@ -17,15 +24,9 @@
     "esModuleInterop": true,
     "target": "ES2021",
     "module": "CommonJS",
-    "lib": [
-      "ES2021"
-    ],
+    "lib": ["ES2021"],
     "skipLibCheck": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "files": [
-    "./index.ts"
-  ]
+  "files": ["./index.ts"]
 }

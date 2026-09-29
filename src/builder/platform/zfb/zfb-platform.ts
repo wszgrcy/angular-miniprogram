@@ -1,10 +1,7 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { Injectable } from 'static-injector';
 import { BuildPlatform } from '../platform';
-import { ZfbTransform } from './zfb.transform';
 
-@Injectable()
 export class ZfbBuildPlatform extends BuildPlatform {
   packageName = 'zfb';
   globalObject = 'my';
@@ -19,7 +16,4 @@ export class ZfbBuildPlatform extends BuildPlatform {
     .readFileSync(path.resolve(__dirname, '../template/app-template.js'))
     .toString()};
     my.__global = my.__window = obj;`;
-  constructor(public templateTransform: ZfbTransform) {
-    super(templateTransform);
-  }
 }

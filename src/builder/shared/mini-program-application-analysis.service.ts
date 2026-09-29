@@ -4,7 +4,7 @@ import { join, normalize, resolve } from '@angular-devkit/core';
 import { createHash } from 'crypto';
 import { createCssSelectorForTs } from 'cyia-code-util';
 import * as path from 'path';
-import { Inject, Injectable, Injector } from 'static-injector';
+import { Injector, inject } from 'static-injector';
 import ts from 'typescript';
 import type { CompilerOptions } from 'typescript';
 import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
@@ -43,8 +43,17 @@ function externalizePath(p: string): string {
   return result;
 }
 
-@Injectable()
 export class MiniProgramApplicationAnalysisService {
+  private injector = inject(Injector);
+  private system = inject<ts.System>(TS_SYSTEM);
+  private compiler = inject<CompilerHostLike>(COMPILER_HOST);
+  private tsConfig = inject<string>(TS_CONFIG_TOKEN);
+  private oldBuilder = inject<
+    ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined
+  >(OLD_BUILDER);
+  private pagePatternList = inject<PagePattern[]>(PAGE_PATTERN_TOKEN);
+  private buildPlatform = inject(BuildPlatform);
+
   private dependencyUseModule = new Map<string, string[]>();
   private cleanDependencyFileCacheSet = new Set<string>();
   builder!: ts.BuilderProgram | ts.EmitAndSemanticDiagnosticsBuilderProgram;
@@ -52,16 +61,6 @@ export class MiniProgramApplicationAnalysisService {
   private tsProgram!: ts.Program;
   private ngCompiler!: NgCompiler;
   private typeChecker!: ts.TypeChecker;
-  constructor(
-    private injector: Injector,
-    @Inject(TS_SYSTEM) private system: ts.System,
-    @Inject(COMPILER_HOST) private compiler: CompilerHostLike,
-    @Inject(TS_CONFIG_TOKEN) private tsConfig: string,
-    @Inject(OLD_BUILDER)
-    private oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined,
-    @Inject(PAGE_PATTERN_TOKEN) private pagePatternList: PagePattern[],
-    private buildPlatform: BuildPlatform,
-  ) {}
 
   async exportComponentBuildMetaMap() {
     const injector = Injector.create({

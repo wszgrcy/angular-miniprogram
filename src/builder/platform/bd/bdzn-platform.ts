@@ -1,10 +1,7 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { Injectable } from 'static-injector';
 import { BuildPlatform } from '../platform';
-import { BdZnTransform } from './bdzn.transform';
 
-@Injectable()
 export class BdZnBuildPlatform extends BuildPlatform {
   packageName = 'bd';
   globalObject = 'swan';
@@ -19,7 +16,4 @@ export class BdZnBuildPlatform extends BuildPlatform {
     .readFileSync(path.resolve(__dirname, '../template/app-template.js'))
     .toString()};
     swan.__global = swan.__window = obj;`;
-  constructor(public templateTransform: BdZnTransform) {
-    super(templateTransform);
-  }
 }

@@ -10,7 +10,7 @@ import type {
   TraitCompiler,
 } from '@angular/compiler-cli/src/ngtsc/transform';
 import path from 'path';
-import { Injectable, Injector } from 'static-injector';
+import { Injector } from 'static-injector';
 import ts, { ClassDeclaration } from 'typescript';
 import { recordLibraryMetaMiss } from '../library/library-meta-diagnostics';
 import { lookupLibraryMeta } from '../library/library-meta-reader';
@@ -64,7 +64,6 @@ function toBindingNameList(
   return Object.keys(mapping as Record<string, unknown>);
 }
 
-@Injectable()
 export class MiniProgramCompilerService {
   private ngCompiler!: NgCompiler;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
