@@ -1,5 +1,5 @@
 export const ExportMiniProgramAssetsPluginSymbol = Symbol.for(
-  'ExportMiniProgramAssetsPluginSymbol'
+  'ExportMiniProgramAssetsPluginSymbol',
 );
 export const LibrarySymbol = Symbol.for('LibrarySymbol');
 export const InjectorSymbol = Symbol.for('InjectorSymbol');

@@ -38,11 +38,11 @@ class MiniProgramCoreFactory extends BaseFactory {
     let addWait = false;
     const oldOnInit = config.onInit;
     config.onInit = function (
-      this: Record<string, any> & MiniProgramComponentInstance
+      this: Record<string, any> & MiniProgramComponentInstance,
     ) {
       let resolveFunction!: () => void;
       this.__waitLinkPromise = new Promise<void>(
-        (resolve) => (resolveFunction = resolve)
+        (resolve) => (resolveFunction = resolve),
       );
       this.__waitLinkResolve = resolveFunction;
       addWait = true;
@@ -52,18 +52,18 @@ class MiniProgramCoreFactory extends BaseFactory {
     };
     const oldDidMount = config.didMount;
     config.didMount = function (
-      this: Record<string, any> & MiniProgramComponentInstance
+      this: Record<string, any> & MiniProgramComponentInstance,
     ) {
       if (!addWait) {
         addWait = true;
         let resolveFunction!: () => void;
         this.__waitLinkPromise = new Promise<void>(
-          (resolve) => (resolveFunction = resolve)
+          (resolve) => (resolveFunction = resolve),
         );
         this.__waitLinkResolve = resolveFunction;
       }
       const nodePath: NodePath = (this.props.nodePath || []).map(
-        (item: string) => (item === 'directive' ? item : parseInt(item, 10))
+        (item: string) => (item === 'directive' ? item : parseInt(item, 10)),
       );
       const nodeIndex = parseInt(this.props.nodeIndex, 10);
       if (this.__isLink) {

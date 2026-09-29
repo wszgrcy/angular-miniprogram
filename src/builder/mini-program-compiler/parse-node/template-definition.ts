@@ -106,7 +106,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
      * 当前视图在组件模板中的路径前缀，用于保证生成的模板名在
      * 同一个 wxml 里全局唯一（否则嵌套的匿名模板会互相覆盖）。
      */
-    private namePrefix = ''
+    private namePrefix = '',
   ) {}
 
   /**
@@ -153,7 +153,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       this.parentNode,
       componentMeta,
       nodeIndex,
-      directiveMeta
+      directiveMeta,
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
@@ -204,7 +204,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       template,
       this.parentNode,
       nodeIndex,
-      templateName
+      templateName,
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(templateInstance);
@@ -221,7 +221,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     const instance = new TemplateDefinition(
       template.children,
       this.componentContext,
-      `${this.namePrefix}${nodeIndex}_`
+      `${this.namePrefix}${nodeIndex}_`,
     );
     instance.parentNode = templateInstance;
 
@@ -248,7 +248,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     if (content.children && content.children.length) {
       throw new Error(
         '暂不支持 <ng-content> 的 fallback 内容（小程序 slot 无对应能力），' +
-          '请把兜底逻辑放到宿主组件里处理'
+          '请把兜底逻辑放到宿主组件里处理',
       );
     }
     const nodeIndex = this.declIndex++;
@@ -300,14 +300,14 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   private createControlFlowTemplate(
     children: TmplAstNode[],
     index: number,
-    kind: string
+    kind: string,
   ) {
     const name = `${kind}_${this.namePrefix}${index}`;
     const templateInstance = new ParsedNgTemplate(
       null,
       this.parentNode,
       index,
-      name
+      name,
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(templateInstance);
@@ -315,7 +315,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     const instance = new TemplateDefinition(
       children,
       this.componentContext,
-      `${this.namePrefix}${index}_`
+      `${this.namePrefix}${index}_`,
     );
     instance.parentNode = templateInstance;
     instance.run();
@@ -344,7 +344,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       return;
     }
     const pipeCount = this.countPipeSlots(
-      ...branches.map((branch) => branch.expression)
+      ...branches.map((branch) => branch.expression),
     );
     const firstIndex = this.declIndex++;
     this.createControlFlowTemplate(branches[0].children, firstIndex, 'ifBlock');
@@ -388,14 +388,14 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       return;
     }
     const caseExpressions = groups.flatMap((group) =>
-      group.cases.map((item) => item.expression)
+      group.cases.map((item) => item.expression),
     );
     const pipeCount = this.countPipeSlots(block.expression, ...caseExpressions);
     const firstIndex = this.declIndex++;
     this.createControlFlowTemplate(
       groups[0].children,
       firstIndex,
-      'switchCase'
+      'switchCase',
     );
     this.declIndex += pipeCount;
     for (let i = 1; i < groups.length; i++) {
@@ -460,7 +460,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       this.createControlFlowTemplate(
         block.empty.children,
         emptyIndex,
-        'forEmpty'
+        'forEmpty',
       );
     }
     this.declIndex += pipeCount;
@@ -487,7 +487,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    */
   visitDeferredBlock(deferred: TmplAstDeferredBlock): void {
     throw new Error(
-      '暂不支持 @defer 语法，请改用 @if 或组件自身的延迟加载能力'
+      '暂不支持 @defer 语法，请改用 @if 或组件自身的延迟加载能力',
     );
   }
 
@@ -549,7 +549,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    */
   visitComponent(component: TmplAstComponent): void {
     throw new Error(
-      `不该出现的 Component AST 节点：${component.componentName}（本 fork 的模板解析路径不产出此节点）`
+      `不该出现的 Component AST 节点：${component.componentName}（本 fork 的模板解析路径不产出此节点）`,
     );
   }
 
@@ -559,7 +559,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    */
   visitDirective(directive: TmplAstDirective): void {
     throw new Error(
-      `不该出现的 Directive AST 节点：${directive.name}（本 fork 的模板解析路径不产出此节点）`
+      `不该出现的 Directive AST 节点：${directive.name}（本 fork 的模板解析路径不产出此节点）`,
     );
   }
 
@@ -662,7 +662,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   visitIcu(icu: t.Icu) {
     throw new Error(
       '暂不支持 ICU 消息语法（{x, plural, ...} / {x, select, ...}），' +
-        '请改用组件内的普通条件渲染'
+        '请改用组件内的普通条件渲染',
     );
   }
 
@@ -700,7 +700,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
  */
 export function visitAll(
   visitor: TemplateDefinition,
-  nodes: TmplAstNode[]
+  nodes: TmplAstNode[],
 ): void {
   for (const node of nodes) {
     node.visit(visitor);

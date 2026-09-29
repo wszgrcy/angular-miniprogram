@@ -21,7 +21,7 @@ import {
   TS_CONFIG_TOKEN,
   TS_SYSTEM,
 } from './token';
-import type { CompilerHostLike , PagePattern } from './type';
+import type { CompilerHostLike, PagePattern } from './type';
 
 /**
  * Windows 下把路径外联成 win32 形式（带缓存）。
@@ -43,7 +43,6 @@ function externalizePath(p: string): string {
   return result;
 }
 
-
 @Injectable()
 export class MiniProgramApplicationAnalysisService {
   private dependencyUseModule = new Map<string, string[]>();
@@ -61,7 +60,7 @@ export class MiniProgramApplicationAnalysisService {
     @Inject(OLD_BUILDER)
     private oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined,
     @Inject(PAGE_PATTERN_TOKEN) private pagePatternList: PagePattern[],
-    private buildPlatform: BuildPlatform
+    private buildPlatform: BuildPlatform,
   ) {}
 
   async exportComponentBuildMetaMap() {
@@ -73,7 +72,7 @@ export class MiniProgramApplicationAnalysisService {
             return new MiniProgramCompilerService(
               this.ngTscProgram,
               injector,
-              buildPlatform
+              buildPlatform,
             );
           },
           deps: [Injector, BuildPlatform],
@@ -114,7 +113,7 @@ export class MiniProgramApplicationAnalysisService {
       const { sourceFile, componentClassName } = splitComponentKey(key);
       const entryPattern = this.getComponentPagePattern(
         sourceFile,
-        componentClassName
+        componentClassName,
       );
       styleMap.set(entryPattern.outputFiles.style, value);
     });
@@ -123,7 +122,7 @@ export class MiniProgramApplicationAnalysisService {
       const { sourceFile, componentClassName } = splitComponentKey(key);
       const entryPattern = this.getComponentPagePattern(
         sourceFile,
-        componentClassName
+        componentClassName,
       );
       contentMap.set(entryPattern.outputFiles.content, value);
     });
@@ -141,13 +140,13 @@ export class MiniProgramApplicationAnalysisService {
       const { sourceFile, componentClassName } = splitComponentKey(key);
       const entryPattern = this.getComponentPagePattern(
         sourceFile,
-        componentClassName
+        componentClassName,
       );
       const list = [
         ...value.libraryPath.map((item) => {
           item.path = resolve(
             normalize('/'),
-            join(normalize(LIBRARY_OUTPUT_ROOTDIR), item.path)
+            join(normalize(LIBRARY_OUTPUT_ROOTDIR), item.path),
           );
           return item;
         }),
@@ -157,10 +156,10 @@ export class MiniProgramApplicationAnalysisService {
           selector: item.selector,
           path: resolve(
             normalize('/'),
-            normalize(this.getComponentPagePattern(item.path).outputFiles.path)
+            normalize(this.getComponentPagePattern(item.path).outputFiles.path),
           ),
           className: item.className,
-        }))
+        })),
       );
       config.set(entryPattern.outputFiles.config, {
         component: entryPattern.type === 'component' || undefined,
@@ -173,20 +172,20 @@ export class MiniProgramApplicationAnalysisService {
       if (
         Object.prototype.hasOwnProperty.call(
           metaMap.otherMetaCollectionGroup,
-          key
+          key,
         )
       ) {
         const element = metaMap.otherMetaCollectionGroup[key];
         element.libraryPath.forEach((item) => {
           item.path = resolve(
             normalize('/'),
-            join(normalize(LIBRARY_OUTPUT_ROOTDIR), item.path)
+            join(normalize(LIBRARY_OUTPUT_ROOTDIR), item.path),
           );
         });
         element.localPath.forEach((item) => {
           item.path = resolve(
             normalize('/'),
-            normalize(this.getComponentPagePattern(item.path).outputFiles.path)
+            normalize(this.getComponentPagePattern(item.path).outputFiles.path),
           );
         });
       }
@@ -241,7 +240,7 @@ export class MiniProgramApplicationAnalysisService {
     this.ngTscProgram = new NgtscProgram(
       config.rootNames,
       config.options,
-      host
+      host,
     );
     this.tsProgram = this.ngTscProgram.getTsProgram();
     this.typeChecker = this.tsProgram.getTypeChecker();
@@ -251,7 +250,7 @@ export class MiniProgramApplicationAnalysisService {
         ts.createEmitAndSemanticDiagnosticsBuilderProgram(
           this.tsProgram,
           host,
-          this.oldBuilder
+          this.oldBuilder,
         );
     } else {
       this.builder = ts.createAbstractBuilder(this.tsProgram, host);
@@ -261,7 +260,7 @@ export class MiniProgramApplicationAnalysisService {
   /** 获得组件/页面的入口 */
   private getComponentPagePattern(
     fileName: string,
-    componentClassName?: string
+    componentClassName?: string,
   ) {
     const findList = [fileName];
     let maybeEntryPath: PagePattern | undefined;
@@ -273,7 +272,7 @@ export class MiniProgramApplicationAnalysisService {
         findList.push(...moduleList);
       } else {
         maybeEntryPath = this.pagePatternList.find(
-          (item) => path.normalize(item.src) === path.normalize(module!)
+          (item) => path.normalize(item.src) === path.normalize(module!),
         );
         if (maybeEntryPath) {
           const sourceFile = this.tsProgram.getSourceFile(maybeEntryPath.src)!;
@@ -283,10 +282,10 @@ export class MiniProgramApplicationAnalysisService {
             // `pageStartup(Module, Component)` 的组件在第二个参数，
             // `bootstrapPage(Component)` 在第一个参数。
             const legacyNode = selector.queryOne(
-              `CallExpression[expression=pageStartup]`
+              `CallExpression[expression=pageStartup]`,
             ) as ts.CallExpression;
             const standaloneNode = selector.queryOne(
-              `CallExpression[expression=bootstrapPage]`
+              `CallExpression[expression=bootstrapPage]`,
             ) as ts.CallExpression;
             if (legacyNode) {
               importComponent = legacyNode.arguments[1];
@@ -294,12 +293,12 @@ export class MiniProgramApplicationAnalysisService {
               importComponent = standaloneNode.arguments[0];
             } else {
               throw new Error(
-                `${maybeEntryPath.src} 找不到 pageStartup / bootstrapPage 调用`
+                `${maybeEntryPath.src} 找不到 pageStartup / bootstrapPage 调用`,
               );
             }
           } else {
             const node = selector.queryOne(
-              `CallExpression[expression=componentRegistry]`
+              `CallExpression[expression=componentRegistry]`,
             ) as ts.CallExpression;
             importComponent = node.arguments[0];
           }
@@ -361,7 +360,7 @@ export class MiniProgramApplicationAnalysisService {
           const importComponentPath =
             path.resolve(
               path.dirname(maybeEntryPath.src),
-              path.normalize(relativeImportComponentPath)
+              path.normalize(relativeImportComponentPath),
             ) + '.ts';
           if (importComponentPath === path.normalize(fileName)) {
             break;
@@ -373,7 +372,7 @@ export class MiniProgramApplicationAnalysisService {
     }
     if (!maybeEntryPath) {
       throw new Error(
-        `没有找到组件[${componentClassName ?? fileName}]对应的入口点`
+        `没有找到组件[${componentClassName ?? fileName}]对应的入口点`,
       );
     }
     return maybeEntryPath;
@@ -392,7 +391,7 @@ export class MiniProgramApplicationAnalysisService {
   private saveModuleDependency(
     filePath: string,
     moduleName: string,
-    module: ts.ResolvedModule
+    module: ts.ResolvedModule,
   ) {
     if (!module) {
       throw new Error(`模块未被解析,文件名${filePath},模块名${moduleName}`);
@@ -403,17 +402,17 @@ export class MiniProgramApplicationAnalysisService {
     useList.push(filePath);
     this.dependencyUseModule.set(
       path.normalize(module.resolvedFileName),
-      useList
+      useList,
     );
   }
   private augmentResolveModuleNames(
     host: ts.CompilerHost,
-    compilerOptions: CompilerOptions
+    compilerOptions: CompilerOptions,
   ) {
     const moduleResolutionCache = ts.createModuleResolutionCache(
       host.getCurrentDirectory(),
       host.getCanonicalFileName.bind(host),
-      compilerOptions
+      compilerOptions,
     );
     const oldResolveModuleNames = host.resolveModuleNames;
     if (oldResolveModuleNames) {
@@ -424,7 +423,7 @@ export class MiniProgramApplicationAnalysisService {
           const result = (oldResolveModuleNames! as any).call(
             host,
             [name],
-            ...args
+            ...args,
           );
           this.saveModuleDependency(args[0], name, result);
 
@@ -437,7 +436,7 @@ export class MiniProgramApplicationAnalysisService {
         containingFile: string,
         _reusedNames: string[] | undefined,
         redirectedReference: ts.ResolvedProjectReference | undefined,
-        options: ts.CompilerOptions
+        options: ts.CompilerOptions,
       ) => {
         return moduleNames.map((name) => {
           const result = ts.resolveModuleName(
@@ -446,7 +445,7 @@ export class MiniProgramApplicationAnalysisService {
             options,
             host,
             moduleResolutionCache,
-            redirectedReference
+            redirectedReference,
           ).resolvedModule;
           if (!containingFile.includes('node_modules')) {
             this.saveModuleDependency(containingFile, name, result!);

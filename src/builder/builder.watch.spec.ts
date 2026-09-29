@@ -35,19 +35,19 @@ describeBuilder(
         const myTestProjectHost = new MyTestProjectHost(harness.host);
 
         const list = await myTestProjectHost.getFileList(
-          normalize(join(root, 'src', '__pages'))
+          normalize(join(root, 'src', '__pages')),
         );
         list.push(
           ...(await myTestProjectHost.getFileList(
-            normalize(join(root, 'src', '__components'))
-          ))
+            normalize(join(root, 'src', '__components')),
+          )),
         );
         await myTestProjectHost.importPathRename(list);
         await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
         await myTestProjectHost.moveDir(
           ALL_COMPONENT_NAME_LIST,
           '__components',
-          'components'
+          'components',
         );
         await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
         let finish: Function;
@@ -74,17 +74,19 @@ describeBuilder(
                   (res) => {},
                   (rej) => {
                     throw rej;
-                  }
+                  },
                 );
               return of(result);
             }),
             take(2),
-            skip(1)
+            skip(1),
           )
           .subscribe((result) => {
             // 同上：Vite 可能不产日志，查全部而不是 logs[0]
             expect(
-              result.logs.filter((l) => l.level === 'error').map((l) => l.value)
+              result.logs
+                .filter((l) => l.level === 'error')
+                .map((l) => l.value),
             ).toEqual([]);
             expect(result).toBeTruthy();
             expect(result.error).toBeFalsy();
@@ -96,40 +98,40 @@ describeBuilder(
               .expectFile(
                 join(
                   normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
-                  'pages/sub3/sub3-entry.js'
-                )
+                  'pages/sub3/sub3-entry.js',
+                ),
               )
               .toExist();
             harness
               .expectFile(
                 join(
                   normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
-                  'pages/sub3/sub3-entry.json'
-                )
+                  'pages/sub3/sub3-entry.json',
+                ),
               )
               .toExist();
             harness
               .expectFile(
                 join(
                   normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
-                  'pages/sub3/sub3-entry.wxml'
-                )
+                  'pages/sub3/sub3-entry.wxml',
+                ),
               )
               .toExist();
             harness
               .expectFile(
                 join(
                   normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
-                  'pages/sub3/sub3-entry.wxss'
-                )
+                  'pages/sub3/sub3-entry.wxss',
+                ),
               )
               .toExist();
             harness
               .expectFile(
                 join(
                   normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
-                  'library/test-library/lib-comp1-component/lib-comp1-component.js'
-                )
+                  'library/test-library/lib-comp1-component/lib-comp1-component.js',
+                ),
               )
               .toExist();
             finish();
@@ -137,7 +139,7 @@ describeBuilder(
         await waitFinish;
       });
     });
-  }
+  },
 );
 function readFixture(dir: string, to: string) {
   const dirPath = path.resolve(__dirname, 'test/fixture', dir);

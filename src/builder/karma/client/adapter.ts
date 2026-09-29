@@ -102,7 +102,10 @@ function formatFailedStep(step: Record<string, any>): string {
 }
 
 class SuiteNode {
-  constructor(public name?: string, public parent?: SuiteNode) {}
+  constructor(
+    public name?: string,
+    public parent?: SuiteNode,
+  ) {}
   description!: string;
   children: any[] = [];
 
@@ -148,7 +151,10 @@ class KarmaReporter implements jasmine.CustomReporter {
 
   startTimeCurrentSpec = new _Date().getTime();
 
-  constructor(private tc: KarmaClient, private jasmineEnv: jasmine.Env) {}
+  constructor(
+    private tc: KarmaClient,
+    private jasmineEnv: jasmine.Env,
+  ) {}
   handleGlobalErrors(result: Record<string, any>) {
     if (result.failedExpectations && result.failedExpectations.length) {
       let message: string = 'An error was thrown in afterAll';
@@ -316,7 +322,7 @@ const getGrepOption = function (clientArguments: any[] | string) {
         }),
         function (arg) {
           return arg.replace(grepRegex, '$1');
-        }
+        },
       )[0] || ''
     );
   } else if (typeof clientArguments === 'string') {
@@ -392,11 +398,15 @@ function getDebugSpecToRun(location: Record<string, any>, specs: any[]) {
 function getSpecsToRunForCurrentShard(
   specs: any[],
   shardIndex: number,
-  totalShards: number
+  totalShards: number,
 ) {
   if (specs.length < totalShards) {
     throw new Error(
-      'More shards (' + totalShards + ') than test specs (' + specs.length + ')'
+      'More shards (' +
+        totalShards +
+        ') than test specs (' +
+        specs.length +
+        ')',
     );
   }
 
@@ -416,7 +426,7 @@ function getShardedSpecsToRun(specs: any[], clientConfig: Record<string, any>) {
     return getSpecsToRunForCurrentShard(
       specs,
       Number(shardIndex),
-      Number(totalShards)
+      Number(totalShards),
     );
   }
 }
@@ -430,12 +440,12 @@ class KarmaSpecFilter {
   specIdsToRun: any[];
   constructor(
     private clientConfig: Record<string, any>,
-    private jasmineEnv: jasmine.Env
+    private jasmineEnv: jasmine.Env,
   ) {
     this.specIdsToRun = this.getSpecsToRun(
       undefined as any,
       this.clientConfig,
-      this.jasmineEnv
+      this.jasmineEnv,
     ).map(getId);
   }
   /**
@@ -470,7 +480,7 @@ class KarmaSpecFilter {
   getSpecsToRun(
     location: Record<string, any>,
     clientConfig: Record<string, any>,
-    jasmineEnv: jasmine.Env
+    jasmineEnv: jasmine.Env,
   ) {
     const specs = this.getAllSpecs(jasmineEnv).map(function (spec) {
       (spec as any).name = spec.getFullName();
@@ -505,7 +515,7 @@ class KarmaSpecFilter {
  */
 const createSpecFilter = function (
   config: Record<string, any>,
-  jasmineEnv: jasmine.Env
+  jasmineEnv: jasmine.Env,
 ) {
   const karmaSpecFilter = new KarmaSpecFilter(config, jasmineEnv);
 
@@ -544,7 +554,7 @@ export function createStartFn(karma: KarmaClient, jasmineEnv: jasmine.Env) {
 
     (jasmineConfig as any).specFilter = createSpecFilter(
       clientConfig,
-      jasmineEnv
+      jasmineEnv,
     );
 
     jasmineEnv.configure(jasmineConfig);
@@ -600,7 +610,7 @@ function filter(collection: any[], filter: any, that?: any /* opt */) {
 function map(
   collection: any[],
   mapper: (value: any, index: number, array: any[]) => any,
-  that?: any /* opt */
+  that?: any /* opt */,
 ) {
   if (collection.map) {
     return collection.map(mapper, that);

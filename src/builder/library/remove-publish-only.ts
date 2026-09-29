@@ -21,20 +21,20 @@ function myWritePackage(options: NgPackagrOptions) {
     await oldFactory(options)(of(graph) as any).toPromise();
     const entryPoint: EntryPointNode = graph.find(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      isEntryPointInProgress() as any
+      isEntryPointInProgress() as any,
     )!;
     if (!entryPoint.data.entryPoint.isSecondaryEntryPoint) {
       const packageJsonPath = path.resolve(
         entryPoint.data.entryPoint.destinationPath,
-        'package.json'
+        'package.json',
       );
       const packageJson = JSON.parse(
-        fs.readFileSync(packageJsonPath).toString()
+        fs.readFileSync(packageJsonPath).toString(),
       );
       delete packageJson.scripts.prepublishOnly;
       fs.writeFileSync(
         packageJsonPath,
-        JSON.stringify(packageJson, undefined, 2)
+        JSON.stringify(packageJson, undefined, 2),
       );
     }
   });

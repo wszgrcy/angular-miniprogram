@@ -23,12 +23,12 @@ export class PageService {
     private injector: Injector,
     private environmentInjector: EnvironmentInjector,
     private applicationRef: ApplicationRef,
-    @Inject(APP_TOKEN) private app: AppOptions
+    @Inject(APP_TOKEN) private app: AppOptions,
   ) {}
 
   /** 给页面组件建一个带 PAGE_TOKEN 的子注入器 */
   private createPageInjector(
-    miniProgramComponentInstance: MiniProgramComponentInstance
+    miniProgramComponentInstance: MiniProgramComponentInstance,
   ) {
     return Injector.create({
       providers: [
@@ -42,7 +42,7 @@ export class PageService {
     // standalone 组件启动，不需要 NgModule
     this.app.__ngStartPage = <C>(
       component: Type<C>,
-      miniProgramComponentInstance: MiniProgramComponentInstance
+      miniProgramComponentInstance: MiniProgramComponentInstance,
     ) => {
       return runInAngular(this.injector, () => {
         const injector = this.createPageInjector(miniProgramComponentInstance);
@@ -61,7 +61,7 @@ export class PageService {
     this.app.__ngStartPageWithModule = <M, C>(
       module: Type<M>,
       component: Type<C>,
-      miniProgramComponentInstance: MiniProgramComponentInstance
+      miniProgramComponentInstance: MiniProgramComponentInstance,
     ) => {
       return runInAngular(this.injector, () => {
         const injector = this.createPageInjector(miniProgramComponentInstance);

@@ -23,7 +23,7 @@ import { ngPackagrFactory } from './ng-packagr-factory';
  */
 export function execute(
   options: any,
-  context: BuilderContext
+  context: BuilderContext,
 ): Observable<BuilderOutput> {
   return from(
     (async () => {
@@ -35,7 +35,7 @@ export function execute(
       }
       const packager = await ngPackagrFactory(
         resolve(root, options.project),
-        tsConfig
+        tsConfig,
       );
 
       const projectName = context.target?.project;
@@ -53,15 +53,15 @@ export function execute(
       };
 
       return { packager, ngPackagrOptions };
-    })()
+    })(),
   ).pipe(
     switchMap(({ packager, ngPackagrOptions }) =>
       options.watch
         ? packager.watch(ngPackagrOptions)
-        : packager.build(ngPackagrOptions)
+        : packager.build(ngPackagrOptions),
     ),
     mapTo({ success: true, workspaceRoot: context.workspaceRoot }),
-    catchError((err) => of({ success: false, error: err.message }))
+    catchError((err) => of({ success: false, error: err.message })),
   );
 }
 

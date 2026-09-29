@@ -40,7 +40,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 function emitWhole(
   prefix: string,
   value: unknown,
-  out: Record<string, unknown>
+  out: Record<string, unknown>,
 ): void {
   if (prefix === '') {
     Object.assign(out, sanitizeUndefined(value));
@@ -56,7 +56,7 @@ function diffValue(
   fromItem: unknown,
   toItem: unknown,
   prefix: string,
-  out: Record<string, unknown>
+  out: Record<string, unknown>,
 ): number {
   // 优化 1：引用相等（含所有相同原始值）直接短路，跳过整棵子树
   if (fromItem === toItem) {
@@ -77,7 +77,7 @@ function diffObject(
   from: Record<string, unknown>,
   to: Record<string, unknown>,
   prefix: string,
-  out: Record<string, unknown>
+  out: Record<string, unknown>,
 ): number {
   const toKeys = Object.keys(to);
   // key 数不一致：无法逐字段对齐，整体送出
@@ -97,7 +97,7 @@ function diffObject(
       from[key],
       to[key],
       prefix + point + key,
-      childOut
+      childOut,
     );
     if (status !== SAME) {
       anyChange = true;
@@ -123,7 +123,7 @@ function diffArray(
   from: unknown[],
   to: unknown[],
   prefix: string,
-  out: Record<string, unknown>
+  out: Record<string, unknown>,
 ): number {
   if (from.length !== to.length) {
     emitWhole(prefix, to, out);
@@ -188,7 +188,7 @@ function sanitizeUndefined<T>(value: T, seen = new Set<unknown>()): T {
 
 export function diffNodeData(
   from: Record<string, unknown>,
-  to: Record<string, unknown>
+  to: Record<string, unknown>,
 ) {
   const out: Record<string, unknown> = {};
   diffValue(from, to, '', out);

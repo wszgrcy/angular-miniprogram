@@ -29,7 +29,7 @@ export const PLATFORM_FLAG_NAMES: Record<PlatformType, string> = {
 
 /** 生成注入 Vite `define` 的平台常量表 */
 export function platformConditionDefine(
-  platform: PlatformType
+  platform: PlatformType,
 ): Record<string, string> {
   const define: Record<string, string> = {
     __MP_PLATFORM__: `"${platform}"`,

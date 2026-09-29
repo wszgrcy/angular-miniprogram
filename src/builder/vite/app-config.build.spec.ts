@@ -25,19 +25,19 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     const root = harness.host.root();
     const myTestProjectHost = new MyTestProjectHost(harness.host);
     const list = await myTestProjectHost.getFileList(
-      normalize(join(root, 'src', '__pages'))
+      normalize(join(root, 'src', '__pages')),
     );
     list.push(
       ...(await myTestProjectHost.getFileList(
-        normalize(join(root, 'src', '__components'))
-      ))
+        normalize(join(root, 'src', '__components')),
+      )),
     );
     await myTestProjectHost.importPathRename(list);
     await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
     await myTestProjectHost.moveDir(
       ALL_COMPONENT_NAME_LIST,
       '__components',
-      'components'
+      'components',
     );
     await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
     return { root, myTestProjectHost };
@@ -54,16 +54,14 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
   const readOutput = async (p: string) =>
     virtualFs.fileBufferToString(
-      await harness.host
-        .read(join(harness.host.root(), p))
-        .toPromise()
+      await harness.host.read(join(harness.host.root(), p)).toPromise(),
     );
 
   const writeAppConfig = async (config: Record<string, unknown>) => {
     await harness.host
       .write(
         join(harness.host.root(), 'src', 'app.config.json'),
-        virtualFs.stringToFileBuffer(JSON.stringify(config))
+        virtualFs.stringToFileBuffer(JSON.stringify(config)),
       )
       .toPromise();
   };
@@ -99,7 +97,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect(result.result?.success).toBeTruthy();
 
       const appJson = JSON.parse(
-        await readOutput('dist/vite-app-json/app.json')
+        await readOutput('dist/vite-app-json/app.json'),
       ) as {
         pages: string[];
         window: { navigationBarTitleText: string };

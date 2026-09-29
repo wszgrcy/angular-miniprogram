@@ -17,7 +17,7 @@ const DEFINE_COMPONENT = 'ɵɵdefineComponent';
  * 文本包含来判断。
  */
 function findDefineComponentMetaList(
-  sf: ts.SourceFile
+  sf: ts.SourceFile,
 ): ts.ObjectLiteralExpression[] {
   const list: ts.ObjectLiteralExpression[] = [];
   const walk = (node: ts.Node): void => {
@@ -43,7 +43,7 @@ function findDefineComponentMetaList(
 function pickProperty(
   sf: ts.SourceFile,
   meta: ts.ObjectLiteralExpression,
-  name: string
+  name: string,
 ): ts.PropertyAssignment | undefined {
   for (const prop of meta.properties) {
     if (ts.isPropertyAssignment(prop) && prop.name.getText(sf) === name) {
@@ -59,7 +59,7 @@ function pickProperty(
  */
 function getTemplateFunction(
   sf: ts.SourceFile,
-  meta: ts.ObjectLiteralExpression
+  meta: ts.ObjectLiteralExpression,
 ): ts.FunctionLikeDeclaration | undefined {
   const initializer = pickProperty(sf, meta, 'template')?.initializer;
   if (
@@ -88,7 +88,7 @@ function isRfBitTest(expr: ts.Expression, bit: number): boolean {
  */
 function findTopLevelRfBlock(
   fn: ts.FunctionLikeDeclaration,
-  bit: number
+  bit: number,
 ): ts.Block | undefined {
   const body = fn.body;
   if (!body || !ts.isBlock(body)) {
@@ -145,7 +145,7 @@ export function changeComponent(data: string) {
       updateInsertChange = change.insertNode(
         updateStatements[updateStatements.length - 1],
         `;${updateContent}`,
-        'end'
+        'end',
       );
     } else {
       // 分支 B：没有更新块（或更新块是空的——老逻辑取 statements[length - 1]
@@ -154,7 +154,7 @@ export function changeComponent(data: string) {
       updateInsertChange = change.insertNode(
         initBlock,
         `if(rf & 2){${updateContent}}`,
-        'end'
+        'end',
       );
     }
     changeList.push(updateInsertChange);
@@ -171,10 +171,10 @@ export function changeComponent(data: string) {
     // import 只需要一份。放在循环里 push 会给每个组件都加一遍，
     // 同文件多组件时就是重复的 `import * as amp ...`。
     changeList.unshift(
-      new InsertChange(0, `import * as ampNgCore from '@angular/core';\n`)
+      new InsertChange(0, `import * as ampNgCore from '@angular/core';\n`),
     );
     changeList.unshift(
-      new InsertChange(0, `import * as amp from 'angular-miniprogram';\n`)
+      new InsertChange(0, `import * as amp from 'angular-miniprogram';\n`),
     );
   }
 
@@ -188,4 +188,23 @@ export function changeComponent(data: string) {
      */
     componentName: componentNames[0] ?? '',
   };
+}
+
+/**
+ * 只检测本文件里的组件类名，**不改代码**。
+ *
+ * 库构建侧现在只需要「这个文件有哪些组件」来定位元数据，不再往产物里注
+ * `amp.propertyChange` —— 那个注入已移到主构建
+ * （`vite/plugins/component-transform.plugin.ts`），库产物保持 vanilla。
+ */
+export function detectComponentNames(data: string): string[] {
+  const sf = ts.createSourceFile('', data, ts.ScriptTarget.Latest, true);
+  const names: string[] = [];
+  for (const meta of findDefineComponentMetaList(sf)) {
+    const name = pickProperty(sf, meta, 'type')?.initializer.getText() ?? '';
+    if (name) {
+      names.push(name);
+    }
+  }
+  return names;
 }

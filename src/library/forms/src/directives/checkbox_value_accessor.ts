@@ -96,7 +96,10 @@ export class CheckboxControl {
   @HostBinding('value') @Input() readonly value!: string | undefined;
   @HostBinding('checked')
   checked: boolean | undefined;
-  constructor(private elementRef: ElementRef, private renderer: Renderer2) {}
+  constructor(
+    private elementRef: ElementRef,
+    private renderer: Renderer2,
+  ) {}
   updateChecked(value: boolean) {
     this.renderer.setProperty(this.elementRef.nativeElement, 'checked', value);
   }

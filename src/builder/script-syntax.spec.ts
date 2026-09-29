@@ -61,7 +61,7 @@ describe('script/*.ts 语法守卫', () => {
         },
       });
       const diags = (out.diagnostics ?? []).filter(
-        (d) => d.category === ts.DiagnosticCategory.Error
+        (d) => d.category === ts.DiagnosticCategory.Error,
       );
       for (const d of diags) {
         let where = f;
@@ -69,7 +69,9 @@ describe('script/*.ts 语法守卫', () => {
           const { line } = d.file.getLineAndCharacterOfPosition(d.start);
           where = `${f}:${line + 1}`;
         }
-        failures.push(`${where}  ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
+        failures.push(
+          `${where}  ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`,
+        );
       }
     }
 
@@ -86,7 +88,7 @@ describe('script/*.ts 语法守卫', () => {
       },
     });
     const diags = (out.diagnostics ?? []).filter(
-      (d) => d.category === ts.DiagnosticCategory.Error
+      (d) => d.category === ts.DiagnosticCategory.Error,
     );
     expect(diags.length)
       .withContext('这段就是当初漏网的 `])  ]);`，若抓不到说明守卫无效')

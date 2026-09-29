@@ -113,7 +113,7 @@ function componentLView(fixture: any): any[] {
  * 容器在 nodeList 里表现为数组，每项含 __templateName / nodeList。
  */
 function collectContainerNames(
-  nodeList: any[]
+  nodeList: any[],
 ): { slot: number; names: (string | undefined)[] }[] {
   const out: { slot: number; names: (string | undefined)[] }[] = [];
   nodeList.forEach((entry, slot) => {
@@ -121,7 +121,7 @@ function collectContainerNames(
       out.push({
         slot,
         names: entry.map((e: any) =>
-          e && '__templateName' in e ? e.__templateName : '<非对象>'
+          e && '__templateName' in e ? e.__templateName : '<非对象>',
         ),
       });
     }
@@ -154,8 +154,8 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
       c.names.forEach((n) =>
         expect(n === null || typeof n === 'string')
           .withContext(`slot${c.slot} 不得为 undefined`)
-          .toBeTrue()
-      )
+          .toBeTrue(),
+      ),
     );
   });
 
@@ -195,13 +195,13 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
     fixture.detectChanges();
 
     const names = collectContainerNames(
-      ctxOf(fixture).nodeList as any[]
+      ctxOf(fixture).nodeList as any[],
     ).flatMap((c) => c.names);
     console.log('OUTLET-STATIC names:', JSON.stringify(names));
 
     expect(names)
       .withContext(
-        '应推导出模板声明名 alpha（未 patch 环境下由 declTNode 顶上）'
+        '应推导出模板声明名 alpha（未 patch 环境下由 declTNode 顶上）',
       )
       .toContain('alpha');
   });
@@ -236,7 +236,7 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
     const picked = ctxName || derivedName || undefined;
 
     console.log(
-      `PRECISION ctx=${JSON.stringify(ctxName)} derived=${JSON.stringify(derivedName)} picked=${JSON.stringify(picked)}`
+      `PRECISION ctx=${JSON.stringify(ctxName)} derived=${JSON.stringify(derivedName)} picked=${JSON.stringify(picked)}`,
     );
 
     expect(ctxName)
@@ -256,7 +256,7 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
 
     // 先确认正常态能推出 alpha
     const before = collectContainerNames(
-      ctxOf(fixture).nodeList as any[]
+      ctxOf(fixture).nodeList as any[],
     ).flatMap((c) => c.names);
     expect(before).toContain('alpha');
 
@@ -282,13 +282,13 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
       .toBeTrue();
 
     const after = collectContainerNames(
-      ctxOf(fixture).nodeList as any[]
+      ctxOf(fixture).nodeList as any[],
     ).flatMap((c) => c.names);
     console.log(
       'REVERSE before=',
       JSON.stringify(before),
       'after=',
-      JSON.stringify(after)
+      JSON.stringify(after),
     );
     expect(after)
       .withContext('抹掉 localNames 后仍能推出 alpha，说明推导不是走 declTNode')

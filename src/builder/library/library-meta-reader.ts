@@ -222,8 +222,61 @@ export function lookupLibraryMeta(
   return { pkgRoot, sidecarPath, entry, entryMatchedButClassMissing: true };
 }
 
+/**
+ * 某个模块文件对应的 mp 库元数据。
+ *
+ * `entry` 是按 fesm 路径精确匹配上的那一个（多 entry point 包靠它避免误伤）；
+ * 匹配不上时 `entry` 为 undefined，调用方可退化成处理 `entries` 全部。
+ */
+export function readLibraryMetaForModule(fromFile: string):
+  | {
+      pkgRoot: string;
+      entries: LibraryMetaEntry[];
+      entry?: LibraryMetaEntry;
+    }
+  | undefined {
+  const pkgRoot = findLibraryPackageRoot(fromFile);
+  if (!pkgRoot) {
+    return undefined;
+  }
+  const file = readLibraryMetaFile(pkgRoot);
+  if (!file) {
+    return undefined;
+  }
+  const entries = Object.values(file.entries);
+  const abs = normalizeMetaKey(
+    path.resolve(fromFile).split(path.sep).join('/'),
+  );
+  const entry = entries.find(
+    (it) =>
+      !!it.fesm &&
+      normalizeMetaKey(
+        path.resolve(pkgRoot, it.fesm).split(path.sep).join('/'),
+      ) === abs,
+  );
+  return { pkgRoot, entries, entry };
+}
+
 /** 仅供测试：清掉读取缓存。 */
 export function clearLibraryMetaReaderCache(): void {
   sidecarCache.clear();
   packageRootCache.clear();
+}
+
+/**
+ * 某个文件所属包是不是「本工具链构建的库」。
+ *
+ * 判据就一个：包根有合法的 `mp-library-meta.json`。
+ *
+ * 这个判据在主构建里**非常重要**：`@angular/common` 的 fesm 里同样有
+ * `ɵɵdefineComponent`（NgIf / NgFor），用「所有 node_modules」这种粗筛会把
+ * 注入打进第三方库，等于给每个 `*ngIf` 加一次 setData。只有带 sidecar 的
+ * 包才进我们的处理范围。
+ */
+export function isMpLibraryFile(fromFile: string): boolean {
+  const pkgRoot = findLibraryPackageRoot(fromFile);
+  if (!pkgRoot) {
+    return false;
+  }
+  return !!readLibraryMetaFile(pkgRoot);
 }

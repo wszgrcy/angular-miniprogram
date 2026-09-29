@@ -13,7 +13,7 @@ export interface AppOptions {
   /** 启动一个 standalone 组件作为页面 */
   __ngStartPage<C>(
     component: Type<C>,
-    miniProgramComponentInstance: any
+    miniProgramComponentInstance: any,
   ): {
     componentRef: ComponentRef<C>;
   };
@@ -24,7 +24,7 @@ export interface AppOptions {
   __ngStartPageWithModule<M, C>(
     module: Type<M>,
     component: Type<C>,
-    miniProgramComponentInstance: any
+    miniProgramComponentInstance: any,
   ): {
     componentRef: ComponentRef<C>;
     ngModuleRef: NgModuleRef<M>;

@@ -33,7 +33,7 @@ describe('app-config: 校验', () => {
   it('主包页面重复报错', () => {
     const errors = validateAppConfig(
       { pages: ['pages/a/a', 'pages/a/a'] },
-      builtPages
+      builtPages,
     );
     expect(errors).toContain('pages 存在重复页面: pages/a/a');
   });
@@ -44,7 +44,7 @@ describe('app-config: 校验', () => {
         pages: ['pages/index/index'],
         subpackages: [{ root: '/sub', pages: ['a'] }],
       },
-      builtPages
+      builtPages,
     );
     expect(errors[0]).toContain('root 非法');
   });
@@ -55,7 +55,7 @@ describe('app-config: 校验', () => {
         pages: ['pages/index/index'],
         subpackages: [{ root: '../outside', pages: ['a'] }],
       },
-      builtPages
+      builtPages,
     );
     expect(errors[0]).toContain('root 非法');
   });
@@ -66,11 +66,11 @@ describe('app-config: 校验', () => {
         pages: ['pages/index/index', 'sub/a/a'],
         subpackages: [{ root: 'sub', pages: ['a/a'] }],
       },
-      builtPages
+      builtPages,
     );
     // 主包直接声明了 sub/a/a，而分包 root=sub + page=a/a 展开也是 sub/a/a
     expect(
-      errors.some((e) => e.includes('分包页面与主包 pages 冲突'))
+      errors.some((e) => e.includes('分包页面与主包 pages 冲突')),
     ).toBeTrue();
   });
 
@@ -80,7 +80,7 @@ describe('app-config: 校验', () => {
         pages: ['pages/index/index'],
         subpackages: [{ root: 'sub', pages: ['pages/index/index'] }],
       },
-      builtPages
+      builtPages,
     );
     expect(errors).toEqual([]);
   });
@@ -94,7 +94,7 @@ describe('app-config: 校验', () => {
           { root: 'sub', pages: ['a/a'] },
         ],
       },
-      builtPages
+      builtPages,
     );
     expect(errors.some((e) => e.includes('重复的 root'))).toBeTrue();
     expect(errors.some((e) => e.includes('跨分包重复'))).toBeTrue();
@@ -106,7 +106,7 @@ describe('app-config: 校验', () => {
         pages: ['pages/index/index'],
         subpackages: [{ root: 'sub', pages: [] }],
       },
-      builtPages
+      builtPages,
     );
     expect(errors.some((e) => e.includes('没有页面'))).toBeTrue();
   });
@@ -118,10 +118,10 @@ describe('app-config: 校验', () => {
         subpackages: [{ root: 'sub', pages: ['a/a'] }],
         tabBar: { list: [{ pagePath: 'sub/a/a', text: 'x' }] },
       },
-      builtPages
+      builtPages,
     );
     expect(
-      errors.some((e) => e.includes('tabBar.pagePath "sub/a/a" 不在主包'))
+      errors.some((e) => e.includes('tabBar.pagePath "sub/a/a" 不在主包')),
     ).toBeTrue();
   });
 
@@ -131,7 +131,7 @@ describe('app-config: 校验', () => {
         pages: ['pages/index/index'],
         tabBar: { list: [{ text: 'x' }] },
       },
-      builtPages
+      builtPages,
     );
     expect(errors.some((e) => e.includes('缺少 pagePath'))).toBeTrue();
   });
@@ -143,7 +143,7 @@ describe('app-config: 校验', () => {
         subpackages: [{ root: 'sub', pages: ['a/a'] }],
         preloadRule: { 'pages/nowhere/nowhere': { packages: ['sub'] } },
       },
-      builtPages
+      builtPages,
     );
     expect(errors.some((e) => e.includes('preloadRule 的页面'))).toBeTrue();
   });
@@ -157,7 +157,7 @@ describe('app-config: 校验', () => {
           'pages/index/index': { packages: ['sub', 'ghost'] },
         },
       },
-      builtPages
+      builtPages,
     );
     expect(errors.some((e) => e.includes('未声明的分包 "ghost"'))).toBeTrue();
   });
@@ -172,7 +172,7 @@ describe('app-config: 校验', () => {
           'sub/a/a': { packages: { sub: 'all' } },
         },
       },
-      builtPages
+      builtPages,
     );
     expect(errors).toEqual([]);
   });

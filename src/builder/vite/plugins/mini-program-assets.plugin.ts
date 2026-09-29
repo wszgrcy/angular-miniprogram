@@ -17,11 +17,7 @@ import {
   TS_CONFIG_TOKEN,
   TS_SYSTEM,
 } from '../../shared/token';
-import type {
-  LibraryTemplateLiteralConvertOptions,
-  PagePattern,
-} from '../../shared/type';
-import { literalResolve } from '../../util';
+import type { PagePattern } from '../../shared/type';
 import { toPosixPath } from '../../util/asset-path';
 import { MpAppConfig, generateAppJson, validateAppConfig } from '../app-config';
 import { collectAssets } from '../copy-assets';
@@ -127,7 +123,7 @@ export interface MiniProgramAssetsPluginOptions {
  *   2. metaMap.style          -> wxss（样式源文件编译后按组件拼接）
  *   3. metaMap.config         -> json（合并已存在的配置文件）
  *   4. library 组件 config    -> json
- *   5. library 模板          -> 经 literalResolve 转换后落盘
+ *   5. library 模板          -> 直接落盘（已在读 sidecar 时渲染完）
  *   6. metaMap.selfTemplate   -> self template
  */
 /**
@@ -330,24 +326,12 @@ export function miniProgramAssetsPlugin(
       }
 
       // 6. library 模板
+      // 注意：这里**不再渲染**。库模板已在 library-template.plugin 从 sidecar
+      // 取出时渲染成目标平台文本；这里拼进来的还有 app 自己的 wxml（带真实
+      // `{{hasLoad}}` 插值），再过一遍模板渲染会把它们吃掉。
       const templateGroup = libraryTemplateScopeService.exportLibraryTemplate();
       for (const [key, element] of Object.entries(templateGroup)) {
-        emit(
-          key,
-          literalResolve<LibraryTemplateLiteralConvertOptions>(
-            `\`${element}\``,
-            {
-              directivePrefix:
-                options.buildPlatform.templateTransform.getData()
-                  .directivePrefix,
-              eventListConvert:
-                options.buildPlatform.templateTransform.eventListConvert,
-              templateInterpolation:
-                options.buildPlatform.templateTransform.templateInterpolation,
-              fileExtname: options.buildPlatform.fileExtname,
-            },
-          ),
-        );
+        emit(key, element);
       }
 
       // 7. self template

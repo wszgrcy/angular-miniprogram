@@ -45,19 +45,19 @@ describeBuilder(
         const root = harness.host.root();
         const myTestProjectHost = new MyTestProjectHost(harness.host);
         const list = await myTestProjectHost.getFileList(
-          normalize(join(root, 'src', '__pages'))
+          normalize(join(root, 'src', '__pages')),
         );
         list.push(
           ...(await myTestProjectHost.getFileList(
-            normalize(join(root, 'src', '__components'))
-          ))
+            normalize(join(root, 'src', '__components')),
+          )),
         );
         await myTestProjectHost.importPathRename(list);
         await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
         await myTestProjectHost.moveDir(
           COMP_LIST,
           '__components',
-          'components'
+          'components',
         );
         await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
       };
@@ -82,24 +82,24 @@ describeBuilder(
                 const base = result.result!.baseOutputPath!;
                 const before = readOut(
                   base,
-                  'pages/control-flow/control-flow-entry.wxml'
+                  'pages/control-flow/control-flow-entry.wxml',
                 );
                 expect(before).not.toContain(marker);
                 void harness.writeFile(
                   'src/pages/control-flow/control-flow.component.html',
-                  before + marker
+                  before + marker,
                 );
               }
               return of(result);
             }),
             take(2),
-            skip(1)
+            skip(1),
           )
           .toPromise();
 
         const base = results[results.length - 1].result!.baseOutputPath!;
         expect(
-          readOut(base, 'pages/control-flow/control-flow-entry.wxml')
+          readOut(base, 'pages/control-flow/control-flow-entry.wxml'),
         ).toContain(marker);
       }, 180000);
 
@@ -119,8 +119,8 @@ describeBuilder(
                 const base = result.result!.baseOutputPath!;
                 expect(
                   fs.existsSync(
-                    path.join(base, 'pages/watch-new/watch-new-entry.wxml')
-                  )
+                    path.join(base, 'pages/watch-new/watch-new-entry.wxml'),
+                  ),
                 ).toBeFalsy();
                 const appJson = JSON.parse(harness.readFile('src/app.json'));
                 appJson.pages = [
@@ -148,18 +148,20 @@ bootstrapPage(WatchNewComponent);
               return of(result);
             }),
             take(2),
-            skip(1)
+            skip(1),
           )
           .toPromise();
 
         const base = results[results.length - 1].result!.baseOutputPath!;
         expect(
-          fs.existsSync(path.join(base, 'pages/watch-new/watch-new-entry.js'))
+          fs.existsSync(path.join(base, 'pages/watch-new/watch-new-entry.js')),
         ).toBeTruthy();
         expect(
-          fs.existsSync(path.join(base, 'pages/watch-new/watch-new-entry.wxml'))
+          fs.existsSync(
+            path.join(base, 'pages/watch-new/watch-new-entry.wxml'),
+          ),
         ).toBeTruthy();
       }, 180000);
     });
-  }
+  },
 );

@@ -17,7 +17,7 @@ export interface TsPathAlias {
  */
 export function tsConfigPathsToAliases(
   tsconfigPath: string,
-  visited = new Set<string>()
+  visited = new Set<string>(),
 ): TsPathAlias[] {
   const resolved = path.resolve(tsconfigPath);
   if (visited.has(resolved) || !fs.existsSync(resolved)) {

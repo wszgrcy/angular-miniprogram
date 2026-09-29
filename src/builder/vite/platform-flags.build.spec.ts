@@ -25,19 +25,19 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     const root = harness.host.root();
     const myTestProjectHost = new MyTestProjectHost(harness.host);
     const list = await myTestProjectHost.getFileList(
-      normalize(join(root, 'src', '__pages'))
+      normalize(join(root, 'src', '__pages')),
     );
     list.push(
       ...(await myTestProjectHost.getFileList(
-        normalize(join(root, 'src', '__components'))
-      ))
+        normalize(join(root, 'src', '__components')),
+      )),
     );
     await myTestProjectHost.importPathRename(list);
     await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
     await myTestProjectHost.moveDir(
       ALL_COMPONENT_NAME_LIST,
       '__components',
-      'components'
+      'components',
     );
     await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
     return { root, myTestProjectHost };
@@ -47,14 +47,14 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     await harness.host
       .write(
         join(harness.host.root(), rel),
-        virtualFs.stringToFileBuffer(content)
+        virtualFs.stringToFileBuffer(content),
       )
       .toPromise();
   };
 
   const readOutput = async (rel: string) =>
     virtualFs.fileBufferToString(
-      await harness.host.read(join(harness.host.root(), rel)).toPromise()
+      await harness.host.read(join(harness.host.root(), rel)).toPromise(),
     );
 
   /** 写入平台常量 d.ts + 变体文件 + 探针入口 */
@@ -66,15 +66,15 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
         'declare const __MP_WX__: boolean;',
         'declare const __MP_ZFB__: boolean;',
         '',
-      ].join('\n')
+      ].join('\n'),
     );
     await write(
       'src/pages/root/platform-value.ts',
-      "export const PLATFORM_VALUE = 'base-value';\n"
+      "export const PLATFORM_VALUE = 'base-value';\n",
     );
     await write(
       'src/pages/root/platform-value.wx.ts',
-      "export const PLATFORM_VALUE = __MP_WX__ ? 'wx-branch' : 'other-branch';\n"
+      "export const PLATFORM_VALUE = __MP_WX__ ? 'wx-branch' : 'other-branch';\n",
     );
     await write(
       'src/pages/root/root.entry.ts',
@@ -86,7 +86,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
         '// 全局赋值是副作用，不会被 tree-shaking 移除，作为产物探针',
         '(globalThis as any).__platformProbe = PLATFORM_VALUE;',
         '',
-      ].join('\n')
+      ].join('\n'),
     );
   };
 
@@ -97,9 +97,9 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       main: DEFAULT_ANGULAR_CONFIG.main,
       pages: DEFAULT_ANGULAR_CONFIG.pages,
       components: DEFAULT_ANGULAR_CONFIG.components,
-      assets: (
-        DEFAULT_ANGULAR_CONFIG.assets as Array<{ glob: string }>
-      ).filter((a) => a.glob !== 'app.json'),
+      assets: (DEFAULT_ANGULAR_CONFIG.assets as Array<{ glob: string }>).filter(
+        (a) => a.glob !== 'app.json',
+      ),
       platform,
       optimization: true,
       sourceMap: false,
@@ -121,7 +121,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       await buildWith(PlatformType.wx, 'dist/vite-flags-wx');
 
       const entryJs = await readOutput(
-        'dist/vite-flags-wx/pages/root/root-entry.js'
+        'dist/vite-flags-wx/pages/root/root-entry.js',
       );
       // 文件级：wx 变体生效
       expect(entryJs).toContain('wx-branch');
@@ -136,7 +136,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       await buildWith(PlatformType.zfb, 'dist/vite-flags-zfb');
 
       const entryJs = await readOutput(
-        'dist/vite-flags-zfb/pages/root/root-entry.js'
+        'dist/vite-flags-zfb/pages/root/root-entry.js',
       );
       // 无变体 → base 文件生效（其值原样）
       expect(entryJs).toContain('base-value');

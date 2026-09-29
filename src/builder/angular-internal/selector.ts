@@ -20,7 +20,7 @@ const _SELECTOR_REGEXP = new RegExp(
     // "[name='value']"
     '(\\))|' + // 7: ")"
     '(\\s*,\\s*)', // 8: ","
-  'g'
+  'g',
 );
 
 /**
@@ -106,7 +106,7 @@ export class CssSelector {
       if (attribute) {
         current.addAttribute(
           current.unescapeAttribute(attribute),
-          match[SelectorRegexp.ATTRIBUTE_VALUE]
+          match[SelectorRegexp.ATTRIBUTE_VALUE],
         );
       }
       if (match[SelectorRegexp.NOT_END]) {
@@ -147,7 +147,7 @@ export class CssSelector {
       if (char === '$' && !escaping) {
         throw new Error(
           `Error in attribute selector "${attr}". ` +
-            `Unescaped "$" is not supported. Please escape with "\\$".`
+            `Unescaped "$" is not supported. Please escape with "\\$".`,
         );
       }
       escaping = false;
@@ -244,7 +244,7 @@ export class SelectorMatcher<T = any> {
   private _addSelectable(
     cssSelector: CssSelector,
     callbackCtxt: T,
-    listContext: SelectorListContext
+    listContext: SelectorListContext,
   ) {
     let matcher: SelectorMatcher<T> = this;
     const element = cssSelector.element;
@@ -253,7 +253,7 @@ export class SelectorMatcher<T = any> {
     const selectable = new SelectorContext(
       cssSelector,
       callbackCtxt,
-      listContext
+      listContext,
     );
 
     if (element) {
@@ -306,7 +306,7 @@ export class SelectorMatcher<T = any> {
   private _addTerminal(
     map: Map<string, SelectorContext<T>[]>,
     name: string,
-    selectable: SelectorContext<T>
+    selectable: SelectorContext<T>,
   ) {
     let terminalList = map.get(name);
     if (!terminalList) {
@@ -318,7 +318,7 @@ export class SelectorMatcher<T = any> {
 
   private _addPartial(
     map: Map<string, SelectorMatcher<T>>,
-    name: string
+    name: string,
   ): SelectorMatcher<T> {
     let matcher = map.get(name);
     if (!matcher) {
@@ -337,7 +337,7 @@ export class SelectorMatcher<T = any> {
    */
   match(
     cssSelector: CssSelector,
-    matchedCallback: ((c: CssSelector, a: T) => void) | null
+    matchedCallback: ((c: CssSelector, a: T) => void) | null,
   ): boolean {
     let result = false;
     const element = cssSelector.element!;
@@ -353,14 +353,14 @@ export class SelectorMatcher<T = any> {
         this._elementMap,
         element,
         cssSelector,
-        matchedCallback
+        matchedCallback,
       ) || result;
     result =
       this._matchPartial(
         this._elementPartialMap,
         element,
         cssSelector,
-        matchedCallback
+        matchedCallback,
       ) || result;
 
     if (classNames) {
@@ -371,14 +371,14 @@ export class SelectorMatcher<T = any> {
             this._classMap,
             className,
             cssSelector,
-            matchedCallback
+            matchedCallback,
           ) || result;
         result =
           this._matchPartial(
             this._classPartialMap,
             className,
             cssSelector,
-            matchedCallback
+            matchedCallback,
           ) || result;
       }
     }
@@ -395,7 +395,7 @@ export class SelectorMatcher<T = any> {
               terminalValuesMap,
               '',
               cssSelector,
-              matchedCallback
+              matchedCallback,
             ) || result;
         }
         result =
@@ -403,7 +403,7 @@ export class SelectorMatcher<T = any> {
             terminalValuesMap,
             value,
             cssSelector,
-            matchedCallback
+            matchedCallback,
           ) || result;
 
         const partialValuesMap = this._attrValuePartialMap.get(name)!;
@@ -413,7 +413,7 @@ export class SelectorMatcher<T = any> {
               partialValuesMap,
               '',
               cssSelector,
-              matchedCallback
+              matchedCallback,
             ) || result;
         }
         result =
@@ -421,7 +421,7 @@ export class SelectorMatcher<T = any> {
             partialValuesMap,
             value,
             cssSelector,
-            matchedCallback
+            matchedCallback,
           ) || result;
       }
     }
@@ -433,7 +433,7 @@ export class SelectorMatcher<T = any> {
     map: Map<string, SelectorContext<T>[]>,
     name: string,
     cssSelector: CssSelector,
-    matchedCallback: ((c: CssSelector, a: any) => void) | null
+    matchedCallback: ((c: CssSelector, a: any) => void) | null,
   ): boolean {
     if (!map || typeof name !== 'string') {
       return false;
@@ -461,7 +461,7 @@ export class SelectorMatcher<T = any> {
     map: Map<string, SelectorMatcher<T>>,
     name: string,
     cssSelector: CssSelector,
-    matchedCallback: ((c: CssSelector, a: any) => void) | null
+    matchedCallback: ((c: CssSelector, a: any) => void) | null,
   ): boolean {
     if (!map || typeof name !== 'string') {
       return false;
@@ -491,14 +491,14 @@ export class SelectorContext<T = any> {
   constructor(
     public selector: CssSelector,
     public cbContext: T,
-    public listContext: SelectorListContext
+    public listContext: SelectorListContext,
   ) {
     this.notSelectors = selector.notSelectors;
   }
 
   finalize(
     cssSelector: CssSelector,
-    callback: ((c: CssSelector, a: T) => void) | null
+    callback: ((c: CssSelector, a: T) => void) | null,
   ): boolean {
     let result = true;
     if (

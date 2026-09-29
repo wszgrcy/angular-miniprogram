@@ -1,7 +1,7 @@
 async function loadEsmModule<T>(modulePath: string): Promise<T> {
   const namespaceObject = await new Function(
     'modulePath',
-    `return import(modulePath);`
+    `return import(modulePath);`,
   )(modulePath);
 
   // If it is not ESM then the values needed will be stored in the `default` property.

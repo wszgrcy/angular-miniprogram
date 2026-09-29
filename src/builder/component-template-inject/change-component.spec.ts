@@ -65,7 +65,7 @@ describe('component-template-inject: changeComponent', () => {
       const initStart = body.indexOf('if (rf & 1) {');
       const initEnd = body.indexOf('if (rf & 2) {');
       expect(body.slice(initStart, initEnd).includes('propertyChange')).toBe(
-        false
+        false,
       );
     });
   });
@@ -77,7 +77,7 @@ describe('component-template-inject: changeComponent', () => {
       expect(body).toContain(`if(rf & 2){${UPDATE_CALL}}`);
       // 补在 init 块之后
       expect(body.indexOf('if (rf & 1) {')).toBeLessThan(
-        body.indexOf('if(rf & 2)')
+        body.indexOf('if(rf & 2)'),
       );
     });
 
@@ -140,11 +140,11 @@ describe('component-template-inject: changeComponent', () => {
     it('分支 A / 分支 B 能被 AST 正确区分', () => {
       const a = analyzeFileInjection(
         'a.js',
-        changeComponent(WITH_UPDATE_BLOCK)!.content
+        changeComponent(WITH_UPDATE_BLOCK)!.content,
       );
       const b = analyzeFileInjection(
         'b.js',
-        changeComponent(WITHOUT_UPDATE_BLOCK)!.content
+        changeComponent(WITHOUT_UPDATE_BLOCK)!.content,
       );
       expect(a.components[0].branch).toBe('A');
       expect(b.components[0].branch).toBe('B');

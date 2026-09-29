@@ -15,6 +15,9 @@ import launcher from '../plugin/launcher';
  * 就是个占位（真实执行是微信开发者工具连回 socket）。
  */
 module.exports = {
-  'framework:@angular-devkit/build-angular': ['factory', viteKarmaFrameworkFactory],
+  'framework:@angular-devkit/build-angular': [
+    'factory',
+    viteKarmaFrameworkFactory,
+  ],
   ...launcher,
 };

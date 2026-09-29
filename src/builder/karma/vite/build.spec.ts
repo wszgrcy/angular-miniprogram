@@ -52,12 +52,12 @@ describeBuilder(
         const root = harness.host.root();
         const host = new MyTestProjectHost(harness.host);
         const list = await host.getFileList(
-          normalize(join(root, 'src', 'spec'))
+          normalize(join(root, 'src', 'spec')),
         );
         list.push(
           ...(await host.getFileList(
-            normalize(join(root, 'src', 'spec-component'))
-          ))
+            normalize(join(root, 'src', 'spec-component')),
+          )),
         );
         await host.importPathRename(list);
 
@@ -70,7 +70,7 @@ describeBuilder(
           // 把它当「无盘符绝对路径」重新补盘 -> C:\C\code\...
           // getSystemPath -> asWindowsPath 才是官方还原：/C:/x -> C:\x
           getSystemPath(harness.host.root()),
-          'dist/karma-vite'
+          'dist/karma-vite',
         );
 
         const config = await createKarmaViteConfig({
@@ -134,5 +134,5 @@ describeBuilder(
         expect(all).toContain('propertyChange');
       }, 300000);
     });
-  }
+  },
 );

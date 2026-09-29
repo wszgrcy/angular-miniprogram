@@ -34,7 +34,7 @@ export const COMPONENT_KEY_SEPARATOR = '#';
 
 export function makeComponentKey(
   sourceFile: string,
-  componentClassName: string
+  componentClassName: string,
 ): string {
   return `${sourceFile}${COMPONENT_KEY_SEPARATOR}${componentClassName}`;
 }

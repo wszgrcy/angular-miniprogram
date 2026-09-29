@@ -10,13 +10,13 @@ import * as glob from 'glob';
 import * as path from 'path';
 import type { BuildPlatform } from '../platform/platform';
 import type { PagePattern } from '../shared/type';
-import { normalizeAssetPatternsSafe , toPosixPath } from '../util/asset-path';
+import { normalizeAssetPatternsSafe, toPosixPath } from '../util/asset-path';
 
 function globAsync(pattern: string, options: glob.IOptions) {
   return new Promise<string[]>((resolvePromise, reject) =>
     glob.default(pattern, options, (e, m) =>
-      e ? reject(e) : resolvePromise(m)
-    )
+      e ? reject(e) : resolvePromise(m),
+    ),
   );
 }
 
@@ -44,9 +44,9 @@ export async function resolveProjectRoots(options: {
     getSystemPath(
       resolve(
         normalize(options.workspaceRoot),
-        normalize((projectMetadata.root as string) || '')
-      )
-    )
+        normalize((projectMetadata.root as string) || ''),
+      ),
+    ),
   );
   const relativeSourceRoot = projectMetadata.sourceRoot as string | undefined;
   if (typeof relativeSourceRoot !== 'string') {
@@ -54,8 +54,8 @@ export async function resolveProjectRoots(options: {
   }
   const absoluteProjectSourceRoot = normalize(
     getSystemPath(
-      resolve(normalize(options.workspaceRoot), normalize(relativeSourceRoot))
-    )
+      resolve(normalize(options.workspaceRoot), normalize(relativeSourceRoot)),
+    ),
   );
   return { absoluteProjectRoot, absoluteProjectSourceRoot };
 }
@@ -74,7 +74,7 @@ export async function generateModuleInfo(
     absoluteProjectRoot: Path;
     absoluteProjectSourceRoot: Path;
   },
-  buildPlatform: BuildPlatform
+  buildPlatform: BuildPlatform,
 ): Promise<PagePattern[]> {
   if (!list?.length) {
     return [];
@@ -83,7 +83,7 @@ export async function generateModuleInfo(
     list,
     options.workspaceRoot,
     options.absoluteProjectRoot,
-    options.absoluteProjectSourceRoot
+    options.absoluteProjectSourceRoot,
   );
   const moduleList: PagePattern[] = [];
   for (const pattern of patternList) {
@@ -110,7 +110,7 @@ export async function generateModuleInfo(
         };
         object.inputFiles!.config = object.src!.replace(
           /\.ts$/,
-          buildPlatform.fileExtname.config!
+          buildPlatform.fileExtname.config!,
         );
         const outputFileName =
           object.fileName!.replace(/\.ts$/, '').replace(/\./g, '-') + '.ts';
@@ -127,7 +127,7 @@ export async function generateModuleInfo(
           object.outputFiles!.path + buildPlatform.fileExtname.config;
         object.type = type;
         return object as PagePattern;
-      })
+      }),
     );
   }
   return moduleList;
@@ -157,13 +157,13 @@ export async function generateEntryPatterns(options: {
       options.pages || [],
       'page',
       roots,
-      options.buildPlatform
+      options.buildPlatform,
     ),
     componentList: await generateModuleInfo(
       options.components || [],
       'component',
       roots,
-      options.buildPlatform
+      options.buildPlatform,
     ),
   };
 }
@@ -176,7 +176,7 @@ export async function generateEntryPatterns(options: {
  * 这种带目录的路径，和 webpack 时代的 outputFiles.logic 对齐。
  */
 export function toRollupInput(
-  patternList: PagePattern[]
+  patternList: PagePattern[],
 ): Record<string, string> {
   const input: Record<string, string> = {};
   for (const item of patternList) {

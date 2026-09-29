@@ -34,9 +34,9 @@ export abstract class WxTransformLike extends TemplateTransformBase {
     return {
       content: `${inlineMetaCollection.templateList
         .map((item) => item.content)
-        .join('')}<block ${this.directivePrefix}${this.seq}if="{{hasLoad}}">${
-        result.wxmlTemplate
-      }</block>`,
+        .join('')}<block ${this.directivePrefix}${this.seq}if="${
+        this.templateInterpolation[0]
+      }hasLoad${this.templateInterpolation[1]}">${result.wxmlTemplate}</block>`,
       useComponentPath: {
         localPath: [...inlineMetaCollection.localPath],
         libraryPath: [...inlineMetaCollection.libraryPath],
@@ -74,8 +74,8 @@ export abstract class WxTransformLike extends TemplateTransformBase {
         } else {
           throw new Error(
             `事件名[${result.name}]解析异常,原绑定${eventMap.get(
-              result.name
-            )},现绑定${bindEventName}`
+              result.name,
+            )},现绑定${bindEventName}`,
           );
         }
       }

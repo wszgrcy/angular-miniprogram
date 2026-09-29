@@ -24,7 +24,9 @@ import { initMiniProgramTestEnv } from './test-util/init-env';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <ng-template #alpha let-greeting="greeting"><span>A:{{ greeting }}</span></ng-template>
+    <ng-template #alpha let-greeting="greeting"
+      ><span>A:{{ greeting }}</span></ng-template
+    >
     <ng-template #beta><span>B</span></ng-template>
   `,
 })
@@ -52,7 +54,7 @@ describe('__templateName 推导：不 patch NgTemplateOutlet 的替代方案', (
     console.log(
       `patch取法 localNames[0] = ${JSON.stringify(declT?.localNames?.[0])}\n` +
         `tView.declTNode === _declarationTContainer ? ${declTNodeFromTView === declT}\n` +
-        `tView.declTNode.localNames[0] = ${JSON.stringify(declTNodeFromTView?.localNames?.[0])}`
+        `tView.declTNode.localNames[0] = ${JSON.stringify(declTNodeFromTView?.localNames?.[0])}`,
     );
 
     expect(declTNodeFromTView)
@@ -73,7 +75,7 @@ describe('__templateName 推导：不 patch NgTemplateOutlet 的替代方案', (
     console.log(
       `beta: patch取法=${JSON.stringify(declT?.localNames?.[0])} ` +
         `lView推导=${JSON.stringify(declTNodeFromTView?.localNames?.[0])} ` +
-        `同一=${declTNodeFromTView === declT}`
+        `同一=${declTNodeFromTView === declT}`,
     );
 
     expect(declTNodeFromTView).toBe(declT);
@@ -95,7 +97,9 @@ describe('__templateName 推导：不 patch NgTemplateOutlet 的替代方案', (
     declTNode.localNames = saved;
     const restored = declTNode?.localNames?.[0];
 
-    console.log(`反向: 抹掉后=${JSON.stringify(tampered)} 还原后=${JSON.stringify(restored)}`);
+    console.log(
+      `反向: 抹掉后=${JSON.stringify(tampered)} 还原后=${JSON.stringify(restored)}`,
+    );
     expect(tampered)
       .withContext('抹掉 localNames 后仍推出名字，说明推导路径不对')
       .toBeUndefined();

@@ -90,7 +90,7 @@ function normName(s: string): string {
  */
 function coveringManifests(
   all: BuildArtifacts['manifests'],
-  referenced: Set<number>
+  referenced: Set<number>,
 ): { manifest: NodeManifest; fromFile: string }[] {
   return all.filter((x) => {
     for (const idx of referenced) {
@@ -116,7 +116,7 @@ function collectArtifacts(outDir: string): BuildArtifacts {
       if (e.name.endsWith('.js')) {
         const ms = extractManifestsFromSource(
           fs.readFileSync(full, 'utf8'),
-          full
+          full,
         );
         for (const m of ms) {
           manifests.push({ manifest: m, fromFile: full });
@@ -158,7 +158,7 @@ function checkTagCorrespondence(
       indices: Set<number>;
       entries: { index: number; instruction: string; tag?: string }[];
     }[];
-  }[]
+  }[],
 ): { violations: string[]; compared: number } {
   const violations: string[] = [];
   let compared = 0;
@@ -172,7 +172,7 @@ function checkTagCorrespondence(
         continue;
       }
       const covering = tree.views.filter((v) =>
-        [...b.indices].every((i) => v.indices.has(i))
+        [...b.indices].every((i) => v.indices.has(i)),
       );
       if (covering.length === 0) {
         continue;
@@ -190,7 +190,7 @@ function checkTagCorrespondence(
         if (expected !== wtag) {
           violations.push(
             `${cmp} 块 ${b.name} 下标 ${idx}: wxml=<${wtag}> ` +
-              `但 Angular 是 "${entries[0].tag}"，映射后应为 <${expected}>`
+              `但 Angular 是 "${entries[0].tag}"，映射后应为 <${expected}>`,
           );
         }
       }
@@ -210,7 +210,7 @@ function checkTagCorrespondence(
  */
 function checkNodeListOverflow(
   blocksByComponent: Map<string, { name: string; indices: Set<number> }[]>,
-  declsByComponent: Map<string, number>
+  declsByComponent: Map<string, number>,
 ): { violations: string[]; checked: number } {
   const violations: string[] = [];
   let checked = 0;
@@ -228,7 +228,7 @@ function checkNodeListOverflow(
     if (max >= decls) {
       violations.push(
         `${cmp}: wxml 根块最大下标 ${max} >= decls ${decls} → ` +
-          `运行时 nodeList(长度 ${decls}) 越界`
+          `运行时 nodeList(长度 ${decls}) 越界`,
       );
     }
   }
@@ -255,7 +255,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const h = new MyTestProjectHost(harness.host);
       const list = await h.getFileList(normalize(join(root, 'src', '__pages')));
       list.push(
-        ...(await h.getFileList(normalize(join(root, 'src', '__components'))))
+        ...(await h.getFileList(normalize(join(root, 'src', '__components')))),
       );
       await h.importPathRename(list);
       await h.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
@@ -309,7 +309,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         for (const idx of wxmlReferencedIndices(w.wxml)) {
           if (!angularUniverse.has(idx)) {
             violations.push(
-              `${w.rel}: 引用 nodeList[${idx}]，Angular 编译产物里无此节点下标`
+              `${w.rel}: 引用 nodeList[${idx}]，Angular 编译产物里无此节点下标`,
             );
           }
         }
@@ -354,14 +354,14 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       // 整体 +1000，模拟「运行时多占槽导致整体错位」
       const shifted = real!.wxml.replace(
         /nodeList\[(\d+)\]/g,
-        (_m, n) => `nodeList[${Number(n) + 1000}]`
+        (_m, n) => `nodeList[${Number(n) + 1000}]`,
       );
       const shiftedIdx = wxmlReferencedIndices(shifted);
       expect(shiftedIdx.size).toBeGreaterThan(0);
 
       const universe = new Set<number>();
       a.manifests.forEach((x) =>
-        x.manifest.indices.forEach((i) => universe.add(i))
+        x.manifest.indices.forEach((i) => universe.add(i)),
       );
 
       const orphans = [...shiftedIdx].filter((i) => !universe.has(i));
@@ -370,7 +370,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         .withContext(
           `人为把 wxml 下标整体 +1000 后，所有引用都应识别为错位。` +
             `识别出 ${orphans.length}/${shiftedIdx.size} 个——` +
-            `若为 0 说明这套校验抓不住错位，是假测试`
+            `若为 0 说明这套校验抓不住错位，是假测试`,
         )
         .toBe(shiftedIdx.size);
       expect(orphans.length).toBeGreaterThan(0);
@@ -404,7 +404,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const h = new MyTestProjectHost(harness.host);
       const list = await h.getFileList(normalize(join(root, 'src', '__pages')));
       list.push(
-        ...(await h.getFileList(normalize(join(root, 'src', '__components'))))
+        ...(await h.getFileList(normalize(join(root, 'src', '__components')))),
       );
       await h.importPathRename(list);
       await h.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
@@ -428,7 +428,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           } else if (e.name.endsWith('.js')) {
             for (const m of extractManifestsFromSource(
               fs.readFileSync(full, 'utf8'),
-              full
+              full,
             )) {
               manifests.push({ manifest: m, fromFile: full });
             }
@@ -457,7 +457,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         }
         // 按组件类名找它自己的 manifest（名字来自 componentKey，权威）
         const mine = c.manifests.filter(
-          (x) => x.manifest.componentName === rec.componentName
+          (x) => x.manifest.componentName === rec.componentName,
         );
         if (mine.length === 0) {
           noManifest.push(`${rec.componentName} (${rec.componentKey})`);
@@ -471,7 +471,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
               `${rec.componentName}: wxml 引用 nodeList[${idx}]，` +
                 `但该组件自身指令流里没有此下标（自身下标集=[${[...own]
                   .sort((a, b) => a - b)
-                  .join(',')}]）`
+                  .join(',')}]）`,
             );
           }
         }
@@ -559,7 +559,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         .toBeDefined();
 
       const mine = c.manifests.filter(
-        (x) => x.manifest.componentName === rec!.componentName
+        (x) => x.manifest.componentName === rec!.componentName,
       );
       const own = new Set<number>();
       mine.forEach((x) => x.manifest.indices.forEach((i) => own.add(i)));
@@ -567,8 +567,8 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const tampered = wxmlReferencedIndices(
         rec!.wxml.replace(
           /nodeList\[(\d+)\]/g,
-          (_m, n) => `nodeList[${Number(n) + 7777}]`
-        )
+          (_m, n) => `nodeList[${Number(n) + 7777}]`,
+        ),
       );
       expect(tampered.size).toBeGreaterThan(0);
 
@@ -576,7 +576,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect(orphans.length)
         .withContext(
           `篡改后应全部识别为错位。识别 ${orphans.length}/${tampered.size}。` +
-            `为 0 说明精确校验抓不住问题`
+            `为 0 说明精确校验抓不住问题`,
         )
         .toBe(tampered.size);
     }, 600000);
@@ -632,7 +632,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const h = new MyTestProjectHost(harness.host);
       const list = await h.getFileList(normalize(join(root, 'src', '__pages')));
       list.push(
-        ...(await h.getFileList(normalize(join(root, 'src', '__components'))))
+        ...(await h.getFileList(normalize(join(root, 'src', '__components')))),
       );
       await h.importPathRename(list);
       await h.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
@@ -679,7 +679,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     it('视图树应拆出多个视图（控制流组件）', async () => {
       const c = await load();
       const cf = c.trees.find(
-        (t) => t.componentName === 'ControlFlowComponent'
+        (t) => t.componentName === 'ControlFlowComponent',
       );
       expect(cf)
         .withContext('没找到 ControlFlowComponent 的视图树')
@@ -702,7 +702,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
             continue;
           }
           const covering = tree.views.filter((v) =>
-            [...b.indices].every((i) => v.indices.has(i))
+            [...b.indices].every((i) => v.indices.has(i)),
           );
           if (covering.length === 0) {
             violations.push(
@@ -712,9 +712,9 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
                 `（各视图下标集: ${tree.views
                   .map(
                     (v) =>
-                      `${v.viewName}=[${[...v.indices].sort((x, y) => x - y).join(',')}]`
+                      `${v.viewName}=[${[...v.indices].sort((x, y) => x - y).join(',')}]`,
                   )
-                  .join(' | ')}）`
+                  .join(' | ')}）`,
             );
           }
         }
@@ -785,7 +785,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
             continue;
           }
           const covering = tree.views.filter((v) =>
-            [...b.indices].every((i) => v.indices.has(i))
+            [...b.indices].every((i) => v.indices.has(i)),
           );
           if (covering.length === 0) {
             violations.push(`${cmp}/${b.name}`);
@@ -812,7 +812,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const c = await load();
       const { violations, checked } = checkNodeListOverflow(
         c.blocksByComponent as never,
-        c.declsByComponent
+        c.declsByComponent,
       );
       console.log(`根块越界比对组件数: ${checked}`);
       expect(checked)
@@ -855,20 +855,20 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           blocks.map((b) =>
             cmp === t.cmp && b.name === '__root__'
               ? { ...b, indices: new Set([...b.indices, t.decls]) }
-              : b
-          )
+              : b,
+          ),
         );
       }
 
       const { violations } = checkNodeListOverflow(
         tampered as never,
-        c.declsByComponent
+        c.declsByComponent,
       );
       const hit = violations.filter((v) => v.includes(t.cmp));
       expect(hit.length)
         .withContext(
           `把 ${t.cmp} 根块最大下标推到 ${t.decls}（decls=${t.decls}）后 ` +
-            `未报越界 → 越界校验是摆设`
+            `未报越界 → 越界校验是摆设`,
         )
         .toBeGreaterThan(0);
     });
@@ -886,7 +886,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const c = await load();
       const { violations, compared } = checkTagCorrespondence(
         c.blocksByComponent as never,
-        c.trees as never
+        c.trees as never,
       );
       console.log(`标签比对对数: ${compared}`);
       expect(compared)
@@ -948,22 +948,22 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
                   ...b,
                   content: b.content.replace(
                     t.snippet,
-                    t.snippet.replace('<view', '<text')
+                    t.snippet.replace('<view', '<text'),
                   ),
                 }
-              : b
-          )
+              : b,
+          ),
         );
       }
 
       const { violations } = checkTagCorrespondence(
         tamperedBlocks as never,
-        c.trees as never
+        c.trees as never,
       );
       const hit = violations.filter((v) => v.includes(`下标 ${t.idx}`));
       expect(hit.length)
         .withContext(
-          `篡改 ${t.cmp} 下标 ${t.idx} 的承载标签为 <text> 后，校验未报违规 → 类型校验是摆设`
+          `篡改 ${t.cmp} 下标 ${t.idx} 的承载标签为 <text> 后，校验未报违规 → 类型校验是摆设`,
         )
         .toBeGreaterThan(0);
     });
@@ -984,13 +984,13 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
       const tampered = new Set([...block!.indices].map((i) => i + 5555));
       const covering = tree.views.filter((v) =>
-        [...tampered].every((i) => v.indices.has(i))
+        [...tampered].every((i) => v.indices.has(i)),
       );
 
       expect(covering.length)
         .withContext(
           `篡改 ${cmp}/${block!.name} 下标 +5555 后不应有任何视图覆盖，` +
-            `实际覆盖 ${covering.length} 个（>0 说明校验抓不住）`
+            `实际覆盖 ${covering.length} 个（>0 说明校验抓不住）`,
         )
         .toBe(0);
     }, 600000);

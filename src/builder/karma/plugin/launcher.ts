@@ -1,7 +1,7 @@
 const miniProgram = function (
   this: any,
   baseBrowserDecorator: any,
-  config: any
+  config: any,
 ) {
   baseBrowserDecorator(this);
   const self = this;

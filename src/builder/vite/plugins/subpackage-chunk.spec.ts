@@ -16,7 +16,7 @@ interface FakeChunk {
 /** 跑一次 generateBundle，返回校验错误信息（没报错返回 '<no error>'） */
 function runGenerateBundle(
   sourceRoot: string,
-  bundle: Record<string, FakeChunk>
+  bundle: Record<string, FakeChunk>,
 ): string {
   const plugin = subpackageChunkPlugin({
     appConfig: {
@@ -33,7 +33,7 @@ function runGenerateBundle(
       generateBundle: (
         this: { error: (msg: string) => void },
         opts: unknown,
-        bundle: unknown
+        bundle: unknown,
       ) => void;
     }
   ).generateBundle;
@@ -72,12 +72,12 @@ const CROSS_SUBPACKAGE_BUNDLE: Record<string, FakeChunk> = {
 
 const withDrive = (drive: string) =>
   mapBundleIds(CROSS_SUBPACKAGE_BUNDLE, (id) =>
-    id.replace('ROOT', `${drive}:/proj`)
+    id.replace('ROOT', `${drive}:/proj`),
   );
 
 function mapBundleIds(
   bundle: Record<string, FakeChunk>,
-  fn: (id: string) => string
+  fn: (id: string) => string,
 ): Record<string, FakeChunk> {
   const out: Record<string, FakeChunk> = {};
   for (const [name, chunk] of Object.entries(bundle)) {

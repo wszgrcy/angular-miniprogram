@@ -18,14 +18,14 @@ describe('diffNodeData', () => {
       a: { b: 2 },
     });
     expect(
-      diffNodeData({ a: { b: 1, b1: 1 }, c: 1 }, { a: { b: 2, b1: 1 }, c: 1 })
+      diffNodeData({ a: { b: 1, b1: 1 }, c: 1 }, { a: { b: 2, b1: 1 }, c: 1 }),
     ).toEqual({
       ['a.b']: 2,
     });
   });
   it('减少数量全量', () => {
     expect(
-      diffNodeData({ a: { b: 1, b1: 1 }, c: 1 }, { a: { b: 2 }, c: 1 })
+      diffNodeData({ a: { b: 1, b1: 1 }, c: 1 }, { a: { b: 2 }, c: 1 }),
     ).toEqual({
       a: { b: 2 },
     });
@@ -35,7 +35,7 @@ describe('diffNodeData', () => {
   });
   it('增加数量全量', () => {
     expect(
-      diffNodeData({ a: { b: 2 }, c: 1 }, { a: { b: 1, b1: 1 }, c: 1 })
+      diffNodeData({ a: { b: 2 }, c: 1 }, { a: { b: 1, b1: 1 }, c: 1 }),
     ).toEqual({
       a: { b: 1, b1: 1 },
     });
@@ -65,8 +65,11 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
       Object.keys(obj as Record<string, unknown>).forEach((k) => {
         const p = prefix ? `${prefix}.${k}` : k;
         const v = (obj as Record<string, unknown>)[k];
-        if (v === undefined) {out.push(p);}
-        else {out.push(...undefPaths(v, p));}
+        if (v === undefined) {
+          out.push(p);
+        } else {
+          out.push(...undefPaths(v, p));
+        }
       });
     }
     return out;
@@ -79,10 +82,9 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
   });
 
   it('嵌套对象字段变 undefined → 转 null', () => {
-    const d = diffNodeData(
-      { a: { b: 'name' } },
-      { a: { b: undefined } } as any
-    );
+    const d = diffNodeData({ a: { b: 'name' } }, {
+      a: { b: undefined },
+    } as any);
     expect(undefPaths(d)).toEqual([]);
   });
 
@@ -96,7 +98,9 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
 
     const d = diffNodeData(from as any, to as any);
 
-    expect(undefPaths(d)).withContext('diff 里不允许出现 undefined').toEqual([]);
+    expect(undefPaths(d))
+      .withContext('diff 里不允许出现 undefined')
+      .toEqual([]);
     // 该路径应被显式清成 null
     expect((d as any)['nodeList[0][0].__templateName']).toBeNull();
   });
@@ -121,10 +125,7 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
   });
 
   it('值未变（都是 null）不产生 diff', () => {
-    const d = diffNodeData(
-      { a: { b: null } },
-      { a: { b: null } }
-    );
+    const d = diffNodeData({ a: { b: null } }, { a: { b: null } });
     expect(d).toEqual({});
   });
 });
@@ -243,7 +244,7 @@ describe('diffNodeData: 优化后正确性与性能', () => {
     console.log(
       `[diff 对比] N=${N}  旧=${oldMs}ms  新=${newMs}ms  加速≈${(
         oldMs / Math.max(newMs, 1)
-      ).toFixed(1)}x`
+      ).toFixed(1)}x`,
     );
 
     // 新算法绝不应比旧算法慢（宽松断言，避免机器噪声误报）
@@ -257,14 +258,14 @@ describe('diffNodeData: 优化后正确性与性能', () => {
  */
 function diffNodeDataOld(
   from: Record<string, unknown>,
-  to: Record<string, unknown>
+  to: Record<string, unknown>,
 ): Record<string, unknown> {
   function _diff(
     count: number,
     prefix: string,
     fromItem: unknown,
     toItem: unknown,
-    changeObject: Record<string, unknown>
+    changeObject: Record<string, unknown>,
   ) {
     if (fromItem instanceof Array && toItem instanceof Array) {
       const result = arr(fromItem, toItem, prefix);
@@ -286,7 +287,7 @@ function diffNodeDataOld(
       const result = obj(
         fromItem as Record<string, unknown>,
         toItem as Record<string, unknown>,
-        prefix
+        prefix,
       );
       if (result.allChange || result.object) {
         if (result.allChange) {
@@ -307,7 +308,7 @@ function diffNodeDataOld(
   function obj(
     from: Record<string, unknown>,
     to: Record<string, unknown>,
-    prefix: string
+    prefix: string,
   ) {
     const toKeyList = Object.keys(to);
     let changeObject: Record<string, unknown> = {};
@@ -323,7 +324,7 @@ function diffNodeDataOld(
         `${prefix}${point}${key}`,
         from[key],
         to[key],
-        changeObject
+        changeObject,
       );
       count = r.count;
       changeObject = r.changeObject;

@@ -29,9 +29,13 @@ function parseExprs(html: string): any[] {
   const out: any[] = [];
   const walk = (nodes: any[]) => {
     (nodes || []).forEach((n) => {
-      if (n.value && n.value.ast) {out.push(n.value.ast);}
+      if (n.value && n.value.ast) {
+        out.push(n.value.ast);
+      }
       ['children', 'branches', 'groups', 'cases'].forEach((k) => {
-        if (Array.isArray(n[k])) {walk(n[k]);}
+        if (Array.isArray(n[k])) {
+          walk(n[k]);
+        }
       });
     });
   };
@@ -63,7 +67,11 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
   const CASES: Array<[string, string, number]> = [
     ['无管道', '<div>{{ plainValue }}</div>', 0],
     ['单个管道', '<div>{{ a | number }}</div>', 1],
-    ['两个兄弟插值各一带管道', '<div>{{ a | number }}{{ b | number }}</div>', 2],
+    [
+      '两个兄弟插值各一带管道',
+      '<div>{{ a | number }}{{ b | number }}</div>',
+      2,
+    ],
     ['管道参数里再嵌管道', '<div>{{ a | date:(b | number) }}</div>', 2],
     ['管道参数三层嵌套', '<div>{{ a | b:(c | d:(e | number)) }}</div>', 3],
     ['安全属性读内含管道', '<div>{{ (a | number)?.b }}</div>', 1],
@@ -72,7 +80,11 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
     ['this 接收者带管道', '<div>{{ this.a | number }}</div>', 1],
     ['this 深层链带管道', '<div>{{ this.a.b.c | number }}</div>', 1],
     ['二元两侧各一管道', '<div>{{ (a | number) + (b | number) }}</div>', 2],
-    ['三元三分支', '<div>{{ (c|number) ? (a | number) : (b | number) }}</div>', 3],
+    [
+      '三元三分支',
+      '<div>{{ (c|number) ? (a | number) : (b | number) }}</div>',
+      3,
+    ],
     ['数组字面量内含管道', '<div>{{ [a | number, b] }}</div>', 1],
     ['对象字面量值含管道', '<div>{{ {k: a | number} }}</div>', 1],
     ['下标 key 含管道', '<div>{{ list[k | number] }}</div>', 1],
@@ -88,7 +100,11 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
     ['展开元素内含管道', '<div>{{ [...(a | number)] }}</div>', 1],
     ['一元负号内含管道', '<div>{{ -(a | number) }}</div>', 1],
     ['括号表达式内含管道', '<div>{{ ((a | number)) }}</div>', 1],
-    ['嵌套组合大表达式', '<div>{{ ((a|number)?.b ?? [c | number]) + (d ? (e|number) : f) }}</div>', 3],
+    [
+      '嵌套组合大表达式',
+      '<div>{{ ((a|number)?.b ?? [c | number]) + (d ? (e|number) : f) }}</div>',
+      3,
+    ],
   ];
 
   for (const [name, html, expected] of CASES) {
@@ -157,23 +173,26 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
     if (r.errors && r.errors.length) {
       throw new Error('模板解析失败: ' + r.errors[0].message);
     }
-    return new TemplateDefinition(r.nodes, new ComponentContext(undefined)).run();
+    return new TemplateDefinition(
+      r.nodes,
+      new ComponentContext(undefined),
+    ).run();
   }
 
   it('ICU 复数消息抛错（实测该节点会真实产出，留空即静默丢弃）', () => {
     expect(() =>
-      run('<p>{count, plural, =1 {one} other {many}}</p>')
+      run('<p>{count, plural, =1 {one} other {many}}</p>'),
     ).toThrowError(/ICU/);
   });
 
   it('ICU select 消息同样抛错', () =>
-    expect(() => run('<p>{gender, select, male {他} other {TA}}</p>')).toThrowError(
-      /ICU/
-    ));
+    expect(() =>
+      run('<p>{gender, select, male {他} other {TA}}</p>'),
+    ).toThrowError(/ICU/));
 
   it('ng-content 带 fallback 内容抛错（小程序 slot 无对应能力）', () => {
     expect(() => run('<ng-content>fallback</ng-content>')).toThrowError(
-      /fallback/
+      /fallback/,
     );
   });
 
@@ -190,7 +209,7 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
   it('@defer / @content 仍按既有策略抛错', () => {
     expect(() => run('@defer { <a></a> }')).toThrowError(/defer/);
     expect(() => run('@content { @case (foo) { <a></a> } }')).toThrowError(
-      /@content/
+      /@content/,
     );
   });
 
@@ -199,16 +218,16 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
     // 都只出 Element），所以直接构造节点喂进去，验证「出现即报错」。
     const def: any = new TemplateDefinition(
       [],
-      new ComponentContext(undefined)
+      new ComponentContext(undefined),
     );
 
     expect(() =>
-      def.visitComponent({ componentName: 'Foo', tagName: 'app-foo' })
+      def.visitComponent({ componentName: 'Foo', tagName: 'app-foo' }),
     ).toThrowError(/Component AST 节点/);
 
-    expect(() =>
-      def.visitDirective({ name: 'MyDirective' })
-    ).toThrowError(/Directive AST 节点/);
+    expect(() => def.visitDirective({ name: 'MyDirective' })).toThrowError(
+      /Directive AST 节点/,
+    );
   });
 });
 
@@ -230,15 +249,22 @@ describe('TemplateDefinition: 整模板槽位与 Angular 基准对齐', () => {
     const gt = new GroundTruthPipeCounter();
     const walkAst = (nodes: any[]) => {
       (nodes || []).forEach((n) => {
-        if (n.value && n.value.ast) {gt.visit(n.value.ast);}
+        if (n.value && n.value.ast) {
+          gt.visit(n.value.ast);
+        }
         ['children', 'branches', 'groups', 'cases'].forEach((k) => {
-          if (Array.isArray(n[k])) {walkAst(n[k]);}
+          if (Array.isArray(n[k])) {
+            walkAst(n[k]);
+          }
         });
       });
     };
     walkAst(r.nodes);
 
-    const def = new TemplateDefinition(r.nodes, new ComponentContext(undefined));
+    const def = new TemplateDefinition(
+      r.nodes,
+      new ComponentContext(undefined),
+    );
     def.run();
     // declIndex 是私有字段，用 astVisitor 的副作用反推：
     // 走完模板后 declIndex 应等于「渲染节点数 + 管道数」
@@ -249,13 +275,19 @@ describe('TemplateDefinition: 整模板槽位与 Angular 基准对齐', () => {
   const CASES: Array<[string, string]> = [
     ['纯静态', '<div>hello</div>'],
     ['单管道', '<div>{{ a | number }}</div>'],
-    ['多节点多管道', '<div>{{ a | number }}</div><span>{{ b | number }}</span>'],
+    [
+      '多节点多管道',
+      '<div>{{ a | number }}</div><span>{{ b | number }}</span>',
+    ],
     [
       '嵌套 + 参数嵌套管道',
       '<div><p>{{ a | date:(b | number) }}</p><b>{{ c }}</b></div>',
     ],
     ['安全读带管道', '<div>{{ (a | number)?.b }}</div>'],
-    ['@if 分支含管道', '@if (a | number) { <p>{{ x }}</p> } @else { <q>{{ y | number }}</q> }'],
+    [
+      '@if 分支含管道',
+      '@if (a | number) { <p>{{ x }}</p> } @else { <q>{{ y | number }}</q> }',
+    ],
   ];
 
   for (const [name, html] of CASES) {

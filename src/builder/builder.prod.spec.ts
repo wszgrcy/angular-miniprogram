@@ -31,19 +31,19 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const myTestProjectHost = new MyTestProjectHost(harness.host);
 
       const list = await myTestProjectHost.getFileList(
-        normalize(join(root, 'src', '__pages'))
+        normalize(join(root, 'src', '__pages')),
       );
       list.push(
         ...(await myTestProjectHost.getFileList(
-          normalize(join(root, 'src', '__components'))
-        ))
+          normalize(join(root, 'src', '__components')),
+        )),
       );
       await myTestProjectHost.importPathRename(list);
       await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
       await myTestProjectHost.moveDir(
         ALL_COMPONENT_NAME_LIST,
         '__components',
-        'components'
+        'components',
       );
       await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
       harness.useTarget('build', angularConfig);

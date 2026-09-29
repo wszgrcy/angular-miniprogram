@@ -29,6 +29,7 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../test/util/file';
+import { analyzeFileInjection } from '../../test/util/template-inject-ast';
 import {
   LIBRARY_META_FILE_NAME,
   LIBRARY_META_SCHEMA_VERSION,
@@ -107,6 +108,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     const r = await harness.executeOnce();
     const base = r.result?.baseOutputPath as string;
     return {
+      base,
       wxml: fs.readFileSync(
         path.join(base, 'pages/base-forms/base-forms-entry.wxml'),
         'utf8',
@@ -140,11 +142,48 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         ),
         'utf8',
       ),
+      /** 二级出口组件自己的 wxml */
+      secCompWxml: fs.readFileSync(
+        path.join(
+          base,
+          'library/test-library/src/secondary/secondary-entry-component/secondary-entry-component.wxml',
+        ),
+        'utf8',
+      ),
+      /** 二级出口组件自己的 wxss */
+      secCompWxss: fs.readFileSync(
+        path.join(
+          base,
+          'library/test-library/src/secondary/secondary-entry-component/secondary-entry-component.wxss',
+        ),
+        'utf8',
+      ),
       /** demo 页编译后的 JS（input/output 只能在里看到） */
       demoJs: fs.readFileSync(
         path.join(base, 'pages/library-meta-demo/library-meta-demo-entry.js'),
         'utf8',
       ),
+      /**
+       * app 产物里的全部 JS。
+       *
+       * 必须在 `load()` 里就读完：harness 的临时工程目录会在 spec 之间被
+       * 清掉，拿着 `base` 稍后再去 scandir 就是 ENOENT。
+       */
+      allAppJs: (() => {
+        const out: { name: string; content: string }[] = [];
+        const walk = (dir: string) => {
+          for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+            const p = path.join(dir, item.name);
+            if (item.isDirectory()) {
+              walk(p);
+            } else if (item.name.endsWith('.js')) {
+              out.push({ name: p, content: fs.readFileSync(p, 'utf8') });
+            }
+          }
+        };
+        walk(base);
+        return out;
+      })(),
     };
   });
 
@@ -153,6 +192,14 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     await load();
     return JSON.parse(fs.readFileSync(metaFilePath, 'utf8'));
   });
+
+  /**
+   * 读 app 产物里的全部 JS。
+   *
+   * 用来验证「库组件的 `amp.propertyChange` 是主构建注进去的」——
+   * 库自己的 fesm 里没有（vanilla），但 app 的 chunk 里有。
+   */
+  const readAllAppJs = async () => (await load()).allAppJs;
 
   describe('库元数据 sidecar → wxml 事件绑定', () => {
     it('库根产出 mp-library-meta.json', async () => {
@@ -415,6 +462,198 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           )
           .toBeTrue(),
       );
+    });
+  });
+
+  /**
+   * 运行时 hook 的所有权：库不管，主构建管。
+   *
+   * 重构前：库构建把 `import * as amp` + `amp.propertyChange(...)` 烘进
+   * 自己的 fesm，库产物不是 vanilla，且运行时 hook 与库版本死锁。
+   * 重构后：库只出 `mp-library-meta.json`，主构建读到 sidecar 后给库组件
+   * 补上注入。
+   *
+   * 两个方向都要钉：
+   *   ✅ app chunk 里库组件的 template fn 有且仅有一次 propertyChange
+   *   ✅ 库 fesm 本身一个 propertyChange 都没有（证明注入来自 app 侧）
+   */
+  describe('库组件的 propertyChange 由主构建注入', () => {
+    const LIB_COMPONENTS = [
+      'TestLibraryComponent',
+      'OtherComponent',
+      'LibComp1Component',
+      'OutsideTemplateComponent',
+      'GlobalSelfTemplateComponent',
+    ];
+
+    it('库 fesm 自身不带任何 propertyChange（vanilla 产物）', async () => {
+      const fesmPath = path.resolve(
+        __dirname,
+        '../../test/hello-world-app/node_modules/test-library/fesm2022/test-library.mjs',
+      );
+      const fesm = fs.readFileSync(fesmPath, 'utf8');
+      expect(fesm).not.toContain('propertyChange');
+      expect(fesm).not.toContain("from 'angular-miniprogram'");
+    });
+
+    it('app 产物里每个库组件都被注入且只注入一次', async () => {
+      const files = await readAllAppJs();
+      const counts = new Map<string, number>();
+      for (const f of files) {
+        const report = analyzeFileInjection(f.name, f.content);
+        for (const c of report.components) {
+          if (!LIB_COMPONENTS.includes(c.componentName)) {
+            continue;
+          }
+          counts.set(
+            c.componentName,
+            (counts.get(c.componentName) ?? 0) + c.propertyChangeCount,
+          );
+        }
+      }
+
+      for (const name of LIB_COMPONENTS) {
+        expect(counts.get(name))
+          .withContext(
+            `${name} 应被注入恰好 1 次 propertyChange，实际=${String(
+              counts.get(name),
+            )}（0 = 主构建没接上，>1 = 重复注入会双倍 setData）`,
+          )
+          .toBe(1);
+      }
+    });
+
+    it('注入位置在 rf & 2 更新块末尾，没有游离调用', async () => {
+      const files = await readAllAppJs();
+      for (const f of files) {
+        const report = analyzeFileInjection(f.name, f.content);
+        const hit = report.components.filter((c) =>
+          LIB_COMPONENTS.includes(c.componentName),
+        );
+        if (!hit.length) {
+          continue;
+        }
+        for (const c of hit) {
+          expect(c.branch)
+            .withContext(`${c.componentName} 应被注入到更新块（A 或 B）`)
+            .toBeTruthy();
+          expect(c.isLastStatement)
+            .withContext(`${c.componentName} 的注入应在更新块最后`)
+            .toBeTrue();
+        }
+      }
+    });
+
+    it('sidecar 里带模板载荷（content / useComponents / style）', async () => {
+      const libMetaPath = path.resolve(
+        __dirname,
+        '../../test/hello-world-app/node_modules/test-library/mp-library-meta.json',
+      );
+      const libMeta: LibraryMetaFile = JSON.parse(
+        fs.readFileSync(libMetaPath, 'utf8'),
+      );
+      expect(libMeta.schemaVersion).toBe(LIBRARY_META_SCHEMA_VERSION);
+      const entry = libMeta.entries['types/test-library.d.ts'];
+      expect(entry.fesm).toBe('fesm2022/test-library.mjs');
+
+      for (const name of LIB_COMPONENTS) {
+        const record = entry.components[name];
+        expect(record)
+          .withContext(`${name} 应在 sidecar 里有记录`)
+          .toBeTruthy();
+        // content 是 ${} 插值模板串（平台中立）
+        expect(typeof record.content)
+          .withContext(`${name} 的 content 应是 \${} 插值模板串`)
+          .toBe('string');
+        expect(record.content)
+          .withContext(`${name} 应带平台中立的模板文本`)
+          .toContain('hasLoad');
+        // 平台相关处留的是插值，不是写死的 wx: / a:
+        expect(record.content).toContain('${directivePrefix}');
+        expect(record.content).not.toContain('wx:');
+      }
+      expect(entry.selfTemplate?.template).toContain(
+        '$$mp$$__self__$$libraryFirst',
+      );
+    });
+  });
+
+  /**
+   * 二级出口（`test-library/src/secondary`）走主构建。
+   *
+   * 多 entry point 的库，每个 entry 有自己的 fesm、自己的组件。主构建
+   * 必须按**组件名**把两边分别对上：碰二级 fesm 只处理二级组件，碰一级
+   * fesm 只处理一级组件。
+   *
+   * 重构前这里是 `meta.entry ? [meta.entry] : meta.entries`，碰不到 entry
+   * 就把整包 emit 一遍 —— 多出口包下会把应用根本没 import 的出口也产出来。
+   */
+  describe('二级出口在主构建下', () => {
+    it('二级出口组件产出自己的 wxml，内容只含它自己的模板', async () => {
+      const { secCompWxml } = await load();
+      expect(secCompWxml)
+        .withContext('二级出口组件应有自己的 wxml 产物')
+        .toContain('secondary entry works!');
+      // 不能把一级出口组件的模板串进来
+      expect(secCompWxml).not.toContain('other works!');
+      expect(secCompWxml).not.toContain('lib-comp1 works!');
+    });
+
+    it('二级出口组件的 host 事件从 sidecar listeners 过来', async () => {
+      const { secCompWxml } = await load();
+      expect(secCompWxml).toContain('bind:tap');
+    });
+
+    it('二级出口组件的样式产出为同名 wxss', async () => {
+      const { secCompWxss } = await load();
+      expect(secCompWxss).toContain('.lib-secondary-entry__text');
+    });
+
+    it('一级出口组件产物仍在，没被二级顶掉', async () => {
+      const { libCompWxml } = await load();
+      // 一级出口组件的 wxml 仍完整：自引用 import + 自己的数据绑定
+      expect(libCompWxml).toContain('/library/test-library/self.wxml');
+      expect(libCompWxml).toContain('{{nodeList[1].value}}');
+      expect(libCompWxml).not.toContain('secondary entry works!');
+    });
+
+    it('demo 页 usingComponents 同时指到一级与二级出口的组件', async () => {
+      const { demoJson } = await load();
+      const paths = Object.values(demoJson.usingComponents);
+      expect(
+        paths.some((p) =>
+          p.includes('/library/test-library/test-library-component/'),
+        ),
+      )
+        .withContext('一级出口组件应在 usingComponents 里')
+        .toBeTrue();
+      expect(
+        paths.some((p) =>
+          p.includes(
+            '/library/test-library/src/secondary/secondary-entry-component/',
+          ),
+        ),
+      )
+        .withContext('二级出口组件应在 usingComponents 里')
+        .toBeTrue();
+    });
+
+    it('二级出口组件被注入恰好 1 次 propertyChange', async () => {
+      const files = await readAllAppJs();
+      let count = 0;
+      for (const f of files) {
+        const report = analyzeFileInjection(f.name, f.content);
+        for (const c of report.components) {
+          if (c.componentName === 'SecondaryEntryComponent') {
+            count += c.propertyChangeCount;
+          }
+        }
+      }
+      expect(count)
+        .withContext(
+          `SecondaryEntryComponent 应被注入恰好 1 次，实际=${count}（0 = 二级出口没接上注入链路）`,
+        )
+        .toBe(1);
     });
   });
 });

@@ -58,7 +58,7 @@ export class MiniProgramCoreFactory {
 
   protected linkNgComponentWithPath(
     mpComponentInstance: MiniProgramComponentInstance,
-    list: NodePath
+    list: NodePath,
   ) {
     mpComponentInstance.__isLink = true;
     const lView: LView = resolveNodePath(list);
@@ -71,7 +71,7 @@ export class MiniProgramCoreFactory {
     const componentFinderService = injector.get(ComponentFinderService);
     componentFinderService.set(
       mpComponentInstance.__ngComponentInstance,
-      mpComponentInstance
+      mpComponentInstance,
     );
     cleanWhenDestroy(lView, () => {
       componentFinderService.remove(mpComponentInstance.__ngComponentInstance);
@@ -93,7 +93,7 @@ export class MiniProgramCoreFactory {
     return this.eventPrefixList.reduce((pre: Record<string, Function>, cur) => {
       pre[cur.listener + 'Event'] = function (
         this: MiniProgramComponentInstance,
-        event: WechatMiniprogram.BaseEvent
+        event: WechatMiniprogram.BaseEvent,
       ) {
         if (this.__lView) {
           const dataset = event.currentTarget?.dataset || event.target.dataset;
@@ -122,7 +122,7 @@ export class MiniProgramCoreFactory {
               } finally {
                 // zoneless：回调可能修改了应用状态，显式调度一次变更检测
                 this.__ngChangeDetectionScheduler?.notify(
-                  NotificationSource.Listener
+                  NotificationSource.Listener,
                 );
               }
             });
@@ -159,7 +159,7 @@ export class MiniProgramCoreFactory {
     mpComponentInstance: MiniProgramComponentInstance,
     componentRef: ComponentRef<unknown>,
     /** standalone 页面没有 NgModule */
-    ngModuleRef?: NgModuleRef<unknown>
+    ngModuleRef?: NgModuleRef<unknown>,
   ) {
     mpComponentInstance.__isLink = true;
     mpComponentInstance.__ngComponentHostView = componentRef.hostView;
@@ -198,7 +198,7 @@ export class MiniProgramCoreFactory {
       componentRef: ComponentRef<unknown>;
       ngModuleRef?: NgModuleRef<unknown>;
     },
-    pageOptions?: { useComponent: boolean }
+    pageOptions?: { useComponent: boolean },
   ) => {
     const _this = this;
     if (pageOptions?.useComponent) {
@@ -258,7 +258,7 @@ export class MiniProgramCoreFactory {
       };
       const oldAttached = config.lifetimes.attached;
       config.lifetimes.attached = function (
-        this: MiniProgramComponentInstance
+        this: MiniProgramComponentInstance,
       ) {
         return this.__lifeTimePromiseObject['created'].then(() => {
           _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
@@ -331,12 +331,12 @@ export class MiniProgramCoreFactory {
    */
   public bootstrapPage = (
     component: Type<unknown>,
-    pageOptions?: { useComponent: boolean }
+    pageOptions?: { useComponent: boolean },
   ) => {
     return this.createPageBootstrap(
       component,
       (instance) => getApp<AppOptions>().__ngStartPage(component, instance),
-      pageOptions
+      pageOptions,
     );
   };
 
@@ -347,7 +347,7 @@ export class MiniProgramCoreFactory {
   public pageStartup = (
     module: Type<unknown>,
     component: Type<unknown>,
-    pageOptions?: { useComponent: boolean }
+    pageOptions?: { useComponent: boolean },
   ) => {
     return this.createPageBootstrap(
       component,
@@ -355,13 +355,13 @@ export class MiniProgramCoreFactory {
         getApp<AppOptions>().__ngStartPageWithModule(
           module,
           component,
-          instance
+          instance,
         ),
-      pageOptions
+      pageOptions,
     );
   };
   protected addNgComponentLinkLogic(
-    config: WechatMiniprogram.Component.Options<{}, {}, {}, []>
+    config: WechatMiniprogram.Component.Options<{}, {}, {}, []>,
   ) {
     config.lifetimes = config.lifetimes || {};
     const oldCreate = config.lifetimes.created;
@@ -380,7 +380,7 @@ export class MiniProgramCoreFactory {
         type: null,
         observer: function (
           this: MiniProgramComponentInstance,
-          list: NodePath
+          list: NodePath,
         ) {
           if (this.__isLink) {
             return;
@@ -433,7 +433,7 @@ export class MiniProgramCoreFactory {
     return component.mpPageOptions as WechatMiniprogram.Page.Options<{}, {}>;
   }
   protected getComponentOptions<T extends boolean = false>(
-    component: Type<unknown> & MiniProgramComponentOptions
+    component: Type<unknown> & MiniProgramComponentOptions,
   ) {
     return component.mpComponentOptions as WechatMiniprogram.Component.Options<
       {},

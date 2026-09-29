@@ -1,1 +1,1 @@
-export * from 'angular-miniprogram/platform/default'
+export * from 'angular-miniprogram/platform/default';

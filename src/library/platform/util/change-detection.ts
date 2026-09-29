@@ -17,7 +17,7 @@ import {
 /** 通知调度器需要跑一次变更检测 */
 export function scheduleChangeDetection(
   injector: Injector,
-  source: NotificationSource = NotificationSource.Listener
+  source: NotificationSource = NotificationSource.Listener,
 ): void {
   injector.get(ChangeDetectionScheduler).notify(source);
 }

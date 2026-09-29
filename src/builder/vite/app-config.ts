@@ -12,7 +12,9 @@
  */
 
 /** 分包内的页面条目：字符串或带 path 的对象（各家小程序均支持） */
-export type MpSubPackagePage = string | { path: string; [key: string]: unknown };
+export type MpSubPackagePage =
+  | string
+  | { path: string; [key: string]: unknown };
 
 export interface MpSubPackage {
   /** 分包根目录，相对产物根。不得以 / 开头、不得包含 .. */
@@ -60,7 +62,7 @@ export function getSubPackages(config: MpAppConfig): MpSubPackage[] {
 
 /** 页面条目归一化为路径字符串 */
 function pagePathOf(
-  page: string | { path: string; [key: string]: unknown }
+  page: string | { path: string; [key: string]: unknown },
 ): string {
   return typeof page === 'string' ? page : page.path;
 }
@@ -77,7 +79,7 @@ function isValidSubPackageRoot(root: unknown): root is string {
 
 /** preloadRule 的 packages 值归一化为 string[]（对象形态取 keys） */
 function preloadPackagesOf(
-  packages: string[] | Record<string, unknown> | undefined
+  packages: string[] | Record<string, unknown> | undefined,
 ): string[] {
   if (Array.isArray(packages)) {
     return packages;
@@ -97,7 +99,7 @@ function preloadPackagesOf(
  */
 export function validateAppConfig(
   config: MpAppConfig,
-  builtPagePaths: string[]
+  builtPagePaths: string[],
 ): string[] {
   const errors: string[] = [];
   const mainPages = (config.pages ?? []).map(pagePathOf);
@@ -127,8 +129,8 @@ export function validateAppConfig(
     if (!isValidSubPackageRoot(sub.root)) {
       errors.push(
         `subpackages[${index}].root 非法（必须为相对路径且不含 ..）: ${String(
-          sub.root
-        )}`
+          sub.root,
+        )}`,
       );
       return;
     }
@@ -148,7 +150,7 @@ export function validateAppConfig(
       }
       if (seen.has(full)) {
         errors.push(
-          `分包页面与主包 pages 冲突: ${full}（主包已声明同路径页面）`
+          `分包页面与主包 pages 冲突: ${full}（主包已声明同路径页面）`,
         );
       }
       if (fullSubPages.has(full)) {
@@ -168,7 +170,7 @@ export function validateAppConfig(
     }
     if (!seen.has(pagePath)) {
       errors.push(
-        `tabBar.pagePath "${pagePath}" 不在主包 pages 中（tabBar 页面必须在主包）`
+        `tabBar.pagePath "${pagePath}" 不在主包 pages 中（tabBar 页面必须在主包）`,
       );
     }
   }
@@ -182,7 +184,7 @@ export function validateAppConfig(
     for (const pkg of preloadPackagesOf(rule.packages)) {
       if (!subRoots.has(pkg)) {
         errors.push(
-          `preloadRule["${page}"].packages 引用了未声明的分包 "${pkg}"`
+          `preloadRule["${page}"].packages 引用了未声明的分包 "${pkg}"`,
         );
       }
     }
@@ -237,10 +239,9 @@ export function resolveSubPackages(config: MpAppConfig): ResolvedSubPackage[] {
  */
 export function findSubPackageByPath(
   subPackages: ResolvedSubPackage[],
-  posixPath: string
+  posixPath: string,
 ): ResolvedSubPackage | undefined {
   return subPackages.find(
-    (sp) =>
-      posixPath === sp.root || posixPath.startsWith(`${sp.root}/`)
+    (sp) => posixPath === sp.root || posixPath.startsWith(`${sp.root}/`),
   );
 }

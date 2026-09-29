@@ -69,7 +69,7 @@ export class WxContainer {
     const children = node.children.map((child) => this._compileTemplate(child));
     const commonTagProperty = `${this.setComponentIdentification(
       node.componentMeta?.isComponent,
-      node.index
+      node.index,
     )} ${this.elementPropertyAndEvent(node, node.index).join(' ')}`;
     if (node.singleClosedTag) {
       return `<${node.tagName} ${commonTagProperty}/>`;
@@ -79,7 +79,7 @@ export class WxContainer {
     }>${children.join('')}</${node.tagName}>`;
   }
   private ngBoundTextTransform(node: NgBoundTextMeta): string {
-    return `{{nodeList[${node.index}].value}}`;
+    return this.interp(`nodeList[${node.index}].value`);
   }
   private ngContentTransform(node: NgContentMeta): string {
     return node.name ? `<slot name="${node.name}"></slot>` : `<slot></slot>`;
@@ -92,7 +92,7 @@ export class WxContainer {
     if (globalTemplate) {
       if (this.fromTemplate && this.fromTemplate !== globalTemplate) {
         throw new Error(
-          `全局ng-template中不可包含其他位置的ng-template,当前为${this.fromTemplate},包含${globalTemplate}`
+          `全局ng-template中不可包含其他位置的ng-template,当前为${this.fromTemplate},包含${globalTemplate}`,
         );
       } else if (globalTemplate) {
         childContainer.fromTemplate = globalTemplate;
@@ -115,13 +115,12 @@ export class WxContainer {
 
     content += `<block ${WxContainer.globalConfig.directivePrefix}${
       WxContainer.globalConfig.seq
-    }for="{{nodeList[${node.index}]}}" ${
+    }for="${this.interp(`nodeList[${node.index}]`)}" ${
       WxContainer.globalConfig.directivePrefix
     }${WxContainer.globalConfig.seq}key="index">
-      <template is="{{item.__templateName||'${defineTemplateName}'}}" ${this.getTemplateDataStr(
-      node.index,
-      `index`
-    )}></template>
+      <template is="${this.interp(
+        `item.__templateName||'${defineTemplateName}'`,
+      )}" ${this.getTemplateDataStr(node.index, `index`)}></template>
       </block>`;
 
     return content;
@@ -131,7 +130,25 @@ export class WxContainer {
   }
 
   private getTemplateDataStr(directiveIndex: number, indexName: string) {
-    return `data="${WxContainer.globalConfig.templateInterpolation[0]}...nodeList[${directiveIndex}][${indexName}] ${WxContainer.globalConfig.templateInterpolation[1]}"`;
+    return `data="${this.interp(
+      `...nodeList[${directiveIndex}][${indexName}] `,
+    )}"`;
+  }
+
+  /**
+   * 包一层 wxml 插值。
+   *
+   * **所有 wxml 插值必须走这里**，不要直接写 `{{ }}` 字面量。
+   *
+   * 目的是把「wxml 插值长什么样」收收拢到一个出口：将来无论换分隔符、
+   * 还是库构建需要特殊处理，只改 `templateInterpolation` 一处就行。
+   *
+   * 注：库模板用 `${}` 作插槽分隔符，与 wxml 的 `{{ }}` 不撞，所以
+   * `LibraryTransform` **不需要**覆盖 `templateInterpolation`。
+   */
+  private interp(text: string): string {
+    const [open, close] = WxContainer.globalConfig.templateInterpolation;
+    return `${open}${text}${close}`;
   }
 
   export(): { wxmlTemplate: string } {
@@ -142,10 +159,10 @@ export class WxContainer {
 
   private setComponentIdentification(
     isComponent: boolean | undefined,
-    nodeIndex: number | undefined
+    nodeIndex: number | undefined,
   ) {
     if (isComponent) {
-      return `nodePath="{{nodePath}}" nodeIndex="${nodeIndex}"`;
+      return `nodePath="${this.interp('nodePath')}" nodeIndex="${nodeIndex}"`;
     }
     return ``;
   }
@@ -170,7 +187,7 @@ export class WxContainer {
               node.directiveMeta?.properties?.includes(property) ||
               node.componentMeta?.properties?.includes(property)
             )
-          )
+          ),
       )
       .filter((key) => !/^(class\.?|style\.?)/.test(key))
       .forEach((key) => {
@@ -190,7 +207,7 @@ export class WxContainer {
           !(
             node.componentMeta?.outputs.some((output) => output === item) ||
             node.directiveMeta?.outputs.some((output) => output === item)
-          )
+          ),
       ),
       ...(node.directiveMeta?.listeners || []),
       ...(node.componentMeta?.isComponent ? node.componentMeta.listeners : []),
@@ -203,10 +220,10 @@ export class WxContainer {
     }
     return [
       ...Array.from(attributeMap.entries()).map(
-        ([key, value]) => `${key}="${value}"`
+        ([key, value]) => `${key}="${value}"`,
       ),
       ...Array.from(propertyMap.entries()).map(
-        ([key, value]) => `${key}="{{${value}}}"`
+        ([key, value]) => `${key}="${this.interp(value)}"`,
       ),
       result,
     ];

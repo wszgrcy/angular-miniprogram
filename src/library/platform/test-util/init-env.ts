@@ -76,6 +76,6 @@ export function initMiniProgramTestEnv(): void {
     {
       errorOnUnknownElements: false,
       errorOnUnknownProperties: false,
-    }
+    },
   );
 }

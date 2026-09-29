@@ -25,19 +25,19 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     const root = harness.host.root();
     const myTestProjectHost = new MyTestProjectHost(harness.host);
     const list = await myTestProjectHost.getFileList(
-      normalize(join(root, 'src', '__pages'))
+      normalize(join(root, 'src', '__pages')),
     );
     list.push(
       ...(await myTestProjectHost.getFileList(
-        normalize(join(root, 'src', '__components'))
-      ))
+        normalize(join(root, 'src', '__components')),
+      )),
     );
     await myTestProjectHost.importPathRename(list);
     await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
     await myTestProjectHost.moveDir(
       ALL_COMPONENT_NAME_LIST,
       '__components',
-      'components'
+      'components',
     );
     await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
     return { root, myTestProjectHost };
@@ -47,14 +47,14 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     await harness.host
       .write(
         join(harness.host.root(), rel),
-        virtualFs.stringToFileBuffer(content)
+        virtualFs.stringToFileBuffer(content),
       )
       .toPromise();
   };
 
   const readOutput = async (rel: string) =>
     virtualFs.fileBufferToString(
-      await harness.host.read(join(harness.host.root(), rel)).toPromise()
+      await harness.host.read(join(harness.host.root(), rel)).toPromise(),
     );
 
   /** 在 src/packageA 下创建一个分包页面 */
@@ -74,7 +74,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
         `  value = '${name}-value';`,
         '}',
         '',
-      ].join('\n')
+      ].join('\n'),
     );
     await write(
       `src/packageA/pages/${name}/${name}.entry.ts`,
@@ -83,13 +83,11 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
         `import { SubPageComponent } from './${name}.component';`,
         `bootstrapPage(SubPageComponent);`,
         '',
-      ].join('\n')
+      ].join('\n'),
     );
   };
 
-  const builtMainPages = ALL_PAGE_NAME_LIST.map(
-    (n) => `pages/${n}/${n}-entry`
-  );
+  const builtMainPages = ALL_PAGE_NAME_LIST.map((n) => `pages/${n}/${n}-entry`);
 
   describe('vite: 分包', () => {
     it('分包页面产物落进 packageA 目录，app.json 声明 subpackages', async () => {
@@ -102,7 +100,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
           subpackages: [
             { root: 'packageA', pages: ['pages/sub-page/sub-page-entry'] },
           ],
-        })
+        }),
       );
 
       harness.useTarget('build', {
@@ -136,19 +134,19 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
       // 分包页面产物在 packageA/ 下
       const subEntry = await readOutput(
-        'dist/vite-subpkg/packageA/pages/sub-page/sub-page-entry.js'
+        'dist/vite-subpkg/packageA/pages/sub-page/sub-page-entry.js',
       );
       expect(subEntry).toContain('subpackage sub-page');
 
       const appJson = JSON.parse(
-        await readOutput('dist/vite-subpkg/app.json')
+        await readOutput('dist/vite-subpkg/app.json'),
       ) as {
         pages: string[];
         subpackages: Array<{ root: string; pages: string[] }>;
       };
       expect(appJson.subpackages[0].root).toBe('packageA');
       expect(appJson.subpackages[0].pages).toContain(
-        'pages/sub-page/sub-page-entry'
+        'pages/sub-page/sub-page-entry',
       );
     }, 300000);
 
@@ -171,7 +169,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
           '})',
           'export class SubBComponent {}',
           '',
-        ].join('\n')
+        ].join('\n'),
       );
       await write(
         'src/packageB/pages/sub-b/sub-b.entry.ts',
@@ -180,7 +178,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
           "import { SubBComponent } from './sub-b.component';",
           'bootstrapPage(SubBComponent);',
           '',
-        ].join('\n')
+        ].join('\n'),
       );
       await write(
         'src/app.config.json',
@@ -190,7 +188,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
             { root: 'packageA', pages: ['pages/sub-page/sub-page-entry'] },
             { root: 'packageB', pages: ['pages/sub-b/sub-b-entry'] },
           ],
-        })
+        }),
       );
 
       harness.useTarget('build', {

@@ -17,7 +17,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     public parent: ParsedNode<NgNodeMeta> | undefined,
     private componentMeta: MatchedComponent | undefined,
     public index: number,
-    private directiveMeta: MatchedDirective | undefined
+    private directiveMeta: MatchedDirective | undefined,
   ) {}
   private analysis() {
     this.getTagName();

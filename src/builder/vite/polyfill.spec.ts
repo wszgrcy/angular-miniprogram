@@ -105,9 +105,7 @@ describe('AbortController polyfill 接入', () => {
       const names = files.map((f) => String(f));
 
       // 1. polyfill chunk 确实落盘了
-      expect(
-        names.some((n) => n.endsWith('polyfills.js')),
-      ).toBeTruthy();
+      expect(names.some((n) => n.endsWith('polyfills.js'))).toBeTruthy();
 
       const appJsPath = names.find((n) => n.endsWith('/app.js'));
       expect(appJsPath).toBeTruthy();

@@ -94,7 +94,7 @@ export class RadioControlRegistry {
 
   private _isSameGroup(
     controlPair: [NgControl, RadioControl],
-    accessor: RadioControl
+    accessor: RadioControl,
   ): boolean {
     if (!controlPair[0].control) {
       return false;
@@ -178,7 +178,7 @@ export class RadioControl {
     private renderer: Renderer2,
     private elementRef: ElementRef,
     private _registry: RadioControlRegistry,
-    private _injector: Injector
+    private _injector: Injector,
   ) {}
 
   updateChecked(value: boolean) {

@@ -47,7 +47,7 @@ export async function compileSourceFiles(
   moduleResolutionCache: ts.ModuleResolutionCache,
   extraOptions?: Partial<CompilerOptions>,
   stylesheetProcessor?: StylesheetProcessor,
-  watch?: boolean
+  watch?: boolean,
 ) {
   const { NgtscProgram, formatDiagnostics } = await ngCompilerCli();
 
@@ -57,7 +57,7 @@ export async function compileSourceFiles(
   };
   const entryPoint: EntryPointNode = graph.find(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    isEntryPointInProgress() as any
+    isEntryPointInProgress() as any,
   )!;
   const ngPackageNode: PackageNode = graph.find(isPackage)!;
   const inlineStyleLanguage = ngPackageNode.data.inlineStyleLanguage;
@@ -68,7 +68,7 @@ export async function compileSourceFiles(
     tsConfigOptions,
     moduleResolutionCache,
     stylesheetProcessor,
-    inlineStyleLanguage
+    inlineStyleLanguage,
   );
   // inject
   augmentLibraryMetadata(tsCompilerHost);
@@ -83,7 +83,7 @@ export async function compileSourceFiles(
     tsConfig.rootNames,
     tsConfigOptions,
     tsCompilerHost,
-    cache.oldNgtscProgram
+    cache.oldNgtscProgram,
   );
 
   const angularCompiler = angularProgram.compiler;
@@ -100,7 +100,7 @@ export async function compileSourceFiles(
       ts.createEmitAndSemanticDiagnosticsBuilderProgram(
         typeScriptProgram,
         tsCompilerHost,
-        cache.oldBuilder
+        cache.oldBuilder,
       );
     cache.oldNgtscProgram = angularProgram;
   } else {
@@ -140,7 +140,7 @@ export async function compileSourceFiles(
           }
 
           return false;
-        }
+        },
       );
 
       if (!result) {
@@ -167,7 +167,7 @@ export async function compileSourceFiles(
           return new MiniProgramCompilerService(
             angularProgram,
             injector,
-            buildPlatform
+            buildPlatform,
           );
         },
         deps: [Injector, BuildPlatform],
@@ -176,7 +176,7 @@ export async function compileSourceFiles(
         provide: ENTRY_FILE_TOKEN,
         useValue: join(
           dirname(normalize(tsConfig.rootNames[0])),
-          normalize(tsConfigOptions.flatModuleOutFile!)
+          normalize(tsConfigOptions.flatModuleOutFile!),
         ),
       },
       {
@@ -208,7 +208,7 @@ export async function compileSourceFiles(
       allDiagnostics.push(
         ...builder.getDeclarationDiagnostics(sourceFile),
         ...builder.getSyntacticDiagnostics(sourceFile),
-        ...builder.getSemanticDiagnostics(sourceFile)
+        ...builder.getSemanticDiagnostics(sourceFile),
       );
     }
 
@@ -242,7 +242,7 @@ export async function compileSourceFiles(
   for (const affectedFile of affectedFiles) {
     const angularDiagnostics = angularCompiler.getDiagnosticsForFile(
       affectedFile,
-      /** OptimizeFor.WholeProgram */ 1
+      /** OptimizeFor.WholeProgram */ 1,
     );
 
     allDiagnostics.push(...angularDiagnostics);
@@ -273,6 +273,23 @@ export async function compileSourceFiles(
       builder.emit(sourceFile, undefined, undefined, undefined, transformers);
     }
   }
+  /**
+   * 在 `compilerHost.writeFile` 上挂一个**只读采集**钩子。
+   *
+   * 关键：这里**不再修改任何产物内容**，写出去的一律是 TS 传进来的原始 `data`。
+   * 钩子只干一件事：在每份产物落盘前，从里面认出类/组件，把元数据登记进
+   * sidecar 暂存区（最终由 `writeLibraryMetaFile` 写成
+   * `<库根>/mp-library-meta.json`）。
+   *
+   * 为什么还挂在 writeFile 上：那是唯一能「按正在写的这个源文件」天然圈定
+   * 当前 entry point 的时机。直接去扫 `componentMap` / `directiveMap` 会把
+   * 上游 entry point 的类一并摄进来（那个 map 是整个 program 的）。
+   *
+   * 三个 service 现在都是「只登记、原样返回」：
+   *   - `.d.ts`  → `AddDeclarationMetaDataService`：host listeners / properties / outputPath
+   *   - flat module `.js` → `OutputTemplateMetadataService`：全局模板
+   *   - 其余 `.js` → `SetupComponentDataService`：组件模板载荷
+   */
   function augmentLibraryMetadata(compilerHost: ts.CompilerHost) {
     const oldWriteFile = compilerHost.writeFile;
     compilerHost.writeFile = function (
@@ -280,7 +297,7 @@ export async function compileSourceFiles(
       data: string,
       writeByteOrderMark,
       onError,
-      sourceFiles
+      sourceFiles,
     ) {
       const entryFileName = injector.get(ENTRY_FILE_TOKEN);
       if (fileName.endsWith('.map')) {
@@ -290,63 +307,37 @@ export async function compileSourceFiles(
           data,
           writeByteOrderMark,
           onError,
-          sourceFiles
+          sourceFiles,
         );
       }
       if (fileName.endsWith('.d.ts')) {
-        const service = injector.get(AddDeclarationMetaDataService);
-        const result = service.run(fileName, data);
-        return oldWriteFile.call(
-          this,
-          fileName,
-          result,
-          writeByteOrderMark,
-          onError,
-          sourceFiles
-        );
-      }
-      const sourceFile = sourceFiles && sourceFiles[0];
-      if (sourceFile) {
-        if (
-          normalize(entryFileName) ===
-          normalize(sourceFile.fileName.replace(/\.ts$/, '.js'))
-        ) {
-          const service = injector.get(OutputTemplateMetadataService);
-          const result = service.run(fileName, data, sourceFiles![0]);
-          return oldWriteFile.call(
-            this,
-            fileName,
-            result,
-            writeByteOrderMark,
-            onError,
-            sourceFiles
-          );
+        injector.get(AddDeclarationMetaDataService).run(fileName, data);
+      } else {
+        const sourceFile = sourceFiles && sourceFiles[0];
+        if (sourceFile) {
+          if (
+            normalize(entryFileName) ===
+            normalize(sourceFile.fileName.replace(/\.ts$/, '.js'))
+          ) {
+            injector.get(OutputTemplateMetadataService).run(fileName, data);
+          }
+          injector
+            .get(SetupComponentDataService)
+            .run(
+              data,
+              path.normalize(sourceFile.fileName),
+              stylesheetProcessor! as CustomStyleSheetProcessor,
+            );
         }
-        const originFileName = path.normalize(sourceFile.fileName);
-        const setupComponentDataService = injector.get(
-          SetupComponentDataService
-        );
-        const result = setupComponentDataService.run(
-          data,
-          originFileName,
-          stylesheetProcessor! as CustomStyleSheetProcessor
-        );
-        return oldWriteFile.call(
-          this,
-          fileName,
-          result,
-          writeByteOrderMark,
-          onError,
-          sourceFiles
-        );
       }
+      // 无论上面采集到什么，写出去的都是原内容。
       return oldWriteFile.call(
         this,
         fileName,
         data,
         writeByteOrderMark,
         onError,
-        sourceFiles
+        sourceFiles,
       );
     };
   }

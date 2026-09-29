@@ -12,7 +12,7 @@ export class ParsedNgBoundText implements ParsedNode<NgBoundTextMeta> {
   constructor(
     private node: BoundText,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    public index: number
+    public index: number,
   ) {}
   getNodeMeta(): NgBoundTextMeta {
     return {

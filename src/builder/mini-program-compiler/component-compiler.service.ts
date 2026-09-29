@@ -10,14 +10,14 @@ export class ComponentCompilerService {
     private buildPlatform: BuildPlatform,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     @Inject(COMPONENT_META) private componentMeta: R3ComponentMetadata<any>,
-    private componentContext: ComponentContext
+    private componentContext: ComponentContext,
   ) {}
 
   private collectionNode() {
     const nodes = this.componentMeta.template.nodes;
     const templateDefinition = new TemplateDefinition(
       nodes,
-      this.componentContext
+      this.componentContext,
     );
     const list = templateDefinition.run();
     return list.map((item) => item.getNodeMeta());

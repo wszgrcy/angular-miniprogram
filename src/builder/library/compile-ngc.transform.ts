@@ -51,6 +51,7 @@ export const myCompileNgcTransformFactory = (
       // Compile TypeScript sources
       const {
         esm2022: esm2022,
+        fesm2022: fesm2022,
         declarations,
         declarationsBundled,
       } = entryPoint.data.destinationFiles;
@@ -76,16 +77,20 @@ export const myCompileNgcTransformFactory = (
       );
 
       /**
-       * 先把本 entry 的「扁平化 d.ts 路径」登记进 sidecar 暂存区。
+       * 先把本 entry 的「扁平化 d.ts 路径 / fesm 产物路径」登记进 sidecar 暂存区。
        *
        * 用 ng-packagr 自己的 `declarationsBundled`（= `dist/types/<flat>.d.ts`），
        * 也就是最终 `package.json#typings` 指的那个文件。读取侧拿类的
        * `getSourceFile()` 相对库根一算就能命中，不用反推 exports map。
+       *
+       * fesm 路径同样直接拿：主构建要把「正在 transform 的那个 .mjs」对上
+       * 具体 entry，多 entry point 的包才不会误伤。
        */
       registerLibraryMetaEntry(
         entryPoint.data.entryPoint.moduleId,
         declarationsBundled,
         distRoot,
+        fesm2022,
       );
 
       await compileSourceFiles(

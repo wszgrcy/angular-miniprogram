@@ -38,17 +38,15 @@ export interface NativeComponentsPluginOptions {
  * Angular 校验），构建后自动接上原生组件，无需手写相对路径。
  */
 export function nativeComponentsPlugin(
-  options: NativeComponentsPluginOptions
+  options: NativeComponentsPluginOptions,
 ): Plugin {
   const absDir = path.resolve(
     options.workspaceRoot,
-    options.nativeComponentsDir
+    options.nativeComponentsDir,
   );
   // 产物里的基路径取目录基名：src/wxcomponents -> wxcomponents，
   // 避免把源码 src/ 前缀带进产物（对齐 uni-app wxcomponents 落产物根）
-  const outputBase = toPosix(
-    path.basename(options.nativeComponentsDir)
-  );
+  const outputBase = toPosix(path.basename(options.nativeComponentsDir));
   const contentExt = options.fileExtname.content; // .wxml
   const configExt = options.fileExtname.config; // .json
 
@@ -67,9 +65,7 @@ export function nativeComponentsPlugin(
       if (fs.existsSync(mainJson)) {
         metas.push({
           tag: options.tagMap?.[dirName] ?? dirName,
-          outputPathNoExt: toPosix(
-            path.join(outputBase, dirName, dirName)
-          ),
+          outputPathNoExt: toPosix(path.join(outputBase, dirName, dirName)),
         });
       }
     }
@@ -93,9 +89,7 @@ export function nativeComponentsPlugin(
           if (entry.isDirectory()) {
             copyDir(relChild);
           } else {
-            const fileName = toPosix(
-              path.join(outputBase, relChild)
-            );
+            const fileName = toPosix(path.join(outputBase, relChild));
             this.emitFile({
               type: 'asset',
               fileName,
@@ -108,20 +102,19 @@ export function nativeComponentsPlugin(
 
       // 2. 扫 wxml，命中原生标签则往同级 json 注入 usingComponents
       const wxmlAssets = Object.entries(bundle).filter(([name]) =>
-        name.endsWith(contentExt)
+        name.endsWith(contentExt),
       );
       for (const [wxmlName] of wxmlAssets) {
         const wxml = String(
-          (bundle[wxmlName] as { source?: unknown }).source ?? ''
+          (bundle[wxmlName] as { source?: unknown }).source ?? '',
         );
         const hits = metas.filter((m) =>
-          new RegExp(`<${m.tag}[\\s/>]`).test(wxml)
+          new RegExp(`<${m.tag}[\\s/>]`).test(wxml),
         );
         if (!hits.length) {
           continue;
         }
-        const jsonName =
-          wxmlName.slice(0, -contentExt.length) + configExt;
+        const jsonName = wxmlName.slice(0, -contentExt.length) + configExt;
         const jsonAsset = bundle[jsonName] as
           | { type: 'asset'; source: string | Uint8Array }
           | undefined;
@@ -143,8 +136,8 @@ export function nativeComponentsPlugin(
           const rel = toPosix(
             path.posix.relative(
               path.posix.dirname(wxmlName),
-              hit.outputPathNoExt
-            )
+              hit.outputPathNoExt,
+            ),
           );
           config.usingComponents[hit.tag] = rel.startsWith('.')
             ? rel

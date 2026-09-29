@@ -52,9 +52,7 @@ describe('#5 createEmbeddedView 不传 __templateName 的自动推导来源', ()
     expect(fromContext)
       .withContext('context 不应带 __templateName')
       .toBeUndefined();
-    expect(fromDecl)
-      .withContext('声明名应自动推导为 autoTpl')
-      .toBe('autoTpl');
+    expect(fromDecl).withContext('声明名应自动推导为 autoTpl').toBe('autoTpl');
 
     // 模拟 lViewToWXView 的取值表达式，结果必须是 autoTpl
     const resolved = fromContext || fromDecl || null;

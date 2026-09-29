@@ -15,7 +15,7 @@ import { splitNsName } from './tags';
  */
 export function createCssSelector(
   elementName: string,
-  attributes: { [name: string]: string }
+  attributes: { [name: string]: string },
 ): CssSelectorType {
   const cssSelector = new CssSelector();
   const elementNameNoNs = splitNsName(elementName)[1];

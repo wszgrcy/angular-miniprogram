@@ -22,7 +22,7 @@ export class MiniProgramHttpResponse<T> extends HttpResponse<T> {
       url?: string;
       cookies?: string[];
       profile?: WechatMiniprogram.RequestProfile;
-    } = {}
+    } = {},
   ) {
     super(init);
     this.cookies = init.cookies ?? null;
@@ -56,7 +56,7 @@ export class MiniProgramHttpResponse<T> extends HttpResponse<T> {
       url?: string;
       cookies?: string[];
       profile?: WechatMiniprogram.RequestProfile;
-    } = {}
+    } = {},
   ): MiniProgramHttpResponse<any> {
     return new MiniProgramHttpResponse<any>({
       body: update.body !== undefined ? update.body : this.body,
@@ -93,7 +93,7 @@ export class MiniProgramHttpDownloadResponse<T> extends HttpResponse<T> {
       filePath?: string;
       tempFilePath?: string;
       profile?: WechatMiniprogram.RequestProfile;
-    } = {}
+    } = {},
   ) {
     super(init);
     this.filePath = init.filePath ?? null;
@@ -131,7 +131,7 @@ export class MiniProgramHttpDownloadResponse<T> extends HttpResponse<T> {
       filePath?: string;
       tempFilePath?: string;
       profile?: WechatMiniprogram.RequestProfile;
-    } = {}
+    } = {},
   ): MiniProgramHttpDownloadResponse<any> {
     return new MiniProgramHttpDownloadResponse<any>({
       body: update.body !== undefined ? update.body : this.body,

@@ -25,7 +25,7 @@ function toPosix(p: string): string {
  */
 function normalizeId(p: string): string {
   return toPosix(p).replace(/^([A-Za-z]):/, (_m, drive: string) =>
-    drive.toLowerCase()
+    drive.toLowerCase(),
   );
 }
 
@@ -52,7 +52,7 @@ export interface SubpackageChunkPluginOptions {
  *     时报错（独立分包不得依赖主包，需自带全部依赖）。
  */
 export function subpackageChunkPlugin(
-  options: SubpackageChunkPluginOptions
+  options: SubpackageChunkPluginOptions,
 ): Plugin {
   const subPackages = resolveSubPackages(options.appConfig);
   const sourceRoot = toPosix(options.sourceRoot);
@@ -89,11 +89,11 @@ export function subpackageChunkPlugin(
         const ids = chunk.moduleIds?.length
           ? chunk.moduleIds
           : chunk.moduleId
-          ? [chunk.moduleId]
-          : [];
+            ? [chunk.moduleId]
+            : [];
         // 全部模块都在同一个分包源码目录下 → 归入该分包目录
         const zones = new Set(
-          ids.filter((id) => SOURCE_EXT.test(id)).map((id) => zoneOfModule(id))
+          ids.filter((id) => SOURCE_EXT.test(id)).map((id) => zoneOfModule(id)),
         );
         if (zones.size === 1) {
           const zone = [...zones][0];
@@ -120,13 +120,13 @@ export function subpackageChunkPlugin(
         imports: string[];
       }
       const chunks = Object.values(bundle).filter(
-        (i) => i.type === 'chunk'
+        (i) => i.type === 'chunk',
       ) as unknown as Chunk[];
       const zoneOfChunk = (chunk: Chunk) => {
         const zones = new Set(
           (chunk.moduleIds ?? [])
             .filter((id) => SOURCE_EXT.test(id))
-            .map((id) => zoneOfModule(id))
+            .map((id) => zoneOfModule(id)),
         );
         // 只返回「纯属于某分包」的 zone；混包/主包返回 undefined
         if (zones.size === 1) {
@@ -152,14 +152,14 @@ export function subpackageChunkPlugin(
             errors.push(
               `跨分包静态依赖：分包 "${fromZone.root}" 的 chunk ` +
                 `"${chunk.fileName}" 依赖了分包 "${toZone.root}" 的 ` +
-                `"${toChunk.fileName}"（小程序不允许跨分包 require）`
+                `"${toChunk.fileName}"（小程序不允许跨分包 require）`,
             );
           }
           // 独立分包不得依赖主包 chunk
           if (fromZone.independent && !toZone) {
             errors.push(
               `独立分包 "${fromZone.root}" 依赖了主包 chunk ` +
-                `"${toChunk.fileName}"（独立分包不得依赖主包，需自带依赖）`
+                `"${toChunk.fileName}"（独立分包不得依赖主包，需自带依赖）`,
             );
           }
         }
@@ -167,7 +167,7 @@ export function subpackageChunkPlugin(
 
       if (errors.length) {
         this.error(
-          `分包校验失败：\n  - ${[...new Set(errors)].join('\n  - ')}`
+          `分包校验失败：\n  - ${[...new Set(errors)].join('\n  - ')}`,
         );
       }
     },

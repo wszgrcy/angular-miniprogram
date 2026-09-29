@@ -4,8 +4,8 @@ import * as path from 'path';
 function globAsync(pattern: string, options: glob.IOptions) {
   return new Promise<string[]>((resolvePromise, reject) =>
     glob.default(pattern, options, (e, m) =>
-      e ? reject(e) : resolvePromise(m)
-    )
+      e ? reject(e) : resolvePromise(m),
+    ),
   );
 }
 

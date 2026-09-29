@@ -90,7 +90,7 @@ export function normalizeAssetPatternsSafe(
   assetPatterns: AssetPattern[],
   workspaceRoot: string | Path,
   projectRoot: string | Path,
-  projectSourceRoot: (string | Path) | undefined
+  projectSourceRoot: (string | Path) | undefined,
 ) {
   return normalizeAssetPatterns(
     assetPatterns,
@@ -98,7 +98,7 @@ export function normalizeAssetPatternsSafe(
     toNativePath(projectRoot),
     projectSourceRoot === undefined
       ? undefined
-      : toNativePath(projectSourceRoot)
+      : toNativePath(projectSourceRoot),
   );
 }
 

@@ -30,8 +30,18 @@
 /** sidecar 文件名，写在库根（`dist/`）下。 */
 export const LIBRARY_META_FILE_NAME = 'mp-library-meta.json';
 
-/** schema 版本。字段语义变化时必须 bump，读取侧据此拒绝吃错格式。 */
-export const LIBRARY_META_SCHEMA_VERSION = 1;
+/**
+ * schema 版本。字段语义变化时必须 bump，读取侧据此拒绝吃错格式。
+ *
+ * v2：库构建不再改写自己的 JS 产物（`let X_ExtraData` / `$self_Global_Template`
+ * / `library_Global_Template` / `amp.propertyChange` 全部取消），这些载荷搬进
+ * 本文件，由主构建读取后完成 wxml 产出与运行时注入。
+ *
+ * v3：插值改用 **`es-toolkit/compat` 的 `template`**，分隔符自定义成 `${x}`。
+ * 选 `${}` 是因为它和 wxml 自己的 `{{ }}` 不撞 —— 库模板里的 `{{hasLoad}}`
+ * 就是普通静态文本，原样进出，不需要任何转义。
+ */
+export const LIBRARY_META_SCHEMA_VERSION = 3;
 
 /** 产出方标识，方便排查「这个文件是谁写的」。 */
 export const LIBRARY_META_GENERATOR = 'angular-miniprogram';
@@ -44,20 +54,65 @@ export interface LibraryDirectiveMetaRecord {
   properties: string[];
 }
 
-/** 组件比指令多一个「小程序自定义组件产物路径」。 */
+/**
+ * 组件比指令多出来的东西：产物路径 + 模板载荷。
+ *
+ * `content` / `contentTemplate` 是 **`${}` 插值模板串**（平台中立）：
+ * 平台相关部分写成插槽（`${directivePrefix}` / `${eventListConvert(["tap"])}` /
+ * `${fileExtname.contentTemplate}`），wxml 自己的 `{{hasLoad}}` 是静态文本原样进出。
+ * 主构建用目标平台的 `LibraryTemplateValues` 调 `renderLibraryTemplate()` 渲染。
+ * 所以一份库产物可以通吃 wx / zfb / bd / qq —— 平台相关的东西一个都不烘进库里。
+ *
+ * 见 `library/mp-template.ts`（渲染与白名单预检）、
+ * `platform/library/library.transform.ts`（插槽的定义处）、
+ * `vite/plugins/library-template.plugin.ts`（调用处）。
+ */
 export interface LibraryComponentMetaRecord extends LibraryDirectiveMetaRecord {
   /** 形如 `/angular-miniprogram/forms/default-value-accessor/default-value-accessor` */
   outputPath: string;
+  /** 小程序侧组件唯一 id（`classify(moduleId) + classify(dasherize(className))`） */
+  id?: string;
+  /** 类名，主构建生成 entry chunk 时要拿它去 `lib.<className>` 上取值 */
+  className?: string;
+  /** `${}` 插值模板串（已含 `<import src=".../self..."/>` 前缀） */
+  content?: string;
+  /** 组件自带的 contentTemplate（递归/自引用模板场景） */
+  contentTemplate?: string;
+  /** 该组件模板用到的子组件映射，等价于小程序的 `usingComponents` */
+  useComponents?: Record<string, string>;
+  /** 编译后的样式文本 */
+  style?: string;
+}
+
+/**
+ * 全局模板（原 `$self_Global_Template` / `library_Global_Template`）。
+ *
+ * 库构建把「多个组件共用的模板片段」聚合成一份，主构建按路径 emit 成
+ * 一个可 `<import src="..."/>` 的文件。
+ */
+export interface LibraryGlobalTemplateRecord {
+  /** `${}` 插值模板串 */
+  template: string;
+  /** emit 目标路径（不含扩展名），仅 self 模板带 */
+  outputPath?: string;
+  /** 该模板作用域内可用的组件映射 */
+  useComponents?: Record<string, string>;
 }
 
 /** 一个 entry point 的元数据。 */
 export interface LibraryMetaEntry {
-  /** 模块 id，如 `angular-miniprogram/forms`。仅用于人读与日志 */
+  /** 模块 id，如 `angular-miniprogram/forms`。同时是主构建的 bare import 说明符 */
   moduleId: string;
   /** 扁平化 d.ts 相对库根的 posix 路径，**读取侧主键** */
   typings: string;
+  /** 该 entry 的 fesm 产物相对库根的 posix 路径，用于把模块 id 对上实际文件 */
+  fesm?: string;
   directives: Record<string, LibraryDirectiveMetaRecord>;
   components: Record<string, LibraryComponentMetaRecord>;
+  /** 本 entry 的自引用模板（原 `$self_Global_Template`） */
+  selfTemplate?: LibraryGlobalTemplateRecord;
+  /** 跨组件共享模板（原 `library_Global_Template`），key 为模板作用域 */
+  scopeTemplates?: Record<string, LibraryGlobalTemplateRecord>;
 }
 
 /** sidecar 文件整体结构。 */
@@ -100,4 +155,32 @@ export function safeStringList(list: unknown): string[] {
   return Array.isArray(list)
     ? (list.filter((i) => typeof i === 'string') as string[])
     : [];
+}
+
+/**
+ * 校验一个 entry 真的带了模板载荷，没带就**显式抛错**。
+ *
+ * 场景：sidecar 里有组件却一个 `content` 都没有 —— 说明这个库不是用当前
+ * 工具链构建的（v1 的载荷在 JS 里，不在 sidecar 里）。
+ *
+ * 必须炸，不能静默出空 wxml：这个仓库已经栽过好几次「静默丢事件绑定 /
+ * 静默丢模板，零报错，页面白屏」。宁可构建失败，也不要交一个白屏产物。
+ */
+export function assertLibraryTemplatePayload(
+  entry: Pick<LibraryMetaEntry, 'moduleId' | 'components'>,
+): void {
+  const components = Object.values(entry.components ?? {});
+  if (!components.length) {
+    return;
+  }
+  const hasPayload = components.some(
+    (c) => typeof c.content === 'string' && c.content.length > 0,
+  );
+  if (!hasPayload) {
+    throw new Error(
+      `[library-template] 库 "${entry.moduleId}" 的 sidecar 里所有组件都缺 content` +
+        `（需要 schemaVersion v${LIBRARY_META_SCHEMA_VERSION}）。` +
+        `该库必须用当前版本工具链重新构建，否则库组件不会有任何 wxml。`,
+    );
+  }
 }

@@ -7,7 +7,7 @@ export class ParsedNgText implements ParsedNode<NgTextMeta> {
   constructor(
     private node: Text,
     public parent: ParsedNode<NgNodeMeta> | undefined,
-    public index: number
+    public index: number,
   ) {}
 
   getNodeMeta(): NgTextMeta {

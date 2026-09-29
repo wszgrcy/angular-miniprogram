@@ -86,13 +86,13 @@ describe('util/asset-path: devkit posix 化的 Windows 路径（/C:/...）', () 
 describe('util/asset-path: toPosixPath（产物路径归一）', () => {
   it('反斜杠全部转成正斜杠', () => {
     expect(toPosixPath('components\\component1\\component1-entry')).toBe(
-      'components/component1/component1-entry'
+      'components/component1/component1-entry',
     );
   });
 
   it('剥掉前导 / 和 ./', () => {
     expect(toPosixPath('/self-template/self.wxml')).toBe(
-      'self-template/self.wxml'
+      'self-template/self.wxml',
     );
     expect(toPosixPath('./pages/a.js')).toBe('pages/a.js');
   });
@@ -115,11 +115,11 @@ describe('util/asset-path: toPosixPath（产物路径归一）', () => {
     // 层级全丢，且字符串变短了。不报错，运行时才找不到模块。
     expect((broken.match(/\//g) || []).length).toBe(1);
     expect(broken).toBe(
-      './componentscomponent-need-templatecomponent-need-template-entry'
+      './componentscomponent-need-templatecomponent-need-template-entry',
     );
     const fixed: string = new Function(`return './${toPosixPath(raw)}'`)();
     expect(fixed).toBe(
-      './components/component-need-template/component-need-template-entry'
+      './components/component-need-template/component-need-template-entry',
     );
   });
 });

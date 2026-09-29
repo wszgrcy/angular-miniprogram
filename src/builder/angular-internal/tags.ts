@@ -33,7 +33,7 @@ export function splitNsName(elementName: string): [string | null, string] {
 
   if (colonIndex === -1) {
     throw new Error(
-      `Unsupported format "${elementName}" expecting ":namespace:name"`
+      `Unsupported format "${elementName}" expecting ":namespace:name"`,
     );
   }
 

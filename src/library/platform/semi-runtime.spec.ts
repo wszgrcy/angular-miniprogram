@@ -51,12 +51,12 @@ describe('半运行时（TestBed）', () => {
 
     console.log(
       `decls=${decls} bsi=${tView.bindingStartIndex} ` +
-        `HEADER_OFFSET=${LVIEW.HEADER_OFFSET} nodeCount=${nodeCount}`
+        `HEADER_OFFSET=${LVIEW.HEADER_OFFSET} nodeCount=${nodeCount}`,
     );
 
     expect(nodeCount)
       .withContext(
-        `节点数(${nodeCount}) 应等于模板声明(${decls})，否则 create pass 没跑完`
+        `节点数(${nodeCount}) 应等于模板声明(${decls})，否则 create pass 没跑完`,
       )
       .toBe(decls);
   });

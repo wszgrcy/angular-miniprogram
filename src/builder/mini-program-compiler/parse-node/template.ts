@@ -19,7 +19,7 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
     private node: Template | null,
     public parent: ParsedNode<NgNodeMeta> | undefined,
     public index: number,
-    private templateName?: string
+    private templateName?: string,
   ) {}
 
   appendNgNodeChild(child: ParsedNode<NgNodeMeta>) {

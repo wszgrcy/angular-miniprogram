@@ -8,8 +8,8 @@ import { normalizeAssetPatternsSafe } from '../util/asset-path';
 function globAsync(pattern: string, options: glob.IOptions) {
   return new Promise<string[]>((resolvePromise, reject) =>
     glob.default(pattern, options, (e, m) =>
-      e ? reject(e) : resolvePromise(m)
-    )
+      e ? reject(e) : resolvePromise(m),
+    ),
   );
 }
 
@@ -34,7 +34,7 @@ export async function collectAssets(
     workspaceRoot: string;
     absoluteProjectRoot: Path;
     absoluteProjectSourceRoot: Path;
-  }
+  },
 ): Promise<CopiedAsset[]> {
   if (!assets?.length) {
     return [];
@@ -43,7 +43,7 @@ export async function collectAssets(
     assets,
     options.workspaceRoot,
     options.absoluteProjectRoot,
-    options.absoluteProjectSourceRoot
+    options.absoluteProjectSourceRoot,
   );
   const result: CopiedAsset[] = [];
   for (const pattern of patternList) {

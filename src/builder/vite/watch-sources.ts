@@ -17,7 +17,7 @@ export interface WatcherFactoryLike {
   watch(
     files: Iterable<string>,
     directories: Iterable<string>,
-    callback: (events: Array<{ path: string; type: WatchEventType }>) => void
+    callback: (events: Array<{ path: string; type: WatchEventType }>) => void,
   ): { close(): void };
 }
 
@@ -84,7 +84,7 @@ export function watchSources(options: {
       watchers.push(
         fs.watch(dir, { recursive: true }, () => {
           fire();
-        })
+        }),
       );
     } catch (error) {
       // 目录不存在或平台不支持 recursive，跳过而不是整体失败

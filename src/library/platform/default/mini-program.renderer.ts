@@ -69,7 +69,7 @@ export class MiniProgramRenderer implements Renderer2 {
     parent: AgentNode,
     newChild: AgentNode,
     refChild: AgentNode,
-    isMove?: boolean
+    isMove?: boolean,
   ) {
     if (isMove) {
       // todo 应该没用
@@ -90,7 +90,7 @@ export class MiniProgramRenderer implements Renderer2 {
   }
   selectRootElement(
     selectorOrNode: string | unknown,
-    preserveContent?: boolean
+    preserveContent?: boolean,
   ) {
     const root = new AgentNode('element');
     root.selector = selectorOrNode;
@@ -107,7 +107,7 @@ export class MiniProgramRenderer implements Renderer2 {
     el: AgentNode,
     name: string,
     value: string,
-    namespace?: string | null
+    namespace?: string | null,
   ) {
     el.attribute[name] = value;
     // `toView()` 只把 attribute 里的 class / style 纳入渲染数据，
@@ -138,7 +138,7 @@ export class MiniProgramRenderer implements Renderer2 {
     el: AgentNode,
     style: string,
     value: string,
-    flags?: RendererStyleFlags2
+    flags?: RendererStyleFlags2,
   ) {
     el.style[style] = value;
     this.emitStyle(el);
@@ -158,7 +158,7 @@ export class MiniProgramRenderer implements Renderer2 {
   listen(
     target: AgentNode,
     eventName: string,
-    callback: (event: WechatMiniprogram.BaseEvent) => boolean | void
+    callback: (event: WechatMiniprogram.BaseEvent) => boolean | void,
   ) {
     if (!(target instanceof AgentNode)) {
       throw new Error('不支持其他类型监听');
