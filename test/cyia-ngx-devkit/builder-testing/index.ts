@@ -22,15 +22,30 @@ import {
   isBuilderOutput,
 } from '@angular-devkit/architect';
 import { TestProjectHost } from '@angular-devkit/architect/testing';
-import { Path, getSystemPath, json, logging } from '@angular-devkit/core';
+import {
+  Path,
+  getSystemPath,
+  json,
+  logging,
+  virtualFs,
+} from '@angular-devkit/core';
+import nodeFs from 'node:fs';
 import nodePath from 'node:path';
-import { Observable, Subject, firstValueFrom, lastValueFrom, of } from 'rxjs';
+import {
+  EMPTY,
+  Observable,
+  Subject,
+  firstValueFrom,
+  lastValueFrom,
+  of,
+} from 'rxjs';
 import {
   catchError,
   finalize,
   map,
   mergeMap,
   shareReplay,
+  tap,
 } from 'rxjs/operators';
 import type { Configuration } from 'webpack';
 
@@ -38,19 +53,118 @@ export interface TestContext {
   buildSuccess: (webpackConfig: Configuration) => void;
 }
 
+/**
+ * 拷 sandbox 时排除的目录。
+ *
+ * `dist/` 是**构建输出**（模板里那份是上一次跑留下的，5.7MB / 358 个文件），
+ * 它从来不是构建的输入；拷进 sandbox 只会白拷，还会让 `toExist()` 这类断言
+ * 拿旧产物蒙对。`.angular/` 是 CLI 缓存，`__test-app/` 是 builder.spec.ts
+ * 往仓库根拷的副本，同理不是输入。
+ */
+const SANDBOX_EXCLUDE = [
+  /(^|[\\/])dist([\\/]|$)/,
+  /(^|[\\/])\.angular([\\/]|$)/,
+  /(^|[\\/])__test-app([\\/]|$)/,
+];
+
+export function isExcludedFromSandbox(
+  templateRoot: string,
+  srcPath: string,
+): boolean {
+  const rel = nodePath.relative(templateRoot, srcPath);
+  if (!rel) {
+    return false;
+  }
+  return SANDBOX_EXCLUDE.some((re) => re.test(rel));
+}
+
+/**
+ * `TestProjectHost` 的快速版本，只改 `initialize()` / `restore()`。
+ *
+ * 上游实现的问题（实测占整个测试套件 ~31% 时间）：
+ *
+ * 1. `initialize()` 递归列目录后，用 `concatMap(read -> write)` **串行**经
+ *    devkit 虚拟 FS 一个个文件拷，而不是用原生递归拷贝；
+ * 2. 模板里的构建产物 `dist/`（5.7MB / 358 文件）也被当成输入拷了一遍；
+ * 3. `restore()` 固定 `delay(50ms)` 再逐文件删。
+ *
+ * 每个用 harness 的 spec 都要付这份钱（共 81 个），实测
+ * initialize 0.46s + restore 0.21s = 0.67s / spec，合计 54.8s。
+ * 换成原生 `fs.cpSync`（排除构建产物）+ `fs.rmSync` 后约 0.27s + 0.07s。
+ */
+export class FastTestProjectHost extends TestProjectHost {
+  private get internals(): any {
+    return this as any;
+  }
+
+  override initialize(): Observable<void> {
+    const templateRoot = getSystemPath(this._templateRoot);
+
+    // findUniqueFolderPath 在上游声明为 private，但语义是公开的（找一个不重
+    // 名的空目录当 sandbox），这里只是拿回它，不改它的行为。
+    return (this.internals.findUniqueFolderPath() as Observable<Path>).pipe(
+      tap((newFolderPath) => {
+        this.internals._currentRoot = newFolderPath;
+        this.internals._scopedSyncHost = new virtualFs.SyncDelegateHost(
+          new virtualFs.ScopedHost(this, this.root()),
+        );
+      }),
+      map(() => {
+        nodeFs.cpSync(templateRoot, getSystemPath(this.root()), {
+          recursive: true,
+          // 与上游行为对齐：上游是 read() 读内容再写，符号链接会被 deref。
+          dereference: true,
+          filter: (p: string) => !isExcludedFromSandbox(templateRoot, p),
+        });
+      }),
+    );
+  }
+
+  override restore(): Observable<void> {
+    if (this.internals._currentRoot === null) {
+      return EMPTY;
+    }
+    return new Observable<void>((subscriber) => {
+      try {
+        // 原生 rm 自带重试，不需要上游那个无条件 delay(50ms)。
+        nodeFs.rmSync(getSystemPath(this.root()), {
+          recursive: true,
+          force: true,
+          maxRetries: 10,
+          retryDelay: 50,
+        });
+      } catch (e) {
+        subscriber.error(e);
+        return;
+      } finally {
+        this.internals._currentRoot = null;
+        this.internals._scopedSyncHost = null;
+      }
+      subscriber.complete();
+    });
+  }
+}
+
 export let host: TestProjectHost;
 
 /** 设置测试项目的位置,不设置情况下默认为 `hello-world-app` */
 export function setWorkspaceRoot(path: Path): void {
-  host = new TestProjectHost(path);
+  host = new FastTestProjectHost(path);
 }
+
+/** 耗时统计（MP_TEST_TIMING=1 才记录）：每次 sandbox 建立 / 回收的耗时 */
+const __timing = ((globalThis as any).__harnessTiming ??= {
+  init: [] as number[],
+  restore: [] as number[],
+});
+const __timeIt = process.env.MP_TEST_TIMING === '1';
 
 const optionSchemaCache = new Map<string, json.JsonObject>();
 
 export function describeBuilder<T>(
   builderHandler: BuilderHandlerFn<T & json.JsonObject>,
   options: { name?: string; schemaPath: string },
-  specDefinitions: (harness: JasmineBuilderHarness<T>) => void
+  specDefinitions: (harness: JasmineBuilderHarness<T>) => void,
 ): void {
   jasmine.DEFAULT_TIMEOUT_INTERVAL = 500 * 1000;
 
@@ -58,7 +172,7 @@ export function describeBuilder<T>(
   if (optionSchema === undefined) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     optionSchema = JSON.parse(
-      require('fs').readFileSync(options.schemaPath, 'utf8')
+      require('fs').readFileSync(options.schemaPath, 'utf8'),
     );
     optionSchemaCache.set(options.schemaPath, optionSchema);
   }
@@ -71,8 +185,20 @@ export function describeBuilder<T>(
   });
 
   describe(options.name || builderHandler.name, () => {
-    beforeEach(() => host.initialize().toPromise());
-    afterEach(() => host.restore().toPromise());
+    beforeEach(async () => {
+      const t = Date.now();
+      await host.initialize().toPromise();
+      if (__timeIt) {
+        __timing.init.push(Date.now() - t);
+      }
+    });
+    afterEach(async () => {
+      const t = Date.now();
+      await host.restore().toPromise();
+      if (__timeIt) {
+        __timing.restore.push(Date.now() - t);
+      }
+    });
 
     specDefinitions(harness);
   });
@@ -100,12 +226,12 @@ export interface WorkspaceHost {
   getOptions(
     project: string,
     target: string,
-    configuration?: string
+    configuration?: string,
   ): Promise<json.JsonObject>;
   hasTarget(project: string, target: string): Promise<boolean>;
   getDefaultConfigurationName(
     project: string,
-    target: string
+    target: string,
   ): Promise<string | undefined>;
 }
 
@@ -114,14 +240,14 @@ export type BuilderWatcherCallback = (
     path: string;
     type: 'created' | 'modified' | 'deleted';
     time?: number;
-  }>
+  }>,
 ) => void;
 
 export interface BuilderWatcherFactory {
   watch(
     files: Iterable<string>,
     directories: Iterable<string>,
-    callback: BuilderWatcherCallback
+    callback: BuilderWatcherCallback,
   ): { close(): void };
 }
 
@@ -145,7 +271,7 @@ export class BuilderHarness<T> {
   constructor(
     private readonly builderHandler: BuilderHandlerFn<T & json.JsonObject>,
     public readonly host: TestProjectHost,
-    builderInfo?: Partial<BuilderInfo>
+    builderInfo?: Partial<BuilderInfo>,
   ) {
     // Generate default pseudo builder info for test purposes
     this.builderInfo = {
@@ -156,7 +282,7 @@ export class BuilderHarness<T> {
     };
 
     this.schemaRegistry.addPostTransform(
-      json.schema.transforms.addUndefinedDefaults
+      json.schema.transforms.addUndefinedDefaults,
     );
   }
 
@@ -198,7 +324,7 @@ export class BuilderHarness<T> {
     target: string,
     handler: BuilderHandlerFn<O & json.JsonObject>,
     options?: O,
-    info?: Partial<BuilderInfo>
+    info?: Partial<BuilderInfo>,
   ): this {
     this.builderTargets.set(target, {
       handler: handler as BuilderHandlerFn<json.JsonObject>,
@@ -215,7 +341,7 @@ export class BuilderHarness<T> {
   }
 
   execute(
-    options: Partial<BuilderHarnessExecutionOptions> = {}
+    options: Partial<BuilderHarnessExecutionOptions> = {},
   ): Observable<BuilderHarnessExecutionResult> {
     const {
       configuration,
@@ -256,7 +382,7 @@ export class BuilderHarness<T> {
       getBuilderName: async function (
         this: HarnessContextHost,
         project: string,
-        target: string
+        target: string,
       ) {
         return (await this.findBuilderByTarget(project, target)).info
           .builderName;
@@ -269,7 +395,7 @@ export class BuilderHarness<T> {
       getOptions: async (
         project: string,
         target: string,
-        configuration?: string
+        configuration?: string,
       ) => {
         this.validateProjectName(project);
         if (target === this.targetName) {
@@ -305,7 +431,7 @@ export class BuilderHarness<T> {
         }
 
         const validator = await this.schemaRegistry.compile(
-          (schema ?? true) as json.schema.JsonSchema
+          (schema ?? true) as json.schema.JsonSchema,
         );
         const { data } = await validator(options);
 
@@ -317,7 +443,7 @@ export class BuilderHarness<T> {
       this.builderInfo,
       this.resolvePath('.'),
       contextHost,
-      useNativeFileWatching ? undefined : this.watcherNotifier
+      useNativeFileWatching ? undefined : this.watcherNotifier,
     );
     if (this.targetName !== undefined) {
       context.target = {
@@ -336,8 +462,8 @@ export class BuilderHarness<T> {
       map((validationResult) => validationResult.data as json.JsonObject),
       mergeMap((data) =>
         convertBuilderOutputToObservable(
-          this.builderHandler(data as T & json.JsonObject, context)
-        )
+          this.builderHandler(data as T & json.JsonObject, context),
+        ),
       ),
       map((buildResult) => ({ result: buildResult, error: undefined })),
       catchError((error) => {
@@ -371,12 +497,12 @@ export class BuilderHarness<T> {
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
           teardown();
         }
-      })
+      }),
     );
   }
 
   async executeOnce(
-    options?: Partial<BuilderHarnessExecutionOptions>
+    options?: Partial<BuilderHarnessExecutionOptions>,
   ): Promise<BuilderHarnessExecutionResult> {
     // Return the first result
     return firstValueFrom(this.execute(options));
@@ -421,7 +547,7 @@ export class BuilderHarness<T> {
 
   async modifyFile(
     path: string,
-    modifier: (content: string) => string | Promise<string>
+    modifier: (content: string) => string | Promise<string>,
   ): Promise<void> {
     const content = this.readFile(path);
     await this.writeFile(path, await modifier(content));
@@ -470,28 +596,28 @@ export interface HarnessFileMatchers {
 interface HarnessContextHost {
   findBuilderByTarget(
     project: string,
-    target: string
+    target: string,
   ): Promise<{ info: BuilderInfo; handler: BuilderHandlerFn<json.JsonObject> }>;
   getBuilderName(project: string, target: string): Promise<string>;
   getMetadata(project: string): Promise<json.JsonObject>;
   getOptions(
     project: string,
     target: string,
-    configuration?: string
+    configuration?: string,
   ): Promise<json.JsonObject>;
   hasTarget(project: string, target: string): Promise<boolean>;
   getDefaultConfigurationName(
     project: string,
-    target: string
+    target: string,
   ): Promise<string | undefined>;
   validate(
     options: json.JsonObject,
-    builderName?: string
+    builderName?: string,
   ): Promise<json.JsonObject>;
 }
 
 function convertBuilderOutputToObservable(
-  output: BuilderOutputLike
+  output: BuilderOutputLike,
 ): Observable<BuilderOutput> {
   if (isBuilderOutput(output)) {
     return of(output);
@@ -522,7 +648,7 @@ class HarnessBuilderContext implements BuilderContext {
     public builder: BuilderInfo,
     basePath: string,
     private contextHost: HarnessContextHost,
-    private watcherFactory?: BuilderWatcherFactory
+    private watcherFactory?: BuilderWatcherFactory,
   ) {
     this.workspaceRoot = this.currentDirectory = basePath;
   }
@@ -549,7 +675,7 @@ class HarnessBuilderContext implements BuilderContext {
   }
 
   async getProjectMetadata(
-    targetOrName: Target | string
+    targetOrName: Target | string,
   ): Promise<json.JsonObject> {
     const project =
       typeof targetOrName === 'string' ? targetOrName : targetOrName.project;
@@ -561,7 +687,7 @@ class HarnessBuilderContext implements BuilderContext {
     return this.contextHost.getOptions(
       target.project,
       target.target,
-      target.configuration
+      target.configuration,
     );
   }
 
@@ -569,7 +695,7 @@ class HarnessBuilderContext implements BuilderContext {
   async scheduleBuilder(
     _builderName: string,
     _options?: json.JsonObject,
-    _scheduleOptions?: unknown
+    _scheduleOptions?: unknown,
   ): Promise<BuilderRun> {
     throw new Error('Not Implemented.');
   }
@@ -577,32 +703,32 @@ class HarnessBuilderContext implements BuilderContext {
   async scheduleTarget(
     target: Target,
     overrides?: json.JsonObject,
-    scheduleOptions?: { logger?: logging.Logger }
+    scheduleOptions?: { logger?: logging.Logger },
   ): Promise<BuilderRun> {
     const { info, handler } = await this.contextHost.findBuilderByTarget(
       target.project,
-      target.target
+      target.target,
     );
     const targetOptions = await this.validateOptions<json.JsonObject>(
       {
         ...(await this.getTargetOptions(target)),
         ...overrides,
       },
-      info.builderName
+      info.builderName,
     );
 
     const context = new HarnessBuilderContext(
       info,
       this.workspaceRoot,
       this.contextHost,
-      this.watcherFactory
+      this.watcherFactory,
     );
     context.target = target;
     context.logger = scheduleOptions?.logger ?? this.logger.createChild('');
 
     const progressSubject = new Subject<BuilderProgressReport>();
     const output = convertBuilderOutputToObservable(
-      handler(targetOptions, context)
+      handler(targetOptions, context),
     );
 
     const run: BuilderRun = {
@@ -629,7 +755,7 @@ class HarnessBuilderContext implements BuilderContext {
 
   async validateOptions<T extends json.JsonObject = json.JsonObject>(
     options: json.JsonObject,
-    builderName: string
+    builderName: string,
   ): Promise<T> {
     return this.contextHost.validate(options, builderName) as Promise<T>;
   }
@@ -644,7 +770,7 @@ class WatcherDescriptor {
   constructor(
     readonly files: Set<string>,
     readonly directories: Set<string>,
-    readonly callback: BuilderWatcherCallback
+    readonly callback: BuilderWatcherCallback,
   ) {}
 
   shouldNotify(_path: string): boolean {
@@ -656,7 +782,10 @@ export class WatcherNotifier implements BuilderWatcherFactory {
   private readonly descriptors = new Set<WatcherDescriptor>();
 
   notify(
-    events: Iterable<{ path: string; type: 'created' | 'modified' | 'deleted' }>
+    events: Iterable<{
+      path: string;
+      type: 'created' | 'modified' | 'deleted';
+    }>,
   ): void {
     for (const descriptor of this.descriptors) {
       for (const { path } of events) {
@@ -671,12 +800,12 @@ export class WatcherNotifier implements BuilderWatcherFactory {
   watch(
     files: Iterable<string>,
     directories: Iterable<string>,
-    callback: BuilderWatcherCallback
+    callback: BuilderWatcherCallback,
   ): { close(): void } {
     const descriptor = new WatcherDescriptor(
       new Set(files),
       new Set(directories),
-      callback
+      callback,
     );
     this.descriptors.add(descriptor);
 
@@ -696,7 +825,7 @@ const DEFAULT_PROJECT_METADATA: json.JsonObject = {
 
 export function expectFile<T>(
   path: string,
-  harness: BuilderHarness<T>
+  harness: BuilderHarness<T>,
 ): HarnessFileMatchers {
   return {
     toExist() {
@@ -714,7 +843,7 @@ export function expectFile<T>(
     get content() {
       try {
         return expect(harness.readFile(path)).withContext(
-          `With file content for '${path}'`
+          `With file content for '${path}'`,
         );
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -723,14 +852,14 @@ export function expectFile<T>(
         // File does not exist so always fail the expectation
         return createFailureExpectation(
           expect(''),
-          `Expected file content but file does not exist: '${path}'`
+          `Expected file content but file does not exist: '${path}'`,
         );
       }
     },
     get size() {
       try {
         return expect(Buffer.byteLength(harness.readFile(path))).withContext(
-          `With file size for '${path}'`
+          `With file size for '${path}'`,
         );
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -739,7 +868,7 @@ export function expectFile<T>(
         // File does not exist so always fail the expectation
         return createFailureExpectation(
           expect(0),
-          `Expected file size but file does not exist: '${path}'`
+          `Expected file size but file does not exist: '${path}'`,
         );
       }
     },
