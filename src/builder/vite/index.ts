@@ -224,6 +224,13 @@ export async function createMiniProgramViteConfig(options: {
     ...entryPatterns.pageList,
     ...entryPatterns.componentList,
   ];
+  context.logger.info(
+    `[小程序构建] 平台 ${viteOptions.platform}，` +
+      `页面 ${entryPatterns.pageList.length} 个、` +
+      `组件 ${entryPatterns.componentList.length} 个，` +
+      `输出 ${viteOptions.outputPath}` +
+      `（${isProduction ? 'production' : 'development'}）`,
+  );
   const { absoluteProjectRoot, absoluteProjectSourceRoot } =
     await resolveProjectRoots({
       workspaceRoot: context.workspaceRoot,
@@ -268,7 +275,9 @@ export async function createMiniProgramViteConfig(options: {
     root: options.root ?? context.workspaceRoot,
     configFile: false,
     mode: isProduction ? 'production' : 'development',
-    logLevel: 'warn',
+    // 'warn' 会把 vite 自己的「building / transformed / 产物清单」全吞掉，
+    // 用户只看到命令一闪而过，分不清是成功还是静默失败。
+    logLevel: 'info',
     define: {
       ...buildPlatformDefine(buildPlatform, isProduction),
       // 条件编译：__MP_WX__ 等布尔常量，死分支由 bundler DCE 移除
@@ -402,6 +411,36 @@ export function getBuildPlatform(platform: PlatformType): BuildPlatform {
   return buildPlatform;
 }
 
+/**
+ * vite / rollup 的 PluginError 把插件名、出错文件、代码帧都挂在 error 对象上，
+ * `String(error.message)` 只剩第一行——恰好把定位需要的那几行丢了。
+ */
+function formatBuildError(error: unknown): string {
+  const e = error as {
+    message?: string;
+    plugin?: string;
+    id?: string;
+    loc?: { file?: string; line?: number; column?: number };
+    frame?: string;
+  };
+  const parts = [e?.message ?? String(error)];
+  if (e?.plugin) {
+    parts.push(`插件：${e.plugin}`);
+  }
+  const file = e?.loc?.file || e?.id;
+  if (file) {
+    const line = e?.loc?.line;
+    const column = e?.loc?.column;
+    parts.push(
+      `文件：${file}${line ? `:${line}${column ? `:${column}` : ''}` : ''}`,
+    );
+  }
+  if (e?.frame) {
+    parts.push(e.frame);
+  }
+  return parts.join('\n');
+}
+
 export function runViteBuilder(
   options: ViteMiniProgramBuildOptions,
   context: BuilderContext,
@@ -432,6 +471,9 @@ export function runViteBuilder(
         const runOnce = async () => {
           // 每轮开头清空上一轮的库元数据缺失记录，否则汇总会跨轮累加
           clearLibraryMetaMisses();
+          const startedAt = Date.now();
+          const elapsed = () =>
+            `${((Date.now() - startedAt) / 1000).toFixed(2)}s`;
           // 每轮重新生成 config，入口 glob 重新展开，
           // 这样 watch 期间新增的入口文件能被拉进来
           const config = await createMiniProgramViteConfig({
@@ -439,7 +481,9 @@ export function runViteBuilder(
             context,
             buildPlatform,
           });
+          context.logger.info('[小程序构建] vite build 开始…');
           await vite.build(config);
+          context.logger.info(`[小程序构建] 完成，耗时 ${elapsed()}`);
           // 把「哪些指令没拿到库元数据」显式报出来。
           // 旧行为是静默返回空 listeners，wxml 丢事件绑定且零报错。
           const metaSummary = formatLibraryMetaSummary();
@@ -492,7 +536,7 @@ export function runViteBuilder(
             await runOnce();
             emitSuccess();
           } catch (error) {
-            context.logger.error(String((error as Error)?.message ?? error));
+            context.logger.error(formatBuildError(error));
             if (!closed) {
               observer.next({ success: false } as BuilderOutput);
             }
@@ -523,7 +567,7 @@ export function runViteBuilder(
         // 那个改动会发生在 watcher 注册之前，直接丢掉。
         emitSuccess();
       } catch (error) {
-        context.logger.error(String((error as Error)?.message ?? error));
+        context.logger.error(formatBuildError(error));
         if (!closed) {
           observer.next({ success: false } as BuilderOutput);
           observer.complete();

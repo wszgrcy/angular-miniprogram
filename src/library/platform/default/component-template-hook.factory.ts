@@ -326,10 +326,9 @@ export function resolveNodePath(list: NodePath): any {
     const item = list.shift()!;
     if (item === 'directive') {
       const index = list.shift()! as number;
-      const lContainer = lView[index + LVIEW.HEADER_OFFSET];
+      const lContainer = lView[index + LVIEW.HEADER_OFFSET] as unknown[];
       const child = list.shift() as number;
-      const viewRef = lContainer[LVIEW.CONTAINER_VIEW_REFS][child];
-      lView = viewRef['_lView'];
+      lView = readEmbeddedLViews(lContainer)[child] as LView;
     } else {
       lView = lView[LVIEW.HEADER_OFFSET + item];
     }
@@ -342,10 +341,9 @@ export function findCurrentElement(lView: LView, list: NodePath = []) {
     const item = list.shift()!;
     if (item === 'directive') {
       const index = list.shift() as number;
-      const lContainer = lView[index + LVIEW.HEADER_OFFSET];
+      const lContainer = lView[index + LVIEW.HEADER_OFFSET] as unknown[];
       const child = list.shift() as number;
-      const viewRef = lContainer[LVIEW.CONTAINER_VIEW_REFS][child];
-      lView = viewRef['_lView'];
+      lView = readEmbeddedLViews(lContainer)[child] as LView;
     } else {
       lView = lView[item + LVIEW.HEADER_OFFSET];
     }

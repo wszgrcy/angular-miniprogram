@@ -9,6 +9,7 @@ import type {
   ClassRecord,
   TraitCompiler,
 } from '@angular/compiler-cli/src/ngtsc/transform';
+import * as fs from 'fs';
 import path from 'path';
 import { Injector } from 'static-injector';
 import ts, { ClassDeclaration } from 'typescript';
@@ -39,6 +40,24 @@ import {
 /** `R3TemplateDependencyKind.NgModule`，compiler 没有把这个枚举导出到运行时 */
 const R3_TEMPLATE_DEPENDENCY_KIND_NG_MODULE = 2;
 
+/** `R3TemplateDependencyKind.Pipe`，同上 */
+const R3_TEMPLATE_DEPENDENCY_KIND_PIPE = 1;
+
+/**
+ * 管道依赖不进指令匹配表。
+ *
+ * 管道没有 `selector`，也不产生任何 host 事件/属性绑定 —— 它是纯值变换，
+ * 结果在 AST 遍历（`BindingPipe`）里就地算完塞进数据，与「元素上挂了
+ * 什么指令」无关。混进来的只有坏处：
+ *
+ * - `CssSelector.parse(undefined)` 会把 `undefined` 当标签名注册出一个假选择器；
+ * - 库元数据缺失诊断会把 AsyncPipe / UpperCasePipe 这类误报成
+ *   「不会生成 host 绑定」，把真问题淹掉。
+ */
+function isPipeDependency(dep: { kind?: unknown }): boolean {
+  return dep.kind === R3_TEMPLATE_DEPENDENCY_KIND_PIPE;
+}
+
 /**
  * ngtsc 的 `ClassPropertyMapping` 转成 R3 的绑定名数组。
  *
@@ -64,6 +83,41 @@ function toBindingNameList(
     return [...reverseMap.keys()];
   }
   return Object.keys(mapping as Record<string, unknown>);
+}
+
+/**
+ * 模板解析错误必须在这里拦下来。
+ *
+ * Angular 把模板解析错误放进 `meta.template.errors`，**不会**自己抛。
+ * 本构建器直接拿 `template.nodes` 产 wxml，错误被忽略的后果是：
+ * 节点树为空 → wxml 只剩一个空 `<block wx:if="{{hasLoad}}"></block>`，
+ * 构建**静默成功**，页面白屏，日志里一个字都不提。
+ *
+ * 典型触发：模板正文里写了裸的 `{`（Angular 会当 ICU 消息解析），
+ * 比如 `import { ... } from 'x'` 这种示例文案。
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function assertTemplateParsed(meta: any, where: string): void {
+  const errors = meta?.template?.errors;
+  if (!Array.isArray(errors) || errors.length === 0) {
+    return;
+  }
+  const detail = errors
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((e: any) => {
+      const msg = e?.message ?? String(e);
+      const span = e?.span ?? e?.errorSpan;
+      const at = span?.start
+        ? ` (行 ${span.start.line + 1} 列 ${span.start.col + 1})`
+        : '';
+      return `    - ${msg}${at}`;
+    })
+    .join('\n');
+  throw new Error(
+    `模板解析失败：${where}\n${detail}\n` +
+      `  提示：模板正文里的裸「{」/「}」会被 Angular 当 ICU 消息解析，` +
+      `要当字面量请写 {{ '{' }} 或 HTML 实体 &#123;。`,
+  );
 }
 
 export class MiniProgramCompilerService {
@@ -115,14 +169,20 @@ export class MiniProgramCompilerService {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(trait as any).resolution,
         };
+        assertTemplateParsed(
+          meta,
+          `${path.normalize(fileName)}#${classDeclaration.name?.getText() ?? '?'}`,
+        );
         this.resolvedDataGroup.style.set(
           makeComponentKey(
             path.normalize(fileName),
             classDeclaration.name?.getText() ?? '',
           ),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ((trait as any)?.analysis?.styleUrls || []).map(
-            (item: { url: string }) => this.resolveStyleUrl(fileName, item.url),
+          this.resolveStyleUrls(
+            fileName,
+            classDeclaration.name?.getText() ?? '',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (trait as any)?.analysis?.styleUrls,
           ),
         );
         this.componentMap.set(
@@ -275,14 +335,14 @@ export class MiniProgramCompilerService {
   }
 
   /**
-   * 取得组件模板可用的指令/管道列表。
+   * 取得组件模板可用的**指令**列表（管道被剔除，见 `isPipeDependency`）。
    *
    * standalone 组件的 `imports` 允许直接引入 NgModule，此时 `meta.declarations` 里会出现
    * `R3TemplateDependencyKind.NgModule`（值为 2）的项。它只带一个指向模块标识符的
    * `type.node`，没有普通依赖上的 `ref.node`，直接拿去查元数据会炸。
    *
    * 这里改用 Angular 自己的 `TypeCheckScope` 拿扁平化之后的作用域（模块会被展开成它
-   * 导出的指令与管道），非 standalone 组件保持原样。
+   * 导出的指令），非 standalone 组件保持原样。
    */
   private resolveTemplateDeclarations(
     classDeclaration: ts.ClassDeclaration,
@@ -312,7 +372,7 @@ export class MiniProgramCompilerService {
       (item) => item.kind === R3_TEMPLATE_DEPENDENCY_KIND_NG_MODULE,
     );
     if (!importsNgModule) {
-      return declarations;
+      return declarations.filter((item) => !isPipeDependency(item));
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const scopeRegistry = (this.ngCompiler as any).compilation
@@ -323,7 +383,9 @@ export class MiniProgramCompilerService {
     // TypeCheckScope 里是 ngtsc 的 DirectiveMeta / PipeMeta，而下游
     // `ComponentContext` 读的是 R3 的 `R3DirectiveDependencyMetadata`，
     // 两边字段名不一致（主要是 `importedFile`），这里对齐成 R3 的形状。
-    return [...scope.directives, ...scope.pipes.values()].map((dep) => {
+    // 只取 scope.directives：scope.pipes 里的 PipeMeta 没有 selector，
+    // 进匹配表只会注册出假选择器，并污染库元数据缺失诊断。
+    return [...scope.directives].map((dep) => {
       const node = dep.ref.node as ts.ClassDeclaration;
       return {
         ...dep,
@@ -369,6 +431,45 @@ export class MiniProgramCompilerService {
   }
   private resolveStyleUrl(componentPath: string, styleUrl: string) {
     return path.normalize(path.resolve(path.dirname(componentPath), styleUrl));
+  }
+  /**
+   * 把 `@Component.styleUrls` 解析成绝对路径，逐个验文件在不在。
+   *
+   * 缺文件必须在这当场抛。`@angular/build` 的 compiler host 在
+   * `resourceNameToFileName` 里 `fileExists` 为 false 时直接 `return null`，
+   * ngtsc 就把这条样式整个跳过：不报 diagnostic、不生成 ɵcmp、退出码 0。
+   * 表现是构建全绿，运行时才在小程序里报
+   * `needs to be compiled using the JIT compiler`。
+   *
+   * 和 `assertTemplateParsed` 同一层、同一个理由：Angular 把错误放进数据
+   * 而不抛，本构建器就在消费这份数据的这一层拦下来。
+   */
+  private resolveStyleUrls(
+    componentPath: string,
+    className: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rawStyleUrls: any,
+  ): string[] {
+    const list: { url?: unknown }[] = Array.isArray(rawStyleUrls)
+      ? rawStyleUrls
+      : [];
+    const missing = list
+      .map((item) => item?.url)
+      .filter(
+        (url): url is string => typeof url === 'string' && url.startsWith('.'),
+      )
+      .filter(
+        (url) => !fs.existsSync(this.resolveStyleUrl(componentPath, url)),
+      );
+    if (missing.length) {
+      throw new Error(
+        `组件 ${className}（${path.normalize(componentPath)}）的 styleUrls 指向的文件不存在：\n` +
+          missing.map((url) => `  - ${url}`).join('\n'),
+      );
+    }
+    return list.map((item) =>
+      this.resolveStyleUrl(componentPath, String(item?.url)),
+    );
   }
   getDirectiveMap() {
     return this.directiveMap;

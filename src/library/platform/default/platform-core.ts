@@ -454,6 +454,97 @@ export class MiniProgramCoreFactory {
     return Component(config);
   };
 
+  /**
+   * 自定义 tabBar（微信 `custom-tab-bar/index`）的启动入口。
+   *
+   * 为什么不能走 `componentRegistry`：那条路上 Angular 实例是**由父模板
+   * 创建、小程序组件靠 `nodePath` / `nodeIndex` 两个 property 回连**的。
+   * 而自定义 tabBar 的组件实例是微信框架自己创建的，没人给它传 nodePath，
+   * 于是永远连不上：`hasLoad` 恒为 `false`，
+   * `<block wx:if="{{hasLoad}}">` 渲染出一个空盒子——
+   * **底部 tab 栏位置一片空白，且不报任何错**。
+   *
+   * 所以这里按「页面」模型自举：自己起一个 Angular 组件实例（带 `PAGE_TOKEN`、
+   * 自己的 lView 与页面 id），`attached` 时完成链接。
+   *
+   * 微信是「每个 tab 页各挂一个 tabbar 实例」，所以选中态必须放在 root
+   * provider 里共享，否则切页后高亮不同步。
+   */
+  public bootstrapCustomTabbar = (component: Type<unknown>) => {
+    const _this = this;
+    const options = this.getComponentOptions(component) || {};
+    let componentRef: ComponentRef<unknown>;
+
+    const config: WechatMiniprogram.Component.Options<{}, {}, {}, []> = {
+      ...options,
+      data: { hasLoad: false },
+      options: { ...options?.options, multipleSlots: true },
+      methods: {
+        ...options.methods,
+        ...this.listenerEvent(),
+        ...this.wxsCallMethodEvent(),
+      },
+    };
+
+    const lifetimes = config.lifetimes || {};
+    const oldCreated = lifetimes.created;
+    const oldAttached = lifetimes.attached;
+    const oldDetached = lifetimes.detached;
+
+    config.lifetimes = {
+      ...lifetimes,
+      created: function (this: MiniProgramComponentInstance) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        this.__lifeTimePromiseObject = {} as any;
+        const app = getApp<AppOptions>();
+        this.__lifeTimePromiseObject['created'] = app.__ngStartPagePromise.then(
+          () => {
+            componentRef = app.__ngStartPage(component, this).componentRef;
+            if (oldCreated) {
+              oldCreated.bind(this)();
+            }
+          },
+        );
+        return this.__lifeTimePromiseObject['created'];
+      },
+      attached: function (this: MiniProgramComponentInstance) {
+        return this.__lifeTimePromiseObject['created'].then(() => {
+          _this.linkNgComponentWithPage(this, componentRef);
+          if (oldAttached) {
+            oldAttached.bind(this)();
+          }
+        });
+      },
+      detached: function (this: MiniProgramComponentInstance) {
+        _this.pageStatus.destroy.bind(this)();
+        if (oldDetached) {
+          oldDetached.bind(this)();
+        }
+      },
+    };
+
+    const pageLifetimes = config.pageLifetimes || {};
+    const oldShow = pageLifetimes.show;
+    const oldHide = pageLifetimes.hide;
+    config.pageLifetimes = {
+      ...pageLifetimes,
+      show: function (this: MiniProgramComponentInstance) {
+        _this.pageStatus.attachView.bind(this)();
+        if (oldShow) {
+          oldShow.bind(this)();
+        }
+      },
+      hide: function (this: MiniProgramComponentInstance) {
+        _this.pageStatus.detachView.bind(this)();
+        if (oldHide) {
+          oldHide.bind(this)();
+        }
+      },
+    };
+
+    return Component(config);
+  };
+
   protected getPageOptions(component: Type<unknown> & MiniProgramPageOptions) {
     return component.mpPageOptions as WechatMiniprogram.Page.Options<{}, {}>;
   }

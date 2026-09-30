@@ -25,6 +25,7 @@
     "static-injector": "7.0.0",
     "@analogjs/vite-plugin-angular": "^2.7.2",
     "abortcontroller-polyfill": "^1.7.8",
+    "es-toolkit": "^1.52.0",
     "fs-extra": "11.2.0",
     "glob": "^7.2.0",
     "ora": "^9.4.1",

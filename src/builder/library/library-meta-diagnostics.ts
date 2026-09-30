@@ -8,10 +8,35 @@
  * 不响应，而且**没有任何报错**。这是整条链路上最危险的失败模式。
  *
  * 现在把所有「没查到」显式登记到这里，由构建器在每轮构建结束时打一条
- * 汇总日志。之所以是汇总而不是一条条 warn：应用模板里 `NgIf` / `NgClass`
- * 这类非本工具链的指令也会走到这里，逐个打会刷屏，但**它们确实不会
- * 生成 host 绑定**，这个事实应该被看见。
+ * 汇总日志。之所以是汇总而不是一条条 warn：第三方库指令也会走到这里，
+ * 逐个打会刷屏。
+ *
+ * 诊断只针对「本可以用本工具链构建、但没构建」的第三方库。`@angular/*`
+ * 直接跳过，见 `isAngularFrameworkSource`。
  */
+
+/**
+ * `@angular/*` 不登记元数据缺失。
+ *
+ * 框架自己的包永远不会有 sidecar，报出来只会淹没真信号。具体到
+ * `@angular/common` 那一堆：
+ *
+ * 1. 静态编译期已经支持的 —— `NgClass` / `NgStyle` 的结果直接进
+ *    `nodeList[i].class` / `.style`，`NgIf` / `NgForOf` / `NgSwitch*` 被
+ *    编成 `wx:if` / `wx:for` / `<template>`，都不靠 host 绑定；
+ * 2. 已废弃、有更优写法的 —— `@if` / `@for` / `@switch` 取代
+ *    `NgIf` / `NgForOf` / `NgSwitch*`（`imports: [CommonModule]` 会把它们
+ *    一并拖进作用域，即使模板里一个字没用）；
+ * 3. 本工具链用不到的 —— `NgPlural` / `NgPluralCase`。
+ *
+ * 按路径段匹配，兼容两种分隔符、pnpm 的
+ * `.pnpm/@angular+common@…/node_modules/@angular/…` 与 fesm 子路径。
+ */
+const ANGULAR_PACKAGE_RE = /(^|[/\\])@angular[/\\]/;
+
+export function isAngularFrameworkSource(sourceFile: string): boolean {
+  return ANGULAR_PACKAGE_RE.test(sourceFile);
+}
 
 export type LibraryMetaMissReason =
   /** 来源包根本没有 sidecar（非本工具链构建的库，或应用自己的源码） */
@@ -29,6 +54,9 @@ let misses: LibraryMetaMiss[] = [];
 const seen = new Set<string>();
 
 export function recordLibraryMetaMiss(miss: LibraryMetaMiss): void {
+  if (isAngularFrameworkSource(miss.sourceFile)) {
+    return;
+  }
   const key = `${miss.reason}::${miss.className}::${miss.sourceFile}`;
   if (seen.has(key)) {
     return;

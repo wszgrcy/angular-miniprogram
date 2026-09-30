@@ -1,15 +1,7 @@
 import type { Plugin } from 'vite';
 import { changeComponent } from '../../component-template-inject/change-component';
 import { isMpLibraryFile } from '../../library/library-meta-reader';
-
-/**
- * 剥掉 vite 可能附加的 query / suffix（`?v=hash`、`?import` 之类）。
- * 判扩展名和查包边界都要用干净路径。
- */
-function cleanId(id: string): string {
-  const q = id.search(/[?#]/);
-  return q === -1 ? id : id.slice(0, q);
-}
+import { stripModuleQuery } from '../../util';
 
 /**
  * 在 Vite 的 transform 阶段给 AOT 编译后的组件注入 propertyChange。
@@ -61,7 +53,7 @@ export function miniProgramComponentTransformPlugin(): Plugin {
       if (!code.includes('ɵɵdefineComponent')) {
         return null;
       }
-      const file = cleanId(id);
+      const file = stripModuleQuery(id);
       const isAppSource = file.endsWith('.ts') && !id.includes('node_modules');
       const isMpLibrary =
         (file.endsWith('.mjs') || file.endsWith('.js')) &&

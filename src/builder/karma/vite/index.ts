@@ -31,6 +31,54 @@ import { writeDerivedTsConfig } from './derived-tsconfig';
 import { setViteKarmaFrameworkHooks } from './karma-framework';
 import { globSpecFiles } from './spec-discovery';
 
+/**
+ * 库兜底超时（毫秒）。
+ *
+ * **只在 karma.conf.js 没显式设这两项时生效。** 这俩是 karma 的原生配置，
+ * 有配置文件就以它为准，本库不抢、不往 angular.json 里镜像。
+ *
+ * - `captureTimeout`：`miniprogram` launcher 是占位实现，不会自己拉开发者
+ *   工具，「没人来连」时这就是干等上限。实测连上约 9.5s，取 3 倍余量。
+ * - `browserNoActivityTimeout`：连上之后要容得下轮询等页面实例、页面
+ *   冷启动、分包下载，karma 自带的 30s 太紧。
+ */
+const FALLBACK_CAPTURE_TIMEOUT = 30_000;
+const FALLBACK_NO_ACTIVITY_TIMEOUT = 180_000;
+
+/**
+ * 给**已解析**的 karma 配置补兜底超时，就地改。
+ *
+ * 只在 karma.conf.js 没设时生效 —— 这俩是 karma 的原生配置，有配置文件
+ * 就以它为准，本库不抢、不往 angular.json 里镜像。
+ *
+ * 判据就是直接比字段：跟一个没动过的 `Config` 比，一样就是没设。
+ *
+ * **必须在 `server.start()` 之前改**：launcher 的 captureTimeout 是在
+ * `_start` 走 DI 时快照的（`karma/lib/server.js`：`_start.$inject`
+ * 里带 `launcher`），而 injector 只是按引用持有 config，所以解析后、
+ * start 前改有效（karma 自己也在 `start()` 里改 `config.port`）。
+ *
+ * 已知边角：显式写成 karma 默认值（60000 / 30000）会被当成「没设」。
+ * 显式写默认值本身没有意义，接受这个取舍。
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function applyKarmaTimeoutFallbacks(karmaConfig: any): void {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { Config } = require('karma/lib/config');
+  // 没动过的对照实例，就是 karma 自带默认
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const defaults: any = new Config();
+
+  if (karmaConfig.captureTimeout === defaults.captureTimeout) {
+    karmaConfig.captureTimeout = FALLBACK_CAPTURE_TIMEOUT;
+  }
+  if (
+    karmaConfig.browserNoActivityTimeout === defaults.browserNoActivityTimeout
+  ) {
+    karmaConfig.browserNoActivityTimeout = FALLBACK_NO_ACTIVITY_TIMEOUT;
+  }
+}
+
 export interface KarmaViteBuilderOptions {
   karmaConfig: string;
   tsConfig: string;
@@ -372,11 +420,22 @@ export function runKarmaViteBuilder(
             .filter(Boolean);
         }
 
+        const karmaConfigFile = require('path').resolve(
+          context.workspaceRoot,
+          options.karmaConfig,
+        );
+
         const karmaConfig = await karma.config.parseConfig(
-          require('path').resolve(context.workspaceRoot, options.karmaConfig),
+          karmaConfigFile,
           karmaOptions,
           { promiseConfig: true, throwErrors: true },
         );
+
+        /**
+         * 解析完再补兜底：karma.conf.js 设过就以它为准。
+         * 必须在 new Server / start 之前改，见函数注释。
+         */
+        applyKarmaTimeoutFallbacks(karmaConfig);
 
         const server = new karma.Server(
           karmaConfig as never,

@@ -339,9 +339,20 @@ export class MiniProgramApplicationAnalysisService {
               );
             }
           } else {
-            const node = selector.queryOne(
-              `CallExpression[expression=componentRegistry]`,
-            ) as ts.CallExpression;
+            // 组件入口认 `componentRegistry(X)`；自定义 tabBar 入口认
+            // `bootstrapCustomTabbar(X)`——两者参数位置相同。
+            const node =
+              (selector.queryOne(
+                `CallExpression[expression=componentRegistry]`,
+              ) as ts.CallExpression) ||
+              (selector.queryOne(
+                `CallExpression[expression=bootstrapCustomTabbar]`,
+              ) as ts.CallExpression);
+            if (!node) {
+              throw new Error(
+                `${maybeEntryPath.src} 找不到 componentRegistry / bootstrapCustomTabbar 调用`,
+              );
+            }
             importComponent = node.arguments[0];
           }
           const symbol = this.typeChecker.getSymbolAtLocation(importComponent);

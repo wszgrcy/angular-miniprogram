@@ -18,7 +18,7 @@ import type {
   LibraryTemplateScopeService,
   ExtraTemplateData as ScopeExtraTemplateData,
 } from '../../shared/library-template-scope.service';
-import { libraryTemplateScopeName } from '../../util';
+import { libraryTemplateScopeName, stripModuleQuery } from '../../util';
 import { toPosixPath } from '../../util/asset-path';
 
 /**
@@ -30,12 +30,6 @@ import { toPosixPath } from '../../util/asset-path';
  */
 function toRollupFileName(p: string) {
   return toPosixPath(normalize(p) as string);
-}
-
-/** 剥掉 vite 可能附加的 query / suffix（`?v=hash`、`?import`）。 */
-function cleanId(id: string): string {
-  const q = id.search(/[?#]/);
-  return q === -1 ? id : id.slice(0, q);
 }
 
 export interface LibraryTemplatePluginOptions {
@@ -276,7 +270,7 @@ export function libraryTemplatePlugin(
       return libraryEntryModuleSource(meta);
     },
     transform(code: string, id: string) {
-      const file = cleanId(id);
+      const file = stripModuleQuery(id);
       // 库产物是 fesm（.mjs）；个别打包形态会出 .js，一并接
       if (!file.endsWith('.mjs') && !file.endsWith('.js')) {
         return null;

@@ -28,12 +28,20 @@ export interface MpSubPackage {
 /**
  * 结构化 app 配置。
  *
- * 已知字段（pages/window/tabBar/subpackages/preloadRule/lazyCodeLoading）
- * 参与校验；其余字段（sitemapLocation、darkmode、plugins……）原样透传，
- * 保证对各家 app.json 方言的开放性。
+ * 已知字段（pages/window/tabBar/subpackages/preloadRule/entryPagePath/
+ * lazyCodeLoading）参与校验；其余字段（sitemapLocation、darkmode、
+ * plugins……）原样透传，保证对各家 app.json 方言的开放性。
  */
 export interface MpAppConfig {
   pages?: Array<string | { path: string; [key: string]: unknown }>;
+  /**
+   * 启动页。不填则用 `pages[0]`。
+   *
+   * 有了它，「启动进哪个页面」就和「pages 的书写顺序」解耦：
+   * 想换启动页只改这一个字段，不用把目标页挪到数组首位。
+   * 可以是主包页，也可以是分包页（冷启动时才下载该分包）。
+   */
+  entryPagePath?: string;
   window?: Record<string, unknown>;
   tabBar?: {
     list?: Array<{ pagePath?: string; [key: string]: unknown }>;
@@ -94,8 +102,8 @@ function preloadPackagesOf(
  * 编译期校验。返回错误列表（空数组 = 通过）。
  *
  * @param config 结构化 app 配置
- * @param builtPagePaths 本次构建实际产出的主包页面路径（不含扩展名），
- *   来自 PagePattern.outputFiles.path
+ * @param builtPagePaths 本次构建实际产出的页面路径（不含扩展名，分包页为
+ *   已拼上 root 的全路径），来自 PagePattern.outputFiles.path
  */
 export function validateAppConfig(
   config: MpAppConfig,
@@ -175,8 +183,38 @@ export function validateAppConfig(
     }
   }
 
-  // preloadRule：key 必须是已知页面，packages 必须是已声明的分包 root
+  // 已知页面全集：主包 pages + 分包页面全路径
   const allPages = new Set([...seen, ...fullSubPages]);
+
+  // 启动页必须是已声明的页面，否则冷启动直接白屏
+  if (config.entryPagePath !== undefined) {
+    if (!config.entryPagePath) {
+      errors.push('entryPagePath 不能为空字符串（不想要就删掉这个字段）');
+    } else if (!allPages.has(config.entryPagePath)) {
+      errors.push(
+        `entryPagePath "${config.entryPagePath}" 不是已声明的页面` +
+          `（主包 pages 与分包页面里都没有）`,
+      );
+    }
+  }
+
+  // 声明了但本次构建没产出入口：漏写 *.entry.ts，或源文件所在目录不在
+  // angular.json 的 pages pattern 覆盖范围内。这类错落到开发者工具里只剩
+  // 一句「页面不存在」，最难查，所以在构建期按页面逐条点名。
+  if (builtPagePaths.length) {
+    const built = new Set(builtPagePaths);
+    for (const page of [...mainPages, ...fullSubPages]) {
+      if (page && !built.has(page)) {
+        errors.push(
+          `页面 "${page}" 声明了但本次构建没有产出入口` +
+            `（检查是否有对应的 *.entry.ts，以及它所在目录是否被 ` +
+            `angular.json 的 pages pattern 覆盖）`,
+        );
+      }
+    }
+  }
+
+  // preloadRule：key 必须是已知页面，packages 必须是已声明的分包 root
   for (const [page, rule] of Object.entries(config.preloadRule ?? {})) {
     if (!allPages.has(page)) {
       errors.push(`preloadRule 的页面 "${page}" 不存在（pages/分包均无）`);
