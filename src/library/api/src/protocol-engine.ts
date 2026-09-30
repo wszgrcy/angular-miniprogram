@@ -57,7 +57,8 @@ export function applyFieldMap(
   let fields: MpFieldMap = {};
 
   if (typeof map === 'function') {
-    fields = map(from ?? {}, to) ?? {};
+    const mapped = map(from ?? {}, to);
+    fields = mapped ? mapped : {};
   } else if (map) {
     fields = map;
   }

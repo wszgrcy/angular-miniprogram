@@ -78,6 +78,16 @@ export interface MpAnimationConfig {
   transformOrigin?: string;
 }
 
+/**
+ * createAnimation 返回的链式动画对象：`step()` 累积关键帧，
+ * `export()` 导出给组件。各家附加字段不一，故保留索引签名。
+ */
+export interface MpAnimation {
+  step(config?: MpAnimationConfig): MpAnimation;
+  export(): { animation: unknown; actions: unknown[] };
+  [key: string]: any;
+}
+
 // ---------------------------------------------------------------- 媒体
 
 export interface MpChooseImageOptions extends MpCallbackOptions {
@@ -715,6 +725,9 @@ export interface MpApiResultMap {
 
   // Canvas
   canvasGetImageData: MpCanvasImageData;
+
+  // 动画
+  createAnimation: MpAnimation;
 
   // 蓝牙 / iBeacon
   getBluetoothDevices: MpBluetoothDevicesResult;

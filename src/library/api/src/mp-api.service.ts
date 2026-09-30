@@ -19,6 +19,7 @@ import { MpContext, mpContext } from './context-wrapper';
 import {
   MpAccelerometerReading,
   MpAddPhoneContactOptions,
+  MpAnimation,
   MpAnimationConfig,
   MpAuthorizeSetting,
   MpBLECharacteristicResult,
@@ -587,7 +588,7 @@ export class MpApiService {
 
   /** 同步返回平台 animation 对象，配合 `createAnimation().xxx().export()` 使用 */
   createAnimation(config: MpAnimationConfig = {}) {
-    return this.callSync('createAnimation', config);
+    return this.callSync<MpAnimation>('createAnimation', config);
   }
 
   // ---------------------------------------------------------------- 键盘
