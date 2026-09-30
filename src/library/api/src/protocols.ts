@@ -19,6 +19,8 @@ export interface MpApiProtocol {
   name?: string;
   /** 统一参数 -> 平台参数 */
   args?: MpFieldMap | MpMapFn;
+  /** 结果整体替换（如支付宝 getStorageSync 的 {data} 拆封） */
+  transformResult?: (res: any) => any;
   /** 平台结果 -> 统一结果（成功结果） */
   returnValue?: MpFieldMap | MpMapFn;
   /** 完全自定义：拿到已包装好回调的 options，自行选择目标 API */
@@ -79,13 +81,42 @@ const NETWORK_VALUE_MAP: Record<string, string> = {
   WWAN: '3g',
 };
 
+/** 微信 icon 值域 -> 支付宝 type 值域 */
+function toastType(v: string): string {
+  return v === 'error' ? 'fail' : v;
+}
+
+/** 支付宝/钉钉同步存储返回 { data }，需拆封；无存储时归一为空串 */
+function unwrapSyncStorage(res: any): any {
+  return res && res.data !== null && res.data !== undefined ? res.data : '';
+}
+
 const ALIPAY: MpProtocolTable = {
   showModal: {
     custom: modalCustom('alert', 'confirm', '确定', '取消'),
   },
+  showToast: {
+    // icon -> type 且值域转换，需表级函数形态（字段级函数只能改值不能换 key）
+    args: (from, to) => {
+      if (from.icon !== undefined) {
+        to.type = toastType(from.icon);
+      }
+      return { title: 'content', icon: false };
+    },
+  },
+  showLoading: {
+    args: { title: 'content' },
+  },
   setNavigationBarTitle: { name: 'setNavigationBar' },
-  setClipboardData: { name: 'setClipboard' },
-  getClipboardData: { name: 'getClipboard' },
+  setClipboardData: {
+    name: 'setClipboard',
+    args: { data: 'text' },
+  },
+  getClipboardData: {
+    name: 'getClipboard',
+    returnValue: { text: 'data' },
+  },
+  getStorageSync: { transformResult: unwrapSyncStorage },
   getNetworkType: {
     returnValue: {
       networkType: (v: string) => NETWORK_VALUE_MAP[v] ?? String(v).toLowerCase(),
@@ -118,9 +149,27 @@ const DINGTALK: MpProtocolTable = {
   showModal: {
     custom: modalCustom('alert', 'confirm', '确定', '取消'),
   },
+  showToast: {
+    args: (from, to) => {
+      if (from.icon !== undefined) {
+        to.type = toastType(from.icon);
+      }
+      return { title: 'content', icon: false };
+    },
+  },
+  showLoading: {
+    args: { title: 'content' },
+  },
   setNavigationBarTitle: { name: 'setNavigationBar' },
-  setClipboardData: { name: 'setClipboard' },
-  getClipboardData: { name: 'getClipboard' },
+  setClipboardData: {
+    name: 'setClipboard',
+    args: { data: 'text' },
+  },
+  getClipboardData: {
+    name: 'getClipboard',
+    returnValue: { text: 'data' },
+  },
+  getStorageSync: { transformResult: unwrapSyncStorage },
 };
 
 /**

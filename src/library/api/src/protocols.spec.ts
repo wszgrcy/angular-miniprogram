@@ -59,6 +59,59 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
       expect(spy.calls.mostRecent().args[0].title).toBe('T');
     });
 
+    it('showToast: title->content, icon error->fail', async () => {
+      const spy = jasmine
+        .createSpy('showToast')
+        .and.callFake((opts: any) => opts.success?.({}));
+      const service = setup('my', { showToast: spy });
+      await service.showToast({ title: 'hi', icon: 'error' });
+      const args = spy.calls.mostRecent().args[0];
+      expect(args.content).toBe('hi');
+      expect(args.type).toBe('fail');
+      expect(args.title).toBeUndefined();
+    });
+
+    it('showLoading: title->content', async () => {
+      const spy = jasmine
+        .createSpy('showLoading')
+        .and.callFake((opts: any) => opts.success?.({}));
+      const service = setup('my', { showLoading: spy });
+      await service.showLoading('加载中');
+      expect(spy.calls.mostRecent().args[0].content).toBe('加载中');
+    });
+
+    it('setClipboardData: my.setClipboard + data->text', async () => {
+      const spy = jasmine
+        .createSpy('setClipboard')
+        .and.callFake((opts: any) => opts.success?.({}));
+      const service = setup('my', { setClipboard: spy });
+      await service.invoke('setClipboardData', { data: 'copy-me' });
+      expect(spy.calls.mostRecent().args[0].text).toBe('copy-me');
+    });
+
+    it('getClipboardData: my.getClipboard + 结果 text->data', async () => {
+      const spy = jasmine
+        .createSpy('getClipboard')
+        .and.callFake((opts: any) => opts.success?.({ text: 'clip' }));
+      const service = setup('my', { getClipboard: spy });
+      const res = await service.invoke('getClipboardData');
+      expect(res.data).toBe('clip');
+    });
+
+    it('getStorageSync: 拆封 {data}', () => {
+      const service = setup('my', {
+        getStorageSync: () => ({ data: 'stored' }),
+      });
+      expect(service.getStorageSync('k')).toBe('stored');
+    });
+
+    it('getStorageSync: 无存储归一为空串', () => {
+      const service = setup('my', {
+        getStorageSync: () => ({ data: null }),
+      });
+      expect(service.getStorageSync('k')).toBe('');
+    });
+
     it('getNetworkType 结果归一：NOTREACHABLE->none, WWAN->3g', async () => {
       const service = setup('my', {
         getNetworkType: (opts: any) =>
@@ -186,6 +239,13 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
       const task = service.invoke('request', { url: 'https://x.com' });
       expect(spy).toHaveBeenCalled();
       expect(task.id).toBe(1);
+    });
+
+    it('钉钉 getStorageSync 同样拆封', () => {
+      const service = setup('dd', {
+        getStorageSync: () => ({ data: 42 }),
+      });
+      expect(service.getStorageSync('k')).toBe(42);
     });
 
     it('showModal -> dd.alert / dd.confirm', async () => {

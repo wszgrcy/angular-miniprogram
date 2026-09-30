@@ -345,6 +345,9 @@ export class MpApiService {
       }
       return (res: any) => {
         let out = normalize ? normalize(name, res) : res;
+        if (withProtocol && protocol?.transformResult) {
+          out = protocol.transformResult(out);
+        }
         if (withProtocol && protocol?.returnValue) {
           out = applyFieldMap(out, protocol.returnValue);
         }
@@ -397,7 +400,20 @@ export class MpApiService {
     if (!fn) {
       throw new Error(`当前平台(${this.platform})不支持 API: ${name}`);
     }
-    return fn.apply(this.globalObject, args) as T;
+    const result = fn.apply(this.globalObject, args) as any;
+    // 同步 API 同样过协议（如支付宝 getStorageSync 的 {data} 拆封）
+    const protocol = this.protocols[this.platform]?.[name];
+    if (!protocol) {
+      return result as T;
+    }
+    let out = result;
+    if (protocol.transformResult) {
+      out = protocol.transformResult(out);
+    }
+    if (protocol.returnValue) {
+      out = applyFieldMap(out, protocol.returnValue);
+    }
+    return out as T;
   }
 
   private runInAngular(fn: () => void): void {
