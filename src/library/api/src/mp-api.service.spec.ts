@@ -286,10 +286,12 @@ describe('MpApiService', () => {
   });
 
   describe('类型化方法', () => {
-    it('navigateTo 字符串参数', async () => {
+    it('navigateTo 字符串参数（自动拼 __id__ 通道参数）', async () => {
       const { service, fake } = setup();
-      await service.navigateTo('/a');
-      expect((fake.navigateTo as any).calls.mostRecent().args[0].url).toBe('/a');
+      const res = await service.navigateTo('/a');
+      const url = (fake.navigateTo as any).calls.mostRecent().args[0].url;
+      expect(url).toMatch(/^\/a\?__id__=\d+$/);
+      expect(res.eventChannel).toBeDefined();
     });
 
     it('navigateBack 数字参数 -> delta', async () => {

@@ -2,6 +2,7 @@ export * from './src/types';
 export * from './src/platform';
 export * from './src/promisify';
 export * from './src/interceptor-registry';
+export * from './src/event-channel';
 export * from './src/protocol-engine';
 export * from './src/protocols';
 export * from './src/system-info';

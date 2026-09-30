@@ -7,6 +7,7 @@ import {
   inject,
 } from '@angular/core';
 import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram/platform';
+import { MpEventChannel } from './event-channel';
 import { MpInterceptorRegistry, runHookQueue } from './interceptor-registry';
 import { MP_PLATFORM } from './platform';
 import { hasCallbackHandlers, shouldPromise } from './promisify';
@@ -47,6 +48,8 @@ export class MpApiService {
   private readonly protocols = inject(MP_API_PROTOCOLS);
   private readonly scheduler = inject(ChangeDetectionScheduler);
   private readonly registry = new MpInterceptorRegistry();
+  private readonly eventChannels = new Map<number, MpEventChannel>();
+  private channelSeq = 0;
 
   // ---------------------------------------------------------------- 拦截器
 
@@ -108,13 +111,29 @@ export class MpApiService {
 
   // ---------------------------------------------------------------- 导航
 
-  navigateTo(urlOrOptions: string | MpCallbackOptions): Promise<void> {
-    return this.invoke(
-      'navigateTo',
+  /**
+   * 导航并建立事件通道（同 uni）：url 自动拼 `__id__`，
+   * 目标页从 query 取 id 调 `getEventChannel(id)` 消费同一通道。
+   */
+  navigateTo(urlOrOptions: string | MpCallbackOptions): Promise<any> {
+    const opts: MpCallbackOptions =
       typeof urlOrOptions === 'string'
         ? { url: urlOrOptions }
-        : urlOrOptions,
-    );
+        : { ...urlOrOptions };
+    const channel = this.initEventChannel(opts.events);
+    if (opts.url) {
+      opts.url =
+        opts.url +
+        (String(opts.url).indexOf('?') === -1 ? '?' : '&') +
+        '__id__=' +
+        channel.id;
+    }
+    return this.invoke('navigateTo', opts).then((res: any) => {
+      if (res && typeof res === 'object') {
+        res.eventChannel = channel;
+      }
+      return res;
+    });
   }
 
   redirectTo(urlOrOptions: string | MpCallbackOptions): Promise<void> {
@@ -151,6 +170,19 @@ export class MpApiService {
         ? { delta: deltaOrOptions }
         : deltaOrOptions,
     );
+  }
+
+  /** 目标页消费通道（一次性，取后即除） */
+  getEventChannel(id: number): MpEventChannel | undefined {
+    const channel = this.eventChannels.get(id);
+    this.eventChannels.delete(id);
+    return channel;
+  }
+
+  private initEventChannel(events?: Record<string, (...args: any[]) => void>) {
+    const channel = new MpEventChannel(++this.channelSeq, events);
+    this.eventChannels.set(channel.id!, channel);
+    return channel;
   }
 
   // ---------------------------------------------------------------- 交互
