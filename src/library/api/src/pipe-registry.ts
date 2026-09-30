@@ -6,14 +6,11 @@ import { MpApiNameInput, MpCallbackOptions } from './types';
 /**
  * 动态数组应用管道（rxjs pipe 只有 0..9 固定重载，不支持 spread 数组）。
  */
-export function pipeThrough<T>(
-  source: Observable<T>,
+export function pipeThrough(
+  source: Observable<any>,
   ops: OperatorFunction<any, any>[],
-): Observable<any> {
-  return ops.reduce<Observable<any>>(
-    (stream, op) => stream.pipe(op),
-    source as Observable<any>,
-  );
+) {
+  return ops.reduce((stream, op) => stream.pipe(op), source);
 }
 
 /** 流经 pre 管道的调用上下文 */
@@ -147,40 +144,37 @@ export class MpPipeRegistry {
   }
 
   /** 全局管道（对所有 API 生效） */
-  setGlobalPipes(set: MpPipeSet): MpPipeHandle {
+  setGlobalPipes(set: MpPipeSet) {
     return this.register(null, set);
   }
 
   /** 清除运行时注册的全局管道（不动 DI 贡献） */
-  clearGlobalPipes(): void {
+  clearGlobalPipes() {
     this.registrations = this.registrations.filter(
       (r) => r.name !== null || r.fromDi,
     );
   }
 
   /** 按 API 名作用域管道 */
-  setPipes(name: MpApiNameInput, set: MpPipeSet): MpPipeHandle {
+  setPipes(name: MpApiNameInput, set: MpPipeSet) {
     return this.register(name, set);
   }
 
   /** 移除该 API 名下的所有作用域管道 */
-  removePipes(name: MpApiNameInput): void {
+  removePipes(name: MpApiNameInput) {
     this.registrations = this.registrations.filter((r) => r.name !== name);
   }
 
   /** DI / 运行时全局在前，作用域在后，各自保持注册顺序 */
-  prePipes(name: MpApiNameInput): OperatorFunction<MpInvokeContext, MpInvokeContext>[] {
+  prePipes(name: MpApiNameInput) {
     return this.collect(name, 'pre');
   }
 
-  postPipes(name: MpApiNameInput): OperatorFunction<any, any>[] {
+  postPipes(name: MpApiNameInput) {
     return this.collect(name, 'post');
   }
 
-  private collect(
-    name: MpApiNameInput,
-    key: 'pre' | 'post',
-  ): OperatorFunction<any, any>[] {
+  private collect(name: MpApiNameInput, key: 'pre' | 'post') {
     const hits = this.registrations.filter(
       (r) => r.name === null || r.name === name,
     );

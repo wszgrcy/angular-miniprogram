@@ -77,7 +77,7 @@ export class MpEventBus implements OnDestroy {
   }
 
   /** 可订阅形态：退订即退订监听 */
-  on$<T = any>(event: string): Observable<T> {
+  on$<T = any>(event: string) {
     return new Observable<T>((subscriber) => {
       const off = this.on<T>(event, (payload) => subscriber.next(payload));
       return off;

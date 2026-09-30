@@ -18,7 +18,6 @@ import {
 import { MpEventChannel } from './event-channel';
 import {
   MpInvokeContext,
-  MpPipeHandle,
   MpPipeRegistry,
   MpPipeSet,
   pipeThrough,
@@ -78,20 +77,20 @@ export class MpApiService {
    * 按 API 注册管道：`const h = api.setPipe('navigateTo', { pre: [...] })`
    * 返回句柄，`h.dispose()` 即撤销本次注册。
    */
-  setPipe(name: MpApiNameInput, set: MpPipeSet): MpPipeHandle {
+  setPipe(name: MpApiNameInput, set: MpPipeSet) {
     return this.registry.setPipes(name, set);
   }
 
-  removePipe(name: MpApiNameInput): void {
+  removePipe(name: MpApiNameInput) {
     this.registry.removePipes(name);
   }
 
   /** 全局管道（对所有 API 生效），同样返回可 dispose 的句柄 */
-  setGlobalPipes(set: MpPipeSet): MpPipeHandle {
+  setGlobalPipes(set: MpPipeSet) {
     return this.registry.setGlobalPipes(set);
   }
 
-  clearGlobalPipes(): void {
+  clearGlobalPipes() {
     this.registry.clearGlobalPipes();
   }
 
@@ -227,7 +226,7 @@ export class MpApiService {
   }
 
   /** 目标页消费通道（一次性，取后即除） */
-  getEventChannel(id: number): MpEventChannel | undefined {
+  getEventChannel(id: number) {
     const channel = this.eventChannels.get(id);
     this.eventChannels.delete(id);
     return channel;
@@ -379,14 +378,7 @@ export class MpApiService {
 
   // ---------------------------------------------------------------- 内部管线
 
-  private extractCallbacks(options: MpCallbackOptions): {
-    cbs: {
-      success?: (res: any) => void;
-      fail?: (err: any) => void;
-      complete?: (res: any) => void;
-    } | null;
-    rest: MpCallbackOptions;
-  } {
+  private extractCallbacks(options: MpCallbackOptions) {
     const rest = { ...options };
     const success =
       typeof rest.success === 'function' ? rest.success : undefined;
@@ -402,7 +394,7 @@ export class MpApiService {
   }
 
   /** 冷流调用单元：订阅时发起，支持 AbortSignal 取消 */
-  private callObservable<T>(ctx: MpInvokeContext): Observable<T> {
+  private callObservable<T>(ctx: MpInvokeContext) {
     return new Observable<T>((subscriber) => {
       const signal = ctx.options.signal as AbortSignal | undefined;
       if (signal?.aborted) {
@@ -429,24 +421,21 @@ export class MpApiService {
    * pre 管道同步执行（异步 pre 与同步 task 返回物理互斥）；
    * 结果经 post 管道后再触发用户回调；signal 接 task.abort()。
    */
-  private invokeTask(
-    name: MpApiNameInput,
-    options: MpCallbackOptions,
-  ): any {
+  private invokeTask(name: MpApiNameInput, options: MpCallbackOptions) {
     const { cbs, rest } = this.extractCallbacks(options);
     let ctx: MpInvokeContext = { name, options: rest };
     let emitted = false;
     let preError: any;
 
     pipeThrough(of(ctx), this.registry.prePipes(name)).subscribe({
-        next: (c) => {
-          emitted = true;
-          ctx = c;
-        },
-        error: (e) => {
-          preError = e;
-        },
-      });
+      next: (c) => {
+        emitted = true;
+        ctx = c;
+      },
+      error: (e) => {
+        preError = e;
+      },
+    });
 
     if (preError) {
       this.runInAngular(() => {
@@ -462,12 +451,12 @@ export class MpApiService {
 
     const result$ = new Subject<any>();
     pipeThrough(result$, this.registry.postPipes(name)).subscribe({
-        next: (res) => cbs?.success?.(res),
-        error: (err) => {
-          cbs?.fail?.(err);
-          cbs?.complete?.(err);
-        },
-      });
+      next: (res) => cbs?.success?.(res),
+      error: (err) => {
+        cbs?.fail?.(err);
+        cbs?.complete?.(err);
+      },
+    });
 
     const opts: MpCallbackOptions = { ...ctx.options };
     const signal = opts.signal as AbortSignal | undefined;
@@ -501,7 +490,7 @@ export class MpApiService {
   }
 
   /** 平台协议归一化后调用目标 API */
-  private dispatch(name: string, opts: MpCallbackOptions): unknown {
+  private dispatch(name: string, opts: MpCallbackOptions) {
     const protocol: MpApiProtocol | undefined =
       this.protocols[this.platform]?.[name];
 
@@ -574,7 +563,7 @@ export class MpApiService {
     return fn.call(this.globalObject, args);
   }
 
-  private callSync<T>(name: string, ...args: unknown[]): T {
+  private callSync<T>(name: string, ...args: unknown[]) {
     const fn = this.getRawApi(name);
     if (!fn) {
       throw new Error(`当前平台(${this.platform})不支持 API: ${name}`);
@@ -595,7 +584,7 @@ export class MpApiService {
     return out as T;
   }
 
-  private runInAngular(fn: () => void): void {
+  private runInAngular(fn: () => void) {
     try {
       fn();
     } finally {
