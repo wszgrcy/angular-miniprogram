@@ -33,6 +33,7 @@ const matchPath = createMatchPath(
       './src/library/platform/type/index.ts',
     ],
     'angular-miniprogram/platform': ['./src/library/platform/index.ts'],
+    'angular-miniprogram/api': ['./src/library/api/index.ts'],
     '@angular/common': ['./src/library/common/index.ts'],
     '@angular/common/http': ['./src/library/common/http/index.ts'],
   },
