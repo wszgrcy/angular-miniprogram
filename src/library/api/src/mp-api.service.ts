@@ -16,6 +16,12 @@ import {
   MP_API_PROTOCOLS,
   MpApiProtocol,
 } from './protocols';
+import {
+  buildAppBaseInfo,
+  buildDeviceInfo,
+  buildWindowInfo,
+  enhanceSystemInfo,
+} from './system-info';
 import { MpApiInterceptor, MpApiNameInput, MpCallbackOptions } from './types';
 
 /**
@@ -221,6 +227,47 @@ export class MpApiService {
     } catch {
       return false;
     }
+  }
+
+  // ---------------------------------------------------------------- 系统信息族
+
+  /** 全量增强：原始结果 + 归一字段（device/host/os/safeAreaInsets） */
+  getSystemInfoSync(): any {
+    const raw = this.callSync<any>('getSystemInfoSync');
+    return enhanceSystemInfo(this.platform, this.globalObject, raw, {});
+  }
+
+  /** 异步全量（走 invoke 管线，可被拦截） */
+  getSystemInfo(): Promise<any> {
+    return this.invoke('getSystemInfo').then((res: any) =>
+      enhanceSystemInfo(this.platform, this.globalObject, res, {}),
+    );
+  }
+
+  /** 平台有原生拆分 API 用原生，否则从 getSystemInfoSync 拼 */
+  getDeviceInfo(): any {
+    const source = this.getRawApi('getDeviceInfo')
+      ? this.callSync<any>('getDeviceInfo')
+      : this.callSync<any>('getSystemInfoSync');
+    return buildDeviceInfo(this.platform, this.globalObject, source);
+  }
+
+  getAppBaseInfo(): any {
+    const source = this.getRawApi('getAppBaseInfo')
+      ? this.callSync<any>('getAppBaseInfo')
+      : this.callSync<any>('getSystemInfoSync');
+    return buildAppBaseInfo(this.platform, this.globalObject, source);
+  }
+
+  getWindowInfo(): any {
+    const source = this.getRawApi('getWindowInfo')
+      ? this.callSync<any>('getWindowInfo')
+      : this.callSync<any>('getSystemInfoSync');
+    return buildWindowInfo(this.platform, this.globalObject, source);
+  }
+
+  getMenuButtonBoundingClientRect(): any {
+    return this.callSync('getMenuButtonBoundingClientRect');
   }
 
   // ---------------------------------------------------------------- 内部管线

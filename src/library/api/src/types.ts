@@ -64,7 +64,6 @@ export type MpApiName =
   | 'getWindowInfo'
   | 'getSystemInfo'
   | 'getSystemInfoSync';
-
 /** 补全候选 + 任意字符串兼容 */
 export type MpApiNameInput = MpApiName | (string & {});
 

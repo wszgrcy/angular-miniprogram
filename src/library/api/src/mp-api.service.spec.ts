@@ -221,6 +221,70 @@ describe('MpApiService', () => {
     });
   });
 
+  describe('系统信息族方法', () => {
+    const sysRaw = {
+      brand: 'Apple',
+      model: 'iPhone 14',
+      system: 'iOS 16.6',
+      platform: 'ios',
+      language: 'zh_CN',
+      SDKVersion: '8.0.30',
+      pixelRatio: 3,
+      windowWidth: 390,
+      screenHeight: 844,
+    };
+
+    it('getSystemInfoSync 返回增强结果', () => {
+      const { service } = setup('wx', {
+        getSystemInfoSync: () => ({ ...sysRaw }),
+      });
+      const res = service.getSystemInfoSync();
+      expect(res.osName).toBe('ios');
+      expect(res.hostName).toBe('WeChat');
+      expect(res.deviceId).toBeDefined();
+    });
+
+    it('getDeviceInfo 优先用平台原生拆分 API', () => {
+      const nativeSpy = jasmine
+        .createSpy('getDeviceInfo')
+        .and.returnValue({ brand: 'Apple', model: 'iPhone', system: 'iOS 16.6', platform: 'ios' });
+      const { service } = setup('wx', {
+        getDeviceInfo: nativeSpy,
+        getSystemInfoSync: () => ({ ...sysRaw }),
+      });
+      const res = service.getDeviceInfo();
+      expect(nativeSpy).toHaveBeenCalled();
+      expect(res.osVersion).toBe('16.6');
+    });
+
+    it('无原生拆分 API 时从 getSystemInfoSync 拼', () => {
+      const sysSpy = jasmine
+        .createSpy('getSystemInfoSync')
+        .and.returnValue({ ...sysRaw });
+      const { service } = setup('my', { getSystemInfoSync: sysSpy });
+      const res = service.getWindowInfo();
+      expect(sysSpy).toHaveBeenCalled();
+      expect(res.windowWidth).toBe(390);
+      expect(res.windowTop).toBe(0);
+    });
+
+    it('异步 getSystemInfo 走 invoke 管线，可被拦截', async () => {
+      const { service } = setup('wx', {
+        getSystemInfo: (opts: any) => opts.success?.({ ...sysRaw }),
+      });
+      let hits = 0;
+      service.addInterceptor('getSystemInfo', {
+        success: (r: any) => {
+          hits++;
+          return r;
+        },
+      });
+      const res = await service.getSystemInfo();
+      expect(hits).toBe(1);
+      expect(res.osName).toBe('ios');
+    });
+  });
+
   describe('类型化方法', () => {
     it('navigateTo 字符串参数', async () => {
       const { service, fake } = setup();
