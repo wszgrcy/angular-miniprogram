@@ -279,4 +279,79 @@ describe('MpApiService 域方法', () => {
       );
     });
   });
+
+  describe('canIUse 能力探测', () => {
+    it('改名 API 用平台真名探测', () => {
+      const { service, fake } = setup('my', {
+        canIUse: jasmine
+          .createSpy('canIUse')
+          .and.callFake((n: string) => n === 'setNavigationBar'),
+      });
+      expect(service.canIUse('setNavigationBarTitle')).toBeTrue();
+      expect((fake.canIUse as any).calls.mostRecent().args[0]).toBe(
+        'setNavigationBar',
+      );
+    });
+
+    it('未走协议表解析时会误报，此处验证已修正', () => {
+      const { service } = setup('my', {
+        canIUse: (n: string) => n === 'setNavigationBar',
+      });
+      // 直接拿统一名去问会得到 false，走表解析后为 true
+      expect(service.canIUse('setNavigationBarTitle')).toBeTrue();
+    });
+
+    it('钉钉 request -> httpRequest 同样走解析', () => {
+      const { service, fake } = setup('dd', {
+        canIUse: jasmine
+          .createSpy('canIUse')
+          .and.callFake((n: string) => n === 'httpRequest'),
+      });
+      expect(service.canIUse('request')).toBeTrue();
+      expect((fake.canIUse as any).calls.mostRecent().args[0]).toBe(
+        'httpRequest',
+      );
+    });
+
+    it('custom 协议需全部合成 API 就位', () => {
+      const { service } = setup('my', {
+        canIUse: (n: string) => n === 'alert',
+      });
+      expect(service.canIUse('showModal')).toBeFalse();
+    });
+
+    it('custom 协议全部就位为 true', () => {
+      const { service } = setup('my', {
+        canIUse: () => true,
+      });
+      expect(service.canIUse('showModal')).toBeTrue();
+    });
+
+    it('平台无 canIUse 时落到函数存在性判断', () => {
+      const { service } = setup('my', {
+        setNavigationBar: () => {},
+      });
+      expect(service.canIUse('setNavigationBarTitle')).toBeTrue();
+      // makePhoneCall 未在 fake 中提供，函数不存在 -> 不支持
+      expect(service.canIUse('makePhoneCall')).toBeFalse();
+    });
+
+    it('平台 canIUse 抛错时不致于误报不支持', () => {
+      const { service } = setup('my', {
+        canIUse: () => {
+          throw new Error('unsupported schema');
+        },
+        setNavigationBar: () => {},
+      });
+      expect(service.canIUse('setNavigationBarTitle')).toBeTrue();
+    });
+
+    it('无协议映射的 API 用统一名探测', () => {
+      const { service, fake } = setup('wx', {
+        canIUse: jasmine.createSpy('canIUse').and.returnValue(true),
+      });
+      expect(service.canIUse('scanCode')).toBeTrue();
+      expect((fake.canIUse as any).calls.mostRecent().args[0]).toBe('scanCode');
+    });
+  });
 });

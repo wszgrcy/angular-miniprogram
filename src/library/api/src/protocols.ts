@@ -25,6 +25,11 @@ export interface MpApiProtocol {
   returnValue?: MpFieldMap | MpMapFn;
   /** 完全自定义：拿到已包装好回调的 options，自行选择目标 API */
   custom?: (args: MpCallbackOptions, call: MpCustomCall) => any;
+  /**
+   * canIUse 探测用的平台 API 名。`custom` 协议由多个平台 API 合成，
+   * 无法从统一名直接推知，需显式声明；全部存在才算支持。
+   */
+  probe?: string[];
 }
 
 export type MpProtocolTable = Record<string, MpApiProtocol>;
@@ -94,6 +99,7 @@ function unwrapSyncStorage(res: any) {
 const ALIPAY: MpProtocolTable = {
   showModal: {
     custom: modalCustom('alert', 'confirm', '确定', '取消'),
+    probe: ['alert', 'confirm'],
   },
   showToast: {
     // icon -> type 且值域转换，需表级函数形态（字段级函数只能改值不能换 key）
@@ -148,6 +154,7 @@ const DINGTALK: MpProtocolTable = {
   request: { name: 'httpRequest' },
   showModal: {
     custom: modalCustom('alert', 'confirm', '确定', '取消'),
+    probe: ['alert', 'confirm'],
   },
   showToast: {
     args: (from, to) => {

@@ -396,12 +396,25 @@ export class MpApiService {
       : g.upx2px({ number: value, to: 'px', deviceWidth });
   }
 
+  /**
+   * 能力探测。不能直接拿统一名去问平台：协议表里改过名的 API
+   * （如 setNavigationBarTitle -> setNavigationBar）会被误报为不支持。
+   */
   canIUse(schema: string) {
-    try {
-      return !!this.globalObject?.canIUse?.(schema);
-    } catch {
-      return false;
+    const protocol = this.protocols[this.platform]?.[schema];
+    const targets = protocol?.probe ?? [protocol?.name ?? schema];
+
+    // 平台探测优先：能覆盖组件等非函数能力
+    const probe = this.getRawApi('canIUse');
+    if (probe) {
+      try {
+        return targets.every((t) => !!probe.call(this.globalObject, t));
+      } catch {
+        // 平台探测不可靠，落到存在性判断
+      }
     }
+
+    return targets.every((t) => typeof this.getRawApi(t) === 'function');
   }
 
   // ---------------------------------------------------------------- 系统信息族
