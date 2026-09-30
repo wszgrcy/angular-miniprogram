@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test:ci": "npm run build:library && npm run test:jasmine library&& npm run test:jasmine",
+    "test:ci": "npm run build:library && npm run test:jasmine",
     "test": "npm run test:jasmine",
     "test:wechat": "node ./script/wechat-karma.cjs --project ./test/hello-world-app --dist ./test/hello-world-app/dist/karma/app",
     "test:jasmine": "tsc -p ./script/tsconfig.startup-jasmine.json && node ./script/startup-jasmine.js",
