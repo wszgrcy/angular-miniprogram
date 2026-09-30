@@ -122,6 +122,8 @@ interface MpPipeRegistration {
 @Injectable({ providedIn: 'root' })
 export class MpPipeRegistry {
   private registrations: MpPipeRegistration[] = [];
+  /** 内置管道：永远最先执行，不受 `clearGlobalPipes()` 影响 */
+  private core: MpPipeRegistration[] = [];
 
   constructor() {
     // multi provider：运行时为数组，Angular 类型不反映 multi，此处显式收敛
@@ -179,9 +181,28 @@ export class MpPipeRegistry {
       (r) => r.name === null || r.name === name,
     );
     return [
+      ...this.core,
       ...hits.filter((r) => r.name === null),
       ...hits.filter((r) => r.name !== null),
     ].flatMap((r) => r[key]);
+  }
+
+  /** 注册内置管道，返回的句柄同样可 `dispose()` */
+  setCorePipes(set: MpPipeSet) {
+    const reg: MpPipeRegistration = {
+      name: null,
+      pre: [...(set.pre ?? [])],
+      post: [...(set.post ?? [])],
+    };
+    this.core.push(reg);
+    return {
+      dispose: () => {
+        const index = this.core.indexOf(reg);
+        if (index !== -1) {
+          this.core.splice(index, 1);
+        }
+      },
+    };
   }
 
   private register(

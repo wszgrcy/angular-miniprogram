@@ -133,6 +133,12 @@ import {
   MpNavigateOptions,
   MpToastOptions,
 } from './types';
+import {
+  MP_API_SCHEMAS,
+  MpApiSchema,
+  mergeSchemas,
+  mpValidationPipe,
+} from './validation';
 
 /**
  * 统一小程序 API 服务（root 单例），对标 uni-app 的 uni.xxx 层。
@@ -165,6 +171,22 @@ export class MpApiService {
   private readonly registry = inject(MpPipeRegistry);
   private readonly eventChannels = new Map<number, MpEventChannel>();
   private channelSeq = 0;
+
+  constructor() {
+    // 守卫必须内联写：包成 `isMpDevMode()` 后打包器无法证明分支已死，
+    // schema 会跟整进生产包（实测 15KB vs 147B）。
+    if (typeof ngDevMode !== 'undefined' && ngDevMode) {
+      const raw = inject(MP_API_SCHEMAS, { optional: true });
+      const contributions: Record<string, MpApiSchema>[] = Array.isArray(raw)
+        ? (raw as Record<string, MpApiSchema>[])
+        : raw
+          ? [raw as Record<string, MpApiSchema>]
+          : [];
+      this.registry.setCorePipes({
+        pre: [mpValidationPipe(mergeSchemas(contributions))],
+      });
+    }
+  }
 
   // ---------------------------------------------------------------- 管道拦截
 
