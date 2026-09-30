@@ -32,6 +32,8 @@ export type MpApiName =
   | 'switchTab'
   | 'reLaunch'
   | 'navigateBack'
+  | 'preloadPage'
+  | 'unPreloadPage'
   // 交互
   | 'showToast'
   | 'hideToast'
@@ -177,6 +179,8 @@ export type MpApiName =
   | 'closeBLEConnection'
   | 'onBLEConnectionStateChange'
   | 'offBLEConnectionStateChange'
+  | 'getBLEDeviceRSSI'
+  | 'setBLEMTU'
   | 'getBLEDeviceServices'
   | 'getBLEDeviceCharacteristics'
   | 'readBLECharacteristicValue'

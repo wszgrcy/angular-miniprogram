@@ -75,6 +75,7 @@ import {
   MpScreenBrightnessResult,
   MpSelectedTextRange,
   MpSendSocketMessageOptions,
+  MpSetBLEMTUOptions,
   MpSetClipboardDataOptions,
   MpSetKeepScreenOnOptions,
   MpSetNavigationBarColorOptions,
@@ -294,6 +295,14 @@ export class MpApiService {
 
   navigateBack(options: MpNavigateBackOptions = {}) {
     return this.invoke('navigateBack', options);
+  }
+
+  preloadPage(options: MpNavigateOptions) {
+    return this.invoke('preloadPage', options);
+  }
+
+  unPreloadPage(options: MpNavigateOptions) {
+    return this.invoke('unPreloadPage', options);
   }
 
   /** 目标页消费通道（一次性，取后即除） */
@@ -892,6 +901,14 @@ export class MpApiService {
       'onBLEConnectionStateChange',
       'offBLEConnectionStateChange',
     );
+  }
+
+  getBLEDeviceRSSI(options: MpBLEDeviceIdOptions) {
+    return this.invoke('getBLEDeviceRSSI', options);
+  }
+
+  setBLEMTU(options: MpSetBLEMTUOptions) {
+    return this.invoke('setBLEMTU', options);
   }
 
   getBLEDeviceServices(

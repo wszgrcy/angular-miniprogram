@@ -505,6 +505,16 @@ export interface MpNotifyBLEChangeOptions
   state: boolean;
 }
 
+/** 单次写入包大小，BLE 默认 20 字节，传大包前需调大 */
+export interface MpSetBLEMTUOptions extends MpBLEDeviceIdOptions {
+  mtu: number;
+}
+
+export interface MpBleRssiResult {
+  rssi: number;
+  errMsg?: string;
+}
+
 export interface MpGetProviderOptions extends MpCallbackOptions {
   service: string;
 }
@@ -631,6 +641,7 @@ export interface MpApiResultMap {
   getBLEDeviceServices: MpBLEServicesResult;
   getBLEDeviceCharacteristics: MpBLECharacteristicsResult;
   readBLECharacteristicValue: MpBLECharacteristicResult;
+  getBLEDeviceRSSI: MpBleRssiResult;
   getBeacons: MpBeaconsResult;
 
   // 系统

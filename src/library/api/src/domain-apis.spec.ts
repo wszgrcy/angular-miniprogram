@@ -97,6 +97,50 @@ describe('MpApiService 域方法', () => {
         errMsg: 'scanCode:fail',
       });
     });
+
+    it('getBLEDeviceRSSI 返回 { rssi }', async () => {
+      const { service, fake } = setup('wx', {
+        getBLEDeviceRSSI: jasmine
+          .createSpy('getBLEDeviceRSSI')
+          .and.callFake((o: any) => o.success?.({ rssi: -63 })),
+      });
+      const res = await service.getBLEDeviceRSSI({ deviceId: 'd1' });
+      expect(res.rssi).toBe(-63);
+      expect((fake.getBLEDeviceRSSI as any).calls.mostRecent().args[0].deviceId).toBe(
+        'd1',
+      );
+    });
+
+    it('setBLEMTU 透传 deviceId + mtu', async () => {
+      const { service, fake } = setup('wx', {
+        setBLEMTU: jasmine
+          .createSpy('setBLEMTU')
+          .and.callFake((o: any) => o.success?.({})),
+      });
+      await service.setBLEMTU({ deviceId: 'd1', mtu: 185 });
+      const arg = (fake.setBLEMTU as any).calls.mostRecent().args[0];
+      expect(arg.deviceId).toBe('d1');
+      expect(arg.mtu).toBe(185);
+    });
+
+    it('preloadPage / unPreloadPage 收 { url }', async () => {
+      const { service, fake } = setup('wx', {
+        preloadPage: jasmine
+          .createSpy('preloadPage')
+          .and.callFake((o: any) => o.success?.({})),
+        unPreloadPage: jasmine
+          .createSpy('unPreloadPage')
+          .and.callFake((o: any) => o.success?.({})),
+      });
+      await service.preloadPage({ url: '/pages/a/a' });
+      await service.unPreloadPage({ url: '/pages/a/a' });
+      expect((fake.preloadPage as any).calls.mostRecent().args[0].url).toBe(
+        '/pages/a/a',
+      );
+      expect((fake.unPreloadPage as any).calls.mostRecent().args[0].url).toBe(
+        '/pages/a/a',
+      );
+    });
   });
 
   describe('同步 API', () => {
