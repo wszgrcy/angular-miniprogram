@@ -7,10 +7,25 @@ import {
   inject,
 } from '@angular/core';
 import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram/platform';
+import {
+  Observable,
+  Subject,
+  defer,
+  of,
+  switchMap,
+  tap,
+} from 'rxjs';
 import { MpEventChannel } from './event-channel';
-import { MpInterceptorRegistry, runHookQueue } from './interceptor-registry';
+import {
+  MpInvokeContext,
+  MpPipeHandle,
+  MpPipeRegistry,
+  MpPipeSet,
+  pipeThrough,
+  toAbortError,
+} from './pipe-registry';
 import { MP_PLATFORM } from './platform';
-import { hasCallbackHandlers, shouldPromise } from './promisify';
+import { hasCallbackHandlers, isTaskApi, shouldPromise } from './promisify';
 import { applyFieldMap } from './protocol-engine';
 import {
   GENERIC_RESULT_NORMALIZERS,
@@ -23,18 +38,24 @@ import {
   buildWindowInfo,
   enhanceSystemInfo,
 } from './system-info';
-import { MpApiInterceptor, MpApiNameInput, MpCallbackOptions } from './types';
+import { MpApiNameInput, MpCallbackOptions } from './types';
 
 /**
  * 统一小程序 API 服务（root 单例），对标 uni-app 的 uni.xxx 层。
  *
- * 三层职责，全部对齐 uni 的调用管线：
+ * rxjs 冷流管线：
  *
- *   invoke(name, options)
- *     -> Promise 化判定（未传回调且非 sync/task 时返回 Promise）
- *     -> 拦截器（invoke 可改写参数 / false 阻断；success/fail/complete 改写结果）
- *     -> 平台协议归一化（API 名 / 参数 / 结果，如 my.showModal -> alert/confirm）
- *     -> 目标全局对象（wx / my / tt / swan / qq / dd / jd）
+ *   invoke$(name, options)
+ *     -> of(ctx) -> pre pipes（改写参数 / blockWith 阻断）
+ *     -> switchMap(真正调用)   <- 订阅才发生
+ *     -> post pipes（改写结果 / 埋点 / catchError）
+ *     -> 平台协议归一化（API 名 / 参数 / 结果）在调用层内完成
+ *
+ * 返回形态：
+ * - `invoke$` 可订阅冷流；`invoke` 返回 Promise（急切订阅）
+ * - task 类同步返回 task（异步 pre 管道不适用，物理限制）
+ * - 同步 API（*Sync / create* / on* 等）直接返回原始值
+ * - AbortSignal：未发起即取消 / in-flight 取消（task 类自动 abort）
  *
  * 所有回调经 `ɵChangeDetectionScheduler` 通知变更检测，不依赖 zone。
  */
@@ -47,59 +68,92 @@ export class MpApiService {
   private readonly platform = inject(MP_PLATFORM);
   private readonly protocols = inject(MP_API_PROTOCOLS);
   private readonly scheduler = inject(ChangeDetectionScheduler);
-  private readonly registry = new MpInterceptorRegistry();
+  private readonly registry = inject(MpPipeRegistry);
   private readonly eventChannels = new Map<number, MpEventChannel>();
   private channelSeq = 0;
 
-  // ---------------------------------------------------------------- 拦截器
+  // ---------------------------------------------------------------- 管道拦截
 
-  /** `addInterceptor('navigateTo', {...})` 按 API 拦截；`addInterceptor({...})` 全局拦截 */
-  addInterceptor(
-    nameOrInterceptor: string | MpApiInterceptor,
-    interceptor?: MpApiInterceptor,
-  ): void {
-    this.registry.add(nameOrInterceptor, interceptor);
+  /**
+   * 按 API 注册管道：`const h = api.setPipe('navigateTo', { pre: [...] })`
+   * 返回句柄，`h.dispose()` 即撤销本次注册。
+   */
+  setPipe(name: MpApiNameInput, set: MpPipeSet): MpPipeHandle {
+    return this.registry.setPipes(name, set);
   }
 
-  removeInterceptor(
-    nameOrInterceptor: string | MpApiInterceptor,
-    interceptor?: MpApiInterceptor,
-  ): void {
-    this.registry.remove(nameOrInterceptor, interceptor);
+  removePipe(name: MpApiNameInput): void {
+    this.registry.removePipes(name);
+  }
+
+  /** 全局管道（对所有 API 生效），同样返回可 dispose 的句柄 */
+  setGlobalPipes(set: MpPipeSet): MpPipeHandle {
+    return this.registry.setGlobalPipes(set);
+  }
+
+  clearGlobalPipes(): void {
+    this.registry.clearGlobalPipes();
   }
 
   // ---------------------------------------------------------------- 通用调用
 
   /**
-   * 通用入口：`invoke('showToast', { title: 'hi' })`。
-   * `name` 带已知 API 名补全，也接受任意字符串（运行时由平台报不支持）。
-   * 未传回调且非 sync/task API 时返回 Promise。
+   * 冷流入口：订阅才发起调用，全程可管道干预。
+   * 用户回调（若传）作为旁路观察者在 post 管道之后触发，
+   * 看到的同样是归一/改写后的结果。
+   */
+  invoke$<T = any>(
+    name: MpApiNameInput,
+    options: MpCallbackOptions = {},
+  ): Observable<T> {
+    return defer(() => {
+      const { cbs, rest } = this.extractCallbacks(options);
+      const ctx: MpInvokeContext = { name, options: rest };
+      let stream$: Observable<any> = pipeThrough(of(ctx), [
+        ...this.registry.prePipes(name),
+        switchMap((c) => this.callObservable<T>(c)),
+        ...this.registry.postPipes(name),
+      ]);
+      if (cbs) {
+        let lastRes: any;
+        stream$ = stream$.pipe(
+          tap(
+            (res) => {
+              lastRes = res;
+              cbs.success?.(res);
+            },
+            (err) => {
+              cbs.fail?.(err);
+              cbs.complete?.(err);
+            },
+            () => cbs.complete?.(lastRes),
+          ),
+        );
+      }
+      return stream$;
+    });
+  }
+
+  /**
+   * Promise 入口：普通 API 返回 Promise；task 类同步返回 task；
+   * 同步 API 直接返回值。`name` 带补全，也接受任意字符串。
    */
   invoke<T = any>(
     name: MpApiNameInput,
     options: MpCallbackOptions = {},
   ): any {
-    const opts: MpCallbackOptions = { ...options };
-    const promiseable = shouldPromise(name) && !hasCallbackHandlers(opts);
-
-    let resolveFn!: (value: T) => void;
-    let rejectFn!: (reason: any) => void;
-    const promise = promiseable
-      ? new Promise<T>((resolve, reject) => {
-          resolveFn = resolve;
-          rejectFn = reject;
-        })
-      : undefined;
-
-    if (promiseable) {
-      opts.success = (res) => resolveFn(res);
-      opts.fail = (err) => rejectFn(err);
-      this.invokeWithInterceptors(name, opts);
-      // Promise 模式下返回值就是 Promise 本身（returnValue 钩子作用于 Promise，同 uni）
-      return this.registry.applyReturnValue(name, promise);
+    if (isTaskApi(name)) {
+      return this.invokeTask(name, options);
     }
-
-    return this.registry.applyReturnValue(name, this.invokeWithInterceptors(name, opts));
+    if (!shouldPromise(name)) {
+      return this.callSync(name, options);
+    }
+    return new Promise<T>((resolve, reject) => {
+      this.invoke$<T>(name, options).subscribe({
+        next: (v) => resolve(v),
+        error: (e) => reject(e),
+      });
+    });
   }
 
   /** 直接取平台原始 API（跳过协议/拦截器），用于协议 custom 之外的特殊场景 */
@@ -325,53 +379,125 @@ export class MpApiService {
 
   // ---------------------------------------------------------------- 内部管线
 
-  private invokeWithInterceptors(
-    name: string,
-    opts: MpCallbackOptions,
-  ): unknown {
-    const invokeHooks = this.registry.hooks(name, 'invoke');
-    if (invokeHooks.length) {
-      const queue = runHookQueue(invokeHooks, { name, options: opts });
-      if (queue.blocked) {
-        return undefined;
-      }
-      if (queue.promise) {
-        return queue.promise.then((ctx) => {
-          if (ctx === false || ctx == null) {
-            return undefined;
-          }
-          const finalOpts = (ctx as MpCallbackOptions).options ?? opts;
-          return this.invokeFinal(name, finalOpts);
-        });
-      }
-      opts = (queue.value as MpCallbackOptions)?.options ?? opts;
-    }
-    return this.invokeFinal(name, opts);
+  private extractCallbacks(options: MpCallbackOptions): {
+    cbs: {
+      success?: (res: any) => void;
+      fail?: (err: any) => void;
+      complete?: (res: any) => void;
+    } | null;
+    rest: MpCallbackOptions;
+  } {
+    const rest = { ...options };
+    const success =
+      typeof rest.success === 'function' ? rest.success : undefined;
+    const fail = typeof rest.fail === 'function' ? rest.fail : undefined;
+    const complete =
+      typeof rest.complete === 'function' ? rest.complete : undefined;
+    delete rest.success;
+    delete rest.fail;
+    delete rest.complete;
+    const cbs =
+      success || fail || complete ? { success, fail, complete } : null;
+    return { cbs, rest };
   }
 
-  /** 包装 success/fail/complete：拦截钩子 + 变更检测通知 */
-  private invokeFinal(name: string, opts: MpCallbackOptions): unknown {
-    const wrapped: MpCallbackOptions = { ...opts };
-    (['success', 'fail', 'complete'] as const).forEach((key) => {
-      const original = wrapped[key];
-      const hooks = this.registry.hooks(name, key);
-      if (!original && !hooks.length) {
+  /** 冷流调用单元：订阅时发起，支持 AbortSignal 取消 */
+  private callObservable<T>(ctx: MpInvokeContext): Observable<T> {
+    return new Observable<T>((subscriber) => {
+      const signal = ctx.options.signal as AbortSignal | undefined;
+      if (signal?.aborted) {
+        subscriber.error(toAbortError(signal));
         return;
       }
-      wrapped[key] = (res: unknown) => {
-        this.runInAngular(() => {
-          let out = res;
-          for (const hook of hooks) {
-            const result = hook(out, opts);
-            if (result !== undefined && result !== false) {
-              out = result;
-            }
-          }
-          original?.(out);
-        });
-      };
+      const onAbort = () => subscriber.error(toAbortError(signal));
+      signal?.addEventListener?.('abort', onAbort);
+
+      const opts: MpCallbackOptions = { ...ctx.options };
+      delete opts.signal;
+      opts.success = (res) =>
+        this.runInAngular(() => subscriber.next(res));
+      opts.fail = (err) => this.runInAngular(() => subscriber.error(err));
+
+      this.dispatch(ctx.name as string, opts);
+
+      return () => signal?.removeEventListener?.('abort', onAbort);
     });
-    return this.dispatch(name, wrapped);
+  }
+
+  /**
+   * task 类：同步返回 task。
+   * pre 管道同步执行（异步 pre 与同步 task 返回物理互斥）；
+   * 结果经 post 管道后再触发用户回调；signal 接 task.abort()。
+   */
+  private invokeTask(
+    name: MpApiNameInput,
+    options: MpCallbackOptions,
+  ): any {
+    const { cbs, rest } = this.extractCallbacks(options);
+    let ctx: MpInvokeContext = { name, options: rest };
+    let emitted = false;
+    let preError: any;
+
+    pipeThrough(of(ctx), this.registry.prePipes(name)).subscribe({
+        next: (c) => {
+          emitted = true;
+          ctx = c;
+        },
+        error: (e) => {
+          preError = e;
+        },
+      });
+
+    if (preError) {
+      this.runInAngular(() => {
+        cbs?.fail?.(preError);
+        cbs?.complete?.(preError);
+      });
+      return undefined;
+    }
+    if (!emitted) {
+      // 被裸 filter 掉：不发起调用
+      return undefined;
+    }
+
+    const result$ = new Subject<any>();
+    pipeThrough(result$, this.registry.postPipes(name)).subscribe({
+        next: (res) => cbs?.success?.(res),
+        error: (err) => {
+          cbs?.fail?.(err);
+          cbs?.complete?.(err);
+        },
+      });
+
+    const opts: MpCallbackOptions = { ...ctx.options };
+    const signal = opts.signal as AbortSignal | undefined;
+    delete opts.signal;
+    opts.success = (res) =>
+      this.runInAngular(() => {
+        result$.next(res);
+        result$.complete();
+        cbs?.complete?.(res);
+      });
+    opts.fail = (err) =>
+      this.runInAngular(() => result$.error(err));
+
+    const task = this.dispatch(name as string, opts);
+
+    if (signal) {
+      const abort = () => {
+        try {
+          (task as any)?.abort?.();
+        } catch {
+          /* 平台 task 不支持 abort 时忽略 */
+        }
+      };
+      if (signal.aborted) {
+        abort();
+      } else {
+        signal.addEventListener?.('abort', abort);
+      }
+    }
+    return task;
   }
 
   /** 平台协议归一化后调用目标 API */

@@ -119,21 +119,3 @@ export interface MpActionSheetResult {
   tapIndex: number;
   errMsg?: string;
 }
-
-/**
- * API 拦截器，钩子语义与 uni-app 对齐：
- *
- * - `invoke(ctx)`：调用前触发，可返回新 options 改写参数；
- *   **返回 `false` 阻断本次调用**（典型场景：登录拦截 navigateTo）。
- * - `success` / `fail` / `complete`：回调结果改写，返回值替换原结果。
- * - `returnValue`：改写同步返回值（task 类 API 的 RequestTask 等）。
- *
- * 钩子可返回 Promise，队列会串接；同步返回 false 立即阻断。
- */
-export interface MpApiInterceptor {
-  invoke?: (ctx: { name: string; options: MpCallbackOptions }) => any;
-  success?: (result: any, options: MpCallbackOptions) => any;
-  fail?: (error: any, options: MpCallbackOptions) => any;
-  complete?: (result: any, options: MpCallbackOptions) => any;
-  returnValue?: (returnValue: any) => any;
-}

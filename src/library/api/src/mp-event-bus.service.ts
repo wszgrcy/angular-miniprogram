@@ -7,6 +7,7 @@ import {
   OnDestroy,
   inject,
 } from '@angular/core';
+import { Observable } from 'rxjs';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Handler = (payload: any) => void;
@@ -72,6 +73,14 @@ export class MpEventBus implements OnDestroy {
       for (const handler of [...set]) {
         handler(payload);
       }
+    });
+  }
+
+  /** 可订阅形态：退订即退订监听 */
+  on$<T = any>(event: string): Observable<T> {
+    return new Observable<T>((subscriber) => {
+      const off = this.on<T>(event, (payload) => subscriber.next(payload));
+      return off;
     });
   }
 

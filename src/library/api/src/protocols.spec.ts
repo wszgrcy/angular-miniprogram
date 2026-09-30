@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { TestBed } from '@angular/core/testing';
 import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram/platform';
+import { tap } from 'rxjs';
 import { initMiniProgramTestEnv } from '../../platform/test-util/init-env';
 import { MpApiService } from './mp-api.service';
 import { MP_PLATFORM } from './platform';
@@ -216,18 +217,19 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
       expect(rejected).toBe(err);
     });
 
-    it('errMsg 归一发生在拦截器之前（拦截器看到归一后结果）', () => {
+    it('errMsg 归一发生在 post 管道之前（管道看到归一后结果）', async () => {
       let seen: any;
       const service = setup('my', {
         showToast: (opts: any) => opts.success?.({}),
       });
-      service.addInterceptor('showToast', {
-        success: (res: any) => {
-          seen = res;
-          return res;
-        },
+      service.setPipe('showToast', {
+        post: [
+          tap((res: any) => {
+            seen = res;
+          }),
+        ],
       });
-      service.invoke('showToast', { title: 'x' });
+      await service.invoke('showToast', { title: 'x' });
       expect(seen.errMsg).toBe('showToast:ok');
     });
   });

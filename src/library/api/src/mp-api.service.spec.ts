@@ -2,8 +2,17 @@
 import { ɵChangeDetectionScheduler as ChangeDetectionScheduler } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram/platform';
+import {
+  catchError,
+  firstValueFrom,
+  map,
+  of,
+  switchMap,
+  tap,
+} from 'rxjs';
 import { initMiniProgramTestEnv } from '../../platform/test-util/init-env';
 import { MpApiService } from './mp-api.service';
+import { MP_API_PIPES, blockWith } from './pipe-registry';
 import { MP_PLATFORM } from './platform';
 
 /** 可记录调用的假全局对象，替代 wx/my 等 */
@@ -59,14 +68,14 @@ describe('MpApiService', () => {
       ).toBeRejectedWith({ errMsg: 'showToast:fail' });
     });
 
-    it('传了 success 回调则不走 Promise，返回 undefined', () => {
+    it('回调作为旁路观察者：Promise 与回调同时可用', async () => {
       const { service } = setup();
       let result: any;
       const ret = service.invoke('showToast', {
         title: 'hi',
         success: (res: any) => (result = res),
       });
-      expect(ret).toBeUndefined();
+      await expectAsync(ret).toBeResolved();
       expect(result.errMsg).toBe('showToast:ok');
     });
 
@@ -92,14 +101,13 @@ describe('MpApiService', () => {
     });
   });
 
-  describe('拦截器', () => {
-    it('invoke 钩子改写参数', async () => {
+  describe('管道拦截（rxjs）', () => {
+    it('pre 管道改写参数', async () => {
       const { service, fake } = setup();
-      service.addInterceptor('navigateTo', {
-        invoke: (ctx: any) => ({
-          ...ctx,
-          options: { ...ctx.options, url: '/login' },
-        }),
+      service.setPipe('navigateTo', {
+        pre: [
+          map((ctx) => ({ ...ctx, options: { ...ctx.options, url: '/login' } })),
+        ],
       });
       await service.navigateTo('/home');
       expect((fake.navigateTo as any).calls.mostRecent().args[0].url).toBe(
@@ -107,107 +115,285 @@ describe('MpApiService', () => {
       );
     });
 
-    it('invoke 返回 false 阻断调用，目标 API 不执行、Promise 永不落定', async () => {
+    it('blockWith 阻断：目标 API 不执行，Promise 以 MpBlockedError 落定', async () => {
       const { service, fake } = setup();
-      service.addInterceptor('navigateTo', { invoke: () => false });
-      let settled = false;
-      service
-        .navigateTo('/home')
-        .then(
-          () => (settled = true),
-          () => (settled = true),
-        );
-      await new Promise((r) => setTimeout(r, 10));
+      service.setPipe('navigateTo', { pre: [blockWith('未登录')]});
+      await expectAsync(service.navigateTo('/home')).toBeRejectedWithError(
+        /未登录/,
+      );
       expect(fake.navigateTo).not.toHaveBeenCalled();
-      expect(settled).toBeFalse();
     });
 
-    it('success 钩子改写结果', async () => {
+    it('post 管道改写结果，用户回调看到改写后结果', async () => {
       const { service } = setup();
-      service.addInterceptor('showToast', {
-        success: (res: any) => ({ ...res, tagged: true }),
+      service.setPipe('showToast', {
+        post: [map((res: any) => ({ ...res, tagged: true }))],
       });
       let result: any;
-      service.invoke('showToast', {
-        title: 'x',
-        success: (res: any) => (result = res),
-      });
+      await service
+        .invoke('showToast', {
+          title: 'x',
+          success: (res: any) => (result = res),
+        })
+        .then(() => undefined);
       expect(result.tagged).toBeTrue();
     });
 
-    it('作用域拦截器只影响目标 API', () => {
+    it('post 管道可 catchError 改写错误', async () => {
+      const { service } = setup('wx', {
+        showToast: (o: any) => o.fail?.({ errMsg: 'showToast:fail boom' }),
+      });
+      service.setPipe('showToast', {
+        post: [catchError((err: any) => of({ recovered: err.errMsg }))],
+      });
+      await expectAsync(
+        service.invoke('showToast', { title: 'x' }),
+      ).toBeResolvedTo({ recovered: 'showToast:fail boom' } as any);
+    });
+
+    it('作用域管道只影响目标 API', async () => {
       const { service } = setup();
       let navigateHits = 0;
       let toastHits = 0;
-      service.addInterceptor('navigateTo', {
-        success: (r: any) => {
-          navigateHits++;
-          return r;
-        },
+      service.setPipe('navigateTo', {
+        post: [
+          tap((r: any) => {
+            navigateHits++;
+            return r;
+          }),
+        ],
       });
-      service.addInterceptor('showToast', {
-        success: (r: any) => {
-          toastHits++;
-          return r;
-        },
+      service.setPipe('showToast', {
+        post: [
+          tap((r: any) => {
+            toastHits++;
+            return r;
+          }),
+        ],
       });
-      service.invoke('showToast', { title: 'x' });
+      await service.invoke('showToast', { title: 'x' });
       expect(toastHits).toBe(1);
       expect(navigateHits).toBe(0);
     });
 
-    it('全局拦截器对所有 API 生效', () => {
+    it('全局管道对所有 API 生效', async () => {
       const { service } = setup();
       let hits = 0;
-      service.addInterceptor({
-        success: (r: any) => {
-          hits++;
-          return r;
-        },
+      service.setGlobalPipes({
+        post: [
+          tap(() => {
+            hits++;
+          }),
+        ],
       });
-      service.invoke('showToast', { title: 'a' });
-      service.invoke('navigateTo', { url: '/b' });
+      await service.invoke('showToast', { title: 'a' });
+      await service.invoke('navigateTo', { url: '/b' });
       expect(hits).toBe(2);
     });
 
-    it('removeInterceptor 精确移除', () => {
+    it('removePipe 后不再生效', async () => {
       const { service } = setup();
       let hits = 0;
-      const interceptor = {
-        success: (r: any) => {
-          hits++;
-          return r;
-        },
-      };
-      service.addInterceptor('showToast', interceptor);
-      service.invoke('showToast', { title: 'a' });
-      expect(hits).toBe(1);
-      service.removeInterceptor('showToast', interceptor);
-      service.invoke('showToast', { title: 'b' });
-      expect(hits).toBe(1);
-    });
-
-    it('returnValue 钩子包装 task', () => {
-      const { service } = setup();
-      service.addInterceptor('request', {
-        returnValue: (task: any) => ({ ...task, tagged: true }),
+      service.setPipe('showToast', {
+        post: [
+          tap(() => {
+            hits++;
+          }),
+        ],
       });
-      const task = service.invoke('request', { url: 'https://x.com' });
-      expect(task.tagged).toBeTrue();
+      await service.invoke('showToast', { title: 'a' });
+      expect(hits).toBe(1);
+      service.removePipe('showToast');
+      await service.invoke('showToast', { title: 'b' });
+      expect(hits).toBe(1);
     });
 
-    it('invoke 钩子支持异步（Promise 改写参数）', async () => {
+    it('pre 管道支持异步（switchMap 到 Promise）', async () => {
       const { service, fake } = setup();
-      service.addInterceptor('navigateTo', {
-        invoke: async (ctx: any) => ({
-          ...ctx,
-          options: { ...ctx.options, url: '/async' },
-        }),
+      service.setPipe('navigateTo', {
+        pre: [
+          switchMap(async (ctx) => ({
+            ...ctx,
+            options: { ...ctx.options, url: '/async' },
+          })),
+        ],
       });
       await service.navigateTo('/home');
       expect((fake.navigateTo as any).calls.mostRecent().args[0].url).toBe(
         '/async',
       );
+    });
+
+    it('DI 多 provider 声明式贡献管道（同 HTTP_INTERCEPTORS）', async () => {
+      initMiniProgramTestEnv();
+      const fake = createFakeGlobal();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: MINIPROGRAM_GLOBAL_TOKEN, useValue: fake },
+          { provide: MP_PLATFORM, useValue: 'wx' },
+          {
+            provide: MP_API_PIPES,
+            multi: true,
+            useValue: {
+              global: { post: [map((res: any) => ({ ...res, g1: true }))] },
+            },
+          },
+          {
+            provide: MP_API_PIPES,
+            multi: true,
+            useValue: {
+              global: { post: [map((res: any) => ({ ...res, g2: true }))] },
+              scoped: {
+                showToast: { pre: [blockWith('禁 toast')] },
+              },
+            },
+          },
+        ],
+      });
+      const service = TestBed.inject(MpApiService);
+
+      await expectAsync(service.invoke('navigateTo', { url: '/a' })).toBeResolvedTo(
+        { errMsg: 'navigateTo:ok', g1: true, g2: true } as any,
+      );
+      await expectAsync(service.invoke('showToast', { title: 'x' })).toBeRejectedWithError(
+        /禁 toast/,
+      );
+    });
+
+    it('clearGlobalPipes 不影响 DI 贡献的全局管道', async () => {
+      initMiniProgramTestEnv();
+      const fake = createFakeGlobal();
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: MINIPROGRAM_GLOBAL_TOKEN, useValue: fake },
+          { provide: MP_PLATFORM, useValue: 'wx' },
+          {
+            provide: MP_API_PIPES,
+            multi: true,
+            useValue: { global: { post: [map((r: any) => ({ ...r, fromDi: true }))] } },
+          },
+        ],
+      });
+      const service = TestBed.inject(MpApiService);
+      service.setGlobalPipes({ post: [map((r: any) => ({ ...r, runtime: true }))] });
+      service.clearGlobalPipes();
+
+      const res = await service.invoke('showToast', { title: 'x' });
+      expect(res.fromDi).toBeTrue();
+      expect(res.runtime).toBeUndefined();
+    });
+
+    it('setPipe 返回句柄，dispose 撤销本次注册', async () => {
+      const { service } = setup();
+      const handle = service.setPipe('showToast', {
+        post: [map((res: any) => ({ ...res, tagged: true }))],
+      });
+
+      expect((await service.invoke('showToast', { title: 'a' })).tagged).toBeTrue();
+
+      handle.dispose();
+      expect((await service.invoke('showToast', { title: 'b' })).tagged).toBeUndefined();
+
+      // 幂等
+      handle.dispose();
+      expect((await service.invoke('showToast', { title: 'c' })).tagged).toBeUndefined();
+    });
+
+    it('dispose 只撤销自己，不影响其他注册', async () => {
+      const { service } = setup();
+      const h1 = service.setPipe('showToast', {
+        post: [map((res: any) => ({ ...res, a: 1 }))],
+      });
+      const h2 = service.setPipe('showToast', {
+        post: [map((res: any) => ({ ...res, b: 2 }))],
+      });
+
+      h1.dispose();
+
+      const res = await service.invoke('showToast', { title: 'x' });
+      expect(res.a).toBeUndefined();
+      expect(res.b).toBe(2);
+
+      h2.dispose();
+      const res2 = await service.invoke('showToast', { title: 'x' });
+      expect(res2.b).toBeUndefined();
+    });
+
+    it('全局管道同样可 dispose', async () => {
+      const { service } = setup();
+      const h = service.setGlobalPipes({
+        post: [map((res: any) => ({ ...res, tracked: true }))],
+      });
+
+      expect((await service.invoke('showToast', { title: 'a' })).tracked).toBeTrue();
+      expect((await service.invoke('navigateTo', { url: '/b' })).tracked).toBeTrue();
+
+      h.dispose();
+      expect((await service.invoke('showToast', { title: 'a' })).tracked).toBeUndefined();
+    });
+
+    it('invoke$ 冷流：不订阅不发起调用', async () => {
+      const { service, fake } = setup();
+      const stream$ = service.invoke$('showToast', { title: 'x' });
+      expect(fake.showToast).not.toHaveBeenCalled();
+      await firstValueFrom(stream$);
+      expect(fake.showToast).toHaveBeenCalledTimes(1);
+    });
+
+    it('AbortSignal：已取消则不发起调用直接 reject', async () => {
+      const { service, fake } = setup();
+      const controller = new AbortController();
+      controller.abort('取消');
+      await expectAsync(
+        service.invoke('showToast', { title: 'x', signal: controller.signal }),
+      ).toBeRejected();
+      expect(fake.showToast).not.toHaveBeenCalled();
+    });
+
+    it('AbortSignal：in-flight 取消以 AbortError 落定', async () => {
+      const { service } = setup('wx', {
+        showToast: () => undefined, // 永不回调
+      });
+      const controller = new AbortController();
+      const promise = service.invoke('showToast', {
+        title: 'x',
+        signal: controller.signal,
+      });
+      controller.abort();
+      await expectAsync(promise).toBeRejected();
+    });
+
+    it('task 类：signal 取消自动 task.abort()', () => {
+      const { service } = setup();
+      const controller = new AbortController();
+      const task = service.invoke('request', {
+        url: 'https://x.com',
+        signal: controller.signal,
+      });
+      const spy = spyOn(task, 'abort');
+      controller.abort();
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it('task 类：post 管道作用于结果后再触发回调', async () => {
+      const { service } = setup('wx', {
+        request: (opts: any) => {
+          setTimeout(() => opts.success?.({ statusCode: 200 }), 0);
+          return { abort: () => undefined };
+        },
+      });
+      service.setPipe('request', {
+        post: [map((res: any) => ({ ...res, tagged: true }))],
+      });
+      let result: any;
+      service.invoke('request', {
+        url: 'https://x.com',
+        success: (res: any) => (result = res),
+      });
+      await new Promise((r) => setTimeout(r, 10));
+      expect(result.tagged).toBeTrue();
     });
   });
 
@@ -308,11 +494,12 @@ describe('MpApiService', () => {
         getSystemInfo: (opts: any) => opts.success?.({ ...sysRaw }),
       });
       let hits = 0;
-      service.addInterceptor('getSystemInfo', {
-        success: (r: any) => {
-          hits++;
-          return r;
-        },
+      service.setPipe('getSystemInfo', {
+        post: [
+          tap(() => {
+            hits++;
+          }),
+        ],
       });
       const res = await service.getSystemInfo();
       expect(hits).toBe(1);
