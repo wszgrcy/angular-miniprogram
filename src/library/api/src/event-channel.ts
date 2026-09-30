@@ -29,7 +29,7 @@ export class MpEventChannel {
     }
   }
 
-  emit(eventName: string, ...args: any[]): void {
+  emit(eventName: string, ...args: any[]) {
     const fns = this.listeners.get(eventName);
     if (!fns || fns.length === 0) {
       this.emitCache.push({ eventName, args });
@@ -42,21 +42,21 @@ export class MpEventChannel {
     );
   }
 
-  on(eventName: string, fn: (...args: any[]) => void): void {
+  on(eventName: string, fn: (...args: any[]) => void) {
     const list = this.listeners.get(eventName) ?? [];
     list.push({ fn, type: 'on' });
     this.listeners.set(eventName, list);
     this.flushCache(eventName);
   }
 
-  once(eventName: string, fn: (...args: any[]) => void): void {
+  once(eventName: string, fn: (...args: any[]) => void) {
     const list = this.listeners.get(eventName) ?? [];
     list.push({ fn, type: 'once' });
     this.listeners.set(eventName, list);
     this.flushCache(eventName);
   }
 
-  off(eventName: string, fn?: (...args: any[]) => void): void {
+  off(eventName: string, fn?: (...args: any[]) => void) {
     const fns = this.listeners.get(eventName);
     if (!fns) {
       return;
@@ -71,7 +71,7 @@ export class MpEventChannel {
     }
   }
 
-  private flushCache(eventName: string): void {
+  private flushCache(eventName: string) {
     const matched = this.emitCache.filter((c) => c.eventName === eventName);
     if (!matched.length) {
       return;

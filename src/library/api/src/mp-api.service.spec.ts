@@ -109,7 +109,7 @@ describe('MpApiService', () => {
           map((ctx) => ({ ...ctx, options: { ...ctx.options, url: '/login' } })),
         ],
       });
-      await service.navigateTo('/home');
+      await service.navigateTo({ url: '/home' });
       expect((fake.navigateTo as any).calls.mostRecent().args[0].url).toBe(
         '/login',
       );
@@ -118,7 +118,7 @@ describe('MpApiService', () => {
     it('blockWith 阻断：目标 API 不执行，Promise 以 MpBlockedError 落定', async () => {
       const { service, fake } = setup();
       service.setPipe('navigateTo', { pre: [blockWith('未登录')]});
-      await expectAsync(service.navigateTo('/home')).toBeRejectedWithError(
+      await expectAsync(service.navigateTo({ url: '/home' })).toBeRejectedWithError(
         /未登录/,
       );
       expect(fake.navigateTo).not.toHaveBeenCalled();
@@ -218,7 +218,7 @@ describe('MpApiService', () => {
           })),
         ],
       });
-      await service.navigateTo('/home');
+      await service.navigateTo({ url: '/home' });
       expect((fake.navigateTo as any).calls.mostRecent().args[0].url).toBe(
         '/async',
       );
@@ -407,9 +407,9 @@ describe('MpApiService', () => {
         },
         getStorage: (o: any) => o.success?.({ data: store[o.key] }),
       });
-      await service.setStorage('user', { id: 1 });
-      const user = await service.getStorage<{ id: number }>('user');
-      expect(user).toEqual({ id: 1 });
+      await service.setStorage({ key: 'user', data: { id: 1 } });
+      const res = await service.getStorage<{ id: number }>({ key: 'user' });
+      expect(res.data).toEqual({ id: 1 });
     });
 
     it('removeStorage/clearStorage', async () => {
@@ -425,7 +425,7 @@ describe('MpApiService', () => {
           o.success?.({});
         },
       });
-      await service.removeStorage('k');
+      await service.removeStorage({ key: 'k' });
       await service.clearStorage();
       expect(removed).toBe('k');
       expect(cleared).toBeTrue();
@@ -433,11 +433,11 @@ describe('MpApiService', () => {
   });
 
   describe('变更检测', () => {
-    it('回调执行后通知 scheduler', () => {
+    it('回调执行后通知 scheduler', async () => {
       const { service } = setup();
       const scheduler = TestBed.inject(ChangeDetectionScheduler);
       const spy = spyOn(scheduler, 'notify');
-      service.invoke('showToast', { title: 'x' });
+      await service.invoke('showToast', { title: 'x' });
       expect(spy).toHaveBeenCalled();
     });
   });
@@ -510,7 +510,7 @@ describe('MpApiService', () => {
   describe('类型化方法', () => {
     it('navigateTo 字符串参数（自动拼 __id__ 通道参数）', async () => {
       const { service, fake } = setup();
-      const res = await service.navigateTo('/a');
+      const res = await service.navigateTo({ url: '/a' });
       const url = (fake.navigateTo as any).calls.mostRecent().args[0].url;
       expect(url).toMatch(/^\/a\?__id__=\d+$/);
       expect(res.eventChannel).toBeDefined();
@@ -521,7 +521,7 @@ describe('MpApiService', () => {
         .createSpy('navigateBack')
         .and.callFake((opts: any) => opts.success?.({}));
       const { service } = setup('wx', { navigateBack: spy });
-      await service.navigateBack(2);
+      await service.navigateBack({ delta: 2 });
       expect(spy.calls.mostRecent().args[0].delta).toBe(2);
     });
   });

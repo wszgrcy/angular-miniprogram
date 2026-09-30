@@ -11,7 +11,7 @@ import { MpPlatform } from './types';
  */
 declare const miniProgramPlatform: MpPlatform | undefined;
 
-export function detectMpPlatform(): MpPlatform {
+export function detectMpPlatform() {
   if (typeof miniProgramPlatform !== 'undefined') {
     return miniProgramPlatform;
   }

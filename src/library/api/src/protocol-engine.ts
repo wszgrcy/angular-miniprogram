@@ -52,7 +52,7 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 export function applyFieldMap(
   from: Record<string, any> | null | undefined,
   map?: MpFieldMap | MpMapFn,
-): Record<string, any> {
+) {
   const to: Record<string, any> = {};
   let fields: MpFieldMap = {};
 

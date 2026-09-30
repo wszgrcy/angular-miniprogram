@@ -11,10 +11,10 @@ export class Demo {
   private bus = inject(MpEventBus);
 
   async go() {
-    await this.api.navigateTo('/pages/detail/detail-entry');
-    const res = await this.api.showModal({ content: '确定？' }); // 跨家归一
+    await this.api.navigateTo({ url: '/pages/detail/detail-entry' });
+    const res = await this.api.showModal({ content: '确定？' });
     if (res.confirm) {
-      this.api.showToast('已确定');
+      await this.api.showToast({ title: '已确定' });
     }
   }
 }

@@ -82,7 +82,7 @@ describe('navigateTo 事件通道接线', () => {
       .createSpy('navigateTo')
       .and.callFake((o: any) => o.success?.({}));
     const service = setup({ navigateTo: navSpy });
-    await service.navigateTo('/b?id=1');
+    await service.navigateTo({ url: '/b?id=1' });
     expect(navSpy.calls.mostRecent().args[0].url).toMatch(
       /^\/b\?id=1&__id__=\d+$/,
     );
@@ -90,7 +90,7 @@ describe('navigateTo 事件通道接线', () => {
 
   it('opener 与 target 通过同一通道通信', async () => {
     const service = setup();
-    const res = await service.navigateTo('/target');
+    const res = await service.navigateTo({ url: '/target' });
     const openerChannel = res.eventChannel as MpEventChannel;
     const id = openerChannel.id!;
 
@@ -111,7 +111,7 @@ describe('navigateTo 事件通道接线', () => {
 
   it('getEventChannel 一次性消费', () => {
     const service = setup();
-    void service.navigateTo('/x');
+    void service.navigateTo({ url: '/x' });
     const first = service.getEventChannel(1);
     expect(first).toBeDefined();
     expect(service.getEventChannel(1)).toBeUndefined();

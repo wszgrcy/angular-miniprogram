@@ -59,7 +59,7 @@ export function blockWith(
 }
 
 /** AbortSignal -> 标准 AbortError */
-export function toAbortError(signal?: AbortSignal): Error {
+export function toAbortError(signal?: AbortSignal) {
   const reason = (signal as any)?.reason;
   if (reason instanceof Error) {
     return reason;
@@ -69,7 +69,7 @@ export function toAbortError(signal?: AbortSignal): Error {
   return err;
 }
 
-export function isAbortError(e: any): boolean {
+export function isAbortError(e: any) {
   return e?.name === 'AbortError';
 }
 

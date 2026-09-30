@@ -44,7 +44,7 @@ export class MpEventBus implements OnDestroy {
     return this.on(event, wrapped);
   }
 
-  off(event: string, handler?: (payload: any) => void): void {
+  off(event: string, handler?: (payload: any) => void) {
     if (!handler) {
       this.listeners.delete(event);
       return;
@@ -63,7 +63,7 @@ export class MpEventBus implements OnDestroy {
     }
   }
 
-  emit<T = any>(event: string, payload?: T): void {
+  emit<T = any>(event: string, payload?: T) {
     const set = this.listeners.get(event);
     if (!set || set.size === 0) {
       return;
@@ -84,19 +84,19 @@ export class MpEventBus implements OnDestroy {
     });
   }
 
-  has(event: string): boolean {
+  has(event: string) {
     return (this.listeners.get(event)?.size ?? 0) > 0;
   }
 
-  clear(): void {
+  clear() {
     this.listeners.clear();
   }
 
-  ngOnDestroy(): void {
+  ngOnDestroy() {
     this.clear();
   }
 
-  private runInAngular(fn: () => void): void {
+  private runInAngular(fn: () => void) {
     try {
       fn();
     } finally {

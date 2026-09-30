@@ -77,7 +77,7 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
         .createSpy('showLoading')
         .and.callFake((opts: any) => opts.success?.({}));
       const service = setup('my', { showLoading: spy });
-      await service.showLoading('加载中');
+      await service.showLoading({ title: '加载中' });
       expect(spy.calls.mostRecent().args[0].content).toBe('加载中');
     });
 

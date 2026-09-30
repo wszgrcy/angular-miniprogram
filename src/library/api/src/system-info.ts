@@ -17,7 +17,7 @@ const UUID_KEY = '__AMP_DEVICE_UUID';
 export function addSafeAreaInsets(
   fromRes: any,
   toRes: Record<string, any>,
-): void {
+) {
   if (fromRes.safeArea) {
     const safeArea = fromRes.safeArea;
     toRes.safeAreaInsets = {
@@ -111,7 +111,7 @@ export function getOSInfo(
 export function normalizePlatform(
   platform: MpPlatform,
   platformField: string,
-): string {
+) {
   const p = (platformField || '').toLowerCase();
   if (platform === 'wx') {
     if (p === 'ohos') {
@@ -135,7 +135,7 @@ export function getDeviceType(
   fromRes: any,
   model = '',
   platform: MpPlatform,
-): string {
+) {
   const platformField = fromRes.platform || '';
   let deviceType = fromRes.deviceType || 'phone';
   const deviceTypeMaps: Record<string, string> = {
@@ -158,12 +158,12 @@ export function getDeviceType(
   return deviceType;
 }
 
-export function getDeviceBrand(brand: string): string {
+export function getDeviceBrand(brand: string) {
   return brand ? brand.toLowerCase() : brand;
 }
 
 /** 宿主名：各家字段名完全不同，逐家映射 */
-export function getHostName(fromRes: any, platform: MpPlatform): string {
+export function getHostName(fromRes: any, platform: MpPlatform) {
   switch (platform) {
     case 'wx':
       if (fromRes.environment) {
@@ -188,7 +188,7 @@ export function getHostName(fromRes: any, platform: MpPlatform): string {
   }
 }
 
-function getHostVersion(fromRes: any, platform: MpPlatform): string {
+function getHostVersion(fromRes: any, platform: MpPlatform) {
   if (platform === 'swan') {
     return fromRes.swanNativeVersion;
   }
@@ -204,7 +204,7 @@ export function enhanceSystemInfo(
   global: any,
   fromRes: any,
   toRes: Record<string, any> = {},
-): any {
+) {
   const {
     brand = '',
     model = '',
@@ -257,7 +257,7 @@ export function buildDeviceInfo(
   platform: MpPlatform,
   global: any,
   fromRes: any,
-): any {
+) {
   const to: Record<string, any> = {};
   useDeviceId(global)(fromRes, to);
   const { brand, model, platform: platformField = '' } = fromRes;
@@ -283,7 +283,7 @@ export function buildAppBaseInfo(
   platform: MpPlatform,
   global: any,
   fromRes: any,
-): any {
+) {
   const { language = '', fontSizeSetting } = fromRes;
   const hostLanguage = (language || '').replace(/_/g, '-');
   return {
@@ -302,7 +302,7 @@ export function buildWindowInfo(
   _platform: MpPlatform,
   _global: any,
   fromRes: any,
-): any {
+) {
   const to: Record<string, any> = {
     windowWidth: fromRes.windowWidth,
     windowHeight: fromRes.windowHeight,

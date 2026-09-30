@@ -82,12 +82,12 @@ const NETWORK_VALUE_MAP: Record<string, string> = {
 };
 
 /** 微信 icon 值域 -> 支付宝 type 值域 */
-function toastType(v: string): string {
+function toastType(v: string) {
   return v === 'error' ? 'fail' : v;
 }
 
 /** 支付宝/钉钉同步存储返回 { data }，需拆封；无存储时归一为空串 */
-function unwrapSyncStorage(res: any): any {
+function unwrapSyncStorage(res: any) {
   return res && res.data !== null && res.data !== undefined ? res.data : '';
 }
 
@@ -181,7 +181,7 @@ const DINGTALK: MpProtocolTable = {
 export function normalizeAlipayStyleResult(
   methodName: string,
   res: any,
-): any {
+) {
   if (res == null || typeof res !== 'object' || res instanceof Error) {
     return res;
   }
