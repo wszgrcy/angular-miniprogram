@@ -444,13 +444,13 @@ export class MpApiService {
   /** 全量增强：原始结果 + 归一字段（device/host/os/safeAreaInsets） */
   getSystemInfoSync() {
     const raw = this.callSync<any>('getSystemInfoSync');
-    return enhanceSystemInfo(this.platform, this.globalObject, raw, {});
+    return enhanceSystemInfo(this.platform, this.globalObject, raw);
   }
 
   /** 异步全量（走 invoke 管线，可被拦截） */
   getSystemInfo() {
     return this.invoke('getSystemInfo').then((res: any) =>
-      enhanceSystemInfo(this.platform, this.globalObject, res, {}),
+      enhanceSystemInfo(this.platform, this.globalObject, res),
     );
   }
 

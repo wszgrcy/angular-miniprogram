@@ -591,6 +591,85 @@ export interface MpCreateInnerAudioContextOptions extends MpCallbackOptions {
  * 未列出的按 `any` 处理。有了这张表，`invoke` 及所有包装方法的
  * 返回类型都能自动推导，无需逐个声明。
  */
+/** 安全区矩形（平台原始字段） */
+export interface MpSafeArea {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+/** 安全区到屏幕四边的距离，由 safeArea 与窗口尺寸算出 */
+export interface MpSafeAreaInsets {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+}
+
+/** 设备类别；各家写法不一，保留字串但给出常见值补全 */
+export type MpDeviceType = 'phone' | 'pad' | 'pc' | 'tv' | (string & {});
+
+/** getDeviceInfo 口径 */
+export interface MpDeviceInfo {
+  deviceId: string;
+  deviceType: MpDeviceType;
+  deviceBrand: string;
+  deviceModel: string;
+  osName: string;
+  osVersion: string;
+  platform: string;
+}
+
+/** getAppBaseInfo 口径 */
+export interface MpAppBaseInfo {
+  hostName: string;
+  hostVersion: string;
+  /** 宿主语言，`zh_CN` -> `zh-CN` */
+  hostLanguage: string;
+  hostSDKVersion?: string;
+  hostFontSizeSetting?: number;
+  language?: string;
+  appLanguage: string;
+}
+
+/** getWindowInfo 口径 */
+export interface MpWindowInfo {
+  windowWidth: number;
+  windowHeight: number;
+  statusBarHeight: number;
+  safeArea?: MpSafeArea;
+  safeAreaInsets?: MpSafeAreaInsets;
+  pixelRatio: number;
+  windowTop: number;
+  windowBottom: number;
+}
+
+/**
+ * getSystemInfo / getSystemInfoSync 增强口径：
+ * 原始结果整体透传 + 归一字段。各家原始字段差异大，故保留索引签名。
+ */
+export interface MpEnhancedSystemInfo
+  extends MpDeviceInfo,
+    MpAppBaseInfo,
+    MpWindowInfo {
+  system: string;
+  hostTheme?: string;
+  [key: string]: any;
+}
+
+/** 胶囊按钮布局矩形 */
+export interface MpMenuButtonRect {
+  width: number;
+  height: number;
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface MpApiResultMap {
   // 交互
   showModal: MpModalResult;
@@ -598,7 +677,8 @@ export interface MpApiResultMap {
 
   // 存储
   getStorage: MpStorageResult;
-  getStorageSync: any;
+  /** 存的是什么取回什么，编译期无从得知；要类型走 `getStorageSync<T>(key)` */
+  getStorageSync: unknown;
 
   // 剪贴板 / 扫码
   getClipboardData: MpClipboardData;
@@ -645,12 +725,12 @@ export interface MpApiResultMap {
   getBeacons: MpBeaconsResult;
 
   // 系统
-  getSystemInfo: any;
-  getSystemInfoSync: any;
-  getDeviceInfo: any;
-  getAppBaseInfo: any;
-  getWindowInfo: any;
-  getMenuButtonBoundingClientRect: any;
+  getSystemInfo: MpEnhancedSystemInfo;
+  getSystemInfoSync: MpEnhancedSystemInfo;
+  getDeviceInfo: MpDeviceInfo;
+  getAppBaseInfo: MpAppBaseInfo;
+  getWindowInfo: MpWindowInfo;
+  getMenuButtonBoundingClientRect: MpMenuButtonRect;
   canIUse: boolean;
   upx2px: number;
   rpx2px: number;

@@ -1,5 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
+  MpAppBaseInfo,
+  MpDeviceInfo,
+  MpEnhancedSystemInfo,
+  MpMenuButtonRect,
+  MpWindowInfo,
+} from './domain-types';
+import { MpApiService } from './mp-api.service';
+import { MpApiReturn, MpResultOf } from './promisify';
+import {
   buildAppBaseInfo,
   buildDeviceInfo,
   buildWindowInfo,
@@ -181,6 +190,64 @@ describe('系统信息族（参考 enhanceSystemInfo 移植）', () => {
       expect(res.windowBottom).toBe(0);
       expect(res.safeAreaInsets).toEqual({ top: 20, left: 0, right: 0, bottom: 0 });
       expect(res.statusBarHeight).toBe(20);
+    });
+  });
+
+  // 编译期断言：确认 MpApiResultMap -> MpResultOf -> 服务方法 的推导链已接上。
+  // 写法要点：把 true 赋给 Eq<...> 元组，任一 Eq 为 false 则赋值在编译期报错。
+  describe('类型推导链（编译期）', () => {
+    type Eq<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B
+      ? 1
+      : 2
+      ? true
+      : false;
+
+    it('构建函数返回口径已绑定到具名类型', () => {
+      const checks: [
+        Eq<ReturnType<typeof buildDeviceInfo>, MpDeviceInfo>,
+        Eq<ReturnType<typeof buildAppBaseInfo>, MpAppBaseInfo>,
+        Eq<ReturnType<typeof buildWindowInfo>, MpWindowInfo>,
+        Eq<ReturnType<typeof enhanceSystemInfo>, MpEnhancedSystemInfo>,
+      ] = [true, true, true, true];
+      expect(checks.length).toBe(4);
+    });
+
+    it('MpResultOf 从 map 查到具名结果类型', () => {
+      const checks: [
+        Eq<MpResultOf<'getDeviceInfo'>, MpDeviceInfo>,
+        Eq<MpResultOf<'getAppBaseInfo'>, MpAppBaseInfo>,
+        Eq<MpResultOf<'getWindowInfo'>, MpWindowInfo>,
+        Eq<MpResultOf<'getSystemInfo'>, MpEnhancedSystemInfo>,
+        Eq<MpResultOf<'getMenuButtonBoundingClientRect'>, MpMenuButtonRect>,
+      ] = [true, true, true, true, true];
+      expect(checks.length).toBe(5);
+    });
+
+    it('服务方法返回类型可推导，无需手写标注', () => {
+      const checks: [
+        Eq<ReturnType<MpApiService['getDeviceInfo']>, MpDeviceInfo>,
+        Eq<ReturnType<MpApiService['getAppBaseInfo']>, MpAppBaseInfo>,
+        Eq<ReturnType<MpApiService['getWindowInfo']>, MpWindowInfo>,
+        Eq<
+          Awaited<ReturnType<MpApiService['getSystemInfo']>>,
+          MpEnhancedSystemInfo
+        >,
+        Eq<
+          ReturnType<MpApiService['getSystemInfoSync']>,
+          MpEnhancedSystemInfo
+        >,
+      ] = [true, true, true, true, true];
+      expect(checks.length).toBe(5);
+    });
+
+    it('sync / async 分类未被误伤', () => {
+      const checks: [
+        // getDeviceInfo 命中同步规则 -> 直接返回对象
+        Eq<MpApiReturn<'getDeviceInfo'>, MpDeviceInfo>,
+        // getSystemInfo 未命中 -> Promise
+        Eq<MpApiReturn<'getSystemInfo'>, Promise<MpEnhancedSystemInfo>>,
+      ] = [true, true];
+      expect(checks.length).toBe(2);
     });
   });
 });

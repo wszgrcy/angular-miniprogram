@@ -1,4 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  MpAppBaseInfo,
+  MpDeviceInfo,
+  MpEnhancedSystemInfo,
+  MpWindowInfo,
+} from './domain-types';
 import { MpPlatform } from './types';
 
 /**
@@ -203,8 +209,8 @@ export function enhanceSystemInfo(
   platform: MpPlatform,
   global: any,
   fromRes: any,
-  toRes: Record<string, any> = {},
-) {
+  toRes: MpEnhancedSystemInfo = {} as MpEnhancedSystemInfo,
+): MpEnhancedSystemInfo {
   const {
     brand = '',
     model = '',
@@ -257,7 +263,7 @@ export function buildDeviceInfo(
   platform: MpPlatform,
   global: any,
   fromRes: any,
-) {
+): MpDeviceInfo {
   const to: Record<string, any> = {};
   useDeviceId(global)(fromRes, to);
   const { brand, model, platform: platformField = '' } = fromRes;
@@ -275,7 +281,7 @@ export function buildDeviceInfo(
     osVersion,
     platform: normalizePlatform(platform, platformField),
   });
-  return to;
+  return to as MpDeviceInfo;
 }
 
 /** getAppBaseInfo 口径 */
@@ -283,7 +289,7 @@ export function buildAppBaseInfo(
   platform: MpPlatform,
   global: any,
   fromRes: any,
-) {
+): MpAppBaseInfo {
   const { language = '', fontSizeSetting } = fromRes;
   const hostLanguage = (language || '').replace(/_/g, '-');
   return {
@@ -302,7 +308,7 @@ export function buildWindowInfo(
   _platform: MpPlatform,
   _global: any,
   fromRes: any,
-) {
+): MpWindowInfo {
   const to: Record<string, any> = {
     windowWidth: fromRes.windowWidth,
     windowHeight: fromRes.windowHeight,
@@ -313,5 +319,5 @@ export function buildWindowInfo(
     windowBottom: 0,
   };
   addSafeAreaInsets(fromRes, to);
-  return to;
+  return to as MpWindowInfo;
 }
