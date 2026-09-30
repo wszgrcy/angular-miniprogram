@@ -219,6 +219,27 @@ export class MpApiService {
     return this.invoke('showActionSheet', options);
   }
 
+  // ---------------------------------------------------------------- 存储（异步）
+
+  setStorage(key: string, value: unknown): Promise<any> {
+    return this.invoke('setStorage', { key, data: value });
+  }
+
+  /** 直接返回存储值（结果 {data} 已拆） */
+  getStorage<T = any>(key: string): Promise<T> {
+    return this.invoke<{ data: T }>('getStorage', { key }).then(
+      (res: { data: T }) => res?.data,
+    );
+  }
+
+  removeStorage(key: string): Promise<any> {
+    return this.invoke('removeStorage', { key });
+  }
+
+  clearStorage(): Promise<any> {
+    return this.invoke('clearStorage');
+  }
+
   // ---------------------------------------------------------------- 存储（同步）
 
   setStorageSync(key: string, value: unknown): void {

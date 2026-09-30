@@ -211,6 +211,41 @@ describe('MpApiService', () => {
     });
   });
 
+  describe('异步存储类型化方法', () => {
+    it('setStorage/getStorage 往返', async () => {
+      const store: Record<string, any> = {};
+      const { service } = setup('wx', {
+        setStorage: (o: any) => {
+          store[o.key] = o.data;
+          o.success?.({});
+        },
+        getStorage: (o: any) => o.success?.({ data: store[o.key] }),
+      });
+      await service.setStorage('user', { id: 1 });
+      const user = await service.getStorage<{ id: number }>('user');
+      expect(user).toEqual({ id: 1 });
+    });
+
+    it('removeStorage/clearStorage', async () => {
+      let removed = '';
+      let cleared = false;
+      const { service } = setup('wx', {
+        removeStorage: (o: any) => {
+          removed = o.key;
+          o.success?.({});
+        },
+        clearStorage: (o: any) => {
+          cleared = true;
+          o.success?.({});
+        },
+      });
+      await service.removeStorage('k');
+      await service.clearStorage();
+      expect(removed).toBe('k');
+      expect(cleared).toBeTrue();
+    });
+  });
+
   describe('变更检测', () => {
     it('回调执行后通知 scheduler', () => {
       const { service } = setup();
