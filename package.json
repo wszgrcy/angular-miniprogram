@@ -19,6 +19,8 @@
     "lint": "eslint --max-warnings 0 \"./**/*.ts\"",
     "sync": "code-recycle ./script/package-sync.ts --cwd ./src/library",
     "coverage": "nyc npm run test",
+    "docs:dev": "npm --prefix ./astro-docs run dev",
+    "docs:build": "npm --prefix ./astro-docs run build",
     "typedoc": "typedoc",
     "deploy": "npm run typedoc && npm run build:library && npm run test:jasmine library && npm run coverage-badge -- init && cpx \"./deploy/doc/**/*\" ./docs && cpx \"./deploy/api-doc/**/*\" ./docs/api-doc && npm run coverage && npm run coverage-badge -- success && cpx ./deploy/doc/assets/img/badge.svg ./docs/assets/img",
     "coverage-badge": "tsx ./script/coverage-badge.ts"

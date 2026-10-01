@@ -1,0 +1,8 @@
+node_modules
+dist
+.astro
+src/env.d.ts
+
+# 根 .gitignore 里有一条 `docs`，会连带把 Starlight 的内容目录
+# `src/content/docs` 一起忽略掉。这里显式放行，否则文档正文进不了库。
+!src/content/docs/
