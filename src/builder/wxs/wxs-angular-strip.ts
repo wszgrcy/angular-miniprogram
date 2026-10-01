@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { getWxsPlan, syntheticCarrierInputs } from './wxs-rewrite';
 import { isWxsCarrier } from './wxs-expr';
+import { getWxsPlan, syntheticCarrierInputs } from './wxs-rewrite';
 
 /**
  * 从**已改写的 AST** 产出「Angular 可见模板」。

@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { parseTemplate } from '@angular/compiler';
 import { withDeclarations } from './test-declare-util';
-import { rewriteWxsTemplates } from './wxs-rewrite';
 import { stripWxsFromAst } from './wxs-angular-strip';
+import { rewriteWxsTemplates } from './wxs-rewrite';
 
 /**
  * `stripWxsFromAst` 的回归钉。

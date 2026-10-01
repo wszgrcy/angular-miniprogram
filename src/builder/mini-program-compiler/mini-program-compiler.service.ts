@@ -1,6 +1,7 @@
 import type {
   R3ComponentMetadata,
   R3DirectiveMetadata,
+  R3TemplateDependency,
   SelectorMatcher,
 } from '@angular/compiler';
 import type { NgtscProgram } from '@angular/compiler-cli';
@@ -22,12 +23,12 @@ import {
 import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
 import { angularCompilerPromise } from '../util';
-import type { WxsDeclaration } from '../wxs/wxs-declare';
-import { getDeclaredWxs, rewriteWxsTemplates } from '../wxs/wxs-rewrite';
 import {
   recordStrippedTemplate,
   stripWxsFromAst,
 } from '../wxs/wxs-angular-strip';
+import type { WxsDeclaration } from '../wxs/wxs-declare';
+import { getDeclaredWxs, rewriteWxsTemplates } from '../wxs/wxs-rewrite';
 import { ComponentCompilerService } from './component-compiler.service';
 import { recordGeneratedWxml } from './manifest-registry';
 import { MetaCollection } from './meta-collection';
@@ -40,6 +41,22 @@ import {
   UseComponent,
   makeComponentKey,
 } from './type';
+
+/**
+ * `meta.template` 的运行时形状。
+ *
+ * 公开声明只写了 `nodes` / `ngContentSelectors` / `preserveWhitespaces`，但 ngtsc
+ * 实际塞进来的是模板解析结果本身：还带着原文 `content`（`file.fileName` 是 `null`，
+ * 只能按内容登记）与解析 `errors`（见 `assertTemplateParsed`）。
+ */
+type ComponentTemplateMeta = NonNullable<
+  R3ComponentMetadata<R3TemplateDependency>['template']
+> & {
+  /** 模板原文，与磁盘上的 .html 逐字节相同 */
+  content?: string;
+  /** 模板解析错误，Angular 不会自己抛，见 `assertTemplateParsed` */
+  errors?: unknown[];
+};
 
 /** `R3TemplateDependencyKind.NgModule`，compiler 没有把这个枚举导出到运行时 */
 const R3_TEMPLATE_DEPENDENCY_KIND_NG_MODULE = 2;
@@ -222,9 +239,9 @@ export class MiniProgramCompilerService {
       const componentSourceFile = path.normalize(
         classDeclaration.getSourceFile().fileName,
       );
+      const template = meta.template as ComponentTemplateMeta | undefined;
       const { declarations } = await rewriteWxsTemplates(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (meta as any)?.template?.nodes ?? [],
+        template?.nodes ?? [],
         // 记下源文件：walk 阶段的事件下推要靠它反查声明集合
         componentSourceFile,
       );
@@ -234,18 +251,15 @@ export class MiniProgramCompilerService {
        * 必须紧跟在改写后面：此时 AST 已带枝叶数组，一次走树同时喂给 wxml 和
        * Angular 两侧，不存在第二个真相源。只按内容登记（`file.fileName` 为 null）。
        */
-      if (declarations.length) {
-        const tpl: any = (meta as any)?.template ?? {};
-        if (typeof tpl.content === 'string') {
-          recordStrippedTemplate(
-            tpl.content,
-            stripWxsFromAst(
-              (tpl.nodes as any[]) ?? [],
-              tpl.content,
-              componentSourceFile,
-            ),
-          );
-        }
+      if (declarations.length && typeof template?.content === 'string') {
+        recordStrippedTemplate(
+          template.content,
+          stripWxsFromAst(
+            template.nodes ?? [],
+            template.content,
+            componentSourceFile,
+          ),
+        );
       }
       if (declarations.length) {
         wxsModules.set(

@@ -25,8 +25,8 @@ import { miniProgramComponentTransformPlugin } from '../../vite/plugins/componen
 import { libraryTemplatePlugin } from '../../vite/plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from '../../vite/plugins/mini-program-assets.plugin';
 import { platformFileResolvePlugin } from '../../vite/plugins/platform-file-resolve.plugin';
-import { wxsStripPlugin } from '../../vite/plugins/wxs-strip.plugin';
 import { requireContextShimPlugin } from '../../vite/plugins/require-context-shim.plugin';
+import { wxsStripPlugin } from '../../vite/plugins/wxs-strip.plugin';
 import { jasmineGlobalDefine, karmaClientDefine } from '../jasmine-define';
 import { writeDerivedTsConfig } from './derived-tsconfig';
 import { setViteKarmaFrameworkHooks } from './karma-framework';

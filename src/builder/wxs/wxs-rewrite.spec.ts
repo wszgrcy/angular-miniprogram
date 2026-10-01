@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { parseTemplate } from '@angular/compiler';
 import { withDeclarations } from './test-declare-util';
-import { getWxsPlan, rewriteWxsTemplates } from './wxs-rewrite';
 import { isWxsCarrier } from './wxs-expr';
+import { getWxsPlan, rewriteWxsTemplates } from './wxs-rewrite';
 
 /** 自动补 `<wxs module src>` 声明，断言集中在改写本身；声明机制见 wxs-declare.spec.ts */
 

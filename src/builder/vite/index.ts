@@ -28,11 +28,11 @@ import { libraryTemplatePlugin } from './plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from './plugins/mini-program-assets.plugin';
 import { nativeComponentsPlugin } from './plugins/native-components.plugin';
 import { platformFileResolvePlugin } from './plugins/platform-file-resolve.plugin';
-import { wxsStripPlugin } from './plugins/wxs-strip.plugin';
 import {
   readAppConfig,
   subpackageChunkPlugin,
 } from './plugins/subpackage-chunk.plugin';
+import { wxsStripPlugin } from './plugins/wxs-strip.plugin';
 import { tsConfigPathsToAliases } from './tsconfig-paths';
 import {
   type SourceWatcher,

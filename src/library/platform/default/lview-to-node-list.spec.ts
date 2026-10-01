@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import type { NodePath } from '../type/type';
 import { AgentNode } from './agent-node';
 import {
-  getPageRefreshContext,
   findCurrentElement,
+  getPageRefreshContext,
 } from './component-template-hook.factory';
 import { LVIEW } from './lview-layout';
-import type { NodePath } from '../type/type';
 
 /**
  * B：运行时 `lView → nodeList` 下标算术的端到端验证。

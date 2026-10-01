@@ -315,7 +315,7 @@ export function splitWxsExpression(
  * 所有表达式的枝叶按出现顺序摊平进同一个 `freeVars`，
  * 供替换成单个 LiteralArray（一次 bind 带一个数组）。
  */
-export interface WxsInterpolationPlan extends WxsExprPlan {}
+export type WxsInterpolationPlan = WxsExprPlan;
 
 export function planWxsInterpolation(
   ast: AST,
