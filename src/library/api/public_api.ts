@@ -11,5 +11,8 @@ export type { MpApiSchema } from './src/validation';
 export * from './src/protocol-engine';
 export * from './src/protocols';
 export * from './src/system-info';
+export * from './src/mp-node-query';
 export * from './src/mp-api.service';
+export * from './src/mp-api.proxy';
+export * from './src/mp-app-lifecycle.service';
 export * from './src/mp-event-bus.service';

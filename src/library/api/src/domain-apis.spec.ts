@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram/platform';
 import { take } from 'rxjs';
 import { initMiniProgramTestEnv } from '../../platform/test-util/init-env';
+import { MP_API_PROXY, MpApiProxy } from './mp-api.proxy';
 import { MpApiService } from './mp-api.service';
 import { MP_PLATFORM } from './platform';
 
@@ -10,7 +11,11 @@ describe('MpApiService 域方法', () => {
   function setup(
     platform: any = 'wx',
     overrides: Record<string, any> = {},
-  ): { service: MpApiService; fake: Record<string, any> } {
+  ): {
+    service: MpApiService;
+    proxy: MpApiProxy;
+    fake: Record<string, any>;
+  } {
     initMiniProgramTestEnv();
     const fake: Record<string, any> = {
       scanCode: jasmine
@@ -42,38 +47,42 @@ describe('MpApiService 域方法', () => {
         { provide: MP_PLATFORM, useValue: platform },
       ],
     });
-    return { service: TestBed.inject(MpApiService), fake };
+    return {
+      service: TestBed.inject(MpApiService),
+      proxy: TestBed.inject(MP_API_PROXY),
+      fake,
+    };
   }
 
   describe('一次性动作 -> Promise', () => {
     it('scanCode resolve 结果', async () => {
-      const { service } = setup();
-      const res = await service.scanCode({ onlyFromCamera: true });
+      const { proxy } = setup();
+      const res = await proxy.scanCode({ onlyFromCamera: true });
       expect(res.result).toBe('ABC');
       expect(res.scanType).toBe('qrCode');
     });
 
     it('剪贴板 set / get', async () => {
-      const { service, fake } = setup();
-      await service.setClipboardData({ data: 'x' });
+      const { proxy, fake } = setup();
+      await proxy.setClipboardData({ data: 'x' });
       expect((fake.setClipboardData as any).calls.mostRecent().args[0].data).toBe(
         'x',
       );
-      expect(await service.getClipboardData()).toEqual({ data: 'hello' });
+      expect(await proxy.getClipboardData()).toEqual({ data: 'hello' });
     });
 
     it('getScreenBrightness 返回 { value }', async () => {
-      const { service } = setup();
-      expect(await service.getScreenBrightness()).toEqual({ value: 0.5 });
+      const { proxy } = setup();
+      expect(await proxy.getScreenBrightness()).toEqual({ value: 0.5 });
     });
 
     it('setKeepScreenOn 收 { keepScreenOn }', async () => {
-      const { service } = setup('wx', {
+      const { service, proxy } = setup('wx', {
         setKeepScreenOn: jasmine
           .createSpy('setKeepScreenOn')
           .and.callFake((o: any) => o.success?.({})),
       });
-      await service.setKeepScreenOn({ keepScreenOn: true });
+      await proxy.setKeepScreenOn({ keepScreenOn: true });
       expect(
         (service.getRawApi('setKeepScreenOn') as any).calls.mostRecent().args[0]
           .keepScreenOn,
@@ -81,30 +90,30 @@ describe('MpApiService 域方法', () => {
     });
 
     it('createBLEConnection 是异步的（create* 中的例外）', async () => {
-      const { service } = setup('wx', {
+      const { proxy } = setup('wx', {
         createBLEConnection: (o: any) => o.success?.({}),
       });
-      const ret = service.createBLEConnection({ deviceId: 'd1' });
+      const ret = proxy.createBLEConnection({ deviceId: 'd1' });
       expect(typeof ret.then).toBe('function');
       await expectAsync(ret).toBeResolved();
     });
 
     it('平台失败时 Promise reject', async () => {
-      const { service } = setup('wx', {
+      const { proxy } = setup('wx', {
         scanCode: (o: any) => o.fail?.({ errMsg: 'scanCode:fail' }),
       });
-      await expectAsync(service.scanCode()).toBeRejectedWith({
+      await expectAsync(proxy.scanCode()).toBeRejectedWith({
         errMsg: 'scanCode:fail',
       });
     });
 
     it('getBLEDeviceRSSI 返回 { rssi }', async () => {
-      const { service, fake } = setup('wx', {
+      const { proxy, fake } = setup('wx', {
         getBLEDeviceRSSI: jasmine
           .createSpy('getBLEDeviceRSSI')
           .and.callFake((o: any) => o.success?.({ rssi: -63 })),
       });
-      const res = await service.getBLEDeviceRSSI({ deviceId: 'd1' });
+      const res = await proxy.getBLEDeviceRSSI({ deviceId: 'd1' });
       expect(res.rssi).toBe(-63);
       expect((fake.getBLEDeviceRSSI as any).calls.mostRecent().args[0].deviceId).toBe(
         'd1',
@@ -112,19 +121,19 @@ describe('MpApiService 域方法', () => {
     });
 
     it('setBLEMTU 透传 deviceId + mtu', async () => {
-      const { service, fake } = setup('wx', {
+      const { proxy, fake } = setup('wx', {
         setBLEMTU: jasmine
           .createSpy('setBLEMTU')
           .and.callFake((o: any) => o.success?.({})),
       });
-      await service.setBLEMTU({ deviceId: 'd1', mtu: 185 });
+      await proxy.setBLEMTU({ deviceId: 'd1', mtu: 185 });
       const arg = (fake.setBLEMTU as any).calls.mostRecent().args[0];
       expect(arg.deviceId).toBe('d1');
       expect(arg.mtu).toBe(185);
     });
 
     it('preloadPage / unPreloadPage 收 { url }', async () => {
-      const { service, fake } = setup('wx', {
+      const { proxy, fake } = setup('wx', {
         preloadPage: jasmine
           .createSpy('preloadPage')
           .and.callFake((o: any) => o.success?.({})),
@@ -132,8 +141,8 @@ describe('MpApiService 域方法', () => {
           .createSpy('unPreloadPage')
           .and.callFake((o: any) => o.success?.({})),
       });
-      await service.preloadPage({ url: '/pages/a/a' });
-      await service.unPreloadPage({ url: '/pages/a/a' });
+      await proxy.preloadPage({ url: '/pages/a/a' });
+      await proxy.unPreloadPage({ url: '/pages/a/a' });
       expect((fake.preloadPage as any).calls.mostRecent().args[0].url).toBe(
         '/pages/a/a',
       );
@@ -145,15 +154,15 @@ describe('MpApiService 域方法', () => {
 
   describe('同步 API', () => {
     it('getAppAuthorizeSetting 直接返回', () => {
-      const { service } = setup();
-      expect(service.getAppAuthorizeSetting().cameraAuthorized).toBe(
+      const { proxy } = setup();
+      expect(proxy.getAppAuthorizeSetting().cameraAuthorized).toBe(
         'authorized',
       );
     });
 
     it('createAnimation 透传平台对象', () => {
-      const { service } = setup();
-      expect(service.createAnimation({ duration: 200 }).__animation).toBeTrue();
+      const { proxy } = setup();
+      expect((proxy.createAnimation({ duration: 200 }) as any).__animation).toBeTrue();
     });
   });
 
@@ -161,12 +170,12 @@ describe('MpApiService 域方法', () => {
     it('订阅即注册，退订即移除', () => {
       let registered: any = null;
       let removed: any = null;
-      const { service } = setup('wx', {
-        onAccelerometer: (h: any) => (registered = h),
-        offAccelerometer: (h: any) => (removed = h),
+      const { proxy } = setup('wx', {
+        onAccelerometerChange: (h: any) => (registered = h),
+        offAccelerometerChange: (h: any) => (removed = h),
       });
 
-      const stream$ = service.onAccelerometer();
+      const stream$ = proxy.onAccelerometerChange();
       expect(registered).toBeNull();
 
       const seen: any[] = [];
@@ -183,11 +192,11 @@ describe('MpApiService 域方法', () => {
 
     it('多订阅共享同一注册，全部退订才移除', () => {
       let offCalls = 0;
-      const { service } = setup('wx', {
-        onCompass: (h: any) => void h,
-        offCompass: () => offCalls++,
+      const { proxy } = setup('wx', {
+        onCompassChange: (h: any) => void h,
+        offCompassChange: () => offCalls++,
       });
-      const stream$ = service.onCompass();
+      const stream$ = proxy.onCompassChange();
       const a = stream$.subscribe();
       const b = stream$.subscribe();
       a.unsubscribe();
@@ -197,11 +206,11 @@ describe('MpApiService 域方法', () => {
     });
 
     it('平台缺 off 时退订不报错', () => {
-      const { service } = setup('wx', {
+      const { proxy } = setup('wx', {
         onWindowResize: (h: any) => h({ windowWidth: 375, windowHeight: 600 }),
       });
       const seen: any[] = [];
-      service
+      proxy
         .onWindowResize()
         .pipe(take(1))
         .subscribe((v) => seen.push(v));
@@ -352,6 +361,48 @@ describe('MpApiService 域方法', () => {
       });
       expect(service.canIUse('scanCode')).toBeTrue();
       expect((fake.canIUse as any).calls.mostRecent().args[0]).toBe('scanCode');
+    });
+  });
+
+  describe('多语言（getLocale/setLocale/onLocaleChange）', () => {
+    function storage() {
+      const store: Record<string, any> = {};
+      return setup('wx', {
+        getStorageSync: (k: string) => store[k] ?? '',
+        setStorageSync: (k: string, v: any) => {
+          store[k] = v;
+        },
+      });
+    }
+
+    it('默认 zh-Hans；setLocale 持久化并广播', () => {
+      const { service } = storage();
+      expect(service.getLocale()).toBe('zh-Hans');
+      const seen: any[] = [];
+      service.onLocaleChange().subscribe((v) => seen.push(v));
+      expect(service.setLocale('en')).toBeTrue();
+      expect(service.getLocale()).toBe('en');
+      expect(seen).toEqual([{ locale: 'en' }]);
+    });
+
+    it('同值 setLocale 返回 false 且不重复广播', () => {
+      const { service } = storage();
+      service.setLocale('en');
+      const seen: any[] = [];
+      service.onLocaleChange().subscribe((v) => seen.push(v));
+      expect(service.setLocale('en')).toBeFalse();
+      expect(seen.length).toBe(0);
+    });
+
+    it('已存储的语言重启后恢复', () => {
+      const store: Record<string, any> = { 'mp.locale': 'fr' };
+      const { service } = setup('wx', {
+        getStorageSync: (k: string) => store[k] ?? '',
+        setStorageSync: (k: string, v: any) => {
+          store[k] = v;
+        },
+      });
+      expect(service.getLocale()).toBe('fr');
     });
   });
 });

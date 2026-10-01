@@ -407,8 +407,11 @@ describe('MpApiService', () => {
         },
         getStorage: (o: any) => o.success?.({ data: store[o.key] }),
       });
-      await service.setStorage({ key: 'user', data: { id: 1 } });
-      const res = await service.getStorage<{ id: number }>({ key: 'user' });
+      await service.invoke('setStorage', { key: 'user', data: { id: 1 } });
+      const res = await service.invoke<'getStorage', { data: { id: number } }>(
+        'getStorage',
+        { key: 'user' },
+      );
       expect(res.data).toEqual({ id: 1 });
     });
 
@@ -425,8 +428,8 @@ describe('MpApiService', () => {
           o.success?.({});
         },
       });
-      await service.removeStorage({ key: 'k' });
-      await service.clearStorage();
+      await service.invoke('removeStorage', { key: 'k' });
+      await service.invoke('clearStorage');
       expect(removed).toBe('k');
       expect(cleared).toBeTrue();
     });
@@ -521,7 +524,7 @@ describe('MpApiService', () => {
         .createSpy('navigateBack')
         .and.callFake((opts: any) => opts.success?.({}));
       const { service } = setup('wx', { navigateBack: spy });
-      await service.navigateBack({ delta: 2 });
+      await service.invoke('navigateBack', { delta: 2 });
       expect(spy.calls.mostRecent().args[0].delta).toBe(2);
     });
   });

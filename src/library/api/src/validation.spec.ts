@@ -96,7 +96,7 @@ describe('参数校验管道', () => {
   it('合法入参不产生告警', async () => {
     const { service } = setup();
     const warn = captureWarn();
-    await service.showToast({
+    await service.invoke('showToast', {
       title: 'hi',
       icon: 'success',
       duration: 1500,
@@ -108,7 +108,7 @@ describe('参数校验管道', () => {
   it('signal 不被当作未知键', async () => {
     const { service } = setup();
     const warn = captureWarn();
-    await service.showToast({ title: 'hi', signal: new AbortController().signal });
+    await service.invoke('showToast', { title: 'hi', signal: new AbortController().signal });
     expect(warn()).toBe('');
   });
 

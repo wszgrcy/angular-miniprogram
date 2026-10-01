@@ -11,93 +11,18 @@ import {
   Observable,
   Subject,
   defer,
+  map,
   of,
   switchMap,
   tap,
 } from 'rxjs';
-import { MpContext, mpContext } from './context-wrapper';
-import {
-  MpAccelerometerReading,
-  MpAddPhoneContactOptions,
-  MpAnimation,
-  MpAnimationConfig,
-  MpAuthorizeSetting,
-  MpBLECharacteristicResult,
-  MpBLECharacteristicTargetOptions,
-  MpBLECharacteristicsResult,
-  MpBLEDeviceIdOptions,
-  MpBLEServicesResult,
-  MpBeacon,
-  MpBeaconsResult,
-  MpBluetoothDevice,
-  MpBluetoothDevicesResult,
-  MpCanvasImageData,
-  MpCanvasImageDataOptions,
-  MpCanvasToTempFilePathOptions,
-  MpChooseFileOptions,
-  MpChooseImageOptions,
-  MpChooseLocationOptions,
-  MpChooseVideoOptions,
-  MpChosenLocation,
-  MpClipboardData,
-  MpCloseSocketOptions,
-  MpCompassReading,
-  MpCompressImageOptions,
-  MpCompressVideoOptions,
-  MpConnectSocketOptions,
-  MpCreateInnerAudioContextOptions,
-  MpFileInfo,
-  MpFilePathOptions,
-  MpGetFileInfoOptions,
-  MpGetImageInfoOptions,
-  MpGetLocationOptions,
-  MpGetProviderOptions,
-  MpGetVideoInfoOptions,
-  MpImageInfo,
-  MpLoadFontFaceOptions,
-  MpLoadSubPackageOptions,
-  MpLocation,
-  MpLoginOptions,
-  MpLoginResult,
-  MpMakePhoneCallOptions,
-  MpNotifyBLEChangeOptions,
-  MpOpenDocumentOptions,
-  MpOpenLocationOptions,
-  MpPageScrollToOptions,
-  MpPaymentOptions,
-  MpPaymentResult,
-  MpPreviewImageOptions,
-  MpProvidersResult,
-  MpSaveFileOptions,
-  MpSavedFileInfo,
-  MpSavedFileListResult,
-  MpScanCodeOptions,
-  MpScanCodeResult,
-  MpScreenBrightnessResult,
-  MpSelectedTextRange,
-  MpSendSocketMessageOptions,
-  MpSetBLEMTUOptions,
-  MpSetClipboardDataOptions,
-  MpSetKeepScreenOnOptions,
-  MpSetNavigationBarColorOptions,
-  MpSetNavigationBarTitleOptions,
-  MpSetScreenBrightnessOptions,
-  MpShareOptions,
-  MpShowKeyboardOptions,
-  MpSoterAuthenticationResult,
-  MpStartAccelerometerOptions,
-  MpStartBeaconDiscoveryOptions,
-  MpStartLocationUpdateOptions,
-  MpStorageOptions,
-  MpStorageResult,
-  MpSystemSetting,
-  MpTabBarBadgeOptions,
-  MpTabBarIndexOptions,
-  MpTabBarItemOptions,
-  MpTabBarStyleOptions,
-  MpVideoInfo,
-} from './domain-types';
+import { mpContext } from './context-wrapper';
 import { MpEventChannel } from './event-channel';
+import {
+  createMpIntersectionObserver,
+  createMpMediaQueryObserverFactory,
+  createMpSelectorQuery,
+} from './mp-node-query';
 import {
   MpInvokeContext,
   MpPipeRegistry,
@@ -129,10 +54,7 @@ import {
 import {
   MpApiNameInput,
   MpCallbackOptions,
-  MpLoadingOptions,
-  MpNavigateBackOptions,
   MpNavigateOptions,
-  MpToastOptions,
 } from './types';
 import {
   MP_API_SCHEMAS,
@@ -141,8 +63,25 @@ import {
   mpValidationPipe,
 } from './validation';
 
+/** 语言持久化存储键（对标 uni 的 UNI_STORAGE_LOCALE） */
+const LOCALE_KEY = 'mp.locale';
+
 /**
  * 统一小程序 API 服务（root 单例），对标 uni-app 的 uni.xxx 层。
+ *
+ * ## 与 MP_API_PROXY 的分工（对齐 uni 的架构）
+ *
+ * uni 的运行时同样**不手写透传方法**：`uni` 是 Proxy，
+ * 未显式实现的 API 自动落到 `platform[key]`；显式实现只存在于
+ * 「有真实逻辑」的 API。类型则全部由独立的类型包声明。
+ * AMP 采用同一分层：
+ *
+ * - `MpApiService`（本服务）：调用管线（promisify / 协议归一 / 管道拦截 /
+ *   AbortSignal / 变更检测调度）+ 仅这里能实现的增强 API
+ *   （事件通道、系统信息增强、上下文包装、节点查询、`on*` 事件流等）。
+ * - `MP_API_PROXY`：uni 式兜底门面，任意原生 API 直接调用，
+ *   参数 / 返回类型由 `MpApiParamMap` / `MpApiResultMap` 类型表提供
+ *   （等价 uni 的 @dcloudio/types 手写声明，但零运行时成本）。
  *
  * rxjs 冷流管线：
  *
@@ -172,6 +111,11 @@ export class MpApiService {
   private readonly registry = inject(MpPipeRegistry);
   private readonly eventChannels = new Map<number, MpEventChannel>();
   private channelSeq = 0;
+  private readonly mediaQueryObserverFactory =
+    createMpMediaQueryObserverFactory(
+      () => this.getWindowInfo(),
+      () => this.event$('onWindowResize', 'offWindowResize'),
+    );
 
   constructor() {
     // 守卫必须内联写：包成 `isMpDevMode()` 后打包器无法证明分支已死，
@@ -280,11 +224,26 @@ export class MpApiService {
     return typeof fn === 'function' ? fn : undefined;
   }
 
-  // ---------------------------------------------------------------- 导航
+  /**
+   * 统一名在当前平台是否可用（协议映射后的目标名存在即算可用）。
+   * uni 式 Proxy 兜底用它决定属性是否返回 `undefined`。
+   */
+  hasApi(name: MpApiNameInput): boolean {
+    const protocol: MpApiProtocol | undefined =
+      this.protocols[this.platform]?.[name];
+    if (protocol?.custom) {
+      return true;
+    }
+    return typeof this.getRawApi(protocol?.name ?? name) === 'function';
+  }
+
+  // ---------------------------------------------------------------- 导航（带事件通道）
 
   /**
    * 导航并建立事件通道：url 自动拼 `__id__`，
    * 目标页从 query 取 id 调 `getEventChannel(id)` 消费同一通道。
+   * 其余导航类 API（redirectTo/switchTab/reLaunch/navigateBack）
+   * 无附加逻辑，走 `invoke` 或 Proxy。
    */
   navigateTo(options: MpNavigateOptions) {
     const opts: MpCallbackOptions = { ...options };
@@ -304,30 +263,6 @@ export class MpApiService {
     });
   }
 
-  redirectTo(options: MpNavigateOptions) {
-    return this.invoke('redirectTo', options);
-  }
-
-  switchTab(options: MpNavigateOptions) {
-    return this.invoke('switchTab', options);
-  }
-
-  reLaunch(options: MpNavigateOptions) {
-    return this.invoke('reLaunch', options);
-  }
-
-  navigateBack(options: MpNavigateBackOptions = {}) {
-    return this.invoke('navigateBack', options);
-  }
-
-  preloadPage(options: MpNavigateOptions) {
-    return this.invoke('preloadPage', options);
-  }
-
-  unPreloadPage(options: MpNavigateOptions) {
-    return this.invoke('unPreloadPage', options);
-  }
-
   /** 目标页消费通道（一次性，取后即除） */
   getEventChannel(id: number) {
     const channel = this.eventChannels.get(id);
@@ -341,51 +276,7 @@ export class MpApiService {
     return channel;
   }
 
-  // ---------------------------------------------------------------- 交互
-
-  showToast(options: MpToastOptions) {
-    return this.invoke('showToast', options);
-  }
-
-  hideToast() {
-    return this.invoke('hideToast');
-  }
-
-  showLoading(options: MpLoadingOptions = {}) {
-    return this.invoke('showLoading', options);
-  }
-
-  hideLoading() {
-    return this.invoke('hideLoading');
-  }
-
-  showModal(options: MpCallbackOptions) {
-    return this.invoke('showModal', options);
-  }
-
-  showActionSheet(options: MpCallbackOptions) {
-    return this.invoke('showActionSheet', options);
-  }
-
-  // ---------------------------------------------------------------- 存储（异步）
-
-  setStorage(options: MpStorageOptions) {
-    return this.invoke('setStorage', options);
-  }
-
-  getStorage<T = any>(options: { key: string }): Promise<MpStorageResult<T>> {
-    return this.invoke('getStorage', options);
-  }
-
-  removeStorage(options: { key: string }) {
-    return this.invoke('removeStorage', options);
-  }
-
-  clearStorage() {
-    return this.invoke('clearStorage');
-  }
-
-  // ---------------------------------------------------------------- 存储（同步）
+  // ---------------------------------------------------------------- 存储（同步，参数为裸值非 options 对象）
 
   setStorageSync(key: string, value: unknown) {
     this.callSync('setStorageSync', key, value);
@@ -403,7 +294,7 @@ export class MpApiService {
     this.callSync('clearStorageSync');
   }
 
-  // ---------------------------------------------------------------- 系统
+  // ---------------------------------------------------------------- 单位 / 能力探测
 
   upx2px(value: number, deviceWidth?: number): number {
     const g = this.globalObject;
@@ -440,7 +331,7 @@ export class MpApiService {
     return targets.every((t) => typeof this.getRawApi(t) === 'function');
   }
 
-  // ---------------------------------------------------------------- 系统信息族
+  // ---------------------------------------------------------------- 系统信息族（增强拼装）
 
   /** 全量增强：原始结果 + 归一字段（device/host/os/safeAreaInsets） */
   getSystemInfoSync() {
@@ -455,189 +346,29 @@ export class MpApiService {
     );
   }
 
-  /** 平台有原生拆分 API 用原生，否则从 getSystemInfoSync 拼 */
+  /** 平台有原生拆分 API（含协议映射名）用原生，否则从 getSystemInfoSync 拼 */
   getDeviceInfo() {
-    const source = this.getRawApi('getDeviceInfo')
+    const source = this.hasApi('getDeviceInfo')
       ? this.callSync<any>('getDeviceInfo')
       : this.callSync<any>('getSystemInfoSync');
     return buildDeviceInfo(this.platform, this.globalObject, source);
   }
 
   getAppBaseInfo() {
-    const source = this.getRawApi('getAppBaseInfo')
+    const source = this.hasApi('getAppBaseInfo')
       ? this.callSync<any>('getAppBaseInfo')
       : this.callSync<any>('getSystemInfoSync');
     return buildAppBaseInfo(this.platform, this.globalObject, source);
   }
 
   getWindowInfo() {
-    const source = this.getRawApi('getWindowInfo')
+    const source = this.hasApi('getWindowInfo')
       ? this.callSync<any>('getWindowInfo')
       : this.callSync<any>('getSystemInfoSync');
     return buildWindowInfo(this.platform, this.globalObject, source);
   }
 
-  getMenuButtonBoundingClientRect() {
-    return this.callSync('getMenuButtonBoundingClientRect');
-  }
-
-  // ================================================================ 域方法
-  //
-  // 约定：一次性动作 -> Promise；on*/off* 对子 -> Observable（订阅即注册，退订即移除）；
-  // 上下文对象 -> MpContext（.on(event) 事件流 + 方法透传）。
-
-  // ---------------------------------------------------------------- 剪贴板
-
-  setClipboardData(options: MpSetClipboardDataOptions) {
-    return this.invoke('setClipboardData', options);
-  }
-
-  getClipboardData() {
-    return this.invoke('getClipboardData');
-  }
-
-  // ---------------------------------------------------------------- 电话 / 扫码 / 图片预览
-
-  makePhoneCall(options: MpMakePhoneCallOptions) {
-    return this.invoke('makePhoneCall', options);
-  }
-
-  scanCode(options: MpScanCodeOptions = {}) {
-    return this.invoke('scanCode', options);
-  }
-
-  previewImage(options: MpPreviewImageOptions) {
-    return this.invoke('previewImage', options);
-  }
-
-  closePreviewImage() {
-    return this.invoke('closePreviewImage');
-  }
-
-  // ---------------------------------------------------------------- 导航栏
-
-  setNavigationBarTitle(options: MpSetNavigationBarTitleOptions) {
-    return this.invoke('setNavigationBarTitle', options);
-  }
-
-  setNavigationBarColor(
-    options: MpSetNavigationBarColorOptions,
-  ) {
-    return this.invoke('setNavigationBarColor', options);
-  }
-
-  showNavigationBarLoading() {
-    return this.invoke('showNavigationBarLoading');
-  }
-
-  hideNavigationBarLoading() {
-    return this.invoke('hideNavigationBarLoading');
-  }
-
-  // ---------------------------------------------------------------- TabBar
-
-  showTabBar(options: MpCallbackOptions = {}) {
-    return this.invoke('showTabBar', options);
-  }
-
-  hideTabBar(options: MpCallbackOptions = {}) {
-    return this.invoke('hideTabBar', options);
-  }
-
-  setTabBarBadge(options: MpTabBarBadgeOptions) {
-    return this.invoke('setTabBarBadge', options);
-  }
-
-  removeTabBarBadge(options: MpTabBarIndexOptions) {
-    return this.invoke('removeTabBarBadge', options);
-  }
-
-  showTabBarRedDot(options: MpTabBarIndexOptions) {
-    return this.invoke('showTabBarRedDot', options);
-  }
-
-  hideTabBarRedDot(options: MpTabBarIndexOptions) {
-    return this.invoke('hideTabBarRedDot', options);
-  }
-
-  setTabBarItem(options: MpTabBarItemOptions) {
-    return this.invoke('setTabBarItem', options);
-  }
-
-  setTabBarStyle(options: MpTabBarStyleOptions) {
-    return this.invoke('setTabBarStyle', options);
-  }
-
-  // ---------------------------------------------------------------- 页面
-
-  pageScrollTo(options: MpPageScrollToOptions) {
-    return this.invoke('pageScrollTo', options);
-  }
-
-  startPullDownRefresh() {
-    return this.invoke('startPullDownRefresh');
-  }
-
-  stopPullDownRefresh() {
-    return this.invoke('stopPullDownRefresh');
-  }
-
-  loadFontFace(options: MpLoadFontFaceOptions) {
-    return this.invoke('loadFontFace', options);
-  }
-
-  /** 同步返回平台 animation 对象，配合 `createAnimation().xxx().export()` 使用 */
-  createAnimation(config: MpAnimationConfig = {}) {
-    return this.callSync<MpAnimation>('createAnimation', config);
-  }
-
-  // ---------------------------------------------------------------- 键盘
-
-  showKeyboard(options: MpShowKeyboardOptions = {}) {
-    return this.invoke('showKeyboard', options);
-  }
-
-  getSelectedTextRange() {
-    return this.invoke('getSelectedTextRange');
-  }
-
-  // ---------------------------------------------------------------- 媒体
-
-  chooseImage(options: MpChooseImageOptions = {}) {
-    return this.invoke('chooseImage', options);
-  }
-
-  chooseVideo(options: MpChooseVideoOptions = {}) {
-    return this.invoke('chooseVideo', options);
-  }
-
-  chooseFile(options: MpChooseFileOptions = {}) {
-    return this.invoke('chooseFile', options);
-  }
-
-  compressImage(options: MpCompressImageOptions) {
-    return this.invoke('compressImage', options);
-  }
-
-  compressVideo(options: MpCompressVideoOptions) {
-    return this.invoke('compressVideo', options);
-  }
-
-  getImageInfo(src: string) {
-    return this.invoke('getImageInfo', { src });
-  }
-
-  getVideoInfo(options: MpGetVideoInfoOptions) {
-    return this.invoke('getVideoInfo', options);
-  }
-
-  saveImageToPhotosAlbum(options: MpFilePathOptions) {
-    return this.invoke('saveImageToPhotosAlbum', options);
-  }
-
-  saveVideoToPhotosAlbum(options: MpFilePathOptions) {
-    return this.invoke('saveVideoToPhotosAlbum', options);
-  }
+  // ---------------------------------------------------------------- 上下文对象（mpContext 包装，事件可订阅）
 
   /** 录音管理器：`rec.on('start')` / `rec.on('frameRecorded')` 可订阅 */
   getRecorderManager() {
@@ -646,243 +377,45 @@ export class MpApiService {
     );
   }
 
-  // ---------------------------------------------------------------- 文件
-
-  saveFile(options: MpSaveFileOptions) {
-    return this.invoke('saveFile', options);
-  }
-
-  getFileInfo(options: MpGetFileInfoOptions) {
-    return this.invoke('getFileInfo', options);
-  }
-
-  getSavedFileInfo(options: MpFilePathOptions) {
-    return this.invoke('getSavedFileInfo', options);
-  }
-
-  getSavedFileList() {
-    return this.invoke('getSavedFileList');
-  }
-
-  removeSavedFile(options: MpFilePathOptions) {
-    return this.invoke('removeSavedFile', options);
-  }
-
-  openDocument(options: MpOpenDocumentOptions) {
-    return this.invoke('openDocument', options);
-  }
-
-  // ---------------------------------------------------------------- 位置
-
-  getLocation(options: MpGetLocationOptions = {}) {
-    return this.invoke('getLocation', options);
-  }
-
-  chooseLocation(options: MpChooseLocationOptions = {}) {
-    return this.invoke('chooseLocation', options);
-  }
-
-  openLocation(options: MpOpenLocationOptions) {
-    return this.invoke('openLocation', options);
-  }
-
-  startLocationUpdate(
-    options: MpStartLocationUpdateOptions = {},
-  ) {
-    return this.invoke('startLocationUpdate', options);
-  }
-
-  stopLocationUpdate() {
-    return this.invoke('stopLocationUpdate');
-  }
-
-  onLocationChange() {
-    return this.event$<MpLocation>('onLocationChange', 'offLocationChange');
-  }
-
-  onLocationChangeError() {
-    return this.event$<any>(
-      'onLocationChangeError',
-      'offLocationChangeError',
-    );
-  }
-
-  // ---------------------------------------------------------------- 设备
-
-  vibrateShort(options: MpCallbackOptions = {}) {
-    return this.invoke('vibrateShort', options);
-  }
-
-  vibrateLong() {
-    return this.invoke('vibrateLong');
-  }
-
-  setKeepScreenOn(options: MpSetKeepScreenOnOptions) {
-    return this.invoke('setKeepScreenOn', options);
-  }
-
-  getScreenBrightness() {
-    return this.invoke('getScreenBrightness');
-  }
-
-  setScreenBrightness(options: MpSetScreenBrightnessOptions) {
-    return this.invoke('setScreenBrightness', options);
-  }
-
-  addPhoneContact(options: MpAddPhoneContactOptions) {
-    return this.invoke('addPhoneContact', options);
-  }
-
-  getAppAuthorizeSetting() {
-    return this.callSync<MpAuthorizeSetting>('getAppAuthorizeSetting');
-  }
-
-  openAppAuthorizeSetting() {
-    return this.invoke('openAppAuthorizeSetting');
-  }
-
-  getSystemSetting() {
-    return this.callSync<MpSystemSetting>('getSystemSetting');
-  }
-
-  // ---------------------------------------------------------------- 传感器
-
-  startAccelerometer(
-    options: MpStartAccelerometerOptions = {},
-  ) {
-    return this.invoke('startAccelerometer', options);
-  }
-
-  stopAccelerometer() {
-    return this.invoke('stopAccelerometer');
-  }
-
-  onAccelerometer() {
-    return this.event$<MpAccelerometerReading>(
-      'onAccelerometer',
-      'offAccelerometer',
-    );
-  }
-
-  startCompass() {
-    return this.invoke('startCompass');
-  }
-
-  stopCompass() {
-    return this.invoke('stopCompass');
-  }
-
-  onCompass() {
-    return this.event$<MpCompassReading>('onCompass', 'offCompass');
-  }
-
-  startSoterAuthentication(options: MpCallbackOptions) {
-    return this.invoke('startSoterAuthentication', options);
-  }
-
-  onWindowResize() {
-    return this.event$<{ windowWidth: number; windowHeight: number }>(
-      'onWindowResize',
-      'offWindowResize',
-    );
-  }
-
-  // ---------------------------------------------------------------- Socket
-
   /** 返回包装后的 SocketTask：`on('open'|'message'|'error'|'close')` 可订阅 */
-  connectSocket(options: MpConnectSocketOptions) {
+  connectSocket(options: MpCallbackOptions) {
     return mpContext(this.invoke('connectSocket', options), (fn) =>
       this.runInAngular(fn),
     );
   }
 
-  sendSocketMessage(options: MpSendSocketMessageOptions) {
-    return this.invoke('sendSocketMessage', options);
-  }
-
-  closeSocket(options: MpCloseSocketOptions = {}) {
-    return this.invoke('closeSocket', options);
-  }
-
-  // ---------------------------------------------------------------- 登录 / 支付 / 分享 / 插件
-
-  login(options: MpLoginOptions = {}) {
-    return this.invoke('login', options);
-  }
-
-  getUserInfo(options: MpCallbackOptions = {}) {
-    return this.invoke('getUserInfo', options);
-  }
-
-  getUserProfile(options: MpCallbackOptions = {}) {
-    return this.invoke('getUserProfile', options);
-  }
-
-  requestPayment(options: MpPaymentOptions) {
-    return this.invoke('requestPayment', options);
-  }
-
-  share(options: MpShareOptions) {
-    return this.invoke('share', options);
-  }
-
-  shareWithSystem(options: MpShareOptions) {
-    return this.invoke('shareWithSystem', options);
-  }
-
-  getProvider(options: MpGetProviderOptions) {
-    return this.invoke('getProvider', options);
-  }
-
-  loadSubPackage(options: MpLoadSubPackageOptions) {
-    return this.invoke('loadSubPackage', options);
-  }
-
-  // ---------------------------------------------------------------- Canvas / Context
-
   createCanvasContext(canvasId: string) {
-    return mpContext(this.callSync<any>('createCanvasContext', canvasId), (fn) =>
-      this.runInAngular(fn),
+    return mpContext(
+      this.callSync<any>('createCanvasContext', canvasId),
+      (fn) => this.runInAngular(fn),
     );
   }
 
-  canvasToTempFilePath(options: MpCanvasToTempFilePathOptions) {
-    return this.invoke('canvasToTempFilePath', options);
-  }
-
-  canvasGetImageData(
-    options: MpCanvasImageDataOptions,
-  ) {
-    return this.invoke('canvasGetImageData', options);
-  }
-
-  canvasPutImageData(options: MpCanvasImageDataOptions) {
-    return this.invoke('canvasPutImageData', options);
-  }
-
   createVideoContext(id: string, component?: any) {
-    return mpContext(this.callSync<any>('createVideoContext', id, component), (fn) =>
-      this.runInAngular(fn),
+    return mpContext(
+      this.callSync<any>('createVideoContext', id, component),
+      (fn) => this.runInAngular(fn),
     );
   }
 
   createAudioContext(id: string, component?: any) {
-    return mpContext(this.callSync<any>('createAudioContext', id, component), (fn) =>
-      this.runInAngular(fn),
+    return mpContext(
+      this.callSync<any>('createAudioContext', id, component),
+      (fn) => this.runInAngular(fn),
     );
   }
 
-  createInnerAudioContext(
-    options: MpCreateInnerAudioContextOptions = {},
-  ) {
-    return mpContext(this.callSync<any>('createInnerAudioContext', options), (fn) =>
-      this.runInAngular(fn),
+  createInnerAudioContext(options: MpCallbackOptions = {}) {
+    return mpContext(
+      this.callSync<any>('createInnerAudioContext', options),
+      (fn) => this.runInAngular(fn),
     );
   }
 
   createMapContext(mapId: string, component?: any) {
-    return mpContext(this.callSync<any>('createMapContext', mapId, component), (fn) =>
-      this.runInAngular(fn),
+    return mpContext(
+      this.callSync<any>('createMapContext', mapId, component),
+      (fn) => this.runInAngular(fn),
     );
   }
 
@@ -899,128 +432,81 @@ export class MpApiService {
     );
   }
 
-  // ---------------------------------------------------------------- 蓝牙 / iBeacon
+  // ---------------------------------------------------------------- 节点查询 / 观察器
 
-  openBluetoothAdapter(options: MpCallbackOptions = {}) {
-    return this.invoke('openBluetoothAdapter', options);
+  /**
+   * 节点查询。`exec()` 返回 Promise。
+   * @param component 原生小程序组件实例（组件内查询；ng 实例先经 ComponentFinderService 换取）
+   */
+  createSelectorQuery(component?: unknown) {
+    const raw = this.callSync<any>('createSelectorQuery');
+    if (component) {
+      raw.in?.(component);
+    }
+    return createMpSelectorQuery(raw, (fn) => this.runInAngular(fn));
   }
 
-  startBluetoothDiscovery(options: MpCallbackOptions = {}) {
-    return this.invoke('startBluetoothDevicesDiscovery', options);
-  }
-
-  stopBluetoothDiscovery() {
-    return this.invoke('stopBluetoothDevicesDiscovery');
-  }
-
-  getBluetoothDevices() {
-    return this.invoke('getBluetoothDevices');
-  }
-
-  onBluetoothDeviceFound() {
-    return this.event$<{ devices: MpBluetoothDevice[] }>(
-      'onBluetoothDeviceFound',
-      'offBluetoothDeviceFound',
-    );
-  }
-
-  createBLEConnection(options: MpBLEDeviceIdOptions) {
-    return this.invoke('createBLEConnection', options);
-  }
-
-  closeBLEConnection(options: MpBLEDeviceIdOptions) {
-    return this.invoke('closeBLEConnection', options);
-  }
-
-  onBLEConnectionStateChange() {
-    return this.event$<{ deviceId: string; connected: boolean }>(
-      'onBLEConnectionStateChange',
-      'offBLEConnectionStateChange',
-    );
-  }
-
-  getBLEDeviceRSSI(options: MpBLEDeviceIdOptions) {
-    return this.invoke('getBLEDeviceRSSI', options);
-  }
-
-  setBLEMTU(options: MpSetBLEMTUOptions) {
-    return this.invoke('setBLEMTU', options);
-  }
-
-  getBLEDeviceServices(
-    options: MpBLEDeviceIdOptions,
+  /** 交叉观察器：`observe$(selector)` 订阅即 observe，退订即 disconnect */
+  createIntersectionObserver(
+    options: MpCallbackOptions = {},
+    component?: unknown,
   ) {
-    return this.invoke('getBLEDeviceServices', options);
+    const raw = this.callSync<any>('createIntersectionObserver', options);
+    if (component) {
+      raw.in?.(component);
+    }
+    return createMpIntersectionObserver(raw, (fn) => this.runInAngular(fn));
   }
 
-  getBLEDeviceCharacteristics(options: {
-    deviceId: string;
-    serviceId: string;
-  }) {
-    return this.invoke('getBLEDeviceCharacteristics', options);
+  /** 媒体查询观察器（JS 求值 + onWindowResize 驱动，各家无原生 API） */
+  createMediaQueryObserver() {
+    return this.mediaQueryObserverFactory();
   }
 
-  readBLECharacteristicValue(
-    options: MpBLECharacteristicTargetOptions,
-  ) {
-    return this.invoke('readBLECharacteristicValue', options);
+  /**
+   * 宿主主题变化（对标 uni 的 onHostThemeChange，基于 wx.onThemeChange）。
+   * 订阅即注册，退订即移除；结果归一为 `{ hostTheme }`。
+   */
+  onHostThemeChange() {
+    return this.event$<{ theme?: string }>(
+      'onThemeChange',
+      'offThemeChange',
+    ).pipe(map((res) => ({ hostTheme: res?.theme ?? '' })));
   }
 
-  writeBLECharacteristicValue(
-    options: MpBLECharacteristicTargetOptions & { value: ArrayBuffer },
-  ) {
-    return this.invoke('writeBLECharacteristicValue', options);
+  // ---------------------------------------------------------------- 多语言
+
+  private localeCache: string | undefined;
+  private readonly localeChanged$ = new Subject<{ locale: string }>();
+
+  /** 当前语言（首次从存储读取，默认 zh-Hans，同 uni） */
+  getLocale(): string {
+    if (this.localeCache === undefined) {
+      let stored = '';
+      try {
+        stored = String(this.callSync<unknown>('getStorageSync', LOCALE_KEY) ?? '');
+      } catch {
+        /* 无存储能力时落回默认 */
+      }
+      this.localeCache = stored || 'zh-Hans';
+    }
+    return this.localeCache;
   }
 
-  notifyBLECharacteristicValueChange(
-    options: MpNotifyBLEChangeOptions,
-  ) {
-    return this.invoke('notifyBLECharacteristicValueChange', options);
+  /** 切换语言：持久化并广播，同值返回 false（同 uni 返回值语义） */
+  setLocale(locale: string): boolean {
+    if (this.getLocale() === locale) {
+      return false;
+    }
+    this.localeCache = locale;
+    this.callSync('setStorageSync', LOCALE_KEY, locale);
+    this.localeChanged$.next({ locale });
+    return true;
   }
 
-  onBLECharacteristicValueChange() {
-    return this.event$<MpBLECharacteristicResult>(
-      'onBLECharacteristicValueChange',
-      'offBLECharacteristicValueChange',
-    );
-  }
-
-  startBeaconDiscovery(
-    options: MpStartBeaconDiscoveryOptions,
-  ) {
-    return this.invoke('startBeaconDiscovery', options);
-  }
-
-  stopBeaconDiscovery() {
-    return this.invoke('stopBeaconDiscovery');
-  }
-
-  getBeacons() {
-    return this.invoke('getBeacons');
-  }
-
-  onBeaconUpdate() {
-    return this.event$<{ beacons: MpBeacon[] }>(
-      'onBeaconUpdate',
-      'offBeaconUpdate',
-    );
-  }
-
-  onBeaconServiceChange() {
-    return this.event$<{ available: boolean; discovering: boolean }>(
-      'onBeaconServiceChange',
-      'offBeaconServiceChange',
-    );
-  }
-
-  // ---------------------------------------------------------------- base64
-
-  arrayBufferToBase64(buffer: ArrayBuffer) {
-    return this.callSync<string>('arrayBufferToBase64', buffer);
-  }
-
-  base64ToArrayBuffer(base64: string) {
-    return this.callSync<ArrayBuffer>('base64ToArrayBuffer', base64);
+  /** 语言切换事件（订阅即监听，无需 off） */
+  onLocaleChange(): Observable<{ locale: string }> {
+    return this.localeChanged$.asObservable();
   }
 
   // ================================================================ 事件桥
@@ -1028,22 +514,42 @@ export class MpApiService {
   /**
    * 平台 `onXxx` / `offXxx` 对子 -> 冷流：订阅即注册，退订即移除。
    * 平台缺任一侧时静默降级（不抛错），事件不可用时流不发出。
+   * 无配对 `off*` 的事件（如 onError）省略第二个参数，退订只断开本地订阅。
+   *
+   * 任意 `on*` 事件都可直接走本方法或 Proxy，不再逐个封装。
    */
-  private event$<T>(onName: MpApiNameInput, offName: MpApiNameInput) {
+  event$<T>(onName: MpApiNameInput, offName?: MpApiNameInput) {
+    const table = this.protocols[this.platform];
+    const onProtocol = table?.[onName];
+    const onTarget = onProtocol?.name ?? onName;
+    const offTarget = offName ? (table?.[offName]?.name ?? offName) : undefined;
     return new Observable<T>((subscriber) => {
-      const handler = (res: T) => this.runInAngular(() => subscriber.next(res));
-      if (this.getRawApi(onName)) {
-        this.callSync(onName, handler);
+      const handler = (res: T) => {
+        let out: any = res;
+        if (onProtocol?.transformResult) {
+          out = onProtocol.transformResult(out);
+        }
+        if (onProtocol?.returnValue) {
+          out = applyFieldMap(out, onProtocol.returnValue);
+        }
+        this.runInAngular(() => subscriber.next(out));
+      };
+      const on = this.getRawApi(onTarget);
+      if (on) {
+        on.call(this.globalObject, handler);
       }
       return () => {
-        if (this.getRawApi(offName)) {
-          this.callSync(offName, handler);
+        if (offTarget) {
+          const off = this.getRawApi(offTarget);
+          if (off) {
+            off.call(this.globalObject, handler);
+          }
         }
       };
     });
   }
 
-  // ---------------------------------------------------------------- 内部管线
+  // ================================================================ 内部管线
 
   private extractCallbacks(options: MpCallbackOptions) {
     const rest = { ...options };
@@ -1231,13 +737,13 @@ export class MpApiService {
   }
 
   private callSync<T>(name: string, ...args: unknown[]) {
-    const fn = this.getRawApi(name);
+    const protocol = this.protocols[this.platform]?.[name];
+    const fn = this.getRawApi(protocol?.name ?? name);
     if (!fn) {
       throw new Error(`当前平台(${this.platform})不支持 API: ${name}`);
     }
     const result = fn.apply(this.globalObject, args) as any;
     // 同步 API 同样过协议（如支付宝 getStorageSync 的 {data} 拆封）
-    const protocol = this.protocols[this.platform]?.[name];
     if (!protocol) {
       return result as T;
     }

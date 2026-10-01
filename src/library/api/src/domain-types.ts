@@ -9,10 +9,16 @@
  */
 
 import {
+  MpActionSheetOptions,
   MpActionSheetResult,
+  MpApiNameInput,
   MpCallbackOptions,
+  MpLoadingOptions,
+  MpModalOptions,
   MpModalResult,
-} from './types';
+  MpNavigateBackOptions,
+  MpNavigateOptions,
+ MpToastOptions } from './types';
 
 // ---------------------------------------------------------------- 导航栏
 
@@ -153,7 +159,9 @@ export interface MpFileInfo {
 export interface MpSavedFileInfo {
   size: number;
   createTime: number;
-  savedFilePath: string;
+  /** wx getSavedFileList 实际给的是 filePath */
+  filePath?: string;
+  savedFilePath?: string;
   errMsg?: string;
 }
 
@@ -646,6 +654,16 @@ export interface MpAppBaseInfo {
 }
 
 /** getWindowInfo 口径 */
+export interface MpNetworkTypeResult {
+  networkType: string;
+  errMsg?: string;
+}
+
+export interface MpBatteryInfoResult {
+  level: number;
+  isCharging: boolean;
+}
+
 export interface MpWindowInfo {
   windowWidth: number;
   windowHeight: number;
@@ -679,6 +697,149 @@ export interface MpMenuButtonRect {
   bottom: number;
   left: number;
 }
+
+// ---------------------------------------------------------------- 授权 / 会话
+
+export interface MpAuthorizeOptions extends MpCallbackOptions {
+  /** 权限 scope，如 `scope.userLocation` */
+  scope: string;
+}
+
+/** getSetting 返回的授权配置：scope -> 是否授权（部分平台有 'deny'/'both' 中间态） */
+export interface MpAuthSetting {
+  [scope: string]: boolean | 'deny' | 'both' | undefined;
+}
+
+export interface MpSettingResult {
+  authSetting: MpAuthSetting;
+  [key: string]: any;
+}
+
+// ---------------------------------------------------------------- 启动参数
+
+/** getLaunchOptionsSync / getEnterOptionsSync / onAppShow 结果 */
+export interface MpLaunchOptions {
+  path?: string;
+  scene?: number | string;
+  query?: Record<string, string>;
+  referrerInfo?: { appId?: string; extraData?: Record<string, any> };
+  shareTicket?: string;
+  [key: string]: any;
+}
+
+// ---------------------------------------------------------------- 键盘事件
+
+export interface MpKeyboardHeightChangeResult {
+  height: number;
+  duration?: number;
+}
+
+// ---------------------------------------------------------------- 生物认证补充
+
+export interface MpSoterSupportResult {
+  supportMode: string[];
+  errMsg?: string;
+}
+
+export interface MpSoterEnrollOptions extends MpCallbackOptions {
+  authChallenge: string;
+  sceneDesc?: string;
+}
+
+export interface MpSoterEnrollResult {
+  isEnrolled: boolean;
+  errMsg?: string;
+}
+
+/**
+ * 统一名 -> 参数形状。Proxy 兜底面的参数类型来源：
+ * 等价 uni 用 @dcloudio/types 手写 uni.xxx 参数，但纯类型零运行时。
+ * 未收录的名字退化为 MpCallbackOptions（宽进，运行时由协议层把关）。
+ */
+export interface MpApiParamMap {
+  navigateTo: MpNavigateOptions;
+  redirectTo: MpNavigateOptions;
+  switchTab: MpNavigateOptions;
+  reLaunch: MpNavigateOptions;
+  navigateBack: MpNavigateBackOptions;
+  preloadPage: MpNavigateOptions;
+  unPreloadPage: MpNavigateOptions;
+  showToast: MpToastOptions;
+  showLoading: MpLoadingOptions;
+  showModal: MpModalOptions;
+  showActionSheet: MpActionSheetOptions;
+  setStorage: MpStorageOptions;
+  getStorage: { key: string };
+  removeStorage: { key: string };
+  setClipboardData: MpSetClipboardDataOptions;
+  makePhoneCall: MpMakePhoneCallOptions;
+  scanCode: MpScanCodeOptions;
+  previewImage: MpPreviewImageOptions;
+  setNavigationBarTitle: MpSetNavigationBarTitleOptions;
+  setNavigationBarColor: MpSetNavigationBarColorOptions;
+  setTabBarBadge: MpTabBarBadgeOptions;
+  removeTabBarBadge: MpTabBarIndexOptions;
+  showTabBarRedDot: MpTabBarIndexOptions;
+  hideTabBarRedDot: MpTabBarIndexOptions;
+  setTabBarItem: MpTabBarItemOptions;
+  setTabBarStyle: MpTabBarStyleOptions;
+  pageScrollTo: MpPageScrollToOptions;
+  loadFontFace: MpLoadFontFaceOptions;
+  createAnimation: MpAnimationConfig;
+  showKeyboard: MpShowKeyboardOptions;
+  authorize: MpAuthorizeOptions;
+  chooseImage: MpChooseImageOptions;
+  chooseVideo: MpChooseVideoOptions;
+  chooseFile: MpChooseFileOptions;
+  compressImage: MpCompressImageOptions;
+  compressVideo: MpCompressVideoOptions;
+  getImageInfo: MpGetImageInfoOptions;
+  getVideoInfo: MpGetVideoInfoOptions;
+  saveImageToPhotosAlbum: MpFilePathOptions;
+  saveVideoToPhotosAlbum: MpFilePathOptions;
+  saveFile: MpSaveFileOptions;
+  getFileInfo: MpGetFileInfoOptions;
+  getSavedFileInfo: MpFilePathOptions;
+  removeSavedFile: MpFilePathOptions;
+  openDocument: MpOpenDocumentOptions;
+  getLocation: MpGetLocationOptions;
+  chooseLocation: MpChooseLocationOptions;
+  openLocation: MpOpenLocationOptions;
+  startLocationUpdate: MpStartLocationUpdateOptions;
+  setKeepScreenOn: MpSetKeepScreenOnOptions;
+  setScreenBrightness: MpSetScreenBrightnessOptions;
+  addPhoneContact: MpAddPhoneContactOptions;
+  startAccelerometer: MpStartAccelerometerOptions;
+  checkIsSoterEnrolledInDevice: MpSoterEnrollOptions;
+  connectSocket: MpConnectSocketOptions;
+  sendSocketMessage: MpSendSocketMessageOptions;
+  closeSocket: MpCloseSocketOptions;
+  login: MpLoginOptions;
+  requestPayment: MpPaymentOptions;
+  share: MpShareOptions;
+  shareWithSystem: MpShareOptions;
+  getProvider: MpGetProviderOptions;
+  loadSubPackage: MpLoadSubPackageOptions;
+  canvasToTempFilePath: MpCanvasToTempFilePathOptions;
+  canvasGetImageData: MpCanvasImageDataOptions;
+  canvasPutImageData: MpCanvasImageDataOptions;
+  createInnerAudioContext: MpCreateInnerAudioContextOptions;
+  createBLEConnection: MpBLEDeviceIdOptions;
+  closeBLEConnection: MpBLEDeviceIdOptions;
+  getBLEDeviceRSSI: MpBLEDeviceIdOptions;
+  getBLEDeviceServices: MpBLEDeviceIdOptions;
+  setBLEMTU: MpSetBLEMTUOptions;
+  readBLECharacteristicValue: MpBLECharacteristicTargetOptions;
+  writeBLECharacteristicValue: MpBLECharacteristicTargetOptions & {
+    value: ArrayBuffer;
+  };
+  notifyBLECharacteristicValueChange: MpNotifyBLEChangeOptions;
+  startBeaconDiscovery: MpStartBeaconDiscoveryOptions;
+}
+
+/** 按名字查参数类型，未收录的保持宽松 */
+export type MpParamOf<N extends MpApiNameInput> =
+  N extends keyof MpApiParamMap ? MpApiParamMap[N] : MpCallbackOptions;
 
 export interface MpApiResultMap {
   // 交互
@@ -717,6 +878,15 @@ export interface MpApiResultMap {
 
   // 生物认证
   startSoterAuthentication: MpSoterAuthenticationResult;
+  checkIsSupportSoterAuthentication: MpSoterSupportResult;
+  checkIsSoterEnrolledInDevice: MpSoterEnrollResult;
+
+  // 授权 / 会话
+  getSetting: MpSettingResult;
+
+  // 启动参数
+  getLaunchOptionsSync: MpLaunchOptions;
+  getEnterOptionsSync: MpLaunchOptions;
 
   // 登录 / 支付 / 插件
   login: MpLoginResult;
@@ -743,6 +913,9 @@ export interface MpApiResultMap {
   getDeviceInfo: MpDeviceInfo;
   getAppBaseInfo: MpAppBaseInfo;
   getWindowInfo: MpWindowInfo;
+  getNetworkType: MpNetworkTypeResult;
+  getBatteryInfo: MpBatteryInfoResult;
+  getBatteryInfoSync: MpBatteryInfoResult;
   getMenuButtonBoundingClientRect: MpMenuButtonRect;
   canIUse: boolean;
   upx2px: number;
