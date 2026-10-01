@@ -254,37 +254,3 @@ export function rewriteComponentForWxs(
 
   return { code: applyEdits(source, edits), inlinedTemplates, resources };
 }
-
-/**
- * 找出一个 .ts 里所有**含 `<wxs`** 的 inline `template` 字面量全文。
- *
- * 返回的是求值后的文本（`node.text`），即 Angular 实际看到的那份，
- * 不是源码里的原始字节 —— 两者在有转义时不等价。
- *
- * 含 `${}` 插值的模板字符串取不到静态全文，直接不报：宁可漏报让
- * Angular 自己报 `fmt is not defined`，也不要为了它卡住整个构建。
- */
-export function findInlineWxsTemplates(source: string): string[] {
-  if (!source.includes('<wxs')) {
-    return [];
-  }
-  const sf = ts.createSourceFile(
-    'scan.ts',
-    source,
-    ts.ScriptTarget.Latest,
-    /* setParentNodes */ true,
-  );
-  const out: string[] = [];
-  for (const meta of metadataObjects(sf)) {
-    for (const prop of meta.properties) {
-      if (propertyName(prop) !== TEMPLATE || !ts.isPropertyAssignment(prop)) {
-        continue;
-      }
-      const raw = stringLiteralValue(prop.initializer);
-      if (raw !== undefined && raw.includes('<wxs')) {
-        out.push(raw);
-      }
-    }
-  }
-  return out;
-}

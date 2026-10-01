@@ -512,9 +512,6 @@ export class MiniProgramApplicationAnalysisService {
     await this.initTscProgram();
     await this.ngCompiler.analyzeAsync();
   }
-  getBuilder() {
-    return this.builder;
-  }
   cleanDependencyFileCache() {
     this.cleanDependencyFileCacheSet.forEach((filePath) => {
       try {

@@ -1,12 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export type TemplateScopeOutside = Omit<
-  LibraryTemplateScopeService,
-  Exclude<
-    keyof LibraryTemplateScopeService,
-    'setScopeLibraryUseComponents' | 'setScopeExtraUseComponents'
-  >
->;
 export interface ExtraTemplateData {
   useComponents: Record<string, string>;
   /** `${}` 插值模板串 */

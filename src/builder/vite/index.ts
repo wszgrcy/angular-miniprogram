@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Observable } from 'rxjs';
 import { Injector } from 'static-injector';
-import type { AliasOptions, InlineConfig } from 'vite';
+import type { InlineConfig } from 'vite';
 import { changeComponent } from '../component-template-inject/change-component';
 import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
 import {
@@ -161,13 +161,6 @@ export function platformReplacementAlias(
       replacement: `angular-miniprogram/platform/${buildPlatform.packageName}`,
     },
   ];
-}
-
-export function buildAlias(
-  buildPlatform: BuildPlatform,
-  extra: Record<string, string> = {},
-): AliasOptions {
-  return { ...extra };
 }
 
 /**

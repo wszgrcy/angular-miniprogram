@@ -208,14 +208,6 @@ export function setLibraryScopeTemplate(
   ensureEntry(moduleId).scopeTemplates.set(scopeKey, record);
 }
 
-/** 仅供测试：查看当前暂存内容。 */
-export function peekLibraryMetaStore(): ReadonlyMap<
-  string,
-  MutableEntryRecord
-> {
-  return store;
-}
-
 /** 仅供测试：清空暂存。 */
 export function clearLibraryMetaStore(): void {
   store.clear();
