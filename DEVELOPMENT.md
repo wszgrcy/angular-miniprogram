@@ -2215,3 +2215,173 @@ import {
    例如 `GlobalSelfTemplateComponent` 的模板用了 `app-outside-template` / `app-other`，
    就得在组件上写 `imports: [OutsideTemplateComponent, OtherComponent]`，
    写在模块里没用。
+
+---
+
+# 构建器改用 vite 出码，测试改用 vitest
+
+## 一句话
+
+`build:builder` / `build:karma` 的 JS 产物从 `tsc` 换成 vite（`script/vite-build.ts`），
+`npm test` 从 jasmine 换成 vitest。产物文件集与 spec 数量都做了逐项比对，
+**106/106 模块导出签名一致，843/843 spec 全绿**。
+
+## 构建侧
+
+| 脚本                | 现在                                                              |
+| ------------------- | ----------------------------------------------------------------- |
+| `build:builder`     | `typecheck:builder`（`tsc --noEmit`）+ `tsx script/vite-build.ts` |
+| `build:karma`       | 两个 karma tsconfig 改成 `--emitDeclarationOnly`，只出 `.d.ts`    |
+| `typecheck:builder` | 新增，纯类型检查                                                  |
+
+`script/vite-build.ts` 一次产出三棵树：
+
+| 目标           | 源                                                                | 产物                |
+| -------------- | ----------------------------------------------------------------- | ------------------- |
+| `builder`      | `src/builder`（排除 `karma/client`、`karma/plugin`）              | `dist/builder`      |
+| `karma-plugin` | `src/builder/karma`，入口 `plugin/index` + `vite/karma-framework` | `dist/karma`        |
+| `karma-client` | `src/builder/karma/client`                                        | `dist/karma/client` |
+
+### 必须 `preserveModules`，不能打包
+
+不是审美问题，是三处硬约束：
+
+1. `builders.json` 的 implementation 是 `./vite` / `./library/builder` / `./karma/vite`，
+   Angular CLI **按文件路径**加载 builder；
+2. 7 个 platform 实现里都有 `path.resolve(__dirname, '../template/app-template.js')`
+   这类「按相对路径取自己的产物」；
+3. `package.json#exports` 的 `./karma/plugin` 指到具体文件。
+
+所以产物目录必须与源码一比一。验证方式：把 tsc 产物和 vite 产物逐文件
+`require` 后比对 `Object.keys()`，**106/106 完全一致**（vite 只多一个
+`_virtual/_rolldown/runtime.js` 辅助模块）。
+
+### 类型检查不能跟着一起换掉
+
+vite 走 oxc/esbuild，**只转译不检查**。原先 `tsconfig.builder.json` 里
+`noEmitOnError: true` 提供的「类型不过就不落盘」保证会消失，
+所以 `build:builder` 显式串了一条 `tsc --noEmit` 在前面。
+
+### vite 出不了 `.d.ts`
+
+`package.json#exports` 的 `./karma/plugin` 带 `types` 字段，
+所以 `build:karma` 保留，但降级成 `--emitDeclarationOnly`。
+
+### 为什么 `src/library` 不换
+
+库走 ng-packagr：Angular 的 AOT 编译、扁平 d.ts、`package.json` 生成、
+partial-Ivy 都是它做的，vite 没有等价物（`@analogjs/vite-plugin-angular`
+是应用侧插件，不做库打包）。**这条不换，也不该换。**
+
+## 测试侧
+
+`npm test` = `vitest run`。jasmine 那条路保留为 `npm run test:jasmine`。
+
+配置 `vitest.config.mts`，环境准备 `test/vitest-setup.ts`。
+75 个 spec 文件、843 个 spec，**一个 spec 文件都没改**。
+
+### 必须补的四层兼容
+
+#### 1. 小程序全局
+
+`platform-core.ts` 里 `MINIPROGRAM_GLOBAL = wx` 在**模块求值时**读全局，
+所以 `wx` / `App` / `Page` / `Component` / `getApp` / `getCurrentPages`
+的替身必须放 `setupFiles`，不能放 spec 里。照搬 `script/startup-jasmine.ts`
+那套 Proxy 兜底。
+
+#### 2. 包自引用
+
+`src/library` 里几十处 `import 'angular-miniprogram/platform/wx'`。
+jasmine 靠 `Module._resolveFilename` 钩子，vite 有自己的解析器、钩子不生效，
+只能在 `resolve.alias` 再声明一遍。**长 key 必须排在短 key 前**，
+否则 `angular-miniprogram/platform` 会先把 `/platform/wx` 吃掉。
+
+#### 3. `@angular/core` 的 `const enum`（**这条是真发现**）
+
+`NotificationSource` 在 Angular 里是 `declare const enum`：
+tsc 编译时把 `NotificationSource.Listener` 内联成 `5`，产物里**根本没有这个导出**。
+oxc/esbuild **不做跨文件 const enum 内联**，于是 vitest 下
+
+```
+TypeError: Cannot read properties of undefined (reading 'Listener')
+```
+
+一处炸在 `MpApiService.runInAngular` / `MpEventBus.runInAngular` 的 `finally`，
+连带 85 个 spec 失败。
+
+库产物本身走 ng-packagr（tsc），线上没这个问题。但
+**任何用 esbuild / vite 直接吃源码的消费方都会踩**，值得记住。
+
+测试侧用一个 vite 插件把 `@angular/core` 转发到
+`export * from '@angular/core'` + 手工补的 `ɵNotificationSource` 常量。
+
+#### 4. `new Function('return import(m)')`
+
+`src/builder/util/load_esm.ts` 用的是 Angular 官方 `loadEsmModule` 写法，
+`new Function` 包一层 `import()` 是为了躲打包器的静态分析。
+vitest 用 `vm.runInThisContext` 跑模块，里面再 `import()` 直接抛
+`ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING` →
+`angularCompilerCliPromise` 变成 rejected → 所有跑真实构建的 spec 连带失败。
+
+同样用插件在 transform 阶段换回真正的动态 import（只影响测试，不改源码）。
+
+### jasmine API 兼容清单
+
+`test/vitest-setup.ts` 里补的，都是实测用量：
+
+| jasmine                                                      | 用量 | vitest 对应                    |
+| ------------------------------------------------------------ | ---- | ------------------------------ |
+| `expect(x).toBeTrue()`                                       | 76   | 自定义 matcher                 |
+| `spyOn(o,k).and.callFake/returnValue/stub/callThrough`       | 70+  | `vi.spyOn` + `.and` 适配器     |
+| `spy.calls.mostRecent()/count()/length/any()`                | 36   | `spy.mock.calls` 适配器        |
+| `expectAsync(p).toBeResolved/To/toBeRejected/With/WithError` | 12   | 包 `expect().resolves/rejects` |
+| `expect(fn).toThrowError(...)`                               | 13   | `toThrow` 别名                 |
+| `jasmine.arrayWithExactContents`                             | 3    | 自定义 asymmetric matcher      |
+| `jasmine.createSpy`                                          | 3    | `vi.fn` + `.and`               |
+
+`withContext()` vitest 5 本来就有（chai 提供），不用补。
+
+`arrayWithExactContents` 里**不要**用 `expect.utils.equals`：
+vitest 5 不保证这个命名空间存在，用了会静默返回 false、matcher 永不匹配。
+
+### 执行模型
+
+`pool: 'forks'` + `maxWorkers: 1` + `sequence.concurrent: false`。
+architect 的 `TestProjectHost` 会在仓库里开真实临时目录并写文件，
+并发跑会互相踩。串行后行为与 jasmine 一致。
+
+`testTimeout` / `hookTimeout` 给到 500s，对齐
+`describeBuilder` 里的 `jasmine.DEFAULT_TIMEOUT_INTERVAL = 500 * 1000`。
+
+### `test:ci` 的顺序依赖
+
+`node_modules/test-library` 由 `library.spec.ts` 构建后拷入，
+但按文件名排序 `library-meta-sidecar.spec.ts` 排在 `library/library.spec.ts` **之前**。
+jasmine 靠 `jasmine.json` 里把 `builder/library/library.spec.ts` 列在第一位解决。
+vitest 按文件排序，所以 `test:ci` 显式跑两遍：
+
+```
+build:library && vitest run src/builder/library/library.spec.ts && vitest run
+```
+
+### 耗时
+
+|                    | 时长 | spec |
+| ------------------ | ---- | ---- |
+| jasmine（ts-node） | ~88s | 843  |
+| vitest             | ~91s | 843  |
+
+vitest 的价值不在速度，在于：不再全量 ts-node 编译、有 per-file 并行能力
+（当前被 architect harness 限制成串行）、以及标准的 reporter / watch / UI 生态。
+
+## 相关测试
+
+本轮没有新增 spec —— 换的是跑测试的机器，不是测试内容。
+等价性靠两条外部验证：
+
+| 验证                                             | 结果                      |
+| ------------------------------------------------ | ------------------------- |
+| tsc 产物 vs vite 产物逐模块 `Object.keys()` 比对 | 106/106 一致              |
+| `npm run build` 全量                             | 通过                      |
+| `npm test`（vitest）                             | 75 files / 843 specs 全绿 |
+| `npm run test:jasmine`（保留路径）               | 843 specs 全绿            |

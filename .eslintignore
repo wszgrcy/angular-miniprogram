@@ -5,6 +5,8 @@ node_modules/
 test/test-project-host-hello-world-app-*
 test/hello-world-app
 jest.builder.config.ts
+vitest.config.mts
+astro-docs
 build-ng-package.ts
 schema-merge.ts
 test/util

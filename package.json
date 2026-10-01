@@ -4,8 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test:ci": "npm run build:library && npm run test:jasmine",
-    "test": "npm run test:jasmine",
+    "test:ci": "npm run build:library && npm run test:vitest -- src/builder/library/library.spec.ts && npm run test:vitest",
+    "test": "vitest run",
+    "test:vitest": "vitest run",
+    "test:watch": "vitest",
     "test:wechat": "node ./script/wechat-karma.cjs --project ./test/hello-world-app --dist ./test/hello-world-app/dist/karma/app",
     "test:jasmine": "tsc -p ./script/tsconfig.startup-jasmine.json && node ./script/startup-jasmine.js",
     "prebuild": "rimraf ./dist",
@@ -13,8 +15,9 @@
     "build:schema": "tsx ./script/build-cli-schema.ts",
     "copy:assets": "cpx \"./src/builder/**/*.json\" ./dist/builder && cpx \"./src/builder/**/*.d.ts\" ./dist/builder && cpx \"./src/builder/**/*.js\" ./dist/builder && cpx ./readme.md ./dist",
     "build:library": "tsx ./script/ensure-sync.ts && tsx ./script/build-ng-package.ts",
-    "build:builder": "tsc -p ./tsconfig.builder.json",
-    "build:karma": "tsc -p ./src/builder/karma/client/tsconfig.json && tsc -p ./src/builder/karma/plugin/tsconfig.json",
+    "build:builder": "npm run typecheck:builder && tsx ./script/vite-build.ts",
+    "typecheck:builder": "tsc -p ./tsconfig.builder.json --noEmit",
+    "build:karma": "tsc -p ./src/builder/karma/client/tsconfig.json --emitDeclarationOnly && tsc -p ./src/builder/karma/plugin/tsconfig.json --emitDeclarationOnly",
     "prepare": "husky install",
     "lint": "eslint --max-warnings 0 \"./**/*.ts\"",
     "sync": "code-recycle ./script/package-sync.ts --cwd ./src/library",
@@ -75,6 +78,7 @@
     "typedoc": "^0.28.20",
     "typescript": "6.0.3",
     "vite": "^8.3.0",
+    "vitest": "^5.0.3",
     "weapp.socket.io": "^3.0.0"
   },
   "dependencies": {
