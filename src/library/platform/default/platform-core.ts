@@ -209,17 +209,50 @@ export class MiniProgramCoreFactory {
    *
    * @param component 页面组件
    * @param startPage 真正创建组件的方式
+   * @param pageOptions
+   *   - `useComponent`：用 `Component()` 而不是 `Page()` 注册
+   *   - `pageHook`：`useComponent` 时页面钩子的落点
    */
   protected createPageBootstrap = (
     component: Type<unknown>,
     startPage: (
       instance: MiniProgramComponentInstance,
     ) => ComponentRef<unknown>,
-    pageOptions?: { useComponent: boolean },
+    pageOptions?: {
+      useComponent?: boolean;
+      /**
+       * `useComponent` 时页面钩子落在哪里：
+       * - `methods`（默认，「组件即页面」）：`methods.onShow / onHide / onUnload`
+       * - `pageLifetimes`（普通组件挂在页面上，如自定义 tabBar）：
+       *   `pageLifetimes.show / hide` + `lifetimes.detached`
+       */
+      pageHook?: 'methods' | 'pageLifetimes';
+    },
   ) => {
     const _this = this;
     if (pageOptions?.useComponent) {
+      const pageHook = pageOptions.pageHook || 'methods';
       const options = this.getComponentOptions<true>(component) || {};
+      // 先拷一份再包：`...options` 是浅拷贝，直接写 config.lifetimes.created
+      // 会污染组件上静态的 mpComponentOptions，同一个组件启动两次就变成
+      // 包装套娃（oldCreated 是上一轮的 created，Angular 实例起两遍）。
+      const userLifetimes = { ...options.lifetimes };
+      const userPageLifetimes = { ...options.pageLifetimes };
+      let componentRef: ComponentRef<unknown>;
+      /**
+       * 包一层「先跑用户钩子，再做框架动作」，与 Page() 分支的顺序一致：
+       * 先 detach 会让用户钩子里改的状态丢掉一次更新。
+       */
+      const wrapPageHook = (
+        userHook: (() => unknown) | undefined,
+        action: (this: MiniProgramComponentInstance) => unknown,
+      ) =>
+        async function (this: MiniProgramComponentInstance): Promise<void> {
+          if (userHook) {
+            await userHook.bind(this)();
+          }
+          await action.bind(this)();
+        };
       const config: WechatMiniprogram.Component.Options<
         {},
         {},
@@ -235,53 +268,66 @@ export class MiniProgramCoreFactory {
           ...options.methods,
           ...this.listenerEvent(),
           ...this.wxsCallMethodEvent(),
-          onHide: async function (this: MiniProgramComponentInstance) {
-            if (options.methods?.onHide) {
-              await options.methods.onHide.bind(this)();
-            }
-            _this.pageStatus.detachView.bind(this)();
+        },
+        lifetimes: {
+          ...userLifetimes,
+          created: function (this: MiniProgramComponentInstance) {
+            const app = getApp<AppOptions>();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            this.__lifeTimePromiseObject = {} as any;
+            return (this.__lifeTimePromiseObject['created'] =
+              app.__ngStartPagePromise.then(() => {
+                componentRef = startPage(this);
+                if (userLifetimes.created) {
+                  userLifetimes.created.bind(this)();
+                }
+              }));
           },
-          onUnload: async function (this: MiniProgramComponentInstance) {
-            if (options.methods?.onUnload) {
-              await options.methods.onUnload.bind(this)();
-            }
-            _this.pageStatus.destroy.bind(this)();
-          },
-
-          onShow: async function (this: MiniProgramComponentInstance) {
-            if (options.methods?.onShow) {
-              await options.methods.onShow.bind(this)();
-            }
-            return _this.pageStatus.attachView.bind(this)();
+          attached: function (this: MiniProgramComponentInstance) {
+            return this.__lifeTimePromiseObject['created'].then(() => {
+              _this.linkNgComponentWithPage(this, componentRef);
+              if (userLifetimes.attached) {
+                userLifetimes.attached.bind(this)();
+              }
+            });
           },
         },
       };
-      config.lifetimes = config.lifetimes || {};
-      const oldCreated = config.lifetimes.created;
-      let componentRef: ComponentRef<unknown>;
-      config.lifetimes.created = function (this: MiniProgramComponentInstance) {
-        const app = getApp<AppOptions>();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        this.__lifeTimePromiseObject = {} as any;
-        return (this.__lifeTimePromiseObject['created'] =
-          app.__ngStartPagePromise.then(() => {
-            componentRef = startPage(this);
-            if (oldCreated) {
-              oldCreated.bind(this)();
-            }
-          }));
-      };
-      const oldAttached = config.lifetimes.attached;
-      config.lifetimes.attached = function (
-        this: MiniProgramComponentInstance,
-      ) {
-        return this.__lifeTimePromiseObject['created'].then(() => {
-          _this.linkNgComponentWithPage(this, componentRef);
-          if (oldAttached) {
-            oldAttached.bind(this)();
-          }
-        });
-      };
+      const methods = config.methods!;
+      const lifetimes = config.lifetimes!;
+      if (pageHook === 'pageLifetimes') {
+        // 普通组件挂在页面上（自定义 tabBar）：页面显隐走 pageLifetimes，
+        // 组件被拆掉就是这一页的 tabbar 销毁，没有 onUnload 可用。
+        lifetimes.detached = wrapPageHook(
+          userLifetimes.detached,
+          _this.pageStatus.destroy,
+        );
+        config.pageLifetimes = {
+          ...userPageLifetimes,
+          show: wrapPageHook(
+            userPageLifetimes.show,
+            _this.pageStatus.attachView,
+          ),
+          hide: wrapPageHook(
+            userPageLifetimes.hide,
+            _this.pageStatus.detachView,
+          ),
+        };
+      } else {
+        // 组件即页面：微信把页面钩子当普通方法调。
+        methods.onShow = wrapPageHook(
+          options.methods?.onShow,
+          _this.pageStatus.attachView,
+        );
+        methods.onHide = wrapPageHook(
+          options.methods?.onHide,
+          _this.pageStatus.detachView,
+        );
+        methods.onUnload = wrapPageHook(
+          options.methods?.onUnload,
+          _this.pageStatus.destroy,
+        );
+      }
       return Component(config);
     }
     const options = this.getPageOptions(component) || {};
@@ -436,84 +482,20 @@ export class MiniProgramCoreFactory {
    * **底部 tab 栏位置一片空白，且不报任何错**。
    *
    * 所以这里按「页面」模型自举：自己起一个 Angular 组件实例（带 `PAGE_TOKEN`、
-   * 自己的 lView 与页面 id），`attached` 时完成链接。
+   * 自己的 lView 与页面 id），`attached` 时完成链接 —— 和 `bootstrapPage`
+   * 走同一份 `createPageBootstrap`，只是页面钩子落在
+   * `pageLifetimes.show / hide` + `lifetimes.detached` 上：tabbar 是微信框架
+   * 挂在每个 tab 页上的普通组件，既没有 `Page()`，也就没有 `onLoad / onUnload`。
    *
    * 微信是「每个 tab 页各挂一个 tabbar 实例」，所以选中态必须放在 root
    * provider 里共享，否则切页后高亮不同步。
    */
   public bootstrapCustomTabbar = (component: Type<unknown>) => {
-    const _this = this;
-    const options = this.getComponentOptions(component) || {};
-    let componentRef: ComponentRef<unknown>;
-
-    const config: WechatMiniprogram.Component.Options<{}, {}, {}, []> = {
-      ...options,
-      data: { hasLoad: false },
-      options: { ...options?.options, multipleSlots: true },
-      methods: {
-        ...options.methods,
-        ...this.listenerEvent(),
-        ...this.wxsCallMethodEvent(),
-      },
-    };
-
-    const lifetimes = config.lifetimes || {};
-    const oldCreated = lifetimes.created;
-    const oldAttached = lifetimes.attached;
-    const oldDetached = lifetimes.detached;
-
-    config.lifetimes = {
-      ...lifetimes,
-      created: function (this: MiniProgramComponentInstance) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        this.__lifeTimePromiseObject = {} as any;
-        const app = getApp<AppOptions>();
-        this.__lifeTimePromiseObject['created'] = app.__ngStartPagePromise.then(
-          () => {
-            componentRef = app.__ngStartPage(component, this);
-            if (oldCreated) {
-              oldCreated.bind(this)();
-            }
-          },
-        );
-        return this.__lifeTimePromiseObject['created'];
-      },
-      attached: function (this: MiniProgramComponentInstance) {
-        return this.__lifeTimePromiseObject['created'].then(() => {
-          _this.linkNgComponentWithPage(this, componentRef);
-          if (oldAttached) {
-            oldAttached.bind(this)();
-          }
-        });
-      },
-      detached: function (this: MiniProgramComponentInstance) {
-        _this.pageStatus.destroy.bind(this)();
-        if (oldDetached) {
-          oldDetached.bind(this)();
-        }
-      },
-    };
-
-    const pageLifetimes = config.pageLifetimes || {};
-    const oldShow = pageLifetimes.show;
-    const oldHide = pageLifetimes.hide;
-    config.pageLifetimes = {
-      ...pageLifetimes,
-      show: function (this: MiniProgramComponentInstance) {
-        _this.pageStatus.attachView.bind(this)();
-        if (oldShow) {
-          oldShow.bind(this)();
-        }
-      },
-      hide: function (this: MiniProgramComponentInstance) {
-        _this.pageStatus.detachView.bind(this)();
-        if (oldHide) {
-          oldHide.bind(this)();
-        }
-      },
-    };
-
-    return Component(config);
+    return this.createPageBootstrap(
+      component,
+      (instance) => getApp<AppOptions>().__ngStartPage(component, instance),
+      { useComponent: true, pageHook: 'pageLifetimes' },
+    );
   };
 
   protected getPageOptions(component: Type<unknown> & MiniProgramPageOptions) {
