@@ -326,21 +326,15 @@ export class MiniProgramApplicationAnalysisService {
           const selector = createCssSelectorForTs(sourceFile);
           let importComponent: ts.Expression;
           if (maybeEntryPath.type === 'page') {
-            // `pageStartup(Module, Component)` 的组件在第二个参数，
-            // `bootstrapPage(Component)` 在第一个参数。
-            const legacyNode = selector.queryOne(
-              `CallExpression[expression=pageStartup]`,
-            ) as ts.CallExpression;
+            // 页面入口认 `bootstrapPage(Component)`，组件在第一个参数。
             const standaloneNode = selector.queryOne(
               `CallExpression[expression=bootstrapPage]`,
             ) as ts.CallExpression;
-            if (legacyNode) {
-              importComponent = legacyNode.arguments[1];
-            } else if (standaloneNode) {
+            if (standaloneNode) {
               importComponent = standaloneNode.arguments[0];
             } else {
               throw new Error(
-                `${maybeEntryPath.src} 找不到 pageStartup / bootstrapPage 调用`,
+                `${maybeEntryPath.src} 找不到 bootstrapPage 调用`,
               );
             }
           } else {

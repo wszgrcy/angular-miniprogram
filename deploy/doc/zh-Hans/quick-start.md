@@ -27,19 +27,19 @@ title: 快速启动
 ├── page1.component.scss
 ├── page1.component.ts
 ├── page1.entry.json
-├── page1.entry.ts
-└── page1.module.ts
+└── page1.entry.ts
 ```
 
 - 新建一个`page1.entry.ts`,输入如下
 
 ```ts
-import { pageStartup } from 'angular-miniprogram';
+import { bootstrapPage } from 'angular-miniprogram';
 import { Page1Component } from './page1.component';
-import { Page1Module } from './page1.module';
 
-pageStartup(Page1Module, Page1Component);
+bootstrapPage(Page1Component);
 ```
+
+> 页面组件用 `standalone: true`,不再需要 `page1.module.ts`
 
 ## 设置组件匹配
 

@@ -9,7 +9,6 @@ export {
   propertyChange,
   ComponentFinderService,
 } from 'angular-miniprogram/platform/wx';
-export const pageStartup = MiniProgramCore.pageStartup;
 export const bootstrapPage = MiniProgramCore.bootstrapPage;
 export const componentRegistry = MiniProgramCore.componentRegistry;
 export const bootstrapCustomTabbar = MiniProgramCore.bootstrapCustomTabbar;

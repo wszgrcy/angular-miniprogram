@@ -3,7 +3,6 @@ import type {
   ɵChangeDetectionScheduler as ChangeDetectionScheduler,
   ComponentRef,
   Injector,
-  NgModuleRef,
   Type,
   ViewRef,
 } from '@angular/core';
@@ -14,21 +13,7 @@ export interface AppOptions {
   __ngStartPage<C>(
     component: Type<C>,
     miniProgramComponentInstance: any,
-  ): {
-    componentRef: ComponentRef<C>;
-  };
-  /**
-   * @deprecated 仍用于 `pageStartup(module, component)` 的 NgModule 启动方式，
-   * 新代码请用 `bootstrapPage(StandaloneComponent)`。
-   */
-  __ngStartPageWithModule<M, C>(
-    module: Type<M>,
-    component: Type<C>,
-    miniProgramComponentInstance: any,
-  ): {
-    componentRef: ComponentRef<C>;
-    ngModuleRef: NgModuleRef<M>;
-  };
+  ): ComponentRef<C>;
   __ngStartPageResolve: Function;
   __ngStartPagePromise: Promise<void>;
 }

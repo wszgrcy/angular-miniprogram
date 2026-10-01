@@ -4,7 +4,6 @@ import {
   ɵChangeDetectionScheduler as ChangeDetectionScheduler,
   ChangeDetectorRef,
   ComponentRef,
-  NgModuleRef,
   ɵNotificationSource as NotificationSource,
   Type,
 } from '@angular/core';
@@ -180,8 +179,6 @@ export class MiniProgramCoreFactory {
   protected linkNgComponentWithPage(
     mpComponentInstance: MiniProgramComponentInstance,
     componentRef: ComponentRef<unknown>,
-    /** standalone 页面没有 NgModule */
-    ngModuleRef?: NgModuleRef<unknown>,
   ) {
     mpComponentInstance.__isLink = true;
     mpComponentInstance.__ngComponentHostView = componentRef.hostView;
@@ -201,7 +198,6 @@ export class MiniProgramCoreFactory {
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__lView = lView;
     mpComponentInstance.__ngDestroy = () => {
-      ngModuleRef?.destroy();
       componentRef.destroy();
       removePageLViewLink(id);
       cleanAll(lView);
@@ -212,14 +208,13 @@ export class MiniProgramCoreFactory {
    * 页面启动的公共实现。
    *
    * @param component 页面组件
-   * @param startPage 真正创建组件的方式（standalone / NgModule）
+   * @param startPage 真正创建组件的方式
    */
   protected createPageBootstrap = (
     component: Type<unknown>,
-    startPage: (instance: MiniProgramComponentInstance) => {
-      componentRef: ComponentRef<unknown>;
-      ngModuleRef?: NgModuleRef<unknown>;
-    },
+    startPage: (
+      instance: MiniProgramComponentInstance,
+    ) => ComponentRef<unknown>,
     pageOptions?: { useComponent: boolean },
   ) => {
     const _this = this;
@@ -263,17 +258,14 @@ export class MiniProgramCoreFactory {
       };
       config.lifetimes = config.lifetimes || {};
       const oldCreated = config.lifetimes.created;
-      let componentRef: ComponentRef<unknown>,
-        ngModuleRef: NgModuleRef<unknown> | undefined;
+      let componentRef: ComponentRef<unknown>;
       config.lifetimes.created = function (this: MiniProgramComponentInstance) {
         const app = getApp<AppOptions>();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.__lifeTimePromiseObject = {} as any;
         return (this.__lifeTimePromiseObject['created'] =
           app.__ngStartPagePromise.then(() => {
-            const result = startPage(this);
-            componentRef = result.componentRef;
-            ngModuleRef = result.ngModuleRef;
+            componentRef = startPage(this);
             if (oldCreated) {
               oldCreated.bind(this)();
             }
@@ -284,7 +276,7 @@ export class MiniProgramCoreFactory {
         this: MiniProgramComponentInstance,
       ) {
         return this.__lifeTimePromiseObject['created'].then(() => {
-          _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
+          _this.linkNgComponentWithPage(this, componentRef);
           if (oldAttached) {
             oldAttached.bind(this)();
           }
@@ -317,8 +309,8 @@ export class MiniProgramCoreFactory {
         this.__lifeTimePromiseObject = {} as any;
         return (this.__lifeTimePromiseObject['onLoad'] =
           app.__ngStartPagePromise.then(() => {
-            const { componentRef, ngModuleRef } = startPage(this);
-            _this.linkNgComponentWithPage(this, componentRef, ngModuleRef);
+            const componentRef = startPage(this);
+            _this.linkNgComponentWithPage(this, componentRef);
             if (options.onLoad) {
               return options.onLoad.bind(this)(query);
             }
@@ -360,27 +352,6 @@ export class MiniProgramCoreFactory {
     return this.createPageBootstrap(
       component,
       (instance) => getApp<AppOptions>().__ngStartPage(component, instance),
-      pageOptions,
-    );
-  };
-
-  /**
-   * @deprecated 请改用 `bootstrapPage(StandaloneComponent)`，
-   * 页面组件直接用 `standalone: true`，不再需要 NgModule。
-   */
-  public pageStartup = (
-    module: Type<unknown>,
-    component: Type<unknown>,
-    pageOptions?: { useComponent: boolean },
-  ) => {
-    return this.createPageBootstrap(
-      component,
-      (instance) =>
-        getApp<AppOptions>().__ngStartPageWithModule(
-          module,
-          component,
-          instance,
-        ),
       pageOptions,
     );
   };
@@ -499,7 +470,7 @@ export class MiniProgramCoreFactory {
         const app = getApp<AppOptions>();
         this.__lifeTimePromiseObject['created'] = app.__ngStartPagePromise.then(
           () => {
-            componentRef = app.__ngStartPage(component, this).componentRef;
+            componentRef = app.__ngStartPage(component, this);
             if (oldCreated) {
               oldCreated.bind(this)();
             }

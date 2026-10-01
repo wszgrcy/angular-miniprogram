@@ -27,19 +27,19 @@ title: Quick Start
 ├── page1.component.scss
 ├── page1.component.ts
 ├── page1.entry.json
-├── page1.entry.ts
-└── page1.module.ts
+└── page1.entry.ts
 ```
 
 - Create a `page1.entry.ts` file, add code as follow
 
 ```ts
-import { pageStartup } from 'angular-miniprogram';
+import { bootstrapPage } from 'angular-miniprogram';
 import { Page1Component } from './page1.component';
-import { Page1Module } from './page1.module';
 
-pageStartup(Page1Module, Page1Component);
+bootstrapPage(Page1Component);
 ```
+
+> The page component is `standalone: true`, no `page1.module.ts` is needed
 
 ## set Component pattern
 
