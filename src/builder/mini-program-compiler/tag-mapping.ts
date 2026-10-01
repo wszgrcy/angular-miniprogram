@@ -9,25 +9,123 @@
  * `element.ts` 与本模块必须走同一套规则，且有单测锁住。
  */
 
-/** 这些 HTML 标签在小程序里统一渲染成 `view` */
-const VIEW_TAGS = /^(div|p|h1|h2|h3|h4|h5|h6|span)$/;
+/**
+ * 在小程序里统一渲染成 `view` 的 HTML 标签。
+ *
+ * 小程序只有 `view / text / image / button / input …` 这几个内置组件，
+ * HTML 的语义标签直接写进 wxml 就是未知标签（不报错，但不渲染）。
+ * 对齐 uni-app 的 `HTML_TO_MINI_PROGRAM_TAGS`：凡是语义上只是个
+ * 「带样式的容器」的标签，一律落到 `view`。
+ *
+ * 不收录的：
+ *   - `input` / `textarea` / `button` / `form` / `video` … 小程序同名组件，原样透传；
+ *   - `a` / `select` / `option` 等：小程序对应物（`navigator` / `picker`）
+ *     连属性名都不一样，静默换标签只会把错误藏得更深。
+ */
+const VIEW_TAGS = new Set<string>([
+  // 块级 / 分区
+  'div',
+  'p',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'hgroup',
+  'header',
+  'footer',
+  'main',
+  'nav',
+  'section',
+  'article',
+  'aside',
+  'figure',
+  'figcaption',
+  'address',
+  'blockquote',
+  'details',
+  'summary',
+  'dialog',
+  'fieldset',
+  'legend',
+  'iframe',
+  'br',
+  'hr',
+  // 行内语义
+  'span',
+  'b',
+  'strong',
+  'i',
+  'em',
+  'u',
+  's',
+  'small',
+  'mark',
+  'code',
+  'pre',
+  'kbd',
+  'samp',
+  'var',
+  'sub',
+  'sup',
+  'cite',
+  'q',
+  'abbr',
+  'dfn',
+  'time',
+  'del',
+  'ins',
+  'bdi',
+  'bdo',
+  'ruby',
+  'rp',
+  'rt',
+  'wbr',
+  'output',
+  // 列表
+  'ul',
+  'ol',
+  'li',
+  'dl',
+  'dt',
+  'dd',
+  'menu',
+  // 表格
+  'table',
+  'caption',
+  'col',
+  'colgroup',
+  'thead',
+  'tbody',
+  'tfoot',
+  'tr',
+  'th',
+  'td',
+]);
+
+/** 一对一改名：HTML 标签在小程序里有个名字不同但语义相同的组件 */
+const TAG_RENAMES: Record<string, string> = {
+  img: 'image',
+};
 
 /**
  * 把 Angular 模板里的标签映射成 wxml 里应出现的标签。
  *
  * 与 `parse-node/element.ts` 的 `getTagName()` 语义一致：
- *   div / p / h1..h6 / span → view
+ *   VIEW_TAGS 里的标签      → view
+ *   TAG_RENAMES 里的标签     → 对应的小程序组件
  *   ng-container            → block
  *   其余（含自定义组件标签）  → 原样
  */
 export function mapAngularTagToWxml(tag: string): string {
-  if (VIEW_TAGS.test(tag)) {
+  if (VIEW_TAGS.has(tag)) {
     return 'view';
   }
   if (tag === 'ng-container') {
     return 'block';
   }
-  return tag;
+  return TAG_RENAMES[tag] ?? tag;
 }
 
 /**

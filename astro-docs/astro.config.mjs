@@ -34,6 +34,18 @@ export default defineConfig({
             nav('快速开始', 'Quick Start', '/getting-started/quick-start/'),
           ],
         },
+        {
+          label: '模板语法',
+          translations: { en: 'Template Syntax' },
+          items: [
+            nav('标签映射', 'Tag Mapping', '/template/tag-mapping/'),
+            nav(
+              '富文本 innerHTML',
+              'Rich Text innerHTML',
+              '/template/rich-text/',
+            ),
+          ],
+        },
       ],
     }),
   ],
