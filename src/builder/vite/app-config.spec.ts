@@ -80,7 +80,7 @@ describe('app-config: 校验', () => {
         pages: ['pages/index/index'],
         subpackages: [{ root: 'sub', pages: ['pages/index/index'] }],
       },
-      builtPages,
+      [...builtPages, 'sub/pages/index/index'],
     );
     expect(errors).toEqual([]);
   });
@@ -172,7 +172,7 @@ describe('app-config: 校验', () => {
           'sub/a/a': { packages: { sub: 'all' } },
         },
       },
-      builtPages,
+      [...builtPages, 'sub/a/a'],
     );
     expect(errors).toEqual([]);
   });
@@ -183,7 +183,73 @@ describe('app-config: 校验', () => {
       subPackages: [{ root: 'sub', pages: ['a/a'] }],
     };
     expect(getSubPackages(config).length).toBe(1);
-    expect(validateAppConfig(config, builtPages)).toEqual([]);
+    expect(validateAppConfig(config, [...builtPages, 'sub/a/a'])).toEqual([]);
+  });
+
+  it('声明了但本次构建未产出入口 → 逐条点名', () => {
+    const errors = validateAppConfig(
+      {
+        pages: ['pages/index/index', 'pages/typo/typo'],
+        subpackages: [{ root: 'sub', pages: ['a/a', 'ghost/g'] }],
+      },
+      ['pages/index/index', 'sub/a/a'],
+    );
+    expect(errors).toContain(
+      '页面 "pages/typo/typo" 声明了但本次构建没有产出入口（检查是否有对应的 *.entry.ts，以及它所在目录是否被 angular.json 的 pages pattern 覆盖）',
+    );
+    expect(
+      errors.some((e) =>
+        e.includes('页面 "sub/ghost/g" 声明了但本次构建没有产出入口'),
+      ),
+    ).toBeTrue();
+  });
+
+  it('builtPagePaths 为空时不做产出比对（避开「全部误报」）', () => {
+    const errors = validateAppConfig({ pages: ['pages/index/index'] }, []);
+    expect(errors).toEqual([]);
+  });
+});
+
+describe('app-config: 启动页 entryPagePath', () => {
+  const config: MpAppConfig = {
+    pages: ['pages/index/index', 'pages/about/about'],
+    subpackages: [{ root: 'sub', pages: ['a/a'] }],
+  };
+  const built = ['pages/index/index', 'pages/about/about', 'sub/a/a'];
+
+  it('不填时不报错（启动页退化为 pages[0]）', () => {
+    expect(validateAppConfig(config, built)).toEqual([]);
+  });
+
+  it('指向主包页 / 分包页均合法，且原样写进产物', () => {
+    expect(
+      validateAppConfig(
+        { ...config, entryPagePath: 'pages/about/about' },
+        built,
+      ),
+    ).toEqual([]);
+    expect(
+      validateAppConfig({ ...config, entryPagePath: 'sub/a/a' }, built),
+    ).toEqual([]);
+    const parsed = JSON.parse(
+      generateAppJson({ ...config, entryPagePath: 'pages/about/about' }),
+    ) as MpAppConfig;
+    expect(parsed.entryPagePath).toBe('pages/about/about');
+  });
+
+  it('指向未声明的页面报错', () => {
+    const errors = validateAppConfig(
+      { ...config, entryPagePath: 'pages/ghost/ghost' },
+      built,
+    );
+    expect(
+      errors.some((e) => e.includes('entryPagePath "pages/ghost/ghost"')),
+    ).toBeTrue();
+  });
+
+  it('空字符串报错', () => {
+    const errors = validateAppConfig({ ...config, entryPagePath: '' }, built);
+    expect(errors.some((e) => e.includes('entryPagePath 不能为空'))).toBeTrue();
   });
 });
 

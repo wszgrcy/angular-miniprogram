@@ -32,6 +32,7 @@ import {
   readAppConfig,
   subpackageChunkPlugin,
 } from './plugins/subpackage-chunk.plugin';
+import { wxsStripPlugin } from './plugins/wxs-strip.plugin';
 import { tsConfigPathsToAliases } from './tsconfig-paths';
 import {
   type SourceWatcher,
@@ -224,6 +225,13 @@ export async function createMiniProgramViteConfig(options: {
     ...entryPatterns.pageList,
     ...entryPatterns.componentList,
   ];
+  context.logger.info(
+    `[小程序构建] 平台 ${viteOptions.platform}，` +
+      `页面 ${entryPatterns.pageList.length} 个、` +
+      `组件 ${entryPatterns.componentList.length} 个，` +
+      `输出 ${viteOptions.outputPath}` +
+      `（${isProduction ? 'production' : 'development'}）`,
+  );
   const { absoluteProjectRoot, absoluteProjectSourceRoot } =
     await resolveProjectRoots({
       workspaceRoot: context.workspaceRoot,
@@ -264,11 +272,29 @@ export async function createMiniProgramViteConfig(options: {
       : (angularPluginModule as { default: unknown }).default
   ) as (opts: unknown) => import('vite').Plugin[];
 
+  /**
+   * 与 analog 共享的 fileReplacements 数组实例。
+   *
+   * analog 存的是引用（`options?.fileReplacements ?? []`）、读得晚
+   * （`initialize()` 时才转成 host 的 record），所以我们只要**持有自己
+   * 这个数组**，在 `enforce: 'pre'` 的 buildStart 里 push，analog 到点
+   * 自然看得到 —— 不用 patch 它一行代码。
+   */
+  /** 分析层结果共享引用：assets 插件填，wxs-strip 插件读 */
+  const wxsAnalysisRef: {
+    current: { wxsModules?: ReadonlyMap<string, unknown> } | null;
+  } = { current: null };
+  const sharedFileReplacements: Array<{ replace: string; with: string }> = [
+    ...(viteOptions.fileReplacements ?? []),
+  ];
+
   const config: InlineConfig = {
     root: options.root ?? context.workspaceRoot,
     configFile: false,
     mode: isProduction ? 'production' : 'development',
-    logLevel: 'warn',
+    // 'warn' 会把 vite 自己的「building / transformed / 产物清单」全吞掉，
+    // 用户只看到命令一闪而过，分不清是成功还是静默失败。
+    logLevel: 'info',
     define: {
       ...buildPlatformDefine(buildPlatform, isProduction),
       // 条件编译：__MP_WX__ 等布尔常量，死分支由 bundler DCE 移除
@@ -309,18 +335,11 @@ export async function createMiniProgramViteConfig(options: {
       // 文件级条件编译（foo.wx.ts 优先），必须 enforce: 'pre' 抢在
       // 其他 resolver 前，故放数组首位
       platformFileResolvePlugin({ platform: viteOptions.platform }),
-      ...angular({
-        tsconfig: viteOptions.tsConfig,
-        workspaceRoot: context.workspaceRoot,
-        fastCompile: false,
-        experimental: { useAngularCompilationAPI: true },
-        // fileReplacements 是 Angular 切环境的标准机制（environment.prod.ts），
-        // 不接的话「生产构建」会静默用着 dev 配置——这是会直接上线出事的坑。
-        // analog 插件本身支持 CLI 风格的 { replace, with }，透传即可。
-        fileReplacements: viteOptions.fileReplacements ?? [],
-      }),
-      libraryTemplatePlugin({ buildPlatform, templateScope }),
-      miniProgramComponentTransformPlugin(),
+      /**
+       * 必须排在 wxsStrip 之前：分析层产出的模板 AST 是剥离的唯一真相源，
+       * 剥离要在 analog 建 program 前就位，所以分析只能跟着往前挪。
+       * 它自己只读磁盘（自建 program + tsconfig），不依赖模块图，往前挪安全。
+       */
       miniProgramAssetsPlugin({
         tsConfig: viteOptions.tsConfig,
         workspaceRoot: context.workspaceRoot,
@@ -334,7 +353,28 @@ export async function createMiniProgramViteConfig(options: {
         styles: viteOptions.styles,
         absoluteProjectRoot,
         absoluteProjectSourceRoot,
+        analysisRef: wxsAnalysisRef,
       }),
+      // 必须排在 analog 之前：wxs 组件的替换项要在 Angular 建 program 前就位
+      wxsStripPlugin({
+        workspaceRoot: context.workspaceRoot,
+        cacheDir: path.resolve(context.workspaceRoot, '.ng-cache'),
+        fileReplacements: sharedFileReplacements,
+        analysisRef: wxsAnalysisRef,
+        watch: !!viteOptions.watch,
+      }),
+      ...angular({
+        tsconfig: viteOptions.tsConfig,
+        workspaceRoot: context.workspaceRoot,
+        fastCompile: false,
+        experimental: { useAngularCompilationAPI: true },
+        // fileReplacements 是 Angular 切环境的标准机制（environment.prod.ts），
+        // 不接的话「生产构建」会静默用着 dev 配置——这是会直接上线出事的坑。
+        // 传我们自己的数组实例，wxs 剥离的替换项由上面的插件就地 push。
+        fileReplacements: sharedFileReplacements,
+      }),
+      libraryTemplatePlugin({ buildPlatform, templateScope }),
+      miniProgramComponentTransformPlugin(),
       ...subpackagePlugin,
       ...(viteOptions.nativeComponentsDir
         ? [
@@ -402,6 +442,36 @@ export function getBuildPlatform(platform: PlatformType): BuildPlatform {
   return buildPlatform;
 }
 
+/**
+ * vite / rollup 的 PluginError 把插件名、出错文件、代码帧都挂在 error 对象上，
+ * `String(error.message)` 只剩第一行——恰好把定位需要的那几行丢了。
+ */
+function formatBuildError(error: unknown): string {
+  const e = error as {
+    message?: string;
+    plugin?: string;
+    id?: string;
+    loc?: { file?: string; line?: number; column?: number };
+    frame?: string;
+  };
+  const parts = [e?.message ?? String(error)];
+  if (e?.plugin) {
+    parts.push(`插件：${e.plugin}`);
+  }
+  const file = e?.loc?.file || e?.id;
+  if (file) {
+    const line = e?.loc?.line;
+    const column = e?.loc?.column;
+    parts.push(
+      `文件：${file}${line ? `:${line}${column ? `:${column}` : ''}` : ''}`,
+    );
+  }
+  if (e?.frame) {
+    parts.push(e.frame);
+  }
+  return parts.join('\n');
+}
+
 export function runViteBuilder(
   options: ViteMiniProgramBuildOptions,
   context: BuilderContext,
@@ -432,6 +502,9 @@ export function runViteBuilder(
         const runOnce = async () => {
           // 每轮开头清空上一轮的库元数据缺失记录，否则汇总会跨轮累加
           clearLibraryMetaMisses();
+          const startedAt = Date.now();
+          const elapsed = () =>
+            `${((Date.now() - startedAt) / 1000).toFixed(2)}s`;
           // 每轮重新生成 config，入口 glob 重新展开，
           // 这样 watch 期间新增的入口文件能被拉进来
           const config = await createMiniProgramViteConfig({
@@ -439,7 +512,9 @@ export function runViteBuilder(
             context,
             buildPlatform,
           });
+          context.logger.info('[小程序构建] vite build 开始…');
           await vite.build(config);
+          context.logger.info(`[小程序构建] 完成，耗时 ${elapsed()}`);
           // 把「哪些指令没拿到库元数据」显式报出来。
           // 旧行为是静默返回空 listeners，wxml 丢事件绑定且零报错。
           const metaSummary = formatLibraryMetaSummary();
@@ -492,7 +567,7 @@ export function runViteBuilder(
             await runOnce();
             emitSuccess();
           } catch (error) {
-            context.logger.error(String((error as Error)?.message ?? error));
+            context.logger.error(formatBuildError(error));
             if (!closed) {
               observer.next({ success: false } as BuilderOutput);
             }
@@ -523,7 +598,7 @@ export function runViteBuilder(
         // 那个改动会发生在 watcher 注册之前，直接丢掉。
         emitSuccess();
       } catch (error) {
-        context.logger.error(String((error as Error)?.message ?? error));
+        context.logger.error(formatBuildError(error));
         if (!closed) {
           observer.next({ success: false } as BuilderOutput);
           observer.complete();

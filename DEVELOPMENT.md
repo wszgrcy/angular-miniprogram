@@ -562,15 +562,15 @@ bootstrapPage(FooComponent); // 页面
 bootstrapPage(FooComponent, { useComponent: true }); // 以 Component 而非 Page 启动
 ```
 
-`pageStartup(module, component)` 标记 `@deprecated` 但保持可用，内部走
-`__ngStartPageWithModule`。
+`pageStartup(module, component)` 与 `AppOptions.__ngStartPageWithModule` 已删除，
+页面组件必须 `standalone: true`。
 
 ### 运行时改动
 
 - `AppOptions.__ngStartPage(component, instance)` 改为 standalone 语义，
-  内部 `createComponent` + `EnvironmentInjector`，不再产生 `NgModuleRef`。
+  内部 `createComponent` + `EnvironmentInjector`，直接返回 `ComponentRef`。
 - `PageService.createPageInjector()` 统一构造带 `PAGE_TOKEN` 的子注入器。
-- `linkNgComponentWithPage` 的 `ngModuleRef` 改为可选，destroy 时用可选链。
+- `linkNgComponentWithPage` 不再接收 `NgModuleRef`，destroy 时只销毁 `componentRef`。
 
 ### 编译器改动（standalone 引入 NgModule 的展开）
 
@@ -595,8 +595,7 @@ standalone 组件的 `imports` 允许直接写 NgModule。这时
 | `inputs: string[]`（绑定名） | `ClassPropertyMapping` | 取 `reverseMap` 的 key            |
 | `outputs: string[]`          | `ClassPropertyMapping` | 取 `reverseMap` 的 key            |
 
-`getComponentPagePattern()` 同时识别两种入口调用：`pageStartup` 取
-`arguments[1]`，`bootstrapPage` 取 `arguments[0]`。
+`getComponentPagePattern()` 只认 `bootstrapPage` 入口，组件取 `arguments[0]`。
 
 ## miniprogram-api-typings 3 → 4 → 5
 
@@ -660,7 +659,7 @@ Options<{}, {}, {}>            ->  Options<{}, {}, {}, []>
 | TS 6.0：根 tsconfig                  | 根 `tsconfig.json` 是 solution-style（只有 references），但 `code-recycle` 跑 sync 时 ts-node 会拿它直接用。空 `compilerOptions` 让 TS 6 用默认 `target=ES5` 并因缺 `rootDir` 报 TS5107 / TS5011，补上 `target` / `module` / `rootDir`                                                                                                                                                                                                                                                                                                                                                                         |
 | TS 6.0：@types 不再自动全量注入      | karma client 的 tsconfig 显式声明 `typeRoots` 与 `types`（`jasmine` 命名空间、`node` 的 `Console`）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `createNgModuleRef` 移除             | 改用 `createNgModule`（签名一致）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `ComponentFactoryResolver` 整体移除  | `NgModuleRef.componentFactoryResolver` 也没了。废弃的 `pageStartup(module, component)` 路径改为用模块 injector 当 `environmentInjector` 走 `createComponent`                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `ComponentFactoryResolver` 整体移除  | `NgModuleRef.componentFactoryResolver` 也没了。当时为废弃的 `pageStartup(module, component)` 路径改用模块 injector 当 `environmentInjector` 走 `createComponent`（该路径已随 `pageStartup` 一并删除）                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `@content` 新块                      | 内容查询块，依赖运行时 content query 观察投影内容并重渲染。小程序 slot / self 模板是静态的，对不上，按 `@defer` 先例显式抛错                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **ICU 消息**（`{x, plural/select}`） | 编译成 `ɵɵpipe` + `I18nSelect` 动态切换子模板。**实测该节点会真的出现在 `parseTemplate` 结果里**，而 `visitIcu` 曾是空实现 → 整段内容静默消失 + 后续节点槽位错位且不报错。现显式抛错。注：这**不是「做不到」**——本 fork 已有的 `__templateName`（`<template is="{{item.__templateName}}">`）恰好就是它需要的能力，只是未实现                                                                                                                                                                                                                                                                                   |
 | **`<ng-content>` fallback 内容**     | 实测空标签与纯空白会被 Angular 归一成 `children = []`，只有写了兜底才有子节点。小程序 `<slot>` 无 fallback 能力，对非空 children 显式抛错（已确认仓内无此用法，不打破现有代码）                                                                                                                                                                                                                                                                                                                                                                                                                                |

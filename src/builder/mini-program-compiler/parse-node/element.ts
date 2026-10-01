@@ -6,6 +6,7 @@ import {
   matchWxsHandler,
 } from '../../wxs/wxs-call';
 import type { DeclaredWxsModules } from '../../wxs/wxs-call';
+import { isWxsCarrier } from '../../wxs/wxs-expr';
 import type { WxsExprPlan } from '../../wxs/wxs-expr';
 import { getDeclaredWxs, getWxsPlan } from '../../wxs/wxs-rewrite';
 import { mapAngularTagToWxml } from '../tag-mapping';
@@ -26,6 +27,10 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   outputs: string[] = [];
   singleClosedTag = false;
   wxsProps: Record<string, WxsExprPlan> = {};
+  /** `[class]` 下推计划（已改挂到合成 property，所以不就在 wxsProps 里） */
+  wxsClass?: WxsExprPlan;
+  /** `[style]` 下推计划，同上 */
+  wxsStyle?: WxsExprPlan;
   wxsEvents: Record<string, WxsHandlerMeta> = {};
   constructor(
     private node: Element,
@@ -56,9 +61,14 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       });
 
     this.node.inputs.forEach((input) => {
-      if (input.type === 0) {
+      if (input.type !== 0) {
+        return;
+      }
+      this.collectWxsProp(input);
+      // 合成承载 property 只是枝叶数组的运输通道，不是业务属性，
+      // 落到 wxml 上只会多一条无用的 `__wxXXXX="{{...}}"`
+      if (!isWxsCarrier(input.name)) {
         this.inputs.push(input.name);
-        this.collectWxsProp(input);
       }
     });
     this.node.outputs.forEach((output) => {
@@ -88,9 +98,23 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
    */
   private collectWxsProp(input: Element['inputs'][number]): void {
     const plan = getWxsPlan((input as any).value);
-    if (plan) {
-      this.wxsProps[input.name] = plan;
+    if (!plan) {
+      return;
     }
+    // class / style 在改写层已被改名为合成 property，这里归位
+    if (plan.origin === 'class') {
+      this.wxsClass = plan;
+      return;
+    }
+    if (plan.origin === 'style') {
+      this.wxsStyle = plan;
+      return;
+    }
+    // 文本插值的枝叶挂在宿主元素上，归 bound-text 自己负贵，这里不重复登记
+    if (plan.origin === 'text') {
+      return;
+    }
+    this.wxsProps[input.name] = plan;
   }
 
   /**
@@ -142,6 +166,8 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       ...(Object.keys(this.wxsProps).length
         ? { wxsProps: this.wxsProps }
         : null),
+      ...(this.wxsClass ? { wxsClass: this.wxsClass } : null),
+      ...(this.wxsStyle ? { wxsStyle: this.wxsStyle } : null),
       ...(Object.keys(this.wxsEvents).length
         ? { wxsEvents: this.wxsEvents }
         : null),

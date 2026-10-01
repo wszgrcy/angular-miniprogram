@@ -108,19 +108,34 @@ describe('wxs 端到端产出: 脊柱运算下推（旧架构做不到）', () =
 });
 
 describe('wxs 端到端产出: 插值下推', () => {
+  /**
+   * 从产物里反解合成承载属性名。
+   *
+   * 文本节点带不了枝叶数组：`ɵɵtextInterpolate*` → `renderStringify` →
+   * `String(v)` 会把数组 join。所以改写层把它挂到宿主元素的合成普通
+   * property 上，wxml 按宿主下标取。key 是 plan 哈希，只能反解。
+   */
+  const carrierOf = (wxml: string) => /property\.(__wx\w+)/.exec(wxml)?.[1];
+
   it('纯 wxs 插值改写', async () => {
     const w = await compileHtml(`<div>{{ mod.fn(a) }}</div>`);
-    expect(w).toContain(`{{mod.fn(nodeList[1].value[0])}}`);
+    const c = carrierOf(w);
+    expect(c).toBeTruthy();
+    expect(w).toContain(`{{mod.fn(nodeList[0].property.${c}[0])}}`);
+    // 承载位只是运输通道，不该作为业务属性多输出一份
+    expect(w).not.toContain(`${c}="{{`);
   });
 
   it('前后缀字面文本保留', async () => {
     const w = await compileHtml(`<div>pre{{ mod.fn(a) }}post</div>`);
-    expect(w).toContain(`pre{{mod.fn(nodeList[1].value[0])}}post`);
+    const c = carrierOf(w);
+    expect(w).toContain(`pre{{mod.fn(nodeList[0].property.${c}[0])}}post`);
   });
 
   it('字符串拼接进插值也能下推', async () => {
     const w = await compileHtml(`<div>{{ 'x' + mod.fn(a) }}</div>`);
-    expect(w).toContain(`{{( 'x' + mod.fn(nodeList[1].value[0]) )}}`);
+    const c = carrierOf(w);
+    expect(w).toContain(`{{( 'x' + mod.fn(nodeList[0].property.${c}[0]) )}}`);
   });
 
   it('wxs 成员引用（常量）零物化', async () => {
@@ -140,22 +155,37 @@ describe('wxs 端到端产出: 插值下推', () => {
 });
 
 describe('wxs 端到端产出: class / style 整体下推', () => {
+  /**
+   * 从产物里反解合成承载属性名。
+   *
+   * `[class]` 走 `ɵɵclassMap` → addClass，不进 `setProperty`，枝叶数组到不了
+   * `property.class`，所以改写层会把它改挂到一个合成普通 property 上。
+   * key 是 plan 哈希，不固定，只能反解。
+   */
+  const carrierOf = (wxml: string) => /property\.(__wx\w+)/.exec(wxml)?.[1];
+  const carriersOf = (wxml: string) =>
+    [...wxml.matchAll(/property\.(__wx\w+)/g)].map((m) => m[1]);
+
   it('class 整体绑定走渲染层', async () => {
     const w = await compileHtml(`<div [class]="u.cls(a)"></div>`);
-    expect(w).toContain(`class="{{u.cls(nodeList[0].property.class[0])}}"`);
+    const c = carrierOf(w);
+    expect(c).toBeTruthy();
+    expect(w).toContain(`class="{{u.cls(nodeList[0].property.${c}[0])}}"`);
+    // 承载位只是运输通道，不该作为业务属性多输出一份
+    expect(w).not.toContain(`${c}="{{`);
   });
 
   it('class 字面量参数内联', async () => {
     const w = await compileHtml(`<div [class]="u.cls('a', b)"></div>`);
-    expect(w).toContain(
-      `class="{{u.cls('a', nodeList[0].property.class[0])}}"`,
-    );
+    const c = carrierOf(w);
+    expect(w).toContain(`class="{{u.cls('a', nodeList[0].property.${c}[0])}}"`);
   });
 
   it('静态 class 与下推 class 合并（不被抹掉）', async () => {
     const w = await compileHtml(`<div class="s1 s2" [class]="u.cls(a)"></div>`);
+    const c = carrierOf(w);
     expect(w).toContain(
-      `class="{{[u.cls(nodeList[0].property.class[0]), 's1 s2']}}"`,
+      `class="{{[u.cls(nodeList[0].property.${c}[0]), 's1 s2']}}"`,
     );
   });
 
@@ -168,8 +198,9 @@ describe('wxs 端到端产出: class / style 整体下推', () => {
     const w = await compileHtml(
       `<div style="color:green" [style]="u.fs(x)"></div>`,
     );
+    const c = carrierOf(w);
     expect(w).toContain(
-      `style="{{u.fs(nodeList[0].property.style[0]) + ';' + 'color:green'}}"`,
+      `style="{{u.fs(nodeList[0].property.${c}[0]) + ';' + 'color:green'}}"`,
     );
   });
 
@@ -177,8 +208,9 @@ describe('wxs 端到端产出: class / style 整体下推', () => {
     const w = await compileHtml(
       `<div [class]="u.cls(a)" [style]="u.fs(b)"></div>`,
     );
-    expect(w).toContain(`class="{{u.cls(nodeList[0].property.class[0])}}"`);
-    expect(w).toContain(`style="{{u.fs(nodeList[0].property.style[0])}}"`);
+    const [cls, sty] = carriersOf(w);
+    expect(w).toContain(`class="{{u.cls(nodeList[0].property.${cls}[0])}}"`);
+    expect(w).toContain(`style="{{u.fs(nodeList[0].property.${sty}[0])}}"`);
   });
 
   it('未下推时 class / style 仍走 AgentNode 聚合串', async () => {
@@ -189,16 +221,20 @@ describe('wxs 端到端产出: class / style 整体下推', () => {
 
   it('class 下推不影响其他属性走物化路径', async () => {
     const w = await compileHtml(`<div [class]="u.cls(a)" [foo]="b"></div>`);
-    expect(w).toContain(`class="{{u.cls(nodeList[0].property.class[0])}}"`);
+    const c = carrierOf(w);
+    expect(w).toContain(`class="{{u.cls(nodeList[0].property.${c}[0])}}"`);
     expect(w).toContain(`foo="{{nodeList[0].property.foo}}"`);
   });
 });
 
 describe('wxs 端到端产出: 对象语法 class / style（uni-app 主用形态）', () => {
+  const carrierOf = (wxml: string) => /property\.(__wx\w+)/.exec(wxml)?.[1];
+
   it('对象语法 class 下推', async () => {
     const w = await compileHtml(`<div [class]="{active: m.f(x)}"></div>`);
+    const c = carrierOf(w);
     expect(w).toContain(
-      `class="{{{'active': m.f(nodeList[0].property.class[0])}}}"`,
+      `class="{{{'active': m.f(nodeList[0].property.${c}[0])}}}"`,
     );
   });
 
@@ -206,16 +242,18 @@ describe('wxs 端到端产出: 对象语法 class / style（uni-app 主用形态
     const w = await compileHtml(
       `<div [class]="{active: m.f(x), big: 'large'}"></div>`,
     );
+    const c = carrierOf(w);
     expect(w).toContain(
-      `class="{{{'active': m.f(nodeList[0].property.class[0]), ` +
+      `class="{{{'active': m.f(nodeList[0].property.${c}[0]), ` +
         `'big': 'large'}}}"`,
     );
   });
 
   it('对象语法 style 下推', async () => {
     const w = await compileHtml(`<div [style]="{color: m.fs(x)}"></div>`);
+    const c = carrierOf(w);
     expect(w).toContain(
-      `style="{{{'color': m.fs(nodeList[0].property.style[0])}}}"`,
+      `style="{{{'color': m.fs(nodeList[0].property.${c}[0])}}}"`,
     );
   });
 
@@ -223,8 +261,9 @@ describe('wxs 端到端产出: 对象语法 class / style（uni-app 主用形态
     const w = await compileHtml(
       `<div class="base" [class]="{active: m.f(x)}"></div>`,
     );
+    const c = carrierOf(w);
     expect(w).toContain(
-      `class="{{[{'active': m.f(nodeList[0].property.class[0])}, 'base']}}"`,
+      `class="{{[{'active': m.f(nodeList[0].property.${c}[0])}, 'base']}}"`,
     );
   });
 

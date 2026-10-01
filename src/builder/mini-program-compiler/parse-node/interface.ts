@@ -47,6 +47,10 @@ export interface NgElementMeta extends NgNodeMeta {
    * `property.__w.<key>`。
    */
   wxsProps?: Record<string, WxsExprPlan>;
+  /** `[class]` 下推：枝叶挂在 `plan.carrier` 上，不是 `class` */
+  wxsClass?: WxsExprPlan;
+  /** `[style]` 下推，同上 */
+  wxsStyle?: WxsExprPlan;
   /**
    * 事件名 → 渲染层 handler。
    *
@@ -62,6 +66,13 @@ export interface NgBoundTextMeta extends NgNodeMeta {
    * （已含 `{{ }}` 块与前后缀字面文本），容器直接落盘。
    */
   wxsText?: WxsExprPlan;
+  /**
+   * 枝叶数组所在宿主元素的下标。
+   *
+   * 文本节点带不了数组（`renderStringify` 会把它 join），枝叶由改写层
+   * 挂到了宿主元素的合成 property 上，所以取值得用宿主下标。
+   */
+  wxsHost?: number;
 }
 export interface NgTextMeta extends NgNodeMeta {
   kind: NgNodeKind.Text;

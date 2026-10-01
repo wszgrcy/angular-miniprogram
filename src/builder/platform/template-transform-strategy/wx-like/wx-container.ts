@@ -105,7 +105,11 @@ export class WxContainer {
       useWxsPlanModules(plan, (m) => this.useWxsModule(m));
       // plan.wxml 已是完整 wxml 文本（含 {{}} 块与前后缀字面文本），
       // 只需把占位换成路径，不再走框架默认的 {{nodeList[i].value}}。
-      return wxsSubstitute(plan.wxml, `nodeList[${node.index}].value`);
+      // 枝叶挂在宿主元素的合成 property 上，不是本文本节点的 value。
+      return wxsSubstitute(
+        plan.wxml,
+        `nodeList[${node.wxsHost ?? node.index}].property.${plan.carrier ?? 'value'}`,
+      );
     }
     return this.interp(`nodeList[${node.index}].value`);
   }
@@ -227,12 +231,12 @@ export class WxContainer {
      *
      * 静态部分按 uni-app 的方式合并：class 进数组，style 用 `+ ';' +` 串。
      */
-    const classPlan = wxsProps['class'];
+    const classPlan = node.wxsClass ?? wxsProps['class'];
     if (classPlan) {
       useWxsPlanModules(classPlan, (m) => this.useWxsModule(m));
       const expr = wxsSubstitute(
         classPlan.wxml,
-        `nodeList[${index}].property.class`,
+        `nodeList[${index}].property.${classPlan.carrier ?? 'class'}`,
       );
       propertyMap.set(
         'class',
@@ -242,12 +246,12 @@ export class WxContainer {
       propertyMap.set('class', `nodeList[${index}].class`);
     }
 
-    const stylePlan = wxsProps['style'];
+    const stylePlan = node.wxsStyle ?? wxsProps['style'];
     if (stylePlan) {
       useWxsPlanModules(stylePlan, (m) => this.useWxsModule(m));
       const expr = wxsSubstitute(
         stylePlan.wxml,
-        `nodeList[${index}].property.style`,
+        `nodeList[${index}].property.${stylePlan.carrier ?? 'style'}`,
       );
       propertyMap.set(
         'style',

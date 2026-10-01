@@ -26,10 +26,59 @@ import { libraryTemplatePlugin } from '../../vite/plugins/library-template.plugi
 import { miniProgramAssetsPlugin } from '../../vite/plugins/mini-program-assets.plugin';
 import { platformFileResolvePlugin } from '../../vite/plugins/platform-file-resolve.plugin';
 import { requireContextShimPlugin } from '../../vite/plugins/require-context-shim.plugin';
+import { wxsStripPlugin } from '../../vite/plugins/wxs-strip.plugin';
 import { jasmineGlobalDefine, karmaClientDefine } from '../jasmine-define';
 import { writeDerivedTsConfig } from './derived-tsconfig';
 import { setViteKarmaFrameworkHooks } from './karma-framework';
 import { globSpecFiles } from './spec-discovery';
+
+/**
+ * 库兜底超时（毫秒）。
+ *
+ * **只在 karma.conf.js 没显式设这两项时生效。** 这俩是 karma 的原生配置，
+ * 有配置文件就以它为准，本库不抢、不往 angular.json 里镜像。
+ *
+ * - `captureTimeout`：`miniprogram` launcher 是占位实现，不会自己拉开发者
+ *   工具，「没人来连」时这就是干等上限。实测连上约 9.5s，取 3 倍余量。
+ * - `browserNoActivityTimeout`：连上之后要容得下轮询等页面实例、页面
+ *   冷启动、分包下载，karma 自带的 30s 太紧。
+ */
+const FALLBACK_CAPTURE_TIMEOUT = 30_000;
+const FALLBACK_NO_ACTIVITY_TIMEOUT = 180_000;
+
+/**
+ * 给**已解析**的 karma 配置补兜底超时，就地改。
+ *
+ * 只在 karma.conf.js 没设时生效 —— 这俩是 karma 的原生配置，有配置文件
+ * 就以它为准，本库不抢、不往 angular.json 里镜像。
+ *
+ * 判据就是直接比字段：跟一个没动过的 `Config` 比，一样就是没设。
+ *
+ * **必须在 `server.start()` 之前改**：launcher 的 captureTimeout 是在
+ * `_start` 走 DI 时快照的（`karma/lib/server.js`：`_start.$inject`
+ * 里带 `launcher`），而 injector 只是按引用持有 config，所以解析后、
+ * start 前改有效（karma 自己也在 `start()` 里改 `config.port`）。
+ *
+ * 已知边角：显式写成 karma 默认值（60000 / 30000）会被当成「没设」。
+ * 显式写默认值本身没有意义，接受这个取舍。
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function applyKarmaTimeoutFallbacks(karmaConfig: any): void {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { Config } = require('karma/lib/config');
+  // 没动过的对照实例，就是 karma 自带默认
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const defaults: any = new Config();
+
+  if (karmaConfig.captureTimeout === defaults.captureTimeout) {
+    karmaConfig.captureTimeout = FALLBACK_CAPTURE_TIMEOUT;
+  }
+  if (
+    karmaConfig.browserNoActivityTimeout === defaults.browserNoActivityTimeout
+  ) {
+    karmaConfig.browserNoActivityTimeout = FALLBACK_NO_ACTIVITY_TIMEOUT;
+  }
+}
 
 export interface KarmaViteBuilderOptions {
   karmaConfig: string;
@@ -160,6 +209,13 @@ export async function createKarmaViteConfig(options: {
       : (angularPluginModule as { default: unknown }).default
   ) as (opts: unknown) => import('vite').Plugin[];
 
+  /** 与 analog 共享的 fileReplacements 数组，wxs 剥离的替换项由插件就地 push */
+  /** 分析层结果共享引用：assets 插件填，wxs-strip 插件读 */
+  const wxsAnalysisRef: {
+    current: { wxsModules?: ReadonlyMap<string, unknown> } | null;
+  } = { current: null };
+  const sharedFileReplacements: Array<{ replace: string; with: string }> = [];
+
   const templateScope = new LibraryTemplateScopeService();
 
   // 把 typeRoots 钉到 workspace 的 node_modules/@types，
@@ -207,6 +263,35 @@ export async function createKarmaViteConfig(options: {
     },
     plugins: [
       platformFileResolvePlugin({ platform: karmaOptions.platform }),
+      // 小程序不是只有 JS：wxml / wxss / json / app.js / app.wxss 全部由
+      // 这个插件产出。之前 karma 链路没挂它，产出的测试工程只有 .js，
+      // 开发者工具打开后根本跑不起来（没页面、没 app.js）。
+      //
+      // 还必须排在 wxsStrip 之前：分析层产出的模板 AST 是剥离的唯一真相源。
+      miniProgramAssetsPlugin({
+        tsConfig: karmaOptions.tsConfig,
+        workspaceRoot: context.workspaceRoot,
+        buildPlatform,
+        entryPatterns: allEntries,
+        context,
+        watch: !!karmaOptions.watch,
+        templateScope,
+        assets: karmaOptions.assets,
+        styles: karmaOptions.styles,
+        absoluteProjectRoot,
+        absoluteProjectSourceRoot,
+        // 测试链路的 app 引导入口叫 test.js，不是 main.js
+        bootstrapChunk: 'test.js',
+        analysisRef: wxsAnalysisRef,
+      }),
+      // 必须排在 analog 之前：wxs 组件的替换项要在 Angular 建 program 前就位
+      wxsStripPlugin({
+        workspaceRoot: context.workspaceRoot,
+        cacheDir: path.resolve(context.workspaceRoot, '.ng-cache'),
+        fileReplacements: sharedFileReplacements,
+        analysisRef: wxsAnalysisRef,
+        watch: false,
+      }),
       // webpack 专有的 require.context 要换成同步 require 映射，否则
       // test.ts 顶层直接报 TypeError，startupTest() 永远轮不到执行。
       // 清单直接复用上面 globSpecFiles 的结果，与 entry 保持同一真相。
@@ -223,27 +308,10 @@ export async function createKarmaViteConfig(options: {
         workspaceRoot: context.workspaceRoot,
         fastCompile: false,
         experimental: { useAngularCompilationAPI: true },
+        fileReplacements: sharedFileReplacements,
       }),
       libraryTemplatePlugin({ buildPlatform, templateScope }),
       miniProgramComponentTransformPlugin(),
-      // 小程序不是只有 JS：wxml / wxss / json / app.js / app.wxss 全部由
-      // 这个插件产出。之前 karma 链路没挂它，产出的测试工程只有 .js，
-      // 开发者工具打开后根本跑不起来（没页面、没 app.js）。
-      miniProgramAssetsPlugin({
-        tsConfig: karmaOptions.tsConfig,
-        workspaceRoot: context.workspaceRoot,
-        buildPlatform,
-        entryPatterns: allEntries,
-        context,
-        watch: !!karmaOptions.watch,
-        templateScope,
-        assets: karmaOptions.assets,
-        styles: karmaOptions.styles,
-        absoluteProjectRoot,
-        absoluteProjectSourceRoot,
-        // 测试链路的 app 引导入口叫 test.js，不是 main.js
-        bootstrapChunk: 'test.js',
-      }),
     ],
     build: {
       outDir: resolveKarmaOutputPath(karmaOptions, context),
@@ -372,11 +440,22 @@ export function runKarmaViteBuilder(
             .filter(Boolean);
         }
 
+        const karmaConfigFile = require('path').resolve(
+          context.workspaceRoot,
+          options.karmaConfig,
+        );
+
         const karmaConfig = await karma.config.parseConfig(
-          require('path').resolve(context.workspaceRoot, options.karmaConfig),
+          karmaConfigFile,
           karmaOptions,
           { promiseConfig: true, throwErrors: true },
         );
+
+        /**
+         * 解析完再补兜底：karma.conf.js 设过就以它为准。
+         * 必须在 new Server / start 之前改，见函数注释。
+         */
+        applyKarmaTimeoutFallbacks(karmaConfig);
 
         const server = new karma.Server(
           karmaConfig as never,

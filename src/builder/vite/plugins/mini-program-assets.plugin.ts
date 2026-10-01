@@ -113,6 +113,16 @@ export interface MiniProgramAssetsPluginOptions {
   bootstrapChunk?: string;
   absoluteProjectRoot?: Path;
   absoluteProjectSourceRoot?: Path;
+  /**
+   * 分析结果共享引用。
+   *
+   * wxs-strip 插件靠它拿「哪些组件声明了 wxs」，不再自己扫全盘。本插件
+   * buildStart 里就填（不是 generateBundle）—— 两个插件的 buildStart 顺序
+   * 是先 assets 后 strip，strip 要在那之前拿到。
+   */
+  analysisRef?: {
+    current: { wxsModules?: ReadonlyMap<string, unknown> } | null;
+  };
 }
 
 /**
@@ -146,6 +156,10 @@ function createStyleProcessor(
 /**
  * 逐个编译样式源文件，返回 path -> css 文本。
  * 单个文件编译失败只记警告并落空串，不中断整轮构建。
+ *
+ * 结果从 `styleProcessor.styleMap` 取，**不能读 `bundleFile` 的返回值**：
+ * `CustomStyleSheetProcessor` 把真实 css 存进 styleMap，返回的 `contents`
+ * 被它故意置空（组件 JS 不内联样式）。读返回值会拿到空串。
  */
 async function compileStyleSources(
   options: MiniProgramAssetsPluginOptions,
@@ -155,8 +169,11 @@ async function compileStyleSources(
   const compiled = new Map<string, string>();
   for (const stylePath of styleSourcePaths) {
     try {
-      const result = await styleProcessor.bundleFile(stylePath);
-      compiled.set(path.normalize(stylePath), result.contents ?? '');
+      await styleProcessor.bundleFile(stylePath);
+      compiled.set(
+        path.normalize(stylePath),
+        styleProcessor.styleMap.get(stylePath) ?? '',
+      );
     } catch (error) {
       options.context.logger.warn(
         `样式编译失败 ${stylePath}: ${String(
@@ -248,14 +265,23 @@ export function miniProgramAssetsPlugin(
 
   return {
     name: 'mini-program:assets',
-    enforce: 'post',
-    buildStart() {
+    enforce: 'pre',
+    async buildStart() {
       // watch 模式下每轮 buildStart 都要作废上一轮的分析结果，
       // 否则改模板不会重新产出 wxml
       if (options.watch) {
         analysisPromise = null;
       }
       analysisPromise ??= runAnalysis();
+      /**
+       * 必须 await。不 await 的话这条 promise 在 buildStart 返回后没人接，
+       * 分析一失败就是 unhandled rejection，直接把 node 进程崩掉：
+       * 报错不走 vite 的插件错误通道，用户只看到一坨裸堆栈。
+       */
+      await analysisPromise;
+      if (options.analysisRef) {
+        options.analysisRef.current = await analysisPromise;
+      }
     },
     async generateBundle(_opts, bundle) {
       if (options.watch) {
@@ -563,7 +589,7 @@ export function miniProgramAssetsPlugin(
           new Set(globalStyleSources.map((s) => path.normalize(s))),
         );
         const globalCss = globalStyleSources
-          .map((s) => compiledStyles.get(path.normalize(s)) ?? '')
+          .map((s) => compiledGlobal.get(path.normalize(s)) ?? '')
           .join('\n');
         // 文件名跟着平台走：wx 是 app.wxss，bdzn 是 app.css，
         // zfb 是 app.acss……写死 wxss 会让其他平台拿不到全局样式。

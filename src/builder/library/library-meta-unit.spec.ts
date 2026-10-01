@@ -10,6 +10,13 @@ import * as os from 'os';
 import * as path from 'path';
 import { detectComponentNames } from '../component-template-inject/change-component';
 import {
+  clearLibraryMetaMisses,
+  formatLibraryMetaSummary,
+  getLibraryMetaMisses,
+  isAngularFrameworkSource,
+  recordLibraryMetaMiss,
+} from './library-meta-diagnostics';
+import {
   clearLibraryMetaReaderCache,
   findLibraryPackageRoot,
   isMpLibraryFile,
@@ -729,5 +736,75 @@ describe('mp-template（es-toolkit template + ${} 分隔符 + 白名单预检）
     expect(() =>
       renderLibraryTemplate(undefined as any, wxValues),
     ).toThrowError(TypeError);
+  });
+});
+
+describe('library-meta-diagnostics（缺失诊断）', () => {
+  beforeEach(() => clearLibraryMetaMisses());
+  afterEach(() => clearLibraryMetaMisses());
+
+  it('@angular/* 不登记，汇总为空', () => {
+    recordLibraryMetaMiss({
+      className: 'NgIf',
+      sourceFile: 'C:/w/node_modules/@angular/common/fesm2022/common.mjs',
+      reason: 'no-sidecar',
+    });
+    recordLibraryMetaMiss({
+      className: 'DatePipe',
+      sourceFile: 'C:/w/node_modules/@angular/common/fesm2022/common.mjs',
+      reason: 'sidecar-missing-class',
+    });
+    expect(getLibraryMetaMisses().length).toBe(0);
+    expect(formatLibraryMetaSummary()).toBe('');
+  });
+
+  it('第三方库缺失照常上报', () => {
+    recordLibraryMetaMiss({
+      className: 'ExtButton',
+      sourceFile: '/w/node_modules/other-lib/index.d.ts',
+      reason: 'no-sidecar',
+    });
+    const summary = formatLibraryMetaSummary();
+    expect(summary).toContain('ExtButton');
+    expect(summary).toContain('没有元数据文件的包');
+  });
+
+  it('sidecar-missing-class 排在 no-sidecar 前面', () => {
+    recordLibraryMetaMiss({
+      className: 'A',
+      sourceFile: '/w/node_modules/other-lib/a.d.ts',
+      reason: 'no-sidecar',
+    });
+    recordLibraryMetaMiss({
+      className: 'B',
+      sourceFile: '/w/node_modules/other-lib/b.d.ts',
+      reason: 'sidecar-missing-class',
+    });
+    const summary = formatLibraryMetaSummary();
+    expect(summary.indexOf('B')).toBeLessThan(summary.indexOf('A'));
+  });
+
+  it('按路径段判定，不被同名目录误判', () => {
+    expect(isAngularFrameworkSource('/a/my-angular-common/x.ts')).toBeFalse();
+    expect(isAngularFrameworkSource('/a/angular/x.ts')).toBeFalse();
+    expect(
+      isAngularFrameworkSource('C:\\w\\node_modules\\@angular\\core\\x.mjs'),
+    ).toBeTrue();
+    expect(
+      isAngularFrameworkSource(
+        '/w/node_modules/.pnpm/@angular+common@1.0.0/node_modules/@angular/common/y.mjs',
+      ),
+    ).toBeTrue();
+  });
+
+  it('去重：同一类重复登记只记一次', () => {
+    const miss = {
+      className: 'ExtButton',
+      sourceFile: '/w/node_modules/other-lib/index.d.ts',
+      reason: 'no-sidecar' as const,
+    };
+    recordLibraryMetaMiss(miss);
+    recordLibraryMetaMiss(miss);
+    expect(getLibraryMetaMisses().length).toBe(1);
   });
 });

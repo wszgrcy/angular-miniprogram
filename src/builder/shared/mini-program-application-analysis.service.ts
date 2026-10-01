@@ -235,6 +235,11 @@ export class MiniProgramApplicationAnalysisService {
       outputContent: contentMap,
       wxsSources,
       wxsSourceFiles,
+      /**
+       * `组件文件#类名` -> wxs 声明。带出来是给 wxs-strip 插件当组件清单用，
+       * 免得它自己扫全盘找哪个组件带了 wxs。
+       */
+      wxsModules: metaMap.wxsModules,
       config: config,
       otherMetaCollectionGroup: metaMap.otherMetaCollectionGroup,
       selfTemplate,
@@ -321,27 +326,32 @@ export class MiniProgramApplicationAnalysisService {
           const selector = createCssSelectorForTs(sourceFile);
           let importComponent: ts.Expression;
           if (maybeEntryPath.type === 'page') {
-            // `pageStartup(Module, Component)` 的组件在第二个参数，
-            // `bootstrapPage(Component)` 在第一个参数。
-            const legacyNode = selector.queryOne(
-              `CallExpression[expression=pageStartup]`,
-            ) as ts.CallExpression;
+            // 页面入口认 `bootstrapPage(Component)`，组件在第一个参数。
             const standaloneNode = selector.queryOne(
               `CallExpression[expression=bootstrapPage]`,
             ) as ts.CallExpression;
-            if (legacyNode) {
-              importComponent = legacyNode.arguments[1];
-            } else if (standaloneNode) {
+            if (standaloneNode) {
               importComponent = standaloneNode.arguments[0];
             } else {
               throw new Error(
-                `${maybeEntryPath.src} 找不到 pageStartup / bootstrapPage 调用`,
+                `${maybeEntryPath.src} 找不到 bootstrapPage 调用`,
               );
             }
           } else {
-            const node = selector.queryOne(
-              `CallExpression[expression=componentRegistry]`,
-            ) as ts.CallExpression;
+            // 组件入口认 `componentRegistry(X)`；自定义 tabBar 入口认
+            // `bootstrapCustomTabbar(X)`——两者参数位置相同。
+            const node =
+              (selector.queryOne(
+                `CallExpression[expression=componentRegistry]`,
+              ) as ts.CallExpression) ||
+              (selector.queryOne(
+                `CallExpression[expression=bootstrapCustomTabbar]`,
+              ) as ts.CallExpression);
+            if (!node) {
+              throw new Error(
+                `${maybeEntryPath.src} 找不到 componentRegistry / bootstrapCustomTabbar 调用`,
+              );
+            }
             importComponent = node.arguments[0];
           }
           const symbol = this.typeChecker.getSymbolAtLocation(importComponent);

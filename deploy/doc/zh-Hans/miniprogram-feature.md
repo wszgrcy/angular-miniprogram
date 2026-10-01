@@ -34,12 +34,14 @@ import {
 ```
 ## api
 
-- `pageStartup`函数作为 page 的启动入口
+- `bootstrapPage`函数作为 page 的启动入口
 
 ```ts
-import { pageStartup } from 'angular-miniprogram';
+import { bootstrapPage } from 'angular-miniprogram';
 //...
-pageStartup(Page1Module, Page1Component);
+bootstrapPage(Page1Component);
+// 以 Component 而非 Page 启动
+bootstrapPage(Page1Component, { useComponent: true });
 ```
 - `componentRegistry`组件注册
 
@@ -52,7 +54,7 @@ componentRegistry(Component1Component);
 ## 组件上静态属性
 
 - 在`Angular`@Component 组件中添加`static mpPageOptions`进行配置传参,与`Page({})`等同
-  > 当使用`pageStartup`函数时,使用此方法
+  > 当使用`bootstrapPage`函数时,使用此方法
 
 ```ts
 @Component({
@@ -78,7 +80,7 @@ export class LifeTimePage implements OnInit {
 }
 ```
 - 在`Angular`@Component 组件中添加`static mpComponentOptions`进行配置传参,与`Component({})`等同
-  > 当使用`componentRegistry`函数时或使用`pageStartup`函数,但是 options 为`{useComponent:true}`,使用此方法
+  > 当使用`componentRegistry`函数时或使用`bootstrapPage`函数,但是 options 为`{useComponent:true}`,使用此方法
 
 ```ts
 @Component({

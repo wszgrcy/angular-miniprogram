@@ -42,6 +42,72 @@ export interface WxsExprPlan {
   freeVars: unknown[];
   /** 表达式触及的 wxs 模块名 */
   modules: string[];
+  /**
+   * 枝叶数组落在哪个 property 上。
+   *
+   * 普通 property 就是它自己的名字；`[class]` / `[style]` / 文本插值
+   * 不能直接当载体（见 `wxsCarrierKey`），会被改写成合成名。
+   */
+  carrier?: string;
+  /** 原绑定位置，供 walk 阶段归位 */
+  origin?: 'class' | 'style' | 'text';
+}
+
+/**
+ * 合成承载属性名。
+ *
+ * 为什么需要它：Angular 只有 `ɵɵproperty` → `renderer.setProperty` 这一条
+ * 通道能原样递送数组。另外两条都不行：
+ *
+ *   - 文本插值：`ɵɵtextInterpolate*` → `interpolationV` → `renderStringify`
+ *     → `String(v)`，数组被 join（core 里没有能递原始值的文本指令）
+ *   - `[class]` / `[style]`：走 `ɵɵclassMap` / `ɵɵstyleMap` → addClass /
+ *     setStyle，压根不进 `setProperty`
+ *
+ * 所以这三处的枝叶数组都得挂到一个**普通 property** 上。
+ *
+ * key 从 `plan.wxml` 派生，不用源偏移：改写层（模板文本）和生成层
+ * （库内解析）对 `preserveWhitespaces` 取值不同，折叠空白会让偏移整体
+ * 错位；而 `plan.wxml` 由同一个切分器产出，两边必然一致。
+ * 同名只可能出现在同一元素内，而 plan 相同意味着枝叶数组也相同，不冲突。
+ */
+export function wxsCarrierKey(plan: WxsExprPlan): string {
+  /**
+   * 只取表达式部分，字面文本不参与。
+   *
+   * 两侧解析模板时 `preserveWhitespaces` 取值不同（改写层固定 true，生成层
+   * 跟组件默认），插值里的字面文本会被折叠掉前后空白。把 `{{ }}` 以外的
+   * 内容剔掉，两边就只剩完全一致的表达式串。
+   */
+  const blocks = [...plan.wxml.matchAll(/\{\{([\s\S]*?)\}\}/g)].map(
+    (m) => m[1],
+  );
+  const key = blocks.length ? blocks.join('|') : plan.wxml;
+  let h = 5381;
+  for (let i = 0; i < key.length; i++) {
+    h = ((h << 5) + h + key.charCodeAt(i)) | 0;
+  }
+  return `__wx${(h >>> 0).toString(36)}`;
+}
+
+/** 是否合成承载属性名 */
+export function isWxsCarrier(name: string): boolean {
+  return name.startsWith('__wx');
+}
+
+/**
+ * 取表达式的绝对起始偏移。
+ *
+ * Angular 22 里表达式节点带的是 `AbsoluteSourceSpan`（`start` 是数字），
+ * 而模板节点带的是 `ParseSourceSpan`（偏移在 `.start.offset`），两种都接。
+ */
+export function wxsAbsoluteOffset(node: any): number {
+  const span = node?.sourceSpan ?? node?.span;
+  if (span && typeof span.start === 'number') {
+    return span.start;
+  }
+  const off = span?.start?.offset;
+  return typeof off === 'number' ? off : 0;
 }
 
 /**
@@ -249,12 +315,7 @@ export function splitWxsExpression(
  * 所有表达式的枝叶按出现顺序摊平进同一个 `freeVars`，
  * 供替换成单个 LiteralArray（一次 bind 带一个数组）。
  */
-export interface WxsInterpolationPlan {
-  /** 完整 wxml 文本，如 `pre{{ util.add(nodeList[0].__w.value[0]) }}post` */
-  wxml: string;
-  freeVars: unknown[];
-  modules: string[];
-}
+export type WxsInterpolationPlan = WxsExprPlan;
 
 export function planWxsInterpolation(
   ast: AST,

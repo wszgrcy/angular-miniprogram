@@ -1,6 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import type { NodePath } from '../type/type';
 import { AgentNode } from './agent-node';
-import { getPageRefreshContext } from './component-template-hook.factory';
+import {
+  findCurrentElement,
+  getPageRefreshContext,
+} from './component-template-hook.factory';
 import { LVIEW } from './lview-layout';
 
 /**
@@ -216,5 +220,86 @@ describe('运行时容器 → nodeList：嵌入视图要从 CONTAINER_HEADER_OFF
     const ctx: any = getPageRefreshContext(wrap(c) as any);
     expect(ctx.nodeList[0].length).toBe(1);
     expect(ctx.nodeList[0][0].__templateName).toBe('tpl-ok');
+  });
+});
+
+/**
+ * 事件回解析：`data-node-path` 里的 `'directive'` 段。
+ *
+ * 上面那组保证「渲染时把嵌入视图铺进 nodeList」，这一组保证「点击时能沿
+ * 同一条路径走回来」——两者必须用同一个取视图的口径，否则就是：
+ * 界面看得到、点下去报错。
+ *
+ * 旧实现读 `LContainer[VIEW_REFS]`，而内建控制流不填它，微信实测：
+ *   TypeError: Cannot read properties of null (reading '0')
+ *       at findCurrentElement
+ *       at pre.<computed> [as bindEvent]
+ * 下标就是被点的子视图序号（0/1/2……）。凡 `@for` / `@if` 里的
+ * `(tap)` 全部失效，自定义 tabBar 的 tab 按钮就是这种。
+ */
+describe('事件路径回解析：directive 段要从 CONTAINER_HEADER_OFFSET 取视图', () => {
+  const TAGS = ['a', 'b', 'c'];
+
+  function makeChildView(tag: string) {
+    const child: any[] = [];
+    child[1] = { bindingStartIndex: LVIEW.HEADER_OFFSET + 1 };
+    const node = new AgentNode('element');
+    node.name = `btn-${tag}`;
+    node.property['tag'] = tag;
+    child[LVIEW.HEADER_OFFSET] = node;
+    child[LVIEW.CONTEXT] = { tag };
+    return { child, node };
+  }
+
+  /** 宿主 lView：槽 0 是一个容器，里面嵌了三个子视图 */
+  function makeHost() {
+    const container: any[] = [];
+    container[0] = new AgentNode('element');
+    container[1] = true;
+    container[2] = 0;
+    container[LVIEW.CONTAINER_VIEW_REFS] = null;
+    const kids = TAGS.map(makeChildView);
+    kids.forEach((k, i) => {
+      container[LVIEW.CONTAINER_HEADER_OFFSET + i] = k.child;
+    });
+
+    const lView: any[] = [];
+    lView[1] = { bindingStartIndex: LVIEW.HEADER_OFFSET + 1 };
+    lView[LVIEW.HEADER_OFFSET] = container;
+    return { lView, kids };
+  }
+
+  it('渲染给出的 nodePath，要能解析回同一个 AgentNode', () => {
+    const { lView, kids } = makeHost();
+    const ctx: any = getPageRefreshContext(lView as any);
+    const items = ctx.nodeList[0];
+    expect(items.length).toBe(TAGS.length);
+
+    kids.forEach((k, i) => {
+      // 真实事件上的完整路径 = 嵌入视图的 nodePath + 被点节点在子模板里的槽号
+      const nodePath = [...(items[i].nodePath as NodePath), 0];
+      expect(nodePath).toEqual(['directive', 0, i, 0]);
+      expect(findCurrentElement(lView as any, nodePath))
+        .withContext(
+          `nodePath ${JSON.stringify(nodePath)} 应解析到 btn-${TAGS[i]}`,
+        )
+        .toBe(k.node);
+    });
+  });
+
+  it('VIEW_REFS 为 null 时不得抛错（旧实现的崩点）', () => {
+    const { lView } = makeHost();
+    for (let i = 0; i < TAGS.length; i++) {
+      expect(() =>
+        findCurrentElement(lView as any, ['directive', 0, i, 0]),
+      ).not.toThrow();
+    }
+  });
+
+  it('越界下标返回 undefined，不抛 null 解引用', () => {
+    const { lView } = makeHost();
+    expect(
+      findCurrentElement(lView as any, ['directive', 0, 99]),
+    ).toBeUndefined();
   });
 });

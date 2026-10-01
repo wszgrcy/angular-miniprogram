@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  standalone: false,
+  standalone: true,
   selector: 'app-sub3',
   templateUrl: './sub3.component.html',
 })

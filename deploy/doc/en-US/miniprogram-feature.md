@@ -35,12 +35,14 @@ import {
 ```
 ## api
 
-- `pageStartup`: page entry
+- `bootstrapPage`: page entry
 
 ```ts
-import { pageStartup } from 'angular-miniprogram';
+import { bootstrapPage } from 'angular-miniprogram';
 //...
-pageStartup(Page1Module, Page1Component);
+bootstrapPage(Page1Component);
+// bootstrap as a Component instead of a Page
+bootstrapPage(Page1Component, { useComponent: true });
 ```
 - `componentRegistry`: component registry
 
@@ -80,7 +82,7 @@ export class LifeTimePage implements OnInit {
 ```
 
 - `static mpComponentOptions`: like `Component(mpComponentOptions)`
-  > use when Component as a Component or a Page but `pageStartup` with `{useComponent:true}`
+  > use when Component as a Component or a Page but `bootstrapPage` with `{useComponent:true}`
 
 ```ts
 @Component({
