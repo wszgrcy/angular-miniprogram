@@ -37,6 +37,14 @@ export interface NgElementMeta extends NgNodeMeta {
   inputs: string[];
   outputs: string[];
   singleClosedTag: boolean;
+  /**
+   * `[innerHTML]` 富文本承载。
+   *
+   * 小程序没有 innerHTML，等价物是 `<rich-text nodes>`，所以容器会把
+   * 子节点整段换成一个 `<rich-text nodes="{{...}}"/>`，取值仍走宿主
+   * 元素的 `property.innerHTML`（运行时 `setProperty` 天然写在那里）。
+   */
+  richText: boolean;
   componentMeta: MatchedComponent | undefined;
   directiveMeta: MatchedDirective | undefined;
   /**

@@ -126,6 +126,22 @@ export class LifeTimeComponent implements OnInit {
 }
 ```
 
+## 富文本
+
+- 小程序没有 `innerHTML`,等价物是 `<rich-text nodes>`。模板里照常写 `[innerHTML]`,构建时会自动换成富文本承载
+
+```html
+<div [innerHTML]="html"></div>
+```
+
+```html
+<!-- 产物 -->
+<view class="" style=""><rich-text nodes="{{nodeList[0].property.innerHTML}}"/></view>
+```
+
+- 元素上原有的子节点会被整段丢弃(与浏览器里 `innerHTML` 覆盖子节点的行为一致)
+- 绑定的值可以是 HTML 字符串,也可以是 `rich-text` 的 nodes 节点数组
+
 ## 全局变量
 
 - `miniProgramPlatform`为一个 string 类型的全局变量,指示当前小程序的运行平台(`wx`,`zfb`,`zj`,`bdzn`,`qq`,`dd`等)

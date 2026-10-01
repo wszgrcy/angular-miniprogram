@@ -26,6 +26,8 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   inputs: string[] = [];
   outputs: string[] = [];
   singleClosedTag = false;
+  /** `[innerHTML]` 命中：子节点交给 `<rich-text nodes>` 承载 */
+  richText = false;
   wxsProps: Record<string, WxsExprPlan> = {};
   /** `[class]` 下推计划（已改挂到合成 property，所以不就在 wxsProps 里） */
   wxsClass?: WxsExprPlan;
@@ -67,9 +69,16 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       this.collectWxsProp(input);
       // 合成承载 property 只是枝叶数组的运输通道，不是业务属性，
       // 落到 wxml 上只会多一条无用的 `__wxXXXX="{{...}}"`
-      if (!isWxsCarrier(input.name)) {
-        this.inputs.push(input.name);
+      if (isWxsCarrier(input.name)) {
+        return;
       }
+      // `innerHTML` 不落到宿主标签上：小程序没有这个属性，值由子级的
+      // `<rich-text nodes>` 消费。数据链路不变，仍走 property 通道。
+      if (this.isRichTextHost && input.name === 'innerHTML') {
+        this.richText = true;
+        return;
+      }
+      this.inputs.push(input.name);
     });
     this.node.outputs.forEach((output) => {
       this.outputs.push(output.name);
@@ -84,6 +93,15 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       this.singleClosedTag = true;
     }
   }
+  /**
+   * 只有普通元素才把 `[innerHTML]` 当富文本处理。
+   *
+   * 组件/指令自己声明的 `innerHTML` @Input 是业务属性，不该被劫持。
+   */
+  private get isRichTextHost() {
+    return !this.componentMeta && !this.directiveMeta;
+  }
+
   private getTagName() {
     // 映射规则抽到 tag-mapping.ts 作为唯一真相源，
     // 等价性测试要用同一套规则交叉校验两端标签。
@@ -153,13 +171,16 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     return {
       kind: NgNodeKind.Element,
       tagName: this.tagName,
-      children: this.children.map((child) => child.getNodeMeta()),
+      // 命中富文本时子节点整段丢弃：声明槽位已由 TemplateDefinition 计过，
+      // 这里只是不再为它们产出 wxml，后续节点的下标不受影响。
+      children: this.richText ? [] : this.children.map((c) => c.getNodeMeta()),
       inputs: this.inputs,
       outputs: this.outputs,
       attributes: this.attributeObject,
       staticClass: this.staticClass,
       staticStyle: this.staticStyle,
-      singleClosedTag: this.singleClosedTag,
+      singleClosedTag: this.richText ? false : this.singleClosedTag,
+      richText: this.richText,
       componentMeta: this.componentMeta,
       index: this.index,
       directiveMeta: this.directiveMeta,

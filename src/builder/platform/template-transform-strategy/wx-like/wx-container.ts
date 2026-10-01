@@ -87,7 +87,9 @@ export class WxContainer {
       }
     }
 
-    const children = node.children.map((child) => this._compileTemplate(child));
+    const children = node.richText
+      ? [this.richTextChild(node)]
+      : node.children.map((child) => this._compileTemplate(child));
     const commonTagProperty = `${this.setComponentIdentification(
       node.componentMeta?.isComponent,
       node.index,
@@ -99,6 +101,26 @@ export class WxContainer {
       node.tagName === 'block' ? '' : commonTagProperty
     }>${children.join('')}</${node.tagName}>`;
   }
+  /**
+   * `[innerHTML]` 的 wxml 承载体。
+   *
+   * 对齐 uni-app 的 `v-html`：原元素保留，子级整段换成
+   * `<rich-text nodes="{{...}}"/>`。取值仍走宿主元素的
+   * `property.innerHTML`（`renderer.setProperty` 天然写在那里），
+   * 所以运行时不需要任何特例。
+   */
+  private richTextChild(node: NgElementMeta): string {
+    const base = `nodeList[${node.index}].property.innerHTML`;
+    const plan = node.wxsProps?.['innerHTML'];
+    if (plan) {
+      useWxsPlanModules(plan, (m) => this.useWxsModule(m));
+      return `<rich-text nodes="${this.interp(
+        wxsSubstitute(plan.wxml, base),
+      )}"/>`;
+    }
+    return `<rich-text nodes="${this.interp(base)}"/>`;
+  }
+
   private ngBoundTextTransform(node: NgBoundTextMeta): string {
     const plan = node.wxsText;
     if (plan) {

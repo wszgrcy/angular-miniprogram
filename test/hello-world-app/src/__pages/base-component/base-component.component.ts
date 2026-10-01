@@ -12,6 +12,7 @@ import { Component, OnInit } from '@angular/core';
 })
 export class BaseComponentComponent implements OnInit {
   componentInput1 = '由父组件传入';
+  richHtml = '<b>富文本</b>';
   constructor() {}
 
   ngOnInit() {}
