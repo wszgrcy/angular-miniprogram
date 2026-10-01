@@ -68,6 +68,7 @@ describeBuilder(
       it('watch 下改模板能重新产出 wxml', async () => {
         await setup();
         const marker = 'VITE_WATCH_MARKER';
+        const htmlFile = 'src/pages/control-flow/control-flow.component.html';
 
         harness.useTarget('build', angularConfig as never);
         const results: Array<{
@@ -79,16 +80,17 @@ describeBuilder(
             concatMap((result, index) => {
               results.push(result as never);
               if (index === 0) {
-                const base = result.result!.baseOutputPath!;
-                const before = readOut(
-                  base,
-                  'pages/control-flow/control-flow-entry.wxml',
-                );
-                expect(before).not.toContain(marker);
-                void harness.writeFile(
-                  'src/pages/control-flow/control-flow.component.html',
-                  before + marker,
-                );
+                /**
+                 * 改的是**源模板**。
+                 *
+                 * 早先这里读的是产物 `control-flow-entry.wxml`、再把它写回
+                 * 源 `.html`。产物里带着改写后的 `[nodeList[1][index]]` 这类
+                 * 片段，当模板喂回去就是 `[...nodeList[1][index] ]` 展开语法，
+                 * 增量构建必然「Parser Error: Unexpected token ...」。
+                 */
+                const source = harness.readFile(htmlFile);
+                expect(source).not.toContain(marker);
+                void harness.writeFile(htmlFile, `${source}\n${marker}`);
               }
               return of(result);
             }),
@@ -97,9 +99,15 @@ describeBuilder(
           )
           .toPromise();
 
-        const base = results[results.length - 1].result!.baseOutputPath!;
+        const last = results[results.length - 1].result;
+        // 先确认构建成功：少了这一步，构建失败只会变成一个莫名其妙的
+        // path.join(undefined) TypeError
+        expect(last?.success).toBe(true);
         expect(
-          readOut(base, 'pages/control-flow/control-flow-entry.wxml'),
+          readOut(
+            last!.baseOutputPath!,
+            'pages/control-flow/control-flow-entry.wxml',
+          ),
         ).toContain(marker);
       }, 180000);
 

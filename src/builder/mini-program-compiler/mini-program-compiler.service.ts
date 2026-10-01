@@ -24,6 +24,10 @@ import { COMPONENT_META } from '../token/component.token';
 import { angularCompilerPromise } from '../util';
 import type { WxsDeclaration } from '../wxs/wxs-declare';
 import { getDeclaredWxs, rewriteWxsTemplates } from '../wxs/wxs-rewrite';
+import {
+  recordStrippedTemplate,
+  stripWxsFromAst,
+} from '../wxs/wxs-angular-strip';
 import { ComponentCompilerService } from './component-compiler.service';
 import { recordGeneratedWxml } from './manifest-registry';
 import { MetaCollection } from './meta-collection';
@@ -224,6 +228,25 @@ export class MiniProgramCompilerService {
         // 记下源文件：walk 阶段的事件下推要靠它反查声明集合
         componentSourceFile,
       );
+      /**
+       * 就地产出「给 Angular 编译的那份模板」。
+       *
+       * 必须紧跟在改写后面：此时 AST 已带枝叶数组，一次走树同时喂给 wxml 和
+       * Angular 两侧，不存在第二个真相源。只按内容登记（`file.fileName` 为 null）。
+       */
+      if (declarations.length) {
+        const tpl: any = (meta as any)?.template ?? {};
+        if (typeof tpl.content === 'string') {
+          recordStrippedTemplate(
+            tpl.content,
+            stripWxsFromAst(
+              (tpl.nodes as any[]) ?? [],
+              tpl.content,
+              componentSourceFile,
+            ),
+          );
+        }
+      }
       if (declarations.length) {
         wxsModules.set(
           makeComponentKey(

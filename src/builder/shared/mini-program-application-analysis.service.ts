@@ -235,6 +235,11 @@ export class MiniProgramApplicationAnalysisService {
       outputContent: contentMap,
       wxsSources,
       wxsSourceFiles,
+      /**
+       * `组件文件#类名` -> wxs 声明。带出来是给 wxs-strip 插件当组件清单用，
+       * 免得它自己扫全盘找哪个组件带了 wxs。
+       */
+      wxsModules: metaMap.wxsModules,
       config: config,
       otherMetaCollectionGroup: metaMap.otherMetaCollectionGroup,
       selfTemplate,

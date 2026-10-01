@@ -25,6 +25,7 @@ import { miniProgramComponentTransformPlugin } from '../../vite/plugins/componen
 import { libraryTemplatePlugin } from '../../vite/plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from '../../vite/plugins/mini-program-assets.plugin';
 import { platformFileResolvePlugin } from '../../vite/plugins/platform-file-resolve.plugin';
+import { wxsStripPlugin } from '../../vite/plugins/wxs-strip.plugin';
 import { requireContextShimPlugin } from '../../vite/plugins/require-context-shim.plugin';
 import { jasmineGlobalDefine, karmaClientDefine } from '../jasmine-define';
 import { writeDerivedTsConfig } from './derived-tsconfig';
@@ -208,6 +209,13 @@ export async function createKarmaViteConfig(options: {
       : (angularPluginModule as { default: unknown }).default
   ) as (opts: unknown) => import('vite').Plugin[];
 
+  /** 与 analog 共享的 fileReplacements 数组，wxs 剥离的替换项由插件就地 push */
+  /** 分析层结果共享引用：assets 插件填，wxs-strip 插件读 */
+  const wxsAnalysisRef: {
+    current: { wxsModules?: ReadonlyMap<string, unknown> } | null;
+  } = { current: null };
+  const sharedFileReplacements: Array<{ replace: string; with: string }> = [];
+
   const templateScope = new LibraryTemplateScopeService();
 
   // 把 typeRoots 钉到 workspace 的 node_modules/@types，
@@ -255,6 +263,35 @@ export async function createKarmaViteConfig(options: {
     },
     plugins: [
       platformFileResolvePlugin({ platform: karmaOptions.platform }),
+      // 小程序不是只有 JS：wxml / wxss / json / app.js / app.wxss 全部由
+      // 这个插件产出。之前 karma 链路没挂它，产出的测试工程只有 .js，
+      // 开发者工具打开后根本跑不起来（没页面、没 app.js）。
+      //
+      // 还必须排在 wxsStrip 之前：分析层产出的模板 AST 是剥离的唯一真相源。
+      miniProgramAssetsPlugin({
+        tsConfig: karmaOptions.tsConfig,
+        workspaceRoot: context.workspaceRoot,
+        buildPlatform,
+        entryPatterns: allEntries,
+        context,
+        watch: !!karmaOptions.watch,
+        templateScope,
+        assets: karmaOptions.assets,
+        styles: karmaOptions.styles,
+        absoluteProjectRoot,
+        absoluteProjectSourceRoot,
+        // 测试链路的 app 引导入口叫 test.js，不是 main.js
+        bootstrapChunk: 'test.js',
+        analysisRef: wxsAnalysisRef,
+      }),
+      // 必须排在 analog 之前：wxs 组件的替换项要在 Angular 建 program 前就位
+      wxsStripPlugin({
+        workspaceRoot: context.workspaceRoot,
+        cacheDir: path.resolve(context.workspaceRoot, '.ng-cache'),
+        fileReplacements: sharedFileReplacements,
+        analysisRef: wxsAnalysisRef,
+        watch: false,
+      }),
       // webpack 专有的 require.context 要换成同步 require 映射，否则
       // test.ts 顶层直接报 TypeError，startupTest() 永远轮不到执行。
       // 清单直接复用上面 globSpecFiles 的结果，与 entry 保持同一真相。
@@ -271,27 +308,10 @@ export async function createKarmaViteConfig(options: {
         workspaceRoot: context.workspaceRoot,
         fastCompile: false,
         experimental: { useAngularCompilationAPI: true },
+        fileReplacements: sharedFileReplacements,
       }),
       libraryTemplatePlugin({ buildPlatform, templateScope }),
       miniProgramComponentTransformPlugin(),
-      // 小程序不是只有 JS：wxml / wxss / json / app.js / app.wxss 全部由
-      // 这个插件产出。之前 karma 链路没挂它，产出的测试工程只有 .js，
-      // 开发者工具打开后根本跑不起来（没页面、没 app.js）。
-      miniProgramAssetsPlugin({
-        tsConfig: karmaOptions.tsConfig,
-        workspaceRoot: context.workspaceRoot,
-        buildPlatform,
-        entryPatterns: allEntries,
-        context,
-        watch: !!karmaOptions.watch,
-        templateScope,
-        assets: karmaOptions.assets,
-        styles: karmaOptions.styles,
-        absoluteProjectRoot,
-        absoluteProjectSourceRoot,
-        // 测试链路的 app 引导入口叫 test.js，不是 main.js
-        bootstrapChunk: 'test.js',
-      }),
     ],
     build: {
       outDir: resolveKarmaOutputPath(karmaOptions, context),

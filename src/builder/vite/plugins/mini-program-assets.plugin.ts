@@ -113,6 +113,16 @@ export interface MiniProgramAssetsPluginOptions {
   bootstrapChunk?: string;
   absoluteProjectRoot?: Path;
   absoluteProjectSourceRoot?: Path;
+  /**
+   * 分析结果共享引用。
+   *
+   * wxs-strip 插件靠它拿「哪些组件声明了 wxs」，不再自己扫全盘。本插件
+   * buildStart 里就填（不是 generateBundle）—— 两个插件的 buildStart 顺序
+   * 是先 assets 后 strip，strip 要在那之前拿到。
+   */
+  analysisRef?: {
+    current: { wxsModules?: ReadonlyMap<string, unknown> } | null;
+  };
 }
 
 /**
@@ -255,7 +265,7 @@ export function miniProgramAssetsPlugin(
 
   return {
     name: 'mini-program:assets',
-    enforce: 'post',
+    enforce: 'pre',
     async buildStart() {
       // watch 模式下每轮 buildStart 都要作废上一轮的分析结果，
       // 否则改模板不会重新产出 wxml
@@ -269,6 +279,9 @@ export function miniProgramAssetsPlugin(
        * 报错不走 vite 的插件错误通道，用户只看到一坨裸堆栈。
        */
       await analysisPromise;
+      if (options.analysisRef) {
+        options.analysisRef.current = await analysisPromise;
+      }
     },
     async generateBundle(_opts, bundle) {
       if (options.watch) {

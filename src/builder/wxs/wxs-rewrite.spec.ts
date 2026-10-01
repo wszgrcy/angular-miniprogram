@@ -2,6 +2,7 @@
 import { parseTemplate } from '@angular/compiler';
 import { withDeclarations } from './test-declare-util';
 import { getWxsPlan, rewriteWxsTemplates } from './wxs-rewrite';
+import { isWxsCarrier } from './wxs-expr';
 
 /** 自动补 `<wxs module src>` 声明，断言集中在改写本身；声明机制见 wxs-declare.spec.ts */
 
@@ -19,6 +20,21 @@ function findInput(nodes: any, name: string): any {
     (ns || []).forEach((n: any) => {
       (n.inputs || []).forEach((i: any) => {
         if (i.name === name && !found) {
+          found = i;
+        }
+      });
+      walk(n.children || []);
+    });
+  walk(nodes);
+  return found;
+}
+
+function findCarrierInput(nodes: any): any {
+  let found: any;
+  const walk = (ns: any[]) =>
+    (ns || []).forEach((n: any) => {
+      (n.inputs || []).forEach((i: any) => {
+        if (!found && isWxsCarrier(i.name)) {
           found = i;
         }
       });
@@ -175,18 +191,24 @@ describe('wxs-rewrite: 模块收集', () => {
 });
 
 describe('wxs-rewrite: class / style', () => {
-  it('整体 [class] 就是 type=0，和普通属性同路改写', async () => {
+  it('整体 [class] 改写成承载属性（不走 setProperty，原名留不住）', async () => {
     const nodes = parse(`<div [class]="u.cls('a', b)"></div>`);
     await rewriteWxsTemplates(nodes);
-    const input = findInput(nodes, 'class');
+    // [class] 走 ɵɵclassMap、不经 setProperty，带不动数组，所以整条改名成
+    // 合成普通属性；原名在 AST 里已经不存在
+    expect(findInput(nodes, 'class')).toBeUndefined();
+    const input = findCarrierInput(nodes);
+    expect(isWxsCarrier(input.name)).toBe(true);
     expect(input.value.ast.constructor.name).toBe('LiteralArray');
     expect(getWxsPlan(input.value)?.wxml).toBe("u.cls('a', @@0@@)");
   });
 
-  it('整体 [style] 同样改写', async () => {
+  it('整体 [style] 同样改写成承载属性', async () => {
     const nodes = parse(`<div [style]="u.fs(x)"></div>`);
     await rewriteWxsTemplates(nodes);
-    const input = findInput(nodes, 'style');
+    expect(findInput(nodes, 'style')).toBeUndefined();
+    const input = findCarrierInput(nodes);
+    expect(isWxsCarrier(input.name)).toBe(true);
     expect(input.value.ast.constructor.name).toBe('LiteralArray');
     expect(getWxsPlan(input.value)?.wxml).toBe('u.fs(@@0@@)');
   });

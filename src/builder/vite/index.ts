@@ -28,6 +28,7 @@ import { libraryTemplatePlugin } from './plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from './plugins/mini-program-assets.plugin';
 import { nativeComponentsPlugin } from './plugins/native-components.plugin';
 import { platformFileResolvePlugin } from './plugins/platform-file-resolve.plugin';
+import { wxsStripPlugin } from './plugins/wxs-strip.plugin';
 import {
   readAppConfig,
   subpackageChunkPlugin,
@@ -271,6 +272,22 @@ export async function createMiniProgramViteConfig(options: {
       : (angularPluginModule as { default: unknown }).default
   ) as (opts: unknown) => import('vite').Plugin[];
 
+  /**
+   * 与 analog 共享的 fileReplacements 数组实例。
+   *
+   * analog 存的是引用（`options?.fileReplacements ?? []`）、读得晚
+   * （`initialize()` 时才转成 host 的 record），所以我们只要**持有自己
+   * 这个数组**，在 `enforce: 'pre'` 的 buildStart 里 push，analog 到点
+   * 自然看得到 —— 不用 patch 它一行代码。
+   */
+  /** 分析层结果共享引用：assets 插件填，wxs-strip 插件读 */
+  const wxsAnalysisRef: {
+    current: { wxsModules?: ReadonlyMap<string, unknown> } | null;
+  } = { current: null };
+  const sharedFileReplacements: Array<{ replace: string; with: string }> = [
+    ...(viteOptions.fileReplacements ?? []),
+  ];
+
   const config: InlineConfig = {
     root: options.root ?? context.workspaceRoot,
     configFile: false,
@@ -318,18 +335,11 @@ export async function createMiniProgramViteConfig(options: {
       // 文件级条件编译（foo.wx.ts 优先），必须 enforce: 'pre' 抢在
       // 其他 resolver 前，故放数组首位
       platformFileResolvePlugin({ platform: viteOptions.platform }),
-      ...angular({
-        tsconfig: viteOptions.tsConfig,
-        workspaceRoot: context.workspaceRoot,
-        fastCompile: false,
-        experimental: { useAngularCompilationAPI: true },
-        // fileReplacements 是 Angular 切环境的标准机制（environment.prod.ts），
-        // 不接的话「生产构建」会静默用着 dev 配置——这是会直接上线出事的坑。
-        // analog 插件本身支持 CLI 风格的 { replace, with }，透传即可。
-        fileReplacements: viteOptions.fileReplacements ?? [],
-      }),
-      libraryTemplatePlugin({ buildPlatform, templateScope }),
-      miniProgramComponentTransformPlugin(),
+      /**
+       * 必须排在 wxsStrip 之前：分析层产出的模板 AST 是剥离的唯一真相源，
+       * 剥离要在 analog 建 program 前就位，所以分析只能跟着往前挪。
+       * 它自己只读磁盘（自建 program + tsconfig），不依赖模块图，往前挪安全。
+       */
       miniProgramAssetsPlugin({
         tsConfig: viteOptions.tsConfig,
         workspaceRoot: context.workspaceRoot,
@@ -343,7 +353,28 @@ export async function createMiniProgramViteConfig(options: {
         styles: viteOptions.styles,
         absoluteProjectRoot,
         absoluteProjectSourceRoot,
+        analysisRef: wxsAnalysisRef,
       }),
+      // 必须排在 analog 之前：wxs 组件的替换项要在 Angular 建 program 前就位
+      wxsStripPlugin({
+        workspaceRoot: context.workspaceRoot,
+        cacheDir: path.resolve(context.workspaceRoot, '.ng-cache'),
+        fileReplacements: sharedFileReplacements,
+        analysisRef: wxsAnalysisRef,
+        watch: !!viteOptions.watch,
+      }),
+      ...angular({
+        tsconfig: viteOptions.tsConfig,
+        workspaceRoot: context.workspaceRoot,
+        fastCompile: false,
+        experimental: { useAngularCompilationAPI: true },
+        // fileReplacements 是 Angular 切环境的标准机制（environment.prod.ts），
+        // 不接的话「生产构建」会静默用着 dev 配置——这是会直接上线出事的坑。
+        // 传我们自己的数组实例，wxs 剥离的替换项由上面的插件就地 push。
+        fileReplacements: sharedFileReplacements,
+      }),
+      libraryTemplatePlugin({ buildPlatform, templateScope }),
+      miniProgramComponentTransformPlugin(),
       ...subpackagePlugin,
       ...(viteOptions.nativeComponentsDir
         ? [
