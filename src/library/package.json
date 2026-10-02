@@ -42,6 +42,9 @@
     "./karma/client": {
       "default": "./karma/client/index.js"
     },
+    "./vitest/runtime": {
+      "default": "./vitest/runtime/index.js"
+    },
     "./karma/plugin": {
       "default": "./karma/plugin/index.js",
       "types": "./karma/plugin/index.d.ts"

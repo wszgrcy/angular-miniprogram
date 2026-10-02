@@ -38,12 +38,15 @@ interface BuildTarget {
 const isKarmaSide = (rel: string) =>
   rel.startsWith('karma/client/') || rel.startsWith('karma/plugin/');
 
+/** vitest 的设备端跑在小程序里，产物根独立于 dist/builder。 */
+const isVitestRuntime = (rel: string) => rel.startsWith('vitest/runtime/');
+
 const TARGETS: BuildTarget[] = [
   {
     name: 'builder',
     srcDir: 'src/builder',
     outDir: 'dist/builder',
-    exclude: isKarmaSide,
+    exclude: (rel) => isKarmaSide(rel) || isVitestRuntime(rel),
   },
   // 顺序有讲究：plugin 的产物根是 `dist/karma`，client 是它的子目录，
   // 先 client 后 plugin 会把 client 的产物连带清掉。
@@ -61,6 +64,14 @@ const TARGETS: BuildTarget[] = [
     name: 'karma-client',
     srcDir: 'src/builder/karma/client',
     outDir: 'dist/karma/client',
+  },
+  // vitest 的设备端：被测试工程的 vite 打进小程序包，
+  // 所以裸依赖（vitest/browser、birpc、flatted）一律 external，
+  // 由应用侧的 vite 去解析 —— 和 karma/client 外置 socket.io-client 同理。
+  {
+    name: 'vitest-runtime',
+    srcDir: 'src/builder/vitest/runtime',
+    outDir: 'dist/vitest/runtime',
   },
 ];
 

@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "title": "MiniProgram Vitest Target",
+  "description": "把 spec 编进小程序产物，由 vitest 通过 WebSocket 驱动执行（替代 karma）。",
+  "type": "object",
+  "properties": {
+    "main": {
+      "type": "string",
+      "description": "测试引导入口（test.ts），里面调 startupMiniProgramTest()。"
+    },
+    "tsConfig": {
+      "type": "string",
+      "description": "The name of the TypeScript configuration file."
+    },
+    "outputPath": {
+      "type": "string",
+      "description": "测试产物输出目录（相对 workspaceRoot）。不填默认 dist/vitest/<project>；不要指向 dist 根，emptyOutDir 会把应用产物一并删掉。"
+    },
+    "platform": {
+      "type": "string",
+      "description": "小程序平台",
+      "default": "wx"
+    },
+    "pages": {
+      "type": "array",
+      "description": "页面配置",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/assetPattern"
+      }
+    },
+    "components": {
+      "type": "array",
+      "description": "组件配置",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/assetPattern"
+      }
+    },
+    "assets": {
+      "type": "array",
+      "description": "List of static application assets.",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/assetPattern"
+      }
+    },
+    "styles": {
+      "description": "Global styles to be included in the build.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/extraEntryPoint"
+      }
+    },
+    "include": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "spec 文件 glob，相对项目 sourceRoot。空数组按没传处理（否则表现为 0 个 spec 全绿）。"
+    },
+    "exclude": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "spec 文件排除 glob。"
+    },
+    "port": {
+      "type": "number",
+      "description": "回连宿主的 WebSocket 端口，默认 17900。必须和 vitest.config 里 miniProgramVitest({ port }) 完全一致，否则产物连 A、宿主在 B，永远连不上。"
+    },
+    "clientHost": {
+      "type": "string",
+      "description": "小程序内回连宿主的地址，默认 127.0.0.1（微信模拟器解不了 localhost）。真机调试改成开发机局域网 IP。"
+    },
+    "sourceMap": {
+      "type": "boolean",
+      "description": "Output source maps.",
+      "default": true
+    },
+    "watch": {
+      "type": "boolean",
+      "description": "Watch source files and rebuild."
+    },
+    "dedupe": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "强制单例的包，透传给 Vite 的 resolve.dedupe。只有 file: / npm link 接入本库时才需要。"
+    }
+  },
+  "additionalProperties": false,
+  "required": ["main", "tsConfig"],
+  "definitions": {
+    "assetPattern": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "glob": {
+              "type": "string",
+              "description": "The pattern to match."
+            },
+            "input": {
+              "type": "string",
+              "description": "The input directory path in which to apply 'glob'. Defaults to the project root."
+            },
+            "output": {
+              "type": "string",
+              "description": "Absolute path within the output."
+            },
+            "ignore": {
+              "description": "An array of globs to ignore.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": ["glob", "input", "output"]
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "extraEntryPoint": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "string",
+              "description": "The file to include."
+            },
+            "bundleName": {
+              "type": "string",
+              "pattern": "^[\\w\\-.]*$",
+              "description": "The bundle name for this extra entry point."
+            },
+            "inject": {
+              "type": "boolean",
+              "description": "If the bundle will be referenced in the HTML file.",
+              "default": true
+            }
+          },
+          "additionalProperties": false,
+          "required": ["input"]
+        },
+        {
+          "type": "string",
+          "description": "The file to include."
+        }
+      ]
+    }
+  }
+}

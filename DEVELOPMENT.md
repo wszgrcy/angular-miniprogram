@@ -2452,3 +2452,103 @@ vitest 用 `sequence.sequencer` 表达同一件事：`vitest.config.mts` 里的
 | `npm run build` 全量                             | 通过                      |
 | `npm run typecheck`（builder + spec）            | 0 error                   |
 | `npm test`（vitest）                             | 75 files / 843 specs 全绿 |
+
+---
+
+# 用 vitest 取代 karma 跑小程序运行时测试
+
+`npm test` 跑的是 **Node 侧**的测试（本仓库自己的逻辑）。
+小程序**运行时里**的测试原来是 karma 链路（`npm run test:wechat`），
+这里新增一条 vitest 链路，两者是**分开的两件事**，互不替代。
+
+代码在 `src/builder/vitest/`：
+
+```
+protocol.ts          宿主 ↔ 小程序的线协议
+node/                跑在 vitest 进程里（pool / WS 服务 / 选项）
+runtime/             跑在小程序运行时里（worker / runner / 传输 / 注册表）
+vite/                builder：把 spec 编进小程序产物
+```
+
+## 为什么不是 browser provider
+
+文档上「自定义环境」看起来该用 `test.browser.provider`，但那条路走不通：
+
+browser 模式下 provider 只负责 `openPage(url)`，**模块图是浏览器自己走的** ——
+被测试文件由页面 `<script type="module">` 从 Vite dev server 逐个拉。
+小程序运行时不执行远程 ES 模块，spec 必须事先全部编进包。
+
+所以走**自定义 pool**（`project.config.poolRunner`）：
+宿主照常跑 vitest，只是「执行一个文件」变成往 WebSocket 发一条 `WorkerRequest`。
+`@nativescript/unit-test-runner` 面对的是同一个约束（设备上没有 dev server），
+选的是同一条路。
+
+## 通信怎么接上的
+
+vitest 宿主 ↔ worker 本来就是一套与传输无关的协议：
+
+- 下行 `WorkerRequest`（`start` / `run` / `collect` / `cancel` / `stop`）
+- 上行 `WorkerResponse`（`started` / `testfileFinished` / `stopped`）
+- 中间再套一层 birpc 做双向 RPC（`onTaskUpdate` / `onQueued` / `onCollected`…）
+
+只要把这三样搬到 WebSocket 上，reporter 完全不知道对端是小程序。
+信封是 `{kind, slot, frame}`，`frame` 用 **flatted** 序列化 ——
+task 结果里带循环引用（Error.cause、context），`JSON.stringify` 直接炸。
+
+设备端要点：
+
+- `vitest` 根入口和 `vitest/browser` **都不含 Node 内建模块**（实测扫过传递依赖），
+  所以能直接打进小程序包，不需要像参考实现那样手搓一个 `expect`。
+  `startTests` / `collectTests` / `setupCommonEnv` 都从 `vitest/browser` 拿。
+- `WorkerGlobalState` 得自己拼（vitest 没导出工厂），
+  照 `chunks/init.*.js` 里 `execute()` 的字段清单来。
+- runner 的 `importFile` 是唯一实质差别：Node 走 module runner 拉模块，
+  小程序只能查编译期就编进包的注册表（按路径后缀匹配宿主给的绝对路径）。
+
+## 三个必须同源的端口/常量
+
+`MP_VITEST_PORT` / `MP_VITEST_HOST` 由 builder 的 `define` 编进产物，
+宿主 WS 监听同一个值。**两处各写一个端口是这类桥最常见的死法**：
+产物去连 A、宿主在 B，表现是永远连不上。
+所以端口只在 `resolveMiniProgramVitestPluginOptions()` 解析一次。
+
+## 用法（三步，两个进程）
+
+```bash
+# 1. 把 spec 编进小程序产物
+ng build <project> --configuration test
+
+# 2. 微信开发者工具打开产物目录
+
+# 3. 起 vitest，它会开 WS 等小程序连上
+npx vitest run
+```
+
+```ts
+// vitest.config.mts
+import { defineConfig } from 'vitest/config';
+import { miniProgramVitest } from 'angular-miniprogram/vitest';
+
+export default defineConfig({
+  plugins: [miniProgramVitest({ port: 17900 })],
+});
+```
+
+builder **只编译不跑测试**，这是和 karma builder 的关键差别：
+karma server 可以开在 builder 里，vitest 的 WS 必须开在 **vitest 进程**里（pool 在那儿）。
+
+## 顺手抽出共用的插件栈
+
+karma 和 vitest 的测试构建只有 define 与 entry 不同，
+插件顺序约束一模一样（platformFileResolve → assets → wxsStrip →
+requireContextShim → analog → libraryTemplate → componentTransform）。
+各写一份迟早改漏一边，所以抽到 `shared/mini-program-test-stack.ts`，
+两条链路都走它。
+
+## 状态
+
+**已验证**：typecheck / lint / build 全通，`npm test` 843 specs 未受影响
+（karma 切共用栈后重跑过）。
+**未验证**：真机 / 开发者工具里的端到端 —— 沙箱里没有微信开发者工具。
+`WorkerGlobalState` 的字段是照 vitest 5.0.3 的 `init` chunk 拼的，
+升级 vitest 时这块最容易漂。

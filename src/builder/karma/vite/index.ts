@@ -9,7 +9,7 @@ import {
   clearLibraryMetaMisses,
   formatLibraryMetaSummary,
 } from '../../library/library-meta-diagnostics';
-import { LibraryTemplateScopeService } from '../../shared/library-template-scope.service';
+import { createMiniProgramTestStack } from '../../shared/mini-program-test-stack';
 import {
   buildPlatformDefine,
   buildViteAlias,
@@ -21,12 +21,6 @@ import {
   toRollupInput,
 } from '../../vite/entry-patterns';
 import { platformConditionDefine } from '../../vite/platform-flags';
-import { miniProgramComponentTransformPlugin } from '../../vite/plugins/component-transform.plugin';
-import { libraryTemplatePlugin } from '../../vite/plugins/library-template.plugin';
-import { miniProgramAssetsPlugin } from '../../vite/plugins/mini-program-assets.plugin';
-import { platformFileResolvePlugin } from '../../vite/plugins/platform-file-resolve.plugin';
-import { requireContextShimPlugin } from '../../vite/plugins/require-context-shim.plugin';
-import { wxsStripPlugin } from '../../vite/plugins/wxs-strip.plugin';
 import { jasmineGlobalDefine, karmaClientDefine } from '../jasmine-define';
 import { writeDerivedTsConfig } from './derived-tsconfig';
 import { setViteKarmaFrameworkHooks } from './karma-framework';
@@ -209,20 +203,29 @@ export async function createKarmaViteConfig(options: {
       : (angularPluginModule as { default: unknown }).default
   ) as (opts: unknown) => import('vite').Plugin[];
 
-  /** 与 analog 共享的 fileReplacements 数组，wxs 剥离的替换项由插件就地 push */
-  /** 分析层结果共享引用：assets 插件填，wxs-strip 插件读 */
-  const wxsAnalysisRef: {
-    current: { wxsModules?: ReadonlyMap<string, unknown> } | null;
-  } = { current: null };
-  const sharedFileReplacements: Array<{ replace: string; with: string }> = [];
-
-  const templateScope = new LibraryTemplateScopeService();
-
   // 把 typeRoots 钉到 workspace 的 node_modules/@types，
   // 否则临时 host 目录下找不到 @types/jasmine
   const derivedTs = writeDerivedTsConfig({
     baseTsConfig: karmaOptions.tsConfig,
     workspaceRoot: context.workspaceRoot,
+  });
+
+  const stack = createMiniProgramTestStack({
+    platform: karmaOptions.platform,
+    buildPlatform,
+    workspaceRoot: context.workspaceRoot,
+    context,
+    tsConfig: derivedTs.path,
+    pages: karmaOptions.pages || [],
+    components: karmaOptions.components || [],
+    assets: karmaOptions.assets,
+    styles: karmaOptions.styles,
+    watch: !!karmaOptions.watch,
+    bootstrapChunk: 'test.js',
+    absoluteProjectRoot,
+    absoluteProjectSourceRoot,
+    entryPatterns,
+    specFiles,
   });
 
   return {
@@ -262,56 +265,9 @@ export async function createKarmaViteConfig(options: {
       dedupe: karmaOptions.dedupe ?? [],
     },
     plugins: [
-      platformFileResolvePlugin({ platform: karmaOptions.platform }),
-      // 小程序不是只有 JS：wxml / wxss / json / app.js / app.wxss 全部由
-      // 这个插件产出。之前 karma 链路没挂它，产出的测试工程只有 .js，
-      // 开发者工具打开后根本跑不起来（没页面、没 app.js）。
-      //
-      // 还必须排在 wxsStrip 之前：分析层产出的模板 AST 是剥离的唯一真相源。
-      miniProgramAssetsPlugin({
-        tsConfig: karmaOptions.tsConfig,
-        workspaceRoot: context.workspaceRoot,
-        buildPlatform,
-        entryPatterns: allEntries,
-        context,
-        watch: !!karmaOptions.watch,
-        templateScope,
-        assets: karmaOptions.assets,
-        styles: karmaOptions.styles,
-        absoluteProjectRoot,
-        absoluteProjectSourceRoot,
-        // 测试链路的 app 引导入口叫 test.js，不是 main.js
-        bootstrapChunk: 'test.js',
-        analysisRef: wxsAnalysisRef,
-      }),
-      // 必须排在 analog 之前：wxs 组件的替换项要在 Angular 建 program 前就位
-      wxsStripPlugin({
-        workspaceRoot: context.workspaceRoot,
-        cacheDir: path.resolve(context.workspaceRoot, '.ng-cache'),
-        fileReplacements: sharedFileReplacements,
-        analysisRef: wxsAnalysisRef,
-        watch: false,
-      }),
-      // webpack 专有的 require.context 要换成同步 require 映射，否则
-      // test.ts 顶层直接报 TypeError，startupTest() 永远轮不到执行。
-      // 清单直接复用上面 globSpecFiles 的结果，与 entry 保持同一真相。
-      requireContextShimPlugin(
-        specFiles.map((f) => ({
-          // webpack 的 context key 是相对 context dir 的，带扩展名
-          key: `./${f.rel}.ts`,
-          // 上面 entry 用的 key 是 specs/<rel>，产物就是 specs/<rel>.js
-          file: `specs/${f.rel}.js`,
-        })),
-      ),
-      ...angular({
-        tsconfig: derivedTs.path,
-        workspaceRoot: context.workspaceRoot,
-        fastCompile: false,
-        experimental: { useAngularCompilationAPI: true },
-        fileReplacements: sharedFileReplacements,
-      }),
-      libraryTemplatePlugin({ buildPlatform, templateScope }),
-      miniProgramComponentTransformPlugin(),
+      ...stack.plugins.slice(0, 4),
+      ...angular(stack.angularOptions),
+      ...stack.plugins.slice(4),
     ],
     build: {
       outDir: resolveKarmaOutputPath(karmaOptions, context),
