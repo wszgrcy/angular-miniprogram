@@ -7,7 +7,11 @@ import type {
   VitestTestRunner,
   WorkerGlobalState,
 } from 'vitest';
-import { collectTests, setupCommonEnv, startTests } from 'vitest/browser';
+import {
+  collectTests,
+  setupCommonEnv,
+  startTests,
+} from 'vitest/internal/browser';
 import type { WorkerRequest, WorkerResponse } from 'vitest/node';
 import type { TestModuleRegistry } from './registry';
 import { MiniProgramTestRunner } from './runner';

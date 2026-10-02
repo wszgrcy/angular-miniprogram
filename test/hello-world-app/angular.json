@@ -88,6 +88,44 @@
             "tsConfig": "src/tsconfig.spec.json",
             "karmaConfig": "karma.conf.js"
           }
+        },
+        "test-vitest": {
+          "builder": "angular-miniprogram:vitest",
+          "options": {
+            "main": "./src/test-vitest.ts",
+            "outputPath": "dist/vitest/app",
+            "platform": "wx",
+            "port": 17900,
+            "clientHost": "127.0.0.1",
+            "pages": [
+              {
+                "glob": "**/*.entry.ts",
+                "input": "./src/spec",
+                "output": "pages"
+              }
+            ],
+            "components": [
+              {
+                "glob": "**/*.entry.ts",
+                "input": "./src/spec-component",
+                "output": "components"
+              }
+            ],
+            "assets": [
+              {
+                "glob": "project.config.json",
+                "input": "./src",
+                "output": "./"
+              },
+              {
+                "glob": "app.json",
+                "input": "./src",
+                "output": "./"
+              }
+            ],
+            "styles": ["src/styles.css"],
+            "tsConfig": "src/tsconfig.spec.json"
+          }
         }
       }
     },

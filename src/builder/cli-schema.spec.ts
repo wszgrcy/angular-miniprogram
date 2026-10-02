@@ -1,6 +1,6 @@
 import { buildSchema } from '../../script/build-cli-schema';
 
-const BUILDERS = ['application', 'library', 'karma'];
+const BUILDERS = ['application', 'library', 'karma', 'vitest'];
 
 interface TargetBranch {
   $comment?: string;

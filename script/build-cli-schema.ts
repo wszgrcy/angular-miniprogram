@@ -25,6 +25,7 @@ const BUILDERS: { name: string; schema: string }[] = [
   { name: 'application', schema: '../src/builder/vite/schema.json' },
   { name: 'library', schema: '../src/builder/library/schema.json' },
   { name: 'karma', schema: '../src/builder/karma/schema.json' },
+  { name: 'vitest', schema: '../src/builder/vitest/vite/schema.json' },
 ];
 
 // 与 CLI 生成器一致：内联进 workspace schema 时丢弃这些键，
