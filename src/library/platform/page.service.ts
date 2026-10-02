@@ -14,7 +14,6 @@ import {
 } from 'angular-miniprogram/platform/type';
 import { PAGE_TOKEN } from 'angular-miniprogram/platform/wx';
 import { APP_TOKEN } from './token';
-import { runInAngular } from './util/change-detection';
 
 @Injectable()
 export class PageService {
@@ -43,15 +42,13 @@ export class PageService {
       component: Type<C>,
       miniProgramComponentInstance: MiniProgramComponentInstance,
     ) => {
-      return runInAngular(this.injector, () => {
-        const injector = this.createPageInjector(miniProgramComponentInstance);
-        const componentRef: ComponentRef<C> = createComponent(component, {
-          environmentInjector: this.environmentInjector,
-          elementInjector: injector,
-        });
-        this.applicationRef.attachView(componentRef.hostView);
-        return componentRef;
+      const injector = this.createPageInjector(miniProgramComponentInstance);
+      const componentRef: ComponentRef<C> = createComponent(component, {
+        environmentInjector: this.environmentInjector,
+        elementInjector: injector,
       });
+      this.applicationRef.attachView(componentRef.hostView);
+      return componentRef;
     };
 
     this.app.__ngStartPageResolve();

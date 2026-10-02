@@ -1,21 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import {
-  ɵChangeDetectionScheduler as ChangeDetectionScheduler,
-  Injectable,
-  ɵNotificationSource as NotificationSource,
-  inject,
-} from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram/platform';
-import {
-  Observable,
-  Subject,
-  defer,
-  map,
-  of,
-  switchMap,
-  tap,
-} from 'rxjs';
+import { Observable, Subject, defer, map, of, switchMap, tap } from 'rxjs';
 import { mpContext } from './context-wrapper';
 import { MpEventChannel } from './event-channel';
 import {
@@ -51,11 +38,7 @@ import {
   buildWindowInfo,
   enhanceSystemInfo,
 } from './system-info';
-import {
-  MpApiNameInput,
-  MpCallbackOptions,
-  MpNavigateOptions,
-} from './types';
+import { MpApiNameInput, MpCallbackOptions, MpNavigateOptions } from './types';
 import {
   MP_API_SCHEMAS,
   MpApiSchema,
@@ -97,7 +80,8 @@ const LOCALE_KEY = 'mp.locale';
  * - 同步 API（*Sync / create* / on* 等）直接返回原始值
  * - AbortSignal：未发起即取消 / in-flight 取消（task 类自动 abort）
  *
- * 所有回调经 `ɵChangeDetectionScheduler` 通知变更检测，不依赖 zone。
+ * 回调不再手动调度变更检测：状态统一走 signal，写入 signal 时 Angular
+ * 自己会把关联视图标脏并调度一次 tick，不依赖 zone。
  */
 @Injectable({ providedIn: 'root' })
 export class MpApiService {
@@ -107,7 +91,6 @@ export class MpApiService {
   >;
   private readonly platform = inject(MP_PLATFORM);
   private readonly protocols = inject(MP_API_PROTOCOLS);
-  private readonly scheduler = inject(ChangeDetectionScheduler);
   private readonly registry = inject(MpPipeRegistry);
   private readonly eventChannels = new Map<number, MpEventChannel>();
   private channelSeq = 0;
@@ -372,64 +355,42 @@ export class MpApiService {
 
   /** 录音管理器：`rec.on('start')` / `rec.on('frameRecorded')` 可订阅 */
   getRecorderManager() {
-    return mpContext(this.callSync<any>('getRecorderManager'), (fn) =>
-      this.runInAngular(fn),
-    );
+    return mpContext(this.callSync<any>('getRecorderManager'));
   }
 
   /** 返回包装后的 SocketTask：`on('open'|'message'|'error'|'close')` 可订阅 */
   connectSocket(options: MpCallbackOptions) {
-    return mpContext(this.invoke('connectSocket', options), (fn) =>
-      this.runInAngular(fn),
-    );
+    return mpContext(this.invoke('connectSocket', options));
   }
 
   createCanvasContext(canvasId: string) {
-    return mpContext(
-      this.callSync<any>('createCanvasContext', canvasId),
-      (fn) => this.runInAngular(fn),
-    );
+    return mpContext(this.callSync<any>('createCanvasContext', canvasId));
   }
 
   createVideoContext(id: string, component?: any) {
-    return mpContext(
-      this.callSync<any>('createVideoContext', id, component),
-      (fn) => this.runInAngular(fn),
-    );
+    return mpContext(this.callSync<any>('createVideoContext', id, component));
   }
 
   createAudioContext(id: string, component?: any) {
-    return mpContext(
-      this.callSync<any>('createAudioContext', id, component),
-      (fn) => this.runInAngular(fn),
-    );
+    return mpContext(this.callSync<any>('createAudioContext', id, component));
   }
 
   createInnerAudioContext(options: MpCallbackOptions = {}) {
-    return mpContext(
-      this.callSync<any>('createInnerAudioContext', options),
-      (fn) => this.runInAngular(fn),
-    );
+    return mpContext(this.callSync<any>('createInnerAudioContext', options));
   }
 
   createMapContext(mapId: string, component?: any) {
-    return mpContext(
-      this.callSync<any>('createMapContext', mapId, component),
-      (fn) => this.runInAngular(fn),
-    );
+    return mpContext(this.callSync<any>('createMapContext', mapId, component));
   }
 
   createLivePusherContext(id?: string, component?: any) {
     return mpContext(
       this.callSync<any>('createLivePusherContext', id, component),
-      (fn) => this.runInAngular(fn),
     );
   }
 
   getBackgroundAudioManager() {
-    return mpContext(this.callSync<any>('getBackgroundAudioManager'), (fn) =>
-      this.runInAngular(fn),
-    );
+    return mpContext(this.callSync<any>('getBackgroundAudioManager'));
   }
 
   // ---------------------------------------------------------------- 节点查询 / 观察器
@@ -443,7 +404,7 @@ export class MpApiService {
     if (component) {
       raw.in?.(component);
     }
-    return createMpSelectorQuery(raw, (fn) => this.runInAngular(fn));
+    return createMpSelectorQuery(raw);
   }
 
   /** 交叉观察器：`observe$(selector)` 订阅即 observe，退订即 disconnect */
@@ -455,7 +416,7 @@ export class MpApiService {
     if (component) {
       raw.in?.(component);
     }
-    return createMpIntersectionObserver(raw, (fn) => this.runInAngular(fn));
+    return createMpIntersectionObserver(raw);
   }
 
   /** 媒体查询观察器（JS 求值 + onWindowResize 驱动，各家无原生 API） */
@@ -484,7 +445,9 @@ export class MpApiService {
     if (this.localeCache === undefined) {
       let stored = '';
       try {
-        stored = String(this.callSync<unknown>('getStorageSync', LOCALE_KEY) ?? '');
+        stored = String(
+          this.callSync<unknown>('getStorageSync', LOCALE_KEY) ?? '',
+        );
       } catch {
         /* 无存储能力时落回默认 */
       }
@@ -522,7 +485,7 @@ export class MpApiService {
     const table = this.protocols[this.platform];
     const onProtocol = table?.[onName];
     const onTarget = onProtocol?.name ?? onName;
-    const offTarget = offName ? (table?.[offName]?.name ?? offName) : undefined;
+    const offTarget = offName ? table?.[offName]?.name ?? offName : undefined;
     return new Observable<T>((subscriber) => {
       const handler = (res: T) => {
         let out: any = res;
@@ -532,7 +495,7 @@ export class MpApiService {
         if (onProtocol?.returnValue) {
           out = applyFieldMap(out, onProtocol.returnValue);
         }
-        this.runInAngular(() => subscriber.next(out));
+        subscriber.next(out);
       };
       const on = this.getRawApi(onTarget);
       if (on) {
@@ -579,9 +542,8 @@ export class MpApiService {
 
       const opts: MpCallbackOptions = { ...ctx.options };
       delete opts.signal;
-      opts.success = (res) =>
-        this.runInAngular(() => subscriber.next(res));
-      opts.fail = (err) => this.runInAngular(() => subscriber.error(err));
+      opts.success = (res) => subscriber.next(res);
+      opts.fail = (err) => subscriber.error(err);
 
       this.dispatch(ctx.name as string, opts);
 
@@ -611,10 +573,8 @@ export class MpApiService {
     });
 
     if (preError) {
-      this.runInAngular(() => {
-        cbs?.fail?.(preError);
-        cbs?.complete?.(preError);
-      });
+      cbs?.fail?.(preError);
+      cbs?.complete?.(preError);
       return undefined;
     }
     if (!emitted) {
@@ -634,14 +594,12 @@ export class MpApiService {
     const opts: MpCallbackOptions = { ...ctx.options };
     const signal = opts.signal as AbortSignal | undefined;
     delete opts.signal;
-    opts.success = (res) =>
-      this.runInAngular(() => {
-        result$.next(res);
-        result$.complete();
-        cbs?.complete?.(res);
-      });
-    opts.fail = (err) =>
-      this.runInAngular(() => result$.error(err));
+    opts.success = (res) => {
+      result$.next(res);
+      result$.complete();
+      cbs?.complete?.(res);
+    };
+    opts.fail = (err) => result$.error(err);
 
     const task = this.dispatch(name as string, opts);
 
@@ -755,13 +713,5 @@ export class MpApiService {
       out = applyFieldMap(out, protocol.returnValue);
     }
     return out as T;
-  }
-
-  private runInAngular(fn: () => void) {
-    try {
-      fn();
-    } finally {
-      this.scheduler.notify(NotificationSource.Listener);
-    }
   }
 }

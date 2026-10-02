@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ɵChangeDetectionScheduler as ChangeDetectionScheduler } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { initMiniProgramTestEnv } from '../../platform/test-util/init-env';
 import { MpEventBus } from './mp-event-bus.service';
@@ -68,15 +67,6 @@ describe('MpEventBus', () => {
     bus.on('e', h2);
     bus.emit('e');
     expect(seen).toEqual([1, 2]);
-  });
-
-  it('emit 后通知变更检测', () => {
-    const bus = setup();
-    const scheduler = TestBed.inject(ChangeDetectionScheduler);
-    const spy = vi.spyOn(scheduler, 'notify');
-    bus.on('e', () => undefined);
-    bus.emit('e');
-    expect(spy).toHaveBeenCalled();
   });
 
   it('has/clear', () => {

@@ -1,13 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject } from 'rxjs';
-import { CommonModule } from '@angular/common';
 import { HttpClientModule } from 'angular-miniprogram';
 import { FIXTURE_ARTICLES_URL } from '../util/fixture-url';
 
 @Component({
   standalone: true,
-  imports: [CommonModule, HttpClientModule],
+  imports: [HttpClientModule],
   selector: 'app-http-spec',
   template: ``,
 })

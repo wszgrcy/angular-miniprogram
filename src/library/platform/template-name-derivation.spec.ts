@@ -12,7 +12,6 @@
  * 这里直接验证两者指向同一个 TNode —— 若同一，则取值必然相同，
  * patch 可用 fork 内一行替代。
  */
-import { CommonModule } from '@angular/common';
 import { Component, TemplateRef, ViewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
@@ -22,7 +21,7 @@ import { initMiniProgramTestEnv } from './test-util/init-env';
 @Component({
   selector: 'probe-outlet',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <ng-template #alpha let-greeting="greeting"
       ><span>A:{{ greeting }}</span></ng-template

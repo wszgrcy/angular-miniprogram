@@ -1,10 +1,8 @@
 /// <reference types="miniprogram-api-typings"/>
 import {
   ApplicationRef,
-  ɵChangeDetectionScheduler as ChangeDetectionScheduler,
   ChangeDetectorRef,
   ComponentRef,
-  ɵNotificationSource as NotificationSource,
   Type,
 } from '@angular/core';
 import type {
@@ -70,8 +68,6 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.__lView = lView;
     mpComponentInstance.__ngComponentInstance = lView[LVIEW.CONTEXT];
     mpComponentInstance.__ngComponentInjector = injector;
-    const scheduler = injector.get(ChangeDetectionScheduler);
-    mpComponentInstance.__ngChangeDetectionScheduler = scheduler;
     const componentFinderService = injector.get(ComponentFinderService);
     componentFinderService.set(
       mpComponentInstance.__ngComponentInstance,
@@ -122,15 +118,8 @@ export class MiniProgramCoreFactory {
           _this
             .getListenerEventMapping(cur.prefix, eventName)
             .forEach((name) => {
-              try {
-                if (el.listener[name]) {
-                  el.listener[name](event);
-                }
-              } finally {
-                // zoneless：回调可能修改了应用状态，显式调度一次变更检测
-                this.__ngChangeDetectionScheduler?.notify(
-                  NotificationSource.Listener,
-                );
+              if (el.listener[name]) {
+                el.listener[name](event);
               }
             });
         } else {
@@ -184,8 +173,6 @@ export class MiniProgramCoreFactory {
     mpComponentInstance.__ngComponentHostView = componentRef.hostView;
     mpComponentInstance.__ngComponentInstance = componentRef.instance;
     mpComponentInstance.__ngComponentInjector = componentRef.injector;
-    const scheduler = componentRef.injector.get(ChangeDetectionScheduler);
-    mpComponentInstance.__ngChangeDetectionScheduler = scheduler;
     const { lView, id }: { lView: LView; id: number } =
       findPageLView(componentRef);
     setLViewPath(lView, [id]);

@@ -12,7 +12,6 @@
  * 与 lview-to-node-list.spec（证明 lViewToWXView 读的就是这些槽）串起来，
  * 整条「声明名 → wxml template is」链路闭合。
  */
-import { CommonModule } from '@angular/common';
 import { Component, TemplateRef, ViewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
@@ -22,7 +21,7 @@ import { initMiniProgramTestEnv } from './test-util/init-env';
 @Component({
   selector: 'probe-auto',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <ng-template #autoTpl let-greeting="greeting">
       <span>{{ greeting }}</span>

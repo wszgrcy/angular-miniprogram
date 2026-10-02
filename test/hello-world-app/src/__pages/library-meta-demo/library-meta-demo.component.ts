@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import {
   InputOutputDirective,
@@ -39,7 +38,6 @@ import { SecondaryEntryComponent } from 'test-library/src/secondary';
  */
 @Component({
   imports: [
-    CommonModule,
     TestLibraryDirective,
     TestLibraryComponent,
     LibComp1Component,

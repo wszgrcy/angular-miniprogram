@@ -24,13 +24,12 @@ export interface MpContext<T extends object = any> {
 }
 
 /**
- * @param raw     平台原始上下文对象
- * @param notify  回调触达 Angular 后的变更检测通知
+ * @param raw  平台原始上下文对象
+ *
+ * 回调不再需要手动调度变更检测：状态一律走 signal，写入 signal 时
+ * Angular 自己会把关联视图标脏并调度一次 tick。
  */
-export function mpContext<T extends object>(
-  raw: T,
-  notify: (fn: () => void) => void,
-): MpContext<T> {
+export function mpContext<T extends object>(raw: T): MpContext<T> {
   const streams = new Map<string, Observable<any>>();
 
   const target = {
@@ -44,7 +43,7 @@ export function mpContext<T extends object>(
     let stream = streams.get(key);
     if (!stream) {
       stream = new Observable<any>((subscriber) => {
-        const handler = (res: any) => notify(() => subscriber.next(res));
+        const handler = (res: any) => subscriber.next(res);
         const onFn = (raw as any)[key];
         if (typeof onFn !== 'function') {
           subscriber.error(

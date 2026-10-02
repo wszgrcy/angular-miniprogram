@@ -46,19 +46,6 @@ describe('MiniprogramHttpBackend 依赖注入', () => {
     expect(typeof def.factory).toBe('function');
   });
 
-  it('changeDetectionScheduler 通过 inject() 真实注入，不是 undefined', () => {
-    TestBed.configureTestingModule({
-      providers: [MiniprogramHttpBackend],
-    });
-
-    const backend: any = TestBed.inject(MiniprogramHttpBackend);
-
-    // 字段初始化器里 inject() 失败的话，这里会是 undefined，
-    // 后续 runInAngular() 会在运行时炸。
-    expect(backend.changeDetectionScheduler).toBeTruthy();
-    expect(typeof backend.changeDetectionScheduler.notify).toBe('function');
-  });
-
   it('provideHttpClient() 把 HttpBackend 指向 MiniprogramHttpBackend', () => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(withMiniProgramRequest())],

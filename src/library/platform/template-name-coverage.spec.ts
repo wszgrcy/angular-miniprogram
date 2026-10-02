@@ -12,7 +12,13 @@
  *   ng_if（then / else）、ng_for_of、ng_switch、ng_template_outlet
  * 外加自定义结构指令显式传值的优先级，以及反向对照。
  */
-import { CommonModule } from '@angular/common';
+import {
+  NgForOf,
+  NgIf,
+  NgSwitch,
+  NgSwitchCase,
+  NgTemplateOutlet,
+} from '@angular/common';
 import { Component, TemplateRef, ViewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
@@ -23,7 +29,7 @@ import { initMiniProgramTestEnv } from './test-util/init-env';
 @Component({
   selector: 'cov-ngif',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgIf],
   template: `
     <ng-template #thenBlock><span>ON</span></ng-template>
     <ng-template #elseBlock><span>OFF</span></ng-template>
@@ -37,7 +43,7 @@ class CovNgIfComponent {
 @Component({
   selector: 'cov-ngfor',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgForOf],
   template: `
     <ng-template #rowTpl let-i>
       <span>{{ i }}</span>
@@ -52,7 +58,7 @@ class CovNgForComponent {
 @Component({
   selector: 'cov-ngswitch',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgSwitch, NgSwitchCase, NgTemplateOutlet],
   template: `
     <div [ngSwitch]="mode">
       <ng-template #oddCase><span>odd</span></ng-template>
@@ -75,7 +81,7 @@ class CovNgSwitchComponent {
 @Component({
   selector: 'cov-outlet',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgTemplateOutlet],
   template: `
     <ng-template #alpha><span>A</span></ng-template>
     <ng-template #beta><span>B</span></ng-template>
@@ -91,7 +97,7 @@ class CovOutletComponent {
 @Component({
   selector: 'cov-outlet-static',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgTemplateOutlet],
   template: `
     <ng-template #alpha><span>A</span></ng-template>
     <div *ngTemplateOutlet="alpha"></div>

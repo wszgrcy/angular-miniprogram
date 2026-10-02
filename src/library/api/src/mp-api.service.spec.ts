@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ɵChangeDetectionScheduler as ChangeDetectionScheduler } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram/platform';
 import { catchError, firstValueFrom, map, of, switchMap, tap } from 'rxjs';
@@ -444,16 +443,6 @@ describe('MpApiService', () => {
       await service.invoke('clearStorage');
       expect(removed).toBe('k');
       expect(cleared).toBe(true);
-    });
-  });
-
-  describe('变更检测', () => {
-    it('回调执行后通知 scheduler', async () => {
-      const { service } = setup();
-      const scheduler = TestBed.inject(ChangeDetectionScheduler);
-      const spy = vi.spyOn(scheduler, 'notify');
-      await service.invoke('showToast', { title: 'x' });
-      expect(spy).toHaveBeenCalled();
     });
   });
 

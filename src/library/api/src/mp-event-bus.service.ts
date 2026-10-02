@@ -1,12 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import {
-  ɵChangeDetectionScheduler as ChangeDetectionScheduler,
-  Injectable,
-  ɵNotificationSource as NotificationSource,
-  OnDestroy,
-  inject,
-} from '@angular/core';
+import { Injectable, OnDestroy } from '@angular/core';
 import { Observable } from 'rxjs';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,11 +11,10 @@ type Handler = (payload: any) => void;
  *
  * 与 rxjs Subject 的区别：为了 `off(event, handler)` 的精确移除语义，
  * 用 handler 集合手工派发；`on` 同时返回退订函数，两种用法都支持。
- * 派发在变更检测调度内执行，监听方改状态后视图自动更新。
+ * 监听方改状态走 signal，写入时 Angular 自己标脏，无需手动调度。
  */
 @Injectable({ providedIn: 'root' })
 export class MpEventBus implements OnDestroy {
-  private readonly scheduler = inject(ChangeDetectionScheduler);
   private readonly listeners = new Map<string, Set<Handler>>();
 
   /** 返回退订函数，等价于 `off(event, handler)` */
@@ -68,12 +61,10 @@ export class MpEventBus implements OnDestroy {
     if (!set || set.size === 0) {
       return;
     }
-    this.runInAngular(() => {
-      // 快照迭代：允许 handler 内部 on/off
-      for (const handler of [...set]) {
-        handler(payload);
-      }
-    });
+    // 快照迭代：允许 handler 内部 on/off
+    for (const handler of [...set]) {
+      handler(payload);
+    }
   }
 
   /** 可订阅形态：退订即退订监听 */
@@ -94,13 +85,5 @@ export class MpEventBus implements OnDestroy {
 
   ngOnDestroy() {
     this.clear();
-  }
-
-  private runInAngular(fn: () => void) {
-    try {
-      fn();
-    } finally {
-      this.scheduler.notify(NotificationSource.Listener);
-    }
   }
 }

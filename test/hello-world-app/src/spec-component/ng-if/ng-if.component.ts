@@ -1,9 +1,9 @@
-import { CommonModule } from '@angular/common';
+import { NgIf } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgIf],
   selector: 'app-ng-if',
   templateUrl: './ng-if.component.html',
 })

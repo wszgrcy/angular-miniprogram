@@ -6,6 +6,9 @@
  * 所以必须早于任何 spec 的 import，只能放 setupFiles。
  *
  * 这里**没有任何断言/spy 兼容层**：spec 全部用 vitest 原生 API。
+ *
+ * 不需要在这里导入 `@angular/compiler`：`@angular/common` 的 partial-IoC 标记
+ * 由 `vitest.config.mts` 的 `angularPartialIocLinker()` 在加载时链好。
  */
 import { expect, vi } from 'vitest';
 

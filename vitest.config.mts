@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
@@ -30,57 +32,57 @@ const alias = Object.entries(SELF_IMPORTS)
   .map(([find, replacement]) => ({ find, replacement: r(replacement) }));
 
 /**
- * 给 `@angular/core` 补上被 TS `const enum` 抹掉的运行时值。
+ * 对 node_modules 里的 partial-IoC 产物跑 **Angular Linker**。
  *
- * `NotificationSource` 在 Angular 里是 `declare const enum`：
- * tsc 编译时把 `NotificationSource.Listener` 直接内联成 `5`，
- * 产物里根本没有这个导出。esbuild / oxc **不做跨文件 const enum 内联**，
- * 于是 vitest 下 `src/library/**` 里的
- * `this.scheduler.notify(NotificationSource.Listener)` 全部炸在
- * `Cannot read properties of undefined (reading 'Listener')`。
+ * `@angular/common` 发的是部分编译产物（`ɵɵngDeclareFactory` / `ɵɵngDeclareClassMetadata`
+ * 等 linker 标记）。真实应用由 Angular 构建器在打包时把标记就地翻成
+ * `ɵɵdefineInjectable` 等运行时定义；裸 vite 没这一步，Angular 会退化成
+ * “运行时 JIT 编译”，于是模块求值直接抛
+ * `The service 'BrowserXhr' needs to be compiled using the JIT compiler,
+ * but '@angular/compiler' is not available`。
  *
- * 库产物本身走 ng-packagr（tsc），所以线上没这个问题；
- * 但任何用 esbuild/vite 直接吃源码的消费方都会踩，
- * 值得单独记一笔。
+ * 这里用官方 `@angular/compiler-cli/linker/babel` 补上同一步，而不是把
+ * `@angular/compiler`（1.1MB）整个拉进测试环境。需要配合
+ * `test.server.deps.inline` —— vitest 默认外部化 node_modules，不内联就轮不到 transform。
  */
-const NOTIFICATION_SOURCE = {
-  MarkAncestorsForTraversal: 0,
-  SetInput: 1,
-  DeferBlockStateUpdate: 2,
-  DebugApplyChanges: 3,
-  MarkForCheck: 4,
-  Listener: 5,
-  CustomElement: 6,
-  RenderHook: 7,
-  ViewAttached: 8,
-  ViewDetachedFromDOM: 9,
-  AsyncAnimationsLoaded: 10,
-  PendingTaskRemoved: 11,
-  RootEffect: 12,
-  ViewEffect: 13,
-};
+async function angularPartialIocLinker(): Promise<Plugin> {
+  const require = createRequire(import.meta.url);
+  const babel = await import('@babel/core');
+  const {
+    createEs2015LinkerPlugin,
+  } = require('@angular/compiler-cli/linker/babel');
 
-const CORE_SHIM = '\0ng-core-const-enum-shim';
-
-function angularCoreConstEnumShim(): Plugin {
-  return {
-    name: 'angular-core-const-enum-shim',
-    enforce: 'pre',
-    resolveId(source, importer) {
-      if (
-        source !== '@angular/core' ||
-        importer?.includes('ng-core-const-enum-shim')
-      ) {
-        return null;
-      }
-      return CORE_SHIM;
+  const linkerPlugin = createEs2015LinkerPlugin({
+    linkerJitMode: false,
+    // 官方构建器同样关掉：https://github.com/angular/angular/issues/42769
+    sourceMapping: false,
+    logger: { level: 1, debug() {}, info() {}, warn() {}, error() {} },
+    fileSystem: {
+      resolve: path.resolve,
+      exists: fs.existsSync,
+      dirname: path.dirname,
+      relative: path.relative,
+      readFile: fs.readFileSync,
     },
-    load(id) {
-      if (id !== CORE_SHIM) return null;
-      return (
-        `export * from '@angular/core';\n` +
-        `export const ɵNotificationSource = ${JSON.stringify(NOTIFICATION_SOURCE)};\n`
-      );
+  });
+
+  return {
+    name: 'angular-partial-ioc-linker',
+    enforce: 'pre',
+    async transform(code, id) {
+      const file = id.split('?')[0];
+      if (!file.includes('node_modules')) return null;
+      // @angular/core / @angular/compiler 会误报，且本身不需要 linker
+      if (/[\\/]@angular[\\/](?:compiler|core)[\\/]/.test(file)) return null;
+      if (!code.includes('ɵɵngDeclare')) return null;
+      const out = await babel.transformAsync(code, {
+        babelrc: false,
+        configFile: false,
+        sourceType: 'module',
+        filename: file,
+        plugins: [linkerPlugin],
+      });
+      return out?.code ? { code: out.code, map: null } : null;
     },
   };
 }
@@ -140,10 +142,12 @@ class OrderedSequencer extends BaseSequencer {
 
 export default defineConfig({
   resolve: { alias },
-  plugins: [angularCoreConstEnumShim(), dynamicImportEscapeHatch()],
+  plugins: [angularPartialIocLinker(), dynamicImportEscapeHatch()],
   test: {
     include: ['src/**/*.spec.ts'],
     exclude: ['**/fixture/**', 'node_modules/**'],
+    // linker 插件要能转到 @angular/common，就不能被 vitest 外部化给 node 直接加载
+    server: { deps: { inline: [/@angular\//] } },
     globals: true,
     environment: 'node',
     setupFiles: ['./test/vitest-setup.ts'],

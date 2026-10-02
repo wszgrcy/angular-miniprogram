@@ -7,8 +7,8 @@ import { Observable, Subscription } from 'rxjs';
  *
  * 对标 uni 的 uni.createSelectorQuery / createIntersectionObserver /
  * createMediaQueryObserver。与 uni 的差异只在返回形态：
- * `exec()` 返回 Promise、`observe$()` 返回 Observable，
- * 回调统一经变更检测调度（由调用方注入 notify）。
+ * `exec()` 返回 Promise、`observe$()` 返回 Observable。
+ * 回调不再手动调度变更检测：状态走 signal，写入时 Angular 自己标脏。
  */
 
 /** 节点字段查询结果（boundingClientRect / scrollOffset / scrollSize 等字段的并集） */
@@ -39,7 +39,10 @@ export interface MpSelectorQuery {
   boundingClientRect(): MpSelectorQuery;
   scrollOffset(): MpSelectorQuery;
   scrollSize(): MpSelectorQuery;
-  fields(option: Record<string, any>, callback?: (res: any) => void): MpSelectorQuery;
+  fields(
+    option: Record<string, any>,
+    callback?: (res: any) => void,
+  ): MpSelectorQuery;
   /** 执行查询，resolve 为各节点结果数组（与 select 顺序一致） */
   exec<T = MpNodeInfo[]>(callback?: (res: T) => void): Promise<T>;
   [method: string]: any;
@@ -59,9 +62,15 @@ export interface MpIntersectionObserved {
 
 export interface MpIntersectionObserver {
   readonly raw: any;
-  relativeTo(selector: string, margins?: Record<string, number>): MpIntersectionObserver;
+  relativeTo(
+    selector: string,
+    margins?: Record<string, number>,
+  ): MpIntersectionObserver;
   relativeToViewport(margins?: Record<string, number>): MpIntersectionObserver;
-  observe(selector: string, callback: (res: MpIntersectionObserved) => void): void;
+  observe(
+    selector: string,
+    callback: (res: MpIntersectionObserved) => void,
+  ): void;
   /** 订阅即 observe，退订即 disconnect */
   observe$(selector: string): Observable<MpIntersectionObserved>;
   disconnect(): void;
@@ -85,16 +94,16 @@ export interface MpMediaQueryResult {
 
 export interface MpMediaQueryObserver {
   /** 立即以当前匹配结果触发一次，之后仅在匹配状态变化时触发 */
-  observe(descriptor: MpMediaQueryDescriptor, callback: (res: MpMediaQueryResult) => void): void;
+  observe(
+    descriptor: MpMediaQueryDescriptor,
+    callback: (res: MpMediaQueryResult) => void,
+  ): void;
   observe$(descriptor: MpMediaQueryDescriptor): Observable<MpMediaQueryResult>;
   disconnect(): void;
 }
 
 /** 把原生 SelectorQuery 包成链式 + Promise exec 的形态 */
-export function createMpSelectorQuery(
-  raw: any,
-  notify: (fn: () => void) => void,
-): MpSelectorQuery {
+export function createMpSelectorQuery(raw: any): MpSelectorQuery {
   const wrapper: any = new Proxy({} as Record<string, any>, {
     get(_target, prop) {
       if (prop === 'raw') {
@@ -103,12 +112,10 @@ export function createMpSelectorQuery(
       if (prop === 'exec') {
         return (callback?: (res: any) => void) =>
           new Promise((resolve) => {
-            raw.exec((res: any) =>
-              notify(() => {
-                callback?.(res);
-                resolve(res);
-              }),
-            );
+            raw.exec((res: any) => {
+              callback?.(res);
+              resolve(res);
+            });
           });
       }
       const value = raw[prop];
@@ -128,10 +135,7 @@ export function createMpSelectorQuery(
 }
 
 /** 把原生 IntersectionObserver 包成 observe$ 可订阅的形态 */
-export function createMpIntersectionObserver(
-  raw: any,
-  notify: (fn: () => void) => void,
-): MpIntersectionObserver {
+export function createMpIntersectionObserver(raw: any): MpIntersectionObserver {
   const wrapper: any = new Proxy({} as Record<string, any>, {
     get(_target, prop) {
       if (prop === 'raw') {
@@ -139,15 +143,13 @@ export function createMpIntersectionObserver(
       }
       if (prop === 'observe') {
         return (selector: string, callback: (res: any) => void) => {
-          raw.observe(selector, (res: any) => notify(() => callback(res)));
+          raw.observe(selector, (res: any) => callback(res));
         };
       }
       if (prop === 'observe$') {
         return (selector: string) =>
           new Observable<MpIntersectionObserved>((subscriber) => {
-            raw.observe(selector, (res: any) =>
-              notify(() => subscriber.next(res)),
-            );
+            raw.observe(selector, (res: any) => subscriber.next(res));
             return () => raw.disconnect?.();
           });
       }

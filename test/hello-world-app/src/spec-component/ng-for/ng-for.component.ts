@@ -1,9 +1,9 @@
-import { CommonModule } from '@angular/common';
+import { NgForOf } from '@angular/common';
 import { Component, OnInit, input } from '@angular/core';
 
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgForOf],
   selector: 'app-ng-for',
   templateUrl: './ng-for.component.html',
 })
