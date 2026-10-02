@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 /**
- * 微信小程序里跑 vitest 的一键执行器（wechat-karma.cjs 的 vitest 版）。
+ * 微信小程序里跑 vitest 的一键执行器。
  *
- * 比 karma 那个简单得多，因为方向反了：
- *   karma  —— karma 反向**控制**开发者工具，所以要 --auto-port、要占位 launcher、
- *             要等 "Connected on socket"。
- *   vitest —— 设备端 `wx.connectSocket` **主动连出**到宿主的 WS 端口
- *             （见 src/builder/vitest/runtime/transport.ts），宿主只是监听。
- * 所以这里不需要自动化端口，把项目打开就够了。
+ * 连接方向是**设备主动连出**：小程序端 `wx.connectSocket` 连到宿主的 WS 端口
+ * （见 src/builder/vitest/runtime/transport.ts），宿主只负责监听。
+ * 所以不需要自动化端口、不需要 launcher，把项目打开就够了。
  *
  * 流程：
  *   1. 保证 node_modules/angular-miniprogram 链到 dist

@@ -3,17 +3,17 @@
 /**
  * 把 dist 以包名链进 node_modules。
  *
- * 测试工程里两处按**包名**解析本仓库：
- *   - angular.json 的 builder：`angular-miniprogram:karma` / `:application` / `:vitest`
- *   - karma.conf.js 的 `require('angular-miniprogram/karma/plugin')`
+ * 测试工程按**包名**解析本仓库：
+ *   - angular.json 的 builder：`angular-miniprogram:application` / `:vitest`
+ *   - vitest.config.mts 的 `import ... from 'angular-miniprogram/vitest'`
  * 这要求 `angular-miniprogram` 能当包名解析到，而仓库根并没有被自链接进
  * node_modules（没有 workspaces，也没有 file: 自引用），所以干净环境里
- * `ng run app:test` 必然报 `Could not find the 'angular-miniprogram:karma'
+ * `ng run app:test` 必然报 `Could not find the 'angular-miniprogram:vitest'
  * builder's node package`。
  *
  * 链接指向 **dist** 而不是仓库根：发布产物的根就是 dist（dist/package.json
  * 里 name 就是 angular-miniprogram，`builders` 和 exports 映射也在那）。
- * 指仓库根的话根 package.json 没有 exports，`angular-miniprogram/karma/plugin`
+ * 指仓库根的话根 package.json 没有 exports，`angular-miniprogram/vitest`
  * 这类子路径一个都解析不到。
  *
  * Windows 上用 junction，普通权限就能建。
