@@ -80,6 +80,12 @@ describe('系统信息族（参考 enhanceSystemInfo 移植）', () => {
       expect(getHostName({ host: 'baidu' }, 'swan')).toBe('baidu');
       expect(getHostName({ AppPlatform: 'qq' }, 'qq')).toBe('qq');
     });
+    it('ks 取 host，xhs 取 hostName，缺失时回退宿主名', () => {
+      expect(getHostName({ host: 'kuaishou' }, 'ks')).toBe('kuaishou');
+      expect(getHostName({}, 'ks')).toBe('Kuaishou');
+      expect(getHostName({ hostName: '小红书' }, 'xhs')).toBe('小红书');
+      expect(getHostName({}, 'xhs')).toBe('Xiaohongshu');
+    });
   });
 
   describe('enhanceSystemInfo', () => {

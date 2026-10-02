@@ -24,6 +24,9 @@ export const PLATFORM_FLAG_NAMES: Record<PlatformType, string> = {
   [PlatformType.zfb]: '__MP_ZFB__',
   [PlatformType.qq]: '__MP_QQ__',
   [PlatformType.dd]: '__MP_DD__',
+  [PlatformType.ks]: '__MP_KS__',
+  [PlatformType.xhs]: '__MP_XHS__',
+  [PlatformType.fs]: '__MP_FS__',
   [PlatformType.library]: '__MP_LIBRARY__',
 };
 

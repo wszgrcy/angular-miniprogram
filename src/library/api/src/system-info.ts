@@ -191,6 +191,10 @@ export function getHostName(fromRes: any, platform: MpPlatform) {
       return fromRes.hostName || 'DingTalk';
     case 'jd':
       return fromRes.hostName || 'JD';
+    case 'ks':
+      return fromRes.host || 'Kuaishou';
+    case 'xhs':
+      return fromRes.hostName || 'Xiaohongshu';
   }
 }
 

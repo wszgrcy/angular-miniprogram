@@ -39,6 +39,9 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       PlatformType.qq,
       PlatformType.zfb,
       PlatformType.zj,
+      PlatformType.ks,
+      PlatformType.xhs,
+      PlatformType.fs,
     ]) {
       it(`运行${PlatformType[platform]}`, async () => {
         angularConfig.platform = platform;
