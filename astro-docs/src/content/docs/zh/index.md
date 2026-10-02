@@ -1,5 +1,5 @@
 ---
-title: "Angular 小程序 文档"
+title: 'Angular 小程序 文档'
 ---
 
 Angular 小程序（angular-miniprogram）让你用 **Angular** 的语法与工程体系开发**微信小程序**，一套模板/样式/逻辑，编译期产出小程序的 `wxml / wxss / js / json`。
@@ -8,7 +8,8 @@ Angular 小程序（angular-miniprogram）让你用 **Angular** 的语法与工�
 
 - **原生 Angular 工程**：`@Component`、依赖注入、模板语法、控制流（`@if` / `@for` / `@switch`）全部照常用
 - **构建期翻译**：模板在构建时翻译成 wxml，运行时把 Angular 的渲染结果物化成小程序 `setData` 数据
-- **多平台**：微信、支付宝、百度、QQ、京东、字节等一套代码多端产出
+- **多平台**：微信、支付宝、钉钉、百度、QQ、京东、字节、快手、小红书、飞书，一套代码多端产出
+  （`platform` 取值：`wx` / `zfb` / `dd` / `bdzn` / `qq` / `jd` / `zj` / `ks` / `xhs` / `fs`）
 - **库构建**：可以把 Angular 库编译成小程序自定义组件库
 
 ---
@@ -23,7 +24,7 @@ import { Component } from '@angular/core';
 @Component({
   selector: 'app-hello',
   standalone: true,
-  template: `<view class="hello">{{name}}</view>`,
+  template: `<view class="hello">{{ name }}</view>`,
 })
 export class HelloComponent {
   name = 'Hello Angular Miniprogram';

@@ -20,10 +20,7 @@ import { MpPlatform } from './types';
 
 const UUID_KEY = '__AMP_DEVICE_UUID';
 
-export function addSafeAreaInsets(
-  fromRes: any,
-  toRes: Record<string, any>,
-) {
+export function addSafeAreaInsets(fromRes: any, toRes: Record<string, any>) {
   if (fromRes.safeArea) {
     const safeArea = fromRes.safeArea;
     toRes.safeAreaInsets = {
@@ -66,8 +63,8 @@ export function getOSInfo(
   system = '',
   platformField = '',
 ): { osName: string; osVersion: string; system: string } {
-  let osName = '';
-  let osVersion = '';
+  let osName: string;
+  let osVersion: string;
 
   if (
     platformField &&
@@ -114,10 +111,7 @@ export function getOSInfo(
 }
 
 /** platform 字段归一：ohos/harmony/iphone os 等各家写法 → 统一值 */
-export function normalizePlatform(
-  platform: MpPlatform,
-  platformField: string,
-) {
+export function normalizePlatform(platform: MpPlatform, platformField: string) {
   const p = (platformField || '').toLowerCase();
   if (platform === 'wx') {
     if (p === 'ohos') {
@@ -137,11 +131,7 @@ export function normalizePlatform(
 }
 
 /** 设备类型推断：ipad→pad，windows/mac/linux/pc→pc，微信 ohos_pc→pc */
-export function getDeviceType(
-  fromRes: any,
-  model = '',
-  platform: MpPlatform,
-) {
+export function getDeviceType(fromRes: any, model = '', platform: MpPlatform) {
   const platformField = fromRes.platform || '';
   let deviceType = fromRes.deviceType || 'phone';
   const deviceTypeMaps: Record<string, string> = {
@@ -191,6 +181,10 @@ export function getHostName(fromRes: any, platform: MpPlatform) {
       return fromRes.hostName || 'DingTalk';
     case 'jd':
       return fromRes.hostName || 'JD';
+    case 'ks':
+      return fromRes.host || 'Kuaishou';
+    case 'xhs':
+      return fromRes.hostName || 'Xiaohongshu';
   }
 }
 
@@ -224,18 +218,19 @@ export function enhanceSystemInfo(
     deviceOrientation,
   } = fromRes;
 
-  const { osName, osVersion, system: updatedSystem } = getOSInfo(
-    platform,
-    system,
-    platformField,
-  );
+  const {
+    osName,
+    osVersion,
+    system: updatedSystem,
+  } = getOSInfo(platform, system, platformField);
   const hostLanguage = (language || '').replace(/_/g, '-');
 
   Object.assign(toRes, fromRes, {
     deviceBrand: getDeviceBrand(brand),
     deviceModel: model,
     deviceType: getDeviceType(fromRes, model, platform),
-    devicePixelRatio: platform === 'swan' ? fromRes.devicePixelRatio : pixelRatio,
+    devicePixelRatio:
+      platform === 'swan' ? fromRes.devicePixelRatio : pixelRatio,
     deviceOrientation:
       platform === 'swan' ? fromRes.orientation : deviceOrientation,
     osName,

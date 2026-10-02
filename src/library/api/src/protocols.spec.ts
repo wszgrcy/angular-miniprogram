@@ -799,6 +799,77 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
     });
   });
 
+  describe('快手(ks) 搬运自 uni-mp-kuaishou', () => {
+    it('requestPayment 新版走 ks.pay，并补上固定 serviceId', async () => {
+      const g: any = globalThis;
+      const saved = g.ks;
+      g.ks = { pay: (o: any) => o.success?.({ received: o }) };
+      try {
+        const service = setup('ks', g.ks as any as Record<string, any>);
+        const res: any = await service.invoke('requestPayment', {
+          orderInfo: 'x',
+        });
+        expect(res.received.serviceId).toBe('1');
+        expect(res.received.orderInfo).toBe('x');
+      } finally {
+        if (saved === undefined) {
+          delete g.ks;
+        } else {
+          g.ks = saved;
+        }
+      }
+    });
+
+    it('requestPayment 旧版仍叫 requestPayment，不注入 serviceId', async () => {
+      let received: any;
+      const service = setup('ks', {
+        requestPayment: (o: any) => {
+          received = o;
+          o.success?.({});
+        },
+      });
+      await service.invoke('requestPayment', { orderInfo: 'x' });
+      expect(received.orderInfo).toBe('x');
+      expect(received.serviceId).toBeUndefined();
+    });
+  });
+
+  describe('小红书(xhs) 搬运自 uni-mp-xhs', () => {
+    it('requestPayment 改名为 requestGuaranteeOrderPayment', async () => {
+      const spy = vi.fn().mockImplementation((o: any) => o.success?.({}));
+      const service = setup('xhs', { requestGuaranteeOrderPayment: spy });
+      await service.invoke('requestPayment', { orderInfo: 'x' });
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it('showActionSheet 不传 itemColor 时补 #000000', async () => {
+      let received: any;
+      const service = setup('xhs', {
+        showActionSheet: (o: any) => {
+          received = o;
+          o.success?.({});
+        },
+      });
+      await service.invoke('showActionSheet', { itemList: ['a'] });
+      expect(received.itemColor).toBe('#000000');
+    });
+
+    it('showActionSheet 显式传 itemColor 时不覆盖', async () => {
+      let received: any;
+      const service = setup('xhs', {
+        showActionSheet: (o: any) => {
+          received = o;
+          o.success?.({});
+        },
+      });
+      await service.invoke('showActionSheet', {
+        itemList: ['a'],
+        itemColor: '#ffffff',
+      });
+      expect(received.itemColor).toBe('#ffffff');
+    });
+  });
+
   describe('核心协议 previewImage（全平台）', () => {
     it('current 传数字串索引：钳位、重排 urls、丢弃 indicator/loop', async () => {
       let received: any;

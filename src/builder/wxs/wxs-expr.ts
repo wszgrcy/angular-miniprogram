@@ -154,6 +154,7 @@ export function wxmlLiteral(value: unknown): string {
   if (typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
   }
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string
   const escaped = String(value)
     .replace(/\\/g, '\\\\')
     .replace(/'/g, "\\'")

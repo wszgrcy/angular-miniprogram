@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 库元数据 sidecar（`<库根>/mp-library-meta.json`）→ wxml 事件绑定。
  *

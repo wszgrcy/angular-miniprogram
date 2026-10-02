@@ -35,6 +35,12 @@ export function detectMpPlatform() {
   if (g.qq) {
     return 'qq';
   }
+  if (g.ks) {
+    return 'ks';
+  }
+  if (g.xhs) {
+    return 'xhs';
+  }
   return 'wx';
 }
 

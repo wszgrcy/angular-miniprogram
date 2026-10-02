@@ -106,7 +106,7 @@ export function nativeComponentsPlugin(
       );
       for (const [wxmlName] of wxmlAssets) {
         const wxml = String(
-          (bundle[wxmlName] as { source?: unknown }).source ?? '',
+          (bundle[wxmlName] as { source?: string | Uint8Array }).source ?? '',
         );
         const hits = metas.filter((m) =>
           new RegExp(`<${m.tag}[\\s/>]`).test(wxml),

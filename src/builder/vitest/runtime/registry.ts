@@ -8,14 +8,12 @@
  * 而宿主给的是 `<repo>/test/.../foo/bar.spec.ts`。
  */
 export interface TestModuleRegistry {
-  load(filepath: string): unknown | Promise<unknown>;
+  load(filepath: string): unknown;
   /** 反查：包内 key，用于日志与错误信息 */
   keys(): string[];
 }
 
-export type TestModuleMap = Readonly<
-  Record<string, () => unknown | Promise<unknown>>
->;
+export type TestModuleMap = Readonly<Record<string, () => unknown>>;
 
 function normalize(value: string): string {
   return value.replace(/\\/g, '/').replace(/^\.\//, '');

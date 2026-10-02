@@ -65,4 +65,4 @@ export function execute(
   );
 }
 
-export default createBuilder<Record<string, string> & any>(execute);
+export default createBuilder<Record<string, string>>(execute);

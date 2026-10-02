@@ -2,8 +2,12 @@ import { BdZnBuildPlatform } from './bd/bdzn-platform';
 import { BdZnTransform } from './bd/bdzn.transform';
 import { DdBuildPlatform } from './dd/dd-platform';
 import { DdTransform } from './dd/dd.transform';
+import { FsBuildPlatform } from './fs/fs-platform';
+import { FsTransform } from './fs/fs.transform';
 import { JdBuildPlatform } from './jd/jd-platform';
 import { JdTransform } from './jd/jd.transform';
+import { KsBuildPlatform } from './ks/ks-platform';
+import { KsTransform } from './ks/ks.transform';
 import { LibraryBuildPlatform } from './library/library-platform';
 import { LibraryTransform } from './library/library.transform';
 import { BuildPlatform, PlatformType } from './platform';
@@ -12,6 +16,8 @@ import { QqTransform } from './qq/qq.transform';
 import { TemplateTransformBase } from './template-transform-strategy/transform.base';
 import { WxBuildPlatform } from './wx/wx-platform';
 import { WxTransform } from './wx/wx.transform';
+import { XhsBuildPlatform } from './xhs/xhs-platform';
+import { XhsTransform } from './xhs/xhs.transform';
 import { ZfbBuildPlatform } from './zfb/zfb-platform';
 import { ZfbTransform } from './zfb/zfb.transform';
 import { ZjBuildPlatform } from './zjtd/zj-platform';
@@ -72,6 +78,27 @@ export function getBuildPlatformInjectConfig(platform: PlatformType) {
         { provide: TemplateTransformBase, useExisting: DdTransform },
         { provide: DdBuildPlatform },
         { provide: BuildPlatform, useClass: DdBuildPlatform },
+      ];
+    case PlatformType.ks:
+      return [
+        { provide: KsTransform },
+        { provide: TemplateTransformBase, useExisting: KsTransform },
+        { provide: KsBuildPlatform },
+        { provide: BuildPlatform, useClass: KsBuildPlatform },
+      ];
+    case PlatformType.xhs:
+      return [
+        { provide: XhsTransform },
+        { provide: TemplateTransformBase, useExisting: XhsTransform },
+        { provide: XhsBuildPlatform },
+        { provide: BuildPlatform, useClass: XhsBuildPlatform },
+      ];
+    case PlatformType.fs:
+      return [
+        { provide: FsTransform },
+        { provide: TemplateTransformBase, useExisting: FsTransform },
+        { provide: FsBuildPlatform },
+        { provide: BuildPlatform, useClass: FsBuildPlatform },
       ];
     case PlatformType.library:
       return [

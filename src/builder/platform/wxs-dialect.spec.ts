@@ -4,14 +4,20 @@ import { BdZnBuildPlatform } from './bd/bdzn-platform';
 import { BdZnTransform } from './bd/bdzn.transform';
 import { DdBuildPlatform } from './dd/dd-platform';
 import { DdTransform } from './dd/dd.transform';
+import { FsBuildPlatform } from './fs/fs-platform';
+import { FsTransform } from './fs/fs.transform';
 import { JdBuildPlatform } from './jd/jd-platform';
 import { JdTransform } from './jd/jd.transform';
+import { KsBuildPlatform } from './ks/ks-platform';
+import { KsTransform } from './ks/ks.transform';
 import { BuildPlatform } from './platform';
 import { QqBuildPlatform } from './qq/qq-platform';
 import { QqTransform } from './qq/qq.transform';
 import { TemplateTransformBase } from './template-transform-strategy/transform.base';
 import { WxBuildPlatform } from './wx/wx-platform';
 import { WxTransform } from './wx/wx.transform';
+import { XhsBuildPlatform } from './xhs/xhs-platform';
+import { XhsTransform } from './xhs/xhs.transform';
 import { ZfbBuildPlatform } from './zfb/zfb-platform';
 import { ZfbTransform } from './zfb/zfb.transform';
 import { ZjBuildPlatform } from './zjtd/zj-platform';
@@ -33,6 +39,9 @@ const DIALECTS: Array<{ name: string; transform: any; extname: string }> = [
   { name: 'bdzn', transform: new BdZnTransform(), extname: '.sjs' },
   { name: 'zjtd', transform: new ZjTransform(), extname: '.sjs' },
   { name: 'jd', transform: new JdTransform(), extname: '.jds' },
+  { name: 'ks', transform: new KsTransform(), extname: '.sjs' },
+  { name: 'xhs', transform: new XhsTransform(), extname: '.sjs' },
+  { name: 'fs', transform: new FsTransform(), extname: '.sjs' },
 ];
 
 describe('wxs 平台方言: transform 扩展名', () => {
@@ -59,6 +68,9 @@ describe('wxs 平台方言: 与平台 fileExtname 一致', () => {
     bdzn: BdZnBuildPlatform,
     zjtd: ZjBuildPlatform,
     jd: JdBuildPlatform,
+    ks: KsBuildPlatform,
+    xhs: XhsBuildPlatform,
+    fs: FsBuildPlatform,
   };
 
   DIALECTS.forEach(({ name, transform }) => {
@@ -89,6 +101,9 @@ describe('wxs 平台方言: 头部转译', () => {
     bdzn: '<import-sjs module="util" src="/common/util.sjs"/>',
     zjtd: '<sjs module="util" src="/common/util.sjs"/>',
     jd: '<jds module="util" src="/common/util.jds"/>',
+    ks: '<sjs module="util" src="/common/util.sjs"/>',
+    xhs: '<sjs module="util" src="/common/util.sjs"/>',
+    fs: '<sjs module="util" src="/common/util.sjs"/>',
   };
 
   DIALECTS.forEach(({ name, transform }) => {

@@ -92,7 +92,7 @@ describe('AbortController polyfill 接入', () => {
       if (!result.result?.success) {
         const errLogs = (result.logs || [])
           .filter((l: { level: string }) => l.level === 'error')
-          .map((l: { message?: unknown; value?: unknown }) =>
+          .map((l: { message?: string; value?: string }) =>
             String(l.message ?? l.value),
           );
         console.log('JS_ERR>>>' + errLogs.join(' ~~ ').slice(0, 4000));

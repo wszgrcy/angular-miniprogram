@@ -3,7 +3,6 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import { Observable } from 'rxjs';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Handler = (payload: any) => void;
 
 /**

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { Observable } from 'rxjs';
 
 /**
@@ -22,8 +20,6 @@ export function fromMpEvent<T>(
 /**
  * 单例式事件源：平台只提供 on*（无 off*）时用，退订只断开本地订阅。
  */
-export function fromMpEventOnce<T>(
-  on: (handler: (res: T) => void) => void,
-) {
+export function fromMpEventOnce<T>(on: (handler: (res: T) => void) => void) {
   return fromMpEvent(on, () => undefined);
 }

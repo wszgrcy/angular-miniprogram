@@ -127,7 +127,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       if (!result.result?.success) {
         const errLogs = (result.logs || [])
           .filter((l: { level: string }) => l.level === 'error')
-          .map((l: { message?: unknown }) => String(l.message));
+          .map((l: { message?: string }) => String(l.message));
         console.log('SUBPKG_ERR>>>' + errLogs.join(' ~~ ').slice(0, 4000));
       }
       expect(result.result?.success).toBeTruthy();
@@ -219,7 +219,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const result = await harness.executeOnce();
       expect(result.result?.success).toBeFalsy();
       const allLogs = (result.logs || [])
-        .map((l: { message?: unknown }) => String(l.message))
+        .map((l: { message?: string }) => String(l.message))
         .join(' ~~ ');
       expect(allLogs).toContain('跨分包静态依赖');
     }, 300000);

@@ -10,6 +10,12 @@ export enum PlatformType {
   zfb = 'zfb',
   qq = 'qq',
   dd = 'dd',
+  /** 快手 */
+  ks = 'ks',
+  /** 小红书 */
+  xhs = 'xhs',
+  /** 飞书（宿主命名空间沿用字节的 tt，见 fs/fs-platform.ts） */
+  fs = 'fs',
   /** 这个属性只会在内部被使用 */
   library = 'library',
 }

@@ -333,7 +333,11 @@ const ALIPAY: MpProtocolTable = {
       }
       const stat = manager.stat;
       manager.stat = function (options: any) {
-        if (options && typeof options === 'object' && options.recursive === true) {
+        if (
+          options &&
+          typeof options === 'object' &&
+          options.recursive === true
+        ) {
           (['success', 'complete'] as const).forEach((name) => {
             const cb = options[name];
             if (typeof cb === 'function') {
@@ -485,13 +489,15 @@ const WX: MpProtocolTable = {
       const g: any = globalThis;
       let hostEnv = '';
       try {
-        const base =
-          g.wx?.getAppBaseInfo?.() ?? g.wx?.getSystemInfoSync?.();
+        const base = g.wx?.getAppBaseInfo?.() ?? g.wx?.getSystemInfoSync?.();
         hostEnv = base?.host?.env ?? '';
       } catch {
         /* 取不到宿主信息时按普通 wx 处理 */
       }
-      if (hostEnv === 'SAAASDK' && typeof g.wx?.miniapp?.shareVideoMessage === 'function') {
+      if (
+        hostEnv === 'SAAASDK' &&
+        typeof g.wx?.miniapp?.shareVideoMessage === 'function'
+      ) {
         return g.wx.miniapp.shareVideoMessage(opts);
       }
       return call('shareVideoMessage', opts);
@@ -517,9 +523,8 @@ const CORE: MpProtocolTable = {
       const currentIndex = Math.min(Math.max(parsed, 0), urls.length - 1);
       if (currentIndex > 0) {
         to.current = urls[currentIndex];
-        to.urls = urls.filter(
-          (item: string, i: number) =>
-            i < currentIndex ? item !== urls[currentIndex] : true,
+        to.urls = urls.filter((item: string, i: number) =>
+          i < currentIndex ? item !== urls[currentIndex] : true,
         );
       } else {
         to.current = urls[0];
@@ -567,11 +572,7 @@ const BAIDU: MpProtocolTable = {
 };
 
 /** 对照 uni 的 createTodoMethod：平台缺失能力调用时给出明确提示 */
-function stubUnsupported(
-  manager: any,
-  methods: string[],
-  contextName: string,
-) {
+function stubUnsupported(manager: any, methods: string[], contextName: string) {
   methods.forEach((method) => {
     manager[method] = () =>
       // eslint-disable-next-line no-console
@@ -612,15 +613,43 @@ function tabbarAnimationArgs(from: any, to: any) {
 }
 
 /**
+ * 快手(ks)协议表，搬运自 uni-mp-kuaishou/src/api/protocols.ts。
+ */
+const KUAISHOU: MpProtocolTable = {
+  requestPayment: {
+    // 新版叫 pay（需带固定 serviceId '1'），旧版仍是 requestPayment
+    custom: (opts, call) => {
+      const g: any = globalThis;
+      if (g.ks?.pay) {
+        return call('pay', { serviceId: '1', ...opts });
+      }
+      return call('requestPayment', opts);
+    },
+  },
+};
+
+/**
+ * 小红书(xhs)协议表，搬运自 uni-mp-xhs/src/api/protocols.ts。
+ */
+const XIAOHONGSHU: MpProtocolTable = {
+  // 小红书 itemColor 无默认值，不传会撞白底白字
+  showActionSheet: {
+    args: (from: any, to: any) => {
+      if (!from?.itemColor) {
+        to.itemColor = '#000000';
+      }
+    },
+  },
+  requestPayment: { name: 'requestGuaranteeOrderPayment' },
+};
+
+/**
  * 通用结果归一（支付宝系）：
  * - 成功结果补 `errMsg: '<name>:ok'`（支付宝原生结果没有该字段）
  * - `error` / `errorMessage` 字段转 `errMsg: '<name>:fail ...'`
  * 参考 uni-mp-alipay 的通用 returnValue。
  */
-export function normalizeAlipayStyleResult(
-  methodName: string,
-  res: any,
-) {
+export function normalizeAlipayStyleResult(methodName: string, res: any) {
   if (res == null || typeof res !== 'object' || res instanceof Error) {
     return res;
   }
@@ -652,6 +681,8 @@ export const DEFAULT_MP_PROTOCOLS: Record<MpPlatform, MpProtocolTable> = {
   jd: { ...CORE },
   my: { ...CORE, ...ALIPAY },
   dd: { ...CORE, ...DINGTALK },
+  ks: { ...CORE, ...KUAISHOU },
+  xhs: { ...CORE, ...XIAOHONGSHU },
 };
 
 export const MP_API_PROTOCOLS = new InjectionToken<

@@ -61,7 +61,7 @@ function copyIfChanged(from: string, to: string): void {
   } catch {
     return;
   }
-  let cur: Buffer | null = null;
+  let cur: Buffer | null;
   try {
     cur = fs.readFileSync(to);
   } catch {

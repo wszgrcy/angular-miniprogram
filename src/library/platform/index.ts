@@ -1,4 +1,4 @@
-// eslint-disable-next-line import/no-unassigned-import
+// eslint-disable-next-line import-x/no-unassigned-import
 import './util/fake-document'; // 副作用导入：装 Document 占位物，见 fake-document.ts
 import { MiniProgramCore } from 'angular-miniprogram/platform/wx';
 

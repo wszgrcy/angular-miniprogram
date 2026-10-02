@@ -195,13 +195,14 @@ export class MpApiService {
     return new Promise<T>((resolve, reject) => {
       this.invoke$<N, T>(name, options).subscribe({
         next: (v) => resolve(v),
+        // 小程序 API 的错误载荷是平台原始对象（`{errMsg: ...}`），原样抛给调用方
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
         error: (e) => reject(e),
       });
     }) as MpApiReturn<N, T>;
   }
 
   /** 直接取平台原始 API（跳过协议/拦截器），用于协议 custom 之外的特殊场景 */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getRawApi(name: MpApiNameInput): ((...args: any[]) => any) | undefined {
     const fn = this.globalObject?.[name];
     return typeof fn === 'function' ? fn : undefined;
@@ -446,7 +447,7 @@ export class MpApiService {
       let stored = '';
       try {
         stored = String(
-          this.callSync<unknown>('getStorageSync', LOCALE_KEY) ?? '',
+          this.callSync<string>('getStorageSync', LOCALE_KEY) ?? '',
         );
       } catch {
         /* 无存储能力时落回默认 */
