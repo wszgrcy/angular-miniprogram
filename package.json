@@ -54,7 +54,7 @@
     "@types/ws": "^8.18.2",
     "@typescript-eslint/eslint-plugin": "^5.44.0",
     "@typescript-eslint/parser": "^5.44.0",
-    "@vitest/coverage-v8": "^5.0.3",
+    "@vitest/coverage-v8": "^4.1.11",
     "birpc": "^4.2.0",
     "cpx": "^1.5.0",
     "cross-env": "^7.0.3",
@@ -80,12 +80,12 @@
     "typedoc": "^0.28.20",
     "typescript": "6.0.3",
     "vite": "^8.3.0",
-    "vitest": "^5.0.3",
+    "vitest": "^4.1.11",
     "weapp.socket.io": "^3.0.0",
     "ws": "^8.22.0"
   },
   "dependencies": {
-    "@angular/common": "^22.1.7",
+    "@angular/common": "22.1.7",
     "abortcontroller-polyfill": "^1.7.8",
     "cyia-code-util": "^1.8.0",
     "es-toolkit": "^1.52.0",

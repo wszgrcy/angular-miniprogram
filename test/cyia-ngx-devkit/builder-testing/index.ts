@@ -588,8 +588,8 @@ export class BuilderTestHarness<T> extends BuilderHarness<T> {
 export interface HarnessFileMatchers {
   toExist(): boolean;
   toNotExist(): boolean;
-  readonly content: Assertion<void, string>;
-  readonly size: Assertion<void, number>;
+  readonly content: Assertion<string>;
+  readonly size: Assertion<number>;
 }
 
 interface HarnessContextHost {
