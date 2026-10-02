@@ -11,6 +11,7 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
+import { executeOnceShared } from '../../../test/util/shared-build';
 import { PlatformType } from '../platform/platform';
 import { buildPlatformDefine, getBuildPlatform, runViteBuilder } from './index';
 
@@ -79,16 +80,14 @@ describe('AbortController polyfill 接入', () => {
       );
       await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
 
-      harness.useTarget('build', {
+      const result = await executeOnceShared(harness, 'build', {
         tsConfig: 'src/tsconfig.app.json',
         outputPath: 'dist/vite-polyfill',
         pages: DEFAULT_ANGULAR_CONFIG.pages,
         components: DEFAULT_ANGULAR_CONFIG.components,
         platform: PlatformType.wx,
         sourceMap: false,
-      } as never);
-
-      const result = await harness.executeOnce();
+      });
       if (!result.result?.success) {
         const errLogs = (result.logs || [])
           .filter((l: { level: string }) => l.level === 'error')

@@ -13,6 +13,7 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../test/util/file';
+import { executeOnceShared } from '../../test/util/shared-build';
 // 主测试链路已切到 Vite builder（webpack 链路待删除）
 import { PlatformType } from './platform/platform';
 import { runViteBuilder as runBuilder } from './vite';
@@ -60,8 +61,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         'components',
       );
       await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
-      harness.useTarget('build', angularConfig);
-      const result = await harness.executeOnce();
+      const result = await executeOnceShared(harness, 'build', angularConfig);
       expect(result.error).toBeFalsy();
       expect(result.result?.success).toBeTruthy();
 

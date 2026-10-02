@@ -210,7 +210,10 @@ describe('diffNodeData: 优化后正确性与性能', () => {
    * Object.assign → O(N)。
    */
   it('新旧对比：结果逐字相等，且新算法在 O(N^2) 负载上更快', () => {
-    const N = 3000;
+    // 旧实现是 O(N^2)，N 直接决定本用例耗时（N=3000 时单跑一次近 1s，
+    // 四个轮子下来近 4s）。平价断言与 N 无关，加速比在 N=1000 已经
+    // 足够跳出噪声，所以这里取小值。
+    const N = 1000;
     const from: any = {};
     const to: any = {};
     for (let i = 0; i < N; i++) {
@@ -224,10 +227,10 @@ describe('diffNodeData: 优化后正确性与性能', () => {
     // 正确性平价：新旧输出必须完全一致
     expect(newResult).toEqual(oldResult);
 
-    // 计时：各自跑多轮取最小值，降低噪声
+    // 计时：各自跑两轮取最小值，降低噪声
     const time = (fn: () => unknown) => {
       let min = Infinity;
-      for (let r = 0; r < 3; r++) {
+      for (let r = 0; r < 2; r++) {
         const t = Date.now();
         fn();
         min = Math.min(min, Date.now() - t);

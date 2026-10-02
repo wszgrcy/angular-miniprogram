@@ -377,21 +377,35 @@ describe('路径式 setData 快速通道', () => {
   });
 
   it('性能：视图从 100 涨到 1000，快路径成本几乎不变', () => {
-    const ITER = 200;
+    /**
+     * 取 best-of-5、单次 20_000 轮，而不是“一轮 200 次取均值”。
+     *
+     * 单次循环体只有一两微秒，200 轮总共不到半毫秒 —— 整个测量窗口都
+     * 淹没在 JIT 升档和 GC 里，均值根本不代表成本。实测那样写在本机
+     * 能碎一半（先跑的 100 节点把 JIT 预热吃了，比值能飘到 3.5）。
+     * best-of-N 是“纯计算成本”的稳健估计；实测比值稳定在 0.6~0.7。
+     */
+    const ITER = 20_000;
+    const REPEAT = 5;
     const measure = (n: number) => {
       const { lView, nodes, mp } = bootstrap(n);
-      const t = process.hrtime.bigint();
-      for (let i = 0; i < ITER; i++) {
-        propertyChange(lView as any);
-        renderer.setProperty(nodes[0], 'k', i);
-        endRender();
+      let best = Infinity;
+      for (let r = 0; r < REPEAT; r++) {
+        const t = process.hrtime.bigint();
+        for (let i = 0; i < ITER; i++) {
+          propertyChange(lView as any);
+          renderer.setProperty(nodes[0], 'k', i);
+          endRender();
+        }
+        best = Math.min(best, Number(process.hrtime.bigint() - t) / ITER);
       }
       void mp;
-      return Number(process.hrtime.bigint() - t) / ITER;
+      return best;
     };
     const small = measure(100);
     const big = measure(1000);
-    // 允许 3 倍浮动（GC / 噪声），但绝不能随节点数线性增长到数量级
+    // 快路径是 O(变更) 而不是 O(视图)，理论上比值≈ 1；给 3 倍余量只为了
+    // 挡住“不当心又变成整表扫”这种量级的回归。
     expect(
       big,
       `1000 节点(${big.toFixed(0)}ns) 不应比 100 节点(${small.toFixed(0)}ns) 贵一个量级`,

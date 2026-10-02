@@ -75,15 +75,15 @@ function angularPartialIocLinker(): Plugin {
  * 必须先执行的文件：**相对仓库根的 posix 路径**，按声明顺序。
  * 新增条目直接加一行路径，后缀匹配。
  *
- * 为什么需要它：`library/library.spec.ts` 会把 test-library 的构建产物拷进
+ * 以前这里只有 `library/library.spec.ts`：它把 test-library 的构建产物拷进
  * `test/hello-world-app/node_modules/test-library`，而
  * `library-meta-sidecar.spec.ts` / `library-multiplatform.spec.ts`
- * 读的就是这份副本。按文件名排序 `library-` < `library/`
- * （`-` 是 0x2D，`/` 是 0x2F），默认顺序下读到的会是上一次残留的旧副本
- * —— 假绿灯。旧 jasmine 链路靠 `jasmine.json` 的 `spec_files` 声明顺序解决，
- * vitest 用 sequencer 表达同一件事。
+ * 读的就是这份副本；顺序错了读到上一次残留的旧副本，就是假绿灯。
+ *
+ * 那份拷贝现在由 `test/global-setup.ts` 在 worker 起跑前统一产出，
+ * 文件之间不再有先后依赖。表留着，当下没有需要打头的文件。
  */
-const RUN_FIRST = ['src/builder/library/library.spec.ts'];
+const RUN_FIRST: string[] = [];
 
 /** 把 Windows 路径归一成 posix，再按 RUN_FIRST 的下标定序；不在表里的排背。 */
 function firstRank(spec: TestSpecification): number {
@@ -146,10 +146,33 @@ const BUILDER_PROJECT: TestProjectInlineConfiguration = {
     // 真卡住就是零反馈干等，而不是报超时。
     testTimeout: 60_000,
     hookTimeout: 60_000,
-    // architect 的 TestProjectHost 会在仓库里开真实临时目录并写文件，
-    // 并发跑会互相踩，所以强制单进程串行。
+    /**
+     * 执行模型：**串行**（`maxWorkers: 1`）。
+     *
+     * sandbox 本身是隔离的：`TestProjectHost.initialize()` 每次用
+     * `claimUniqueSandboxRoot()` 以 `mkdir` 原子地占一个独立目录
+     * （`test/test-project-host-hello-world-app-<pid>-<序号>/`）。
+     *
+     * 钉成串行是因为 spec 之间存在**跨文件的进程级依赖**：`@angular/core` 被
+     * vitest 外部化，一个 worker 里只有一份，而 Ivy 的 `TView` 状态（指令匹配 /
+     * `TNode.localNames` 等）是跨文件累加的。实测洗牌顺序下会随机碎
+     * `template-name-coverage.spec.ts`，**强制 `maxWorkers: 1` 加洗牌同样会碎**
+     * —— 即这是文件顺序依赖，不是并发竞态；`isolate: true` 也挡不住。
+     * 默认顺序（`OrderedSequencer`）下全绿，所以先钉串行。
+     *
+     * `MP_TEST_MAX_WORKERS=N` 可以开并发，但上面那个顺序依赖没修之前不要这么跑。
+     *
+     * `isolate: false` + `sequence.concurrent: false`：同一个 worker 里 spec
+     * 共用模块图，`manifest-registry` 这类模块级注册表才不会串台。
+     */
     pool: 'forks',
-    maxWorkers: 1,
+    maxWorkers: Number(process.env.MP_TEST_MAX_WORKERS) || 1,
+    /**
+     * worker 起跑前把 `test-library` 夹具构建出来，spec 之间不再有先后依赖
+     * （见 `test/global-setup.ts`）。只给本 project：library 不碰磁盘也不碰
+     * `dist/`，让它白付那 4s 构建没道理。
+     */
+    globalSetup: ['./test/global-setup.ts'],
     /**
      * 把 `src/builder/util/load_esm.ts` 交给 **Node 原生加载**，不走 vitest 的模块运行器。
      *
@@ -172,6 +195,10 @@ const BUILDER_PROJECT: TestProjectInlineConfiguration = {
      * `server.deps.external` 的官方语义就是 "pass the package to native Node"，
      * Node 24 自带 TS 类型剥离，.ts 也能直接加载。
      * 结果：源码不动、不改源码文本、跑的是真实代码路径。
+     *
+     * `globalSetup` 也跑在本 project 的 runner 里（`Project._initializeGlobalSetup()`），
+     * 而 `test/global-setup.ts` 要 import 真的 builder，绕不开 `load_esm.ts`，
+     * 所以这条必须跟 `globalSetup` 待在同一层。
      */
     server: { deps: { external: [/util[\/]load_esm[.]ts$/] } },
     isolate: false,

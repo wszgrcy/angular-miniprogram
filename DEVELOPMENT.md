@@ -2425,50 +2425,206 @@ vitest 用 `vm.runInThisContext` 跑模块，里面再 `import()` 直接抛
 
 ### 执行模型
 
-`pool: 'forks'` + `maxWorkers: 1` + `sequence.concurrent: false`。
-architect 的 `TestProjectHost` 会在仓库里开真实临时目录并写文件，
-并发跑会互相踩。
+`pool: 'forks'` + **`maxWorkers: 1`（串行）** + `isolate: false` +
+`sequence.concurrent: false`。
 
-`testTimeout` / `hookTimeout` 给到 500s —— builder 类 spec 会真的跑一遍
-小程序全量构建。
+钉串行是因为 **spec 之间存在跨文件的进程级依赖**：`@angular/core` 被 vitest
+外部化，一个 worker 里只有一份，而 Ivy 的 `TView` 状态（指令匹配、
+`TNode.localNames` 等）是跨文件累加的。实测：`--sequence.shuffle` 下会随机碎
+`src/library/platform/template-name-coverage.spec.ts`（断言 `__templateName`
+推不出米源，`TNode.localNames` 为 `null`），而**强制 `maxWorkers: 1` + 洗牌
+同样会碎** —— 即这是文件顺序依赖，不是并发竞态；`isolate: true` 也挡不住
+（被外部化的 `@angular/core` 不受 isolate 控制）。
 
-### 文件执行顺序（sequencer）
+默认顺序（`OrderedSequencer`，按文件路径）下全绿，所以先钉串行。
+`MP_TEST_MAX_WORKERS=N` 这个旋钮留着，但上面那个顺序依赖修好之前不要开。
 
-`node_modules/test-library` 由 `library/library.spec.ts` 构建后拷入，
-`library-meta-sidecar.spec.ts` / `library-multiplatform.spec.ts` 读的就是这份副本。
-按文件名排序 `library-` < `library/`（`-` 是 0x2D，`/` 是 0x2F），
-**默认顺序下读到的会是上一轮残留的旧副本 —— 假绿灯**。
+已经确定并修掉的一个跨文件依赖：`@angular/compiler` 必须早于任何用 TestBed 的
+spec 加载，见文末「`@angular/compiler` 从哪来」。
 
-旧 jasmine 链路靠 `jasmine.json` 的 `spec_files` 声明顺序解决，
-vitest 用 `sequence.sequencer` 表达同一件事：`vitest.config.mts` 里的
-`OrderedSequencer extends BaseSequencer`，重写 `sort()` 把 `RUN_FIRST`
-列出的文件提到最前。
+sandbox 本身是隔离的：`TestProjectHost.initialize()` 每次用
+`claimUniqueSandboxRoot()` 以 `mkdir` 原子地占一个独立目录
+（`test/test-project-host-hello-world-app-<pid>-<序号>/`）。
 
-所以 `test:ci` 就是 `build:library && npm test`，**不需要先单独跑一个文件**。
-实测（删掉 `test/hello-world-app/node_modules/test-library` 后跑全量）：
-`library/library.spec.ts` 排第 1 执行，sidecar 第 11、multiplatform 第 14，
-843 specs 全绿。
+### 并发安全清单
 
-两个 spec 里保留的「副本新鲜度」守卫仍然有意义 —— 它挡的是
-**单独跑某一个文件**（`vitest run library-meta-sidecar`）的场景，
-那时 sequencer 帮不上忙。
+下面是「worker 之间有没有共享可写状态」的逐项审计结果。文件系统的部分都是
+干净的（下面这些结论仍然成立）；卡住并发的是上面说的 `@angular/core` 跨文件
+状态，不是文件/端口/环境变量那一类。
+
+| 共享的东西                                                         | 为什么（不）冲突                                                                                                                                                                             |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| sandbox 目录                                                       | 每次 `initialize()` 一个独立目录，天然隔离。但「名字怎么保证不重名」有讲究，见下                                                                                                             |
+| 模板目录 `test/hello-world-app`                                    | 只读。唯一的写者（library.spec 拷库产物）已挪进 globalSetup，跑在 worker 起来之前                                                                                                            |
+| spec 里的裸 `fs` 写                                                | 只有 `sandbox-copy.spec.ts` / `library-meta-unit.spec.ts`，两者都写 `mkdtemp(os.tmpdir())`，各自独立                                                                                         |
+| 端口 / 网络                                                        | 没有。`test:wechat` 才占 17900，走的是另一套 config                                                                                                                                          |
+| `process.cwd()`                                                    | 没有 spec 依赖它，也没有 `process.chdir`                                                                                                                                                     |
+| 模块级注册表（`manifest-registry`、library meta store、wxs 缓存…） | `isolate: false` 下同 worker 共享 —— 但**串行时是 74 个文件挤在一个 worker 里**，拆成 6 个 worker 只会共享得更少，不会更多。worker 内仍靠 `sequence.concurrent: false` 保证一次只跑一个 spec |
+| `test/.shared-build`                                               | 唯一真正需要设计的地方，见「构建去重」一节                                                                                                                                                   |
+
+#### 占坑：名字构造唯一，创建用原子操作
+
+上游 `findUniqueFolderPath()` 只做「exists 检查 → 返回路径」，**中间不创立**，
+目录是后面 `cpSync` 顺手建的 —— 两个 worker 双双通过检查就会共用一份 sandbox。
+它靠 `Math.random().toString(36).slice(2)` 碰唯一性（上游注释写着 "11 character
+alphanumeric string"，实测长度 7~14 不等），那是概率，不是保证。
+
+`FastTestProjectHost` 里换成 `claimUniqueSandboxRoot()`，名字
+`test-project-host-<模板名>-<pid>-<序号>`，两段各自堵死一种撞法：
+
+| 可能来抢的         | 为什么抢不到                        |
+| ------------------ | ----------------------------------- |
+| 别的进程 / worker  | 同一台机器上活着的进程 PID 互不相同 |
+| 本进程别的 harness | 序号单调递增，发出去的名字不回收    |
+
+两条都成立，`mkdirSync` 必然一次成功 —— **没有重试，也没有随机数**。真抛
+`EEXIST`（PID 被回收后撞上上轮崩溃留下的同名目录）就让它响，静默换个名字
+只会把问题埋掉。计数器挂在 `globalThis` 而不是模块变量：同一进程里这个模块
+可能被实例化两份，那样两个计数器会同时从 0 开始而 `pid` 又相同。
+
+占坑用 `mkdirSync`（不带 `recursive`）：目录已存在会 `EEXIST` 而不是静默通过，
+`mkdir(2)` 本身原子 —— 拿内核占坑，不需要锁文件，进程崩了也不留待回收的状态。
+锁文件自己也得靠 `O_CREAT|O_EXCL` 或 `mkdir` 才有效，还得额外处理 stale lock。
+同理，`test/.shared-build` 的发布用的是 `<key>.tmp-<pid>` + `rename`，也是原子
+占坑，不是锁。
+
+并发度参考（那个顺序依赖修好后才能用）：本机 16 核实测 2 个 38s / 4 个 29s /
+6 个 25s / 8 个 27s，6 个就到顶。内存每个 worker 一次真实 AOT 约 1.5~2GB
+（6 个并发峰值约 14GB，4 个约 9.5GB）。
+
+`isolate: false` 照旧：同一个 worker 里多个 spec 共用模块图，
+`manifest-registry` 这类模块级注册表才不会串台。
+
+`testTimeout` / `hookTimeout` 给到 60s —— builder 类 spec 会真的跑一遍小程序
+全量构建，但**必须有界**：以前写的 500s（8 分钟）等于没有上限，真卡住就是零
+反馈干等，而不是报超时。
+
+### 库产物前置（globalSetup）
+
+`library-meta-sidecar.spec.ts` / `library-multiplatform.spec.ts` 构建 app 时
+要消费 `node_modules/test-library`。这份产物以前由
+`library/library.spec.ts` 构建完顺手拷进模板目录，于是三个文件之间有了隐式
+先后依赖：按文件名排序 `library-` < `library/`（`-` 是 0x2D，`/` 是 0x2F），
+**默认顺序下读到的是上一轮残留的旧副本 —— 假绿灯**。
+
+现在由 `test/global-setup.ts` 在 builder 的 worker 起跑前统一产出，文件之间
+不再有先后依赖，`RUN_FIRST` 因此是空的（`OrderedSequencer` 留着，以后确实需要
+打头文件时往里加一行即可）。
+
+`globalSetup` 挂在 `BUILDER_PROJECT` 上而不是根配置：读这份副本的全在
+`src/builder/` 下，library 那边纯内存，不该为它白跑一次构建（实测
+`vitest run --project library` 单文件 7.7s → 1.8s）。同理，
+`server.deps.external`（`load_esm.ts` 交给 Node 原生加载）也得跟它待在同一层
+—— `globalSetup` 用的就是本 project 的 runner。
+
+**globalSetup 走的是出厂的那个 builder，不是底层 ng-packagr。** 它调
+`execute()`（`builders.json` 里 `library` 指向的实现），产物落在
+`test/hello-world-app/dist/test-library`，再拷一份进 `node_modules/test-library`。
+于是 `library.spec.ts` **不再自己构建**，直接断言这份制品 —— 同一件事不用花两遍
+2s。harness 本来也是直接调 `execute`（`BuilderHarness` 里
+`this.builderHandler(data, context)`，并没有经过 `createBuilder`），所以这条
+路径就是原来的被测路径本身，覆盖没降级。
+
+代价是 harness 顺带的两样东西没了，得显式补：
+
+- **options schema 校验**。以前 `executeOnce()` 走 architect 的
+  `CoreSchemaRegistry`。现在 `library.spec.ts` 里单开一组用例直接校验，
+  而且读的是**出厂那份** `src/builder/library/schema.json` —— 以前 harness
+  校验的是 `test/test-builder/schema.library.json` 手抄副本，迟早和出厂的对不上。
+  副本和 `LIBRARY_BUILDER_INFO` 已一并删掉。
+- **`cli.cache` 的 context**。globalSetup 的 stub context 显式给了
+  `cli.cache.enabled: false`，与 harness 的 `DEFAULT_PROJECT_METADATA` 对齐，
+  否则 ng-packagr 会往模板目录写 `.angular/cache`（既没被 gitignore，
+  又把上一轮编译缓存留给下一次运行）。
+
+构建失败在 globalSetup 里直接抛，带 ng-packagr 的原始错误（实测
+`ENOENT ... NOPE.json` 会整条打出来）—— 夹具都没出来，跑下去全是连带失败。
+
+两个消费 spec 里保留的「副本新鲜度」守卫仍然有意义 —— 它挡的是模板目录里那份
+副本压根没生成 / 已过期的情况。
+
+构建参数与落点集中在 `test/library-fixture.ts`，globalSetup 与 spec 共用一份，
+不在两处各写一遍。
+
+### 构建去重（shared-build）
+
+一次全量构建 ≈ 2s，其中约一半是 Angular AOT（analog 插件在 `buildStart`
+里整包重编），跟断言内容无关。而一批 spec 用的是同一份 fixture + 同一份构建
+参数，只是各看产物的一个侧面，于是同一件事被构建了七八遍。
+
+`test/util/shared-build.ts` 的 `executeOnceShared()` 按「构建参数（不含
+`outputPath`）+ sandbox 文件树内容」做记忆化：命中就把上次产物拷进当前
+sandbox，不重跑构建。
+
+两条边界值得记住：
+
+- **只在进程内**。键覆盖不了「构建器自己的源码变了」；一旦落盘跨运行复用，
+  改了 `src/builder/**` 命中的还是旧产物，是典型的假绿灯。
+- **依赖构建的进程内副作用的 spec 不能用**。命中缓存就不跑构建，
+  `manifest-registry` / library meta 那些模块级注册表会是空的。
+  `node-index-equivalence.spec.ts` 的按组件精确比对就是这一类，
+  它靠文件内的 `loadSharedArtifacts()` 只构建一次。
+- **发布必须原子**。缓存表是进程内的，两个 worker 会同时算出同一个 key 并
+  各自往 `CACHE_ROOT/<key>` 里 `cpSync`，互相删对方刚建的目录 ——
+  `fs.cpSync` 会直接 `terminate`（`std::filesystem_error: cannot create
+directory`）把整个 worker 带卡，coverage 跑时实测到过。现在先写
+  `<key>.tmp-<pid>` 再 `rename` 发布，缓存根目录的清理也从 worker 挪到了
+  globalSetup（worker 里 `rmSync` 会删掉别人正在读写的那份）。
 
 ### 覆盖率
 
 `npm run coverage` = `vitest run --coverage`（`@vitest/coverage-v8`）。
 `reportsDirectory` 指到 `docs/coverage`，因为
-`script/coverage-badge.ts` 读的是 `docs/coverage/coverage-summary.json`
-的 `total.lines.pct`，v8 的 `json-summary` reporter 形状正好对得上。
+`script/coverage-badge.ts` 读的是 `docs/coverage/coverage-summary.json` 的
+`total.lines.pct`，v8 的 `json-summary` reporter 形状正好对得上。
 
 ### 耗时
 
-|                         | 时长 | spec |
-| ----------------------- | ---- | ---- |
-| 旧（jasmine + ts-node） | ~88s | 843  |
-| vitest                  | ~92s | 843  |
+|                                     | 时长     | spec |
+| ----------------------------------- | -------- | ---- |
+| 旧（jasmine + ts-node）             | ~88s     | 843  |
+| vitest（串行，去重前）              | ~101s    | 883  |
+| **vitest（串行 + 构建去重，当前）** | **~67s** | 883  |
+| vitest（并发 + 构建去重）           | ~25s     | 883  |
 
-价值不在速度，在于：不再全量 ts-node 编译、有 per-file 并行能力
-（当前被 architect harness 限制成串行）、以及标准的 reporter / watch / UI 生态。
+串行那一档省下的 34s 全来自「少构建」：十家平台的全量冒烟收敛成 wx + zfb
+（平台差异由 `platform-registry.spec.ts` 逐字覆盖）、同参数构建合并 / 去重、
+test-library 只构建一次、删掉与 `vite/watch.spec.ts` 重复的
+`builder.watch.spec.ts`。价值不只在速度：不再全量 ts-node 编译，还有标准的
+reporter / watch / UI 生态。
+
+并发那一档能再拿掉 40s，但因为上面说的跨文件顺序依赖没修，**当前不开**。
+
+### `@angular/compiler` 从哪来
+
+`@angular/common/http` 的 `_xhr-chunk.mjs` 里 `BrowserXhr` 带的是**部分编译**
+（partial）的 `ɵɵngDeclareFactory`，静态初始化时要么已被 Angular Linker 处理过，
+要么进程里已加载 `@angular/compiler`，否则直接抛：
+
+```
+The service 'BrowserXhr' needs to be compiled using the JIT compiler,
+but '@angular/compiler' is not available.
+```
+
+以前能跑过，靠的是 `src/builder/wxs/*.spec.ts` 顺手
+`import { parseTemplate } from '@angular/compiler'`，而 `builder` 按字母序排在
+`library` 前面 —— 文件顺序巧合，不是设计：单跑
+`src/library/platform/application.spec.ts` 就是失败的。
+
+**现在走的是 linker 那条路，不是把 `@angular/compiler` 拉进进程。** `library`
+project 挂了 `angularPartialIocLinker()` + `server.deps.inline: [/@angular\//]`，
+`@angular/common` 被内联后插件才轮得到它，partial 标记在加载时就链成了完整的
+`ɵɵdefineInjectable`，与真实应用构建一致（`jit: false`）。
+
+所以 `test/vitest-setup.ts` 里**不**应该再 `import '@angular/compiler'`：
+
+- `setupFiles` 是根配置，builder project 也得跟着加载这个几 MB 的包，而它
+  根本用不上；
+- 更要紧的是，进程里一旦有 JIT 编译器，linker 插件碎了就没人发现 —— 拿
+  兼容层把真问题盖住。
+
+验证方法：`npx vitest run --project library src/library/platform/application.spec.ts`
+单独跑一遗，不报 `BrowserXhr` 就是 linker 在干活。
 
 ## 相关测试
 

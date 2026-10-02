@@ -1,5 +1,7 @@
 node_modules*
 test-project-host-hello-world-app-*
+# 进程内构建去重缓存（test/util/shared-build.ts），跑一次清一次
+test/.shared-build
 dist
 __test-app
 coverage-builder

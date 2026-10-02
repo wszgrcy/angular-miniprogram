@@ -109,6 +109,18 @@ describeBuilder(
             'pages/control-flow/control-flow-entry.wxml',
           ),
         ).toContain(marker);
+
+        // watch 轮次不能只重编改动的页面：库组件产物（走 library-meta
+        // 那条旁路）也得在。以前由 builder.watch.spec.ts 守，那个文件
+        // 与本文件跑的是同一个 builder，已合到这里。
+        expect(
+          fs.existsSync(
+            path.join(
+              last!.baseOutputPath!,
+              'library/test-library/lib-comp1-component/lib-comp1-component.js',
+            ),
+          ),
+        ).toBe(true);
       }, 180000);
 
       it('watch 期间新增入口能被拉进来', async () => {

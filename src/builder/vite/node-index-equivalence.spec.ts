@@ -3,6 +3,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 
 import {
+  type BuilderTestHarness,
   MyTestProjectHost,
   describeBuilder,
 } from '../../../test/plugin-describe-builder';
@@ -34,7 +35,10 @@ import {
   mapAngularTagToWxml,
 } from '../mini-program-compiler/tag-mapping';
 import { PlatformType } from '../platform/platform';
-import { runViteBuilder as runBuilder } from './index';
+import {
+  type ViteMiniProgramBuildOptions,
+  runViteBuilder as runBuilder,
+} from './index';
 
 /**
  * 证明「wxml 的下标」与「Angular 编译产出的节点下标」两端等价。
@@ -235,47 +239,104 @@ function checkNodeListOverflow(
   return { violations, checked };
 }
 
+/**
+ * 三个 describe 共用一次构建。
+ *
+ * 它们验的是同一次构建的不同侧面（下标并集 / 按组件精确 / 视图分组），
+ * 构建参数逐字相同。以前各自 build 一次，一个文件付了三份 2s。
+ *
+ * 这里不能用 `executeOnceShared`：后两个 describe 要读 `manifest-registry`
+ * 这个进程内注册表，命中缓存就不会跑构建，注册表会是空的。
+ */
+type SharedArtifacts = {
+  manifests: { manifest: NodeManifest; fromFile: string }[];
+  wxmls: { wxml: string; rel: string }[];
+  records: ReturnType<typeof getGeneratedWxmlRecords>;
+  trees: ReturnType<typeof extractViewTreesFromSource>;
+  declsByComponent: Map<string, number>;
+};
+
+let sharedArtifacts: Promise<SharedArtifacts> | undefined;
+
+function loadSharedArtifacts(
+  harness: BuilderTestHarness<ViteMiniProgramBuildOptions>,
+): Promise<SharedArtifacts> {
+  return (sharedArtifacts ??= buildSharedArtifacts(harness));
+}
+
+async function buildSharedArtifacts(
+  harness: BuilderTestHarness<ViteMiniProgramBuildOptions>,
+): Promise<SharedArtifacts> {
+  // 构建前清空注册表，避免跨次构建脏数据
+  resetGeneratedWxmlRecords();
+  const root = harness.host.root();
+  const h = new MyTestProjectHost(harness.host);
+  const list = await h.getFileList(normalize(join(root, 'src', '__pages')));
+  list.push(
+    ...(await h.getFileList(normalize(join(root, 'src', '__components')))),
+  );
+  await h.importPathRename(list);
+  await h.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
+  await h.moveDir(ALL_COMPONENT_NAME_LIST, '__components', 'components');
+  await h.addPageEntry(ALL_PAGE_NAME_LIST);
+
+  harness.useTarget('build', {
+    ...DEFAULT_ANGULAR_CONFIG,
+    platform: PlatformType.wx,
+    outputPath: 'dist/node-index',
+    sourceMap: false,
+  } as never);
+
+  const r = await harness.executeOnce();
+  const outDir = r.result?.baseOutputPath as string;
+
+  const { manifests, wxmls } = collectArtifacts(outDir);
+
+  const trees: ReturnType<typeof extractViewTreesFromSource> = [];
+  const declsByComponent = new Map<string, number>();
+  const walkJs = (dir: string) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        walkJs(full);
+      } else if (e.name.endsWith('.js')) {
+        const src = fs.readFileSync(full, 'utf8');
+        trees.push(...extractViewTreesFromSource(src, full));
+        for (const [k, v] of extractDeclsByComponent(src, full)) {
+          // 同名组件可能出现在多个 chunk，取首次见到的值
+          if (!declsByComponent.has(k)) {
+            declsByComponent.set(k, v);
+          }
+        }
+      }
+    }
+  };
+  walkJs(outDir);
+
+  // 至少要有若干对 wxml/js，否则后面的断言会空跑通过
+  expect(wxmls.length).toBeGreaterThan(5);
+  expect(manifests.length).toBeGreaterThan(5);
+
+  return {
+    manifests,
+    wxmls,
+    records: getGeneratedWxmlRecords(),
+    trees,
+    declsByComponent,
+  };
+}
+
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('节点下标两端等价性', () => {
     /**
      * 必须在 it() 内部触发构建，不能用 beforeAll——
      * harness 的 TestProjectHost 是在 spec 执行期才初始化的，
      * beforeAll 阶段调用会报 "TestProjectHost must be initialized"。
-     * 用 memoize 保证只构建一次，多个 it() 共享同一批制品。
+     * 三个 describe 共用同一份制品，见 `loadSharedArtifacts`。
      */
-    let cache: BuildArtifacts | null = null;
-
     async function loadArtifacts(): Promise<BuildArtifacts> {
-      if (cache) {
-        return cache;
-      }
-      // 构建前清空注册表，避免跨次构建脏数据
-      resetGeneratedWxmlRecords();
-      const root = harness.host.root();
-      const h = new MyTestProjectHost(harness.host);
-      const list = await h.getFileList(normalize(join(root, 'src', '__pages')));
-      list.push(
-        ...(await h.getFileList(normalize(join(root, 'src', '__components')))),
-      );
-      await h.importPathRename(list);
-      await h.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
-      await h.moveDir(ALL_COMPONENT_NAME_LIST, '__components', 'components');
-      await h.addPageEntry(ALL_PAGE_NAME_LIST);
-
-      harness.useTarget('build', {
-        ...DEFAULT_ANGULAR_CONFIG,
-        platform: PlatformType.wx,
-        outputPath: 'dist/manifest-eq',
-        sourceMap: false,
-      } as never);
-
-      const r = await harness.executeOnce();
-      const outDir = r.result?.baseOutputPath as string;
-      cache = collectArtifacts(outDir);
-      // 至少要有若干对 wxml/js，否则下面的断言会空跑通过
-      expect(cache.wxmls.length).toBeGreaterThan(5);
-      expect(cache.manifests.length).toBeGreaterThan(5);
-      return cache;
+      const a = await loadSharedArtifacts(harness);
+      return { manifests: a.manifests, wxmls: a.wxmls };
     }
 
     /**
@@ -390,54 +451,9 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
  */
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('节点下标两端等价性（按组件精确）', () => {
-    let cache: {
-      manifests: { manifest: NodeManifest; fromFile: string }[];
-      records: ReturnType<typeof getGeneratedWxmlRecords>;
-    } | null = null;
-
-    async function load(): Promise<NonNullable<typeof cache>> {
-      if (cache) {
-        return cache;
-      }
-      resetGeneratedWxmlRecords();
-      const root = harness.host.root();
-      const h = new MyTestProjectHost(harness.host);
-      const list = await h.getFileList(normalize(join(root, 'src', '__pages')));
-      list.push(
-        ...(await h.getFileList(normalize(join(root, 'src', '__components')))),
-      );
-      await h.importPathRename(list);
-      await h.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
-      await h.moveDir(ALL_COMPONENT_NAME_LIST, '__components', 'components');
-      await h.addPageEntry(ALL_PAGE_NAME_LIST);
-      harness.useTarget('build', {
-        ...DEFAULT_ANGULAR_CONFIG,
-        platform: PlatformType.wx,
-        outputPath: 'dist/manifest-precise',
-        sourceMap: false,
-      } as never);
-      const r = await harness.executeOnce();
-      const outDir = r.result?.baseOutputPath as string;
-
-      const manifests: { manifest: NodeManifest; fromFile: string }[] = [];
-      const walk = (dir: string) => {
-        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-          const full = path.join(dir, e.name);
-          if (e.isDirectory()) {
-            walk(full);
-          } else if (e.name.endsWith('.js')) {
-            for (const m of extractManifestsFromSource(
-              fs.readFileSync(full, 'utf8'),
-              full,
-            )) {
-              manifests.push({ manifest: m, fromFile: full });
-            }
-          }
-        }
-      };
-      walk(outDir);
-      cache = { manifests, records: getGeneratedWxmlRecords() };
-      return cache;
+    async function load() {
+      const a = await loadSharedArtifacts(harness);
+      return { manifests: a.manifests, records: a.records };
     }
 
     it('注册表应记录到组件（否则本测试空跑）', async () => {
@@ -614,63 +630,17 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       }));
     }
 
-    let cache: {
-      trees: ReturnType<typeof extractViewTreesFromSource>;
-      blocksByComponent: Map<string, Block[]>;
-      declsByComponent: Map<string, number>;
-    } | null = null;
-
     async function load() {
-      if (cache) {
-        return cache;
-      }
-      resetGeneratedWxmlRecords();
-      const root = harness.host.root();
-      const h = new MyTestProjectHost(harness.host);
-      const list = await h.getFileList(normalize(join(root, 'src', '__pages')));
-      list.push(
-        ...(await h.getFileList(normalize(join(root, 'src', '__components')))),
-      );
-      await h.importPathRename(list);
-      await h.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
-      await h.moveDir(ALL_COMPONENT_NAME_LIST, '__components', 'components');
-      await h.addPageEntry(ALL_PAGE_NAME_LIST);
-      harness.useTarget('build', {
-        ...DEFAULT_ANGULAR_CONFIG,
-        platform: PlatformType.wx,
-        outputPath: 'dist/view-group',
-        sourceMap: false,
-      } as never);
-      const r = await harness.executeOnce();
-      const outDir = r.result?.baseOutputPath as string;
-
-      const trees: ReturnType<typeof extractViewTreesFromSource> = [];
-      const declsByComponent = new Map<string, number>();
-      const walk = (dir: string) => {
-        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-          const full = path.join(dir, e.name);
-          if (e.isDirectory()) {
-            walk(full);
-          } else if (e.name.endsWith('.js')) {
-            const src = fs.readFileSync(full, 'utf8');
-            trees.push(...extractViewTreesFromSource(src, full));
-            for (const [k, v] of extractDeclsByComponent(src, full)) {
-              // 同名组件可能出现在多个 chunk，取首次见到的值
-              if (!declsByComponent.has(k)) {
-                declsByComponent.set(k, v);
-              }
-            }
-          }
-        }
-      };
-      walk(outDir);
-
+      const a = await loadSharedArtifacts(harness);
       const blocksByComponent = new Map<string, Block[]>();
-      for (const rec of getGeneratedWxmlRecords()) {
+      for (const rec of a.records) {
         blocksByComponent.set(rec.componentName, splitWxmlBlocks(rec.wxml));
       }
-      cache = { trees, blocksByComponent, declsByComponent };
-      return cache;
+      return {
+        trees: a.trees,
+        blocksByComponent,
+        declsByComponent: a.declsByComponent,
+      };
     }
 
     it('视图树应拆出多个视图（控制流组件）', async () => {

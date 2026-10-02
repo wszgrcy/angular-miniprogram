@@ -24,7 +24,10 @@ import {
 import { TestProjectHost } from '@angular-devkit/architect/testing';
 import {
   Path,
+  basename,
+  dirname,
   getSystemPath,
+  join,
   json,
   logging,
   virtualFs,
@@ -37,6 +40,7 @@ import {
   EMPTY,
   Observable,
   Subject,
+  defer,
   firstValueFrom,
   lastValueFrom,
   of,
@@ -80,6 +84,44 @@ export function isExcludedFromSandbox(
   return SANDBOX_EXCLUDE.some((re) => re.test(rel));
 }
 
+/** sandbox 目录名前缀。`.gitignore` 里 `test-project-host-hello-world-app-*` 对的就是它。 */
+const SANDBOX_PREFIX = 'test-project-host-';
+
+/**
+ * 本进程内的 sandbox 序号。挂 `globalThis` 而不是模块变量：同一个进程里这个模块
+ * 可能被实例化两份（vitest 的模块图不保证单例），那样两个计数器会同时从 0 开始，
+ * 而 `pid` 又相同，名字就真撞了。文件下面统计耗时的 `__harnessTiming` 同理。
+ */
+const sandboxCounter: { n: number } = ((
+  globalThis as any
+).__harnessSandboxCounter ??= { n: 0 });
+
+/**
+ * 占一个独占的 sandbox 目录 —— 名字是**构造唯一**的，所以既不用重试也不用随机数。
+ *
+ * `test-project-host-<模板名>-<pid>-<序号>` 两段各自堵死一种撞法：
+ *
+ * | 可能来抢的         | 为什么抢不到                        |
+ * | ------------------ | ----------------------------------- |
+ * | 别的进程 / worker  | 同一台机器上活着的进程 pid 互不相同  |
+ * | 本进程别的 harness | 序号单调递增，发出去的名字不回收      |
+ *
+ * 两条都成立，`mkdirSync` 就必然一次成功。真抛 EEXIST（PID 被回收后撞上上轮
+ * 崩溃留下的同名目录）就让它直接响，静默换个名字只会把问题埋掉。
+ *
+ * `mkdirSync` 不带 `recursive`：目录已存在会 EEXIST 而不是静默通过，`mkdir(2)`
+ * 本身原子 —— 拿内核占坑，不需要锁文件，进程崩了也不留待回收的状态。
+ *
+ * 上游 `findUniqueFolderPath()` 两样都反过来：先 exists 检查再返回，目录是
+ * 后面 `cpSync` 顺手建的（查和用之间是 TOCTOU），名字靠 `Math.random()` 碰。
+ */
+function claimUniqueSandboxRoot(templateRoot: Path): Path {
+  const name = `${SANDBOX_PREFIX}${basename(templateRoot)}-${process.pid}-${sandboxCounter.n++}`;
+  const candidate = join(dirname(templateRoot), name);
+  nodeFs.mkdirSync(getSystemPath(candidate));
+  return candidate;
+}
+
 /**
  * `TestProjectHost` 的快速版本，只改 `initialize()` / `restore()`。
  *
@@ -93,6 +135,9 @@ export function isExcludedFromSandbox(
  * 每个用 harness 的 spec 都要付这份钱（共 81 个），实测
  * initialize 0.46s + restore 0.21s = 0.67s / spec，合计 54.8s。
  * 换成原生 `fs.cpSync`（排除构建产物）+ `fs.rmSync` 后约 0.27s + 0.07s。
+ *
+ * 并发安全：sandbox 目录由 `claimUniqueSandboxRoot()` 构造唯一 + 原子地占，
+ * 不依赖上游那个先查后用的 `findUniqueFolderPath()`。
  */
 export class FastTestProjectHost extends TestProjectHost {
   private get internals(): any {
@@ -102,31 +147,27 @@ export class FastTestProjectHost extends TestProjectHost {
   override initialize(): Observable<void> {
     const templateRoot = getSystemPath(this._templateRoot);
 
-    // findUniqueFolderPath 在上游声明为 private，但语义是公开的（找一个不重
-    // 名的空目录当 sandbox），这里只是拿回它，不改它的行为。
-    return (this.internals.findUniqueFolderPath() as Observable<Path>).pipe(
-      tap((newFolderPath) => {
-        this.internals._currentRoot = newFolderPath;
-        this.internals._scopedSyncHost = new virtualFs.SyncDelegateHost(
-          new virtualFs.ScopedHost(this, this.root()),
-        );
-      }),
-      map(() => {
-        nodeFs.cpSync(templateRoot, getSystemPath(this.root()), {
-          recursive: true,
-          // 与上游行为对齐：上游是 read() 读内容再写，符号链接会被 deref。
-          dereference: true,
-          filter: (p: string) => !isExcludedFromSandbox(templateRoot, p),
-        });
-      }),
-    );
+    // defer 把同步抛出的异常直接转成 error 通知，不需要手写 subscriber.error
+    return defer(() => {
+      this.internals._currentRoot = claimUniqueSandboxRoot(this._templateRoot);
+      this.internals._scopedSyncHost = new virtualFs.SyncDelegateHost(
+        new virtualFs.ScopedHost(this, this.root()),
+      );
+      nodeFs.cpSync(templateRoot, getSystemPath(this.root()), {
+        recursive: true,
+        // 与上游行为对齐：上游是 read() 读内容再写，符号链接会被 deref。
+        dereference: true,
+        filter: (p: string) => !isExcludedFromSandbox(templateRoot, p),
+      });
+      return EMPTY;
+    });
   }
 
   override restore(): Observable<void> {
     if (this.internals._currentRoot === null) {
       return EMPTY;
     }
-    return new Observable<void>((subscriber) => {
+    return defer(() => {
       try {
         // 原生 rm 自带重试，不需要上游那个无条件 delay(50ms)。
         nodeFs.rmSync(getSystemPath(this.root()), {
@@ -135,14 +176,11 @@ export class FastTestProjectHost extends TestProjectHost {
           maxRetries: 10,
           retryDelay: 50,
         });
-      } catch (e) {
-        subscriber.error(e);
-        return;
       } finally {
         this.internals._currentRoot = null;
         this.internals._scopedSyncHost = null;
       }
-      subscriber.complete();
+      return EMPTY;
     });
   }
 }

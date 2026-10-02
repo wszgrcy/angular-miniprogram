@@ -11,6 +11,7 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
+import { executeOnceShared } from '../../../test/util/shared-build';
 import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
@@ -27,8 +28,15 @@ import { runViteBuilder } from './index';
  * 这条链路原先没有任何断言覆盖，所以在这里补上——关键是断言
  * **「产物里有编译后的内容」**，而不是「构建成功」。
  */
+
+/** 构建一次，多个用例复用同一份产物（sandbox 随用例销毁，产物先读进内存） */
+function memoize<T>(fn: () => Promise<T>) {
+  let promise: Promise<T> | undefined;
+  return () => (promise = promise ?? fn());
+}
+
 describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
-  const setupBase = async (extraPages: string[] = []) => {
+  const setupBase = async () => {
     const root = harness.host.root();
     const myTestProjectHost = new MyTestProjectHost(harness.host);
     const list = await myTestProjectHost.getFileList(
@@ -52,7 +60,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       JSON.stringify({
         pages: [
           ...ALL_PAGE_NAME_LIST.map((n) => `pages/${n}/${n}-entry`),
-          ...extraPages,
+          'pages/styled/styled-entry',
         ],
       }),
     );
@@ -73,21 +81,20 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     );
 
   const build = async () => {
-    harness.useTarget('build', {
+    const result = await executeOnceShared(harness, 'build', {
       tsConfig: 'src/tsconfig.app.json',
       outputPath: 'dist/vite-styles',
       main: DEFAULT_ANGULAR_CONFIG.main,
       pages: DEFAULT_ANGULAR_CONFIG.pages,
       components: DEFAULT_ANGULAR_CONFIG.components,
       styles: DEFAULT_ANGULAR_CONFIG.styles,
-      assets: (DEFAULT_ANGULAR_CONFIG.assets as Array<{ glob: string }>).filter(
+      assets: DEFAULT_ANGULAR_CONFIG.assets.filter(
         (a) => a.glob !== 'app.json',
       ),
       appJson: 'src/app.config.json',
       platform: PlatformType.wx,
       sourceMap: false,
-    } as never);
-    const result = await harness.executeOnce();
+    });
     if (!result.result?.success) {
       const errLogs = (result.logs || [])
         .filter((l: { level: string }) => l.level === 'error')
@@ -96,21 +103,16 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     }
   };
 
-  it('全局 styles 编译进 app.wxss（非空、且是编译后的 css）', async () => {
+  /**
+   * 两条用例只是各看一份产物的一个侧面（全局样式 / 组件样式），
+   * 构建参数完全一致，所以共用一次构建。
+   */
+  const load = memoize(async () => {
     await setupBase();
     await write(
       'src/styles.css',
       'page { background: #f5f6f8; }\n.global-card { padding: 24rpx; }\n',
     );
-    await build();
-
-    const appWxss = await readOutput('dist/vite-styles/app.wxss');
-    expect(appWxss).toContain('page{background:#f5f6f8}');
-    expect(appWxss).toContain('.global-card{padding:24rpx}');
-  }, 300000);
-
-  it('组件 styleUrls 编译进组件自己的 wxss（scss 嵌套被展开）', async () => {
-    await setupBase(['pages/styled/styled-entry']);
     await write(
       'src/pages/styled/styled.component.scss',
       '.styled {\n  color: red;\n  &__title {\n    font-size: 40rpx;\n  }\n}\n',
@@ -142,10 +144,23 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     );
     await build();
 
-    const wxss = await readOutput(
-      'dist/vite-styles/pages/styled/styled-entry.wxss',
-    );
-    expect(wxss).toContain('.styled{color:red}');
-    expect(wxss).toContain('.styled__title{font-size:40rpx}');
+    return {
+      appWxss: await readOutput('dist/vite-styles/app.wxss'),
+      styledWxss: await readOutput(
+        'dist/vite-styles/pages/styled/styled-entry.wxss',
+      ),
+    };
+  });
+
+  it('全局 styles 编译进 app.wxss（非空、且是编译后的 css）', async () => {
+    const { appWxss } = await load();
+    expect(appWxss).toContain('page{background:#f5f6f8}');
+    expect(appWxss).toContain('.global-card{padding:24rpx}');
+  }, 300000);
+
+  it('组件 styleUrls 编译进组件自己的 wxss（scss 嵌套被展开）', async () => {
+    const { styledWxss } = await load();
+    expect(styledWxss).toContain('.styled{color:red}');
+    expect(styledWxss).toContain('.styled__title{font-size:40rpx}');
   }, 300000);
 });
