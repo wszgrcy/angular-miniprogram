@@ -3,9 +3,19 @@ import { filter, take, tap } from 'rxjs/operators';
 
 export function routeEvent() {
   return new Observable<any>((ob) => {
-    (wx as any).onAppRoute((result) => {
+    const handler = (result: any) => {
       ob.next(result);
-    });
+    };
+    (wx as any).onAppRoute(handler);
+    /**
+     * 必须给 teardown。onAppRoute 的 handler 不摘就一直挂着：
+     * openComponent 在每个 spec 的 beforeEach 里都调一次，13 个 spec 就泄
+     * 13 个，全部活到整轮测试结束，而且都活在自己的 spec 之外。
+     */
+    return () => {
+      const off = (wx as any).offAppRoute;
+      if (typeof off === 'function') off(handler);
+    };
   });
 }
 

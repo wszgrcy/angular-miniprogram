@@ -29,6 +29,7 @@ export class LifeTimeSPecComponent {
     },
   };
   @ViewChild('instance', { static: true }) instance: LifeTimeComponent;
+  private finishTimer?: ReturnType<typeof setTimeout>;
   constructor(
     private componentFinderService: ComponentFinderService,
     private ngZone: NgZone,
@@ -36,9 +37,18 @@ export class LifeTimeSPecComponent {
   ngOnInit(): void {
     console.log('test-ngOnInit');
     this.ngZone.runOutsideAngular(() => {
-      setTimeout(() => {
+      this.finishTimer = setTimeout(() => {
         this.testFinish$$.complete();
       }, 3000);
     });
+  }
+  /**
+   * reLaunch 换页时这个 timer 会活到下一个 spec 里去（onReady 已经
+   * complete 过了，它晚 3s 再 complete 一次）。今天它里面没断言以故
+   * 无害，但「上一个页面的异步跑在下一个 spec 期间」正是
+   * `'expect' was used when there was no current spec` 的成因形状。
+   */
+  ngOnDestroy(): void {
+    clearTimeout(this.finishTimer);
   }
 }

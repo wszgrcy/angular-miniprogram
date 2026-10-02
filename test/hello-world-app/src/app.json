@@ -1,7 +1,7 @@
 {
   "pages": [
-    "pages/control-flow-spec/control-flow-spec-entry",
     "pages/empty/empty-entry",
+    "pages/control-flow-spec/control-flow-spec-entry",
     "pages/http-spec/http-spec-entry",
     "pages/life-time-spec/life-time-spec-entry",
     "pages/ng-content-spec/ng-content-spec-entry",
