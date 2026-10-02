@@ -14,22 +14,13 @@ import {
 } from './validation';
 
 describe('参数校验管道', () => {
-  function setup(
-    schemas: Record<string, MpApiSchema> = {},
-    devMode = true,
-  ) {
+  function setup(schemas: Record<string, MpApiSchema> = {}, devMode = true) {
     const existing = (globalThis as any).ngDevMode;
-    (globalThis as any).ngDevMode = devMode ? (existing ?? {}) : null;
+    (globalThis as any).ngDevMode = devMode ? existing ?? {} : null;
     const fake: Record<string, any> = {
-      showToast: jasmine
-        .createSpy('showToast')
-        .and.callFake((o: any) => o.success?.({})),
-      navigateTo: jasmine
-        .createSpy('navigateTo')
-        .and.callFake((o: any) => o.success?.({})),
-      scanCode: jasmine
-        .createSpy('scanCode')
-        .and.callFake((o: any) => o.success?.({})),
+      showToast: vi.fn().mockImplementation((o: any) => o.success?.({})),
+      navigateTo: vi.fn().mockImplementation((o: any) => o.success?.({})),
+      scanCode: vi.fn().mockImplementation((o: any) => o.success?.({})),
     };
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -44,18 +35,16 @@ describe('参数校验管道', () => {
 
   /** 返回最近一次告警文本，无告警则为空串 */
   function captureWarn(order?: string[]) {
-    const spy = spyOn(console, 'warn').and.callFake((msg: string) => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation((msg: string) => {
       order?.push('validate');
     });
     return () =>
-      spy.calls.any()
-        ? String(spy.calls.mostRecent().args[0])
-        : '';
+      spy.mock.calls.length > 0 ? String(spy.mock.calls.at(-1)[0]) : '';
   }
 
   it('开发期判定生效', () => {
     setup();
-    expect(isMpDevMode()).toBeTrue();
+    expect(isMpDevMode()).toBe(true);
   });
 
   it('拼错的键被报出', async () => {
@@ -108,16 +97,19 @@ describe('参数校验管道', () => {
   it('signal 不被当作未知键', async () => {
     const { service } = setup();
     const warn = captureWarn();
-    await service.invoke('showToast', { title: 'hi', signal: new AbortController().signal });
+    await service.invoke('showToast', {
+      title: 'hi',
+      signal: new AbortController().signal,
+    });
     expect(warn()).toBe('');
   });
 
   it('未收录的 API 不做校验', async () => {
     const { service } = setup();
     const warn = captureWarn();
-    await expectAsync(
+    await expect(
       service.invoke('someUnknownApi', { whatever: 1 } as any),
-    ).toBeRejected();
+    ).rejects.toBeDefined();
     expect(warn()).toBe('');
   });
 
@@ -166,7 +158,7 @@ describe('参数校验管道', () => {
     handle.dispose();
     const warn = captureWarn();
     await service.invoke('showToast', { titel: 'hi' } as any);
-    expect(ran).toBeFalse();
+    expect(ran).toBe(false);
     expect(warn()).toContain('titel');
   });
 
@@ -186,18 +178,18 @@ describe('参数校验管道', () => {
     const pipe = mpValidationPipe({
       foo: v.strictObject({ id: v.string() }),
     });
-    const spy = spyOn(console, 'warn').and.stub();
+    const spy = vi.spyOn(console, 'warn').mockReturnValue(undefined);
 
     await lastValueFrom(of({ name: 'foo', options: { id: 1 } }).pipe(pipe));
-    expect(spy.calls.count()).toBe(1);
-    expect(String(spy.calls.mostRecent().args[0])).toContain('id');
+    expect(spy.mock.calls.length).toBe(1);
+    expect(String(spy.mock.calls.at(-1)[0])).toContain('id');
 
     // 无 schema 的名字走同一管道，不产生新告警
     await lastValueFrom(of({ name: 'bar', options: { x: 1 } }).pipe(pipe));
-    expect(spy.calls.count()).toBe(1);
+    expect(spy.mock.calls.length).toBe(1);
 
     // 合法入参不告警
     await lastValueFrom(of({ name: 'foo', options: { id: 'ok' } }).pipe(pipe));
-    expect(spy.calls.count()).toBe(1);
+    expect(spy.mock.calls.length).toBe(1);
   });
 });

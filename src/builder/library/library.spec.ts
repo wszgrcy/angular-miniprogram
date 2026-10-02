@@ -59,28 +59,26 @@ describeBuilder(execute, LIBRARY_BUILDER_INFO, (harness) => {
         '_ExtraData',
         'Global_Template',
       ].filter((needle) => fesm.includes(needle));
-      expect(offenders)
-        .withContext('库 JS 产物不应被改写，不应出现任何 mp 内联标记')
-        .toEqual([]);
+      expect(
+        offenders,
+        '库 JS 产物不应被改写，不应出现任何 mp 内联标记',
+      ).toEqual([]);
 
       // 元数据全部在 sidecar 里，且带模板载荷
       const metaPath = path.join(output, LIBRARY_META_FILE_NAME);
-      expect(fs.existsSync(metaPath))
-        .withContext('库根应产出 sidecar')
-        .toBeTrue();
+      expect(fs.existsSync(metaPath), '库根应产出 sidecar').toBe(true);
       const meta: LibraryMetaFile = JSON.parse(
         fs.readFileSync(metaPath, 'utf8'),
       );
       expect(meta.schemaVersion).toBe(LIBRARY_META_SCHEMA_VERSION);
       const entry = meta.entries['types/test-library.d.ts'];
       expect(entry.fesm).toBe('fesm2022/test-library.mjs');
-      expect(entry.selfTemplate?.template)
-        .withContext('自引用模板应从 JS 搬进 sidecar')
-        .toContain('$$mp$$__self__$$libraryFirst');
+      expect(
+        entry.selfTemplate?.template,
+        '自引用模板应从 JS 搬进 sidecar',
+      ).toContain('$$mp$$__self__$$libraryFirst');
       const comp = entry.components.TestLibraryComponent;
-      expect(typeof comp.content)
-        .withContext('content 应是 ${} 插值模板串')
-        .toBe('string');
+      expect(typeof comp.content, 'content 应是 ${} 插值模板串').toBe('string');
       expect(comp.content).toContain('hasLoad');
       // 平台相关部分以 ${} 插值形式存在，而不是写死的平台前缀
       expect(comp.content).toContain('${directivePrefix}');
@@ -99,9 +97,7 @@ describeBuilder(execute, LIBRARY_BUILDER_INFO, (harness) => {
       const secondary = Object.values(meta.entries).find((e) =>
         e.moduleId.endsWith('/secondary'),
       );
-      expect(secondary)
-        .withContext('sidecar 应多出二级出口的 entry')
-        .toBeDefined();
+      expect(secondary, 'sidecar 应多出二级出口的 entry').toBeDefined();
       expect(secondary!.fesm).toBe('fesm2022/test-library-src-secondary.mjs');
       expect(Object.keys(secondary!.components)).toEqual([
         'SecondaryEntryComponent',
@@ -111,9 +107,10 @@ describeBuilder(execute, LIBRARY_BUILDER_INFO, (harness) => {
       expect(secComp.listeners).toEqual(['tap']);
       expect(secComp.properties).toEqual(['class']);
       expect(secComp.style).toContain('.lib-secondary-entry__text');
-      expect(typeof secComp.content)
-        .withContext('二级出口 content 应是 ${} 插值模板串')
-        .toBe('string');
+      expect(
+        typeof secComp.content,
+        '二级出口 content 应是 ${} 插值模板串',
+      ).toBe('string');
       // 平台相关部分留成 ${} 插值；wxml 自己的 {{}} 是静态文本，**不需要转义**
       expect(secComp.content).toContain('${directivePrefix}');
       expect(secComp.content).toContain('${eventListConvert(["tap"])}');
@@ -135,9 +132,7 @@ describeBuilder(execute, LIBRARY_BUILDER_INFO, (harness) => {
         '_ExtraData',
         'Global_Template',
       ].filter((needle) => secFesm.includes(needle));
-      expect(secOffenders)
-        .withContext('二级出口的 JS 产物同样不应被改写')
-        .toEqual([]);
+      expect(secOffenders, '二级出口的 JS 产物同样不应被改写').toEqual([]);
 
       fs.copySync(
         output,

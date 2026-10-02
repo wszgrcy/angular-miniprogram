@@ -57,9 +57,10 @@ describe('__templateName 推导：不 patch NgTemplateOutlet 的替代方案', (
         `tView.declTNode.localNames[0] = ${JSON.stringify(declTNodeFromTView?.localNames?.[0])}`,
     );
 
-    expect(declTNodeFromTView)
-      .withContext('declTNode 应与 TemplateRef._declarationTContainer 同一')
-      .toBe(declT);
+    expect(
+      declTNodeFromTView,
+      'declTNode 应与 TemplateRef._declarationTContainer 同一',
+    ).toBe(declT);
     expect(declTNodeFromTView?.localNames?.[0]).toBe('alpha');
   });
 
@@ -100,9 +101,10 @@ describe('__templateName 推导：不 patch NgTemplateOutlet 的替代方案', (
     console.log(
       `反向: 抹掉后=${JSON.stringify(tampered)} 还原后=${JSON.stringify(restored)}`,
     );
-    expect(tampered)
-      .withContext('抹掉 localNames 后仍推出名字，说明推导路径不对')
-      .toBeUndefined();
+    expect(
+      tampered,
+      '抹掉 localNames 后仍推出名字，说明推导路径不对',
+    ).toBeUndefined();
     expect(restored).toBe('alpha');
   });
 });

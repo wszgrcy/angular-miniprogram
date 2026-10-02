@@ -53,17 +53,19 @@ describe('lview-layout: 与已安装 @angular/core 交叉校验', () => {
   let bundleSource = '';
 
   beforeAll(() => {
-    expect(fs.existsSync(fesmDir))
-      .withContext(`解析出的 @angular/core fesm 目录不存在：${fesmDir}`)
-      .toBe(true);
+    expect(
+      fs.existsSync(fesmDir),
+      `解析出的 @angular/core fesm 目录不存在：${fesmDir}`,
+    ).toBe(true);
 
     const mjsFiles = fs.readdirSync(fesmDir).filter((f) => f.endsWith('.mjs'));
 
     // 常量声明可能分散在 core.mjs 和内部 chunk（如 _debug_node-chunk.mjs）
     // 里，所以整目录拼起来再匹配，不能只读 core.mjs。
-    expect(mjsFiles.length)
-      .withContext(`fesm 目录里没有 .mjs 文件：${fesmDir}`)
-      .toBeGreaterThan(0);
+    expect(
+      mjsFiles.length,
+      `fesm 目录里没有 .mjs 文件：${fesmDir}`,
+    ).toBeGreaterThan(0);
 
     bundleSource = mjsFiles
       .map((f) => fs.readFileSync(path.join(fesmDir, f), 'utf8'))
@@ -95,13 +97,12 @@ describe('lview-layout: 与已安装 @angular/core 交叉校验', () => {
     it(`${key} 应与 @angular/core 的 ${angularName} 一致`, () => {
       const actual = readConstFromBundle(angularName);
 
-      expect(actual)
-        .withContext(
-          `在已安装的 @angular/core fesm 里没找到 \`const ${angularName} = <n>\`。` +
-            `可能 Angular 改了声明形式或常量名——此时不能想当然沿用旧值，` +
-            `去 packages/core/src/render3/interfaces/{view,container}.ts 核对后再更新 lview-layout.ts`,
-        )
-        .toBeDefined();
+      expect(
+        actual,
+        `在已安装的 @angular/core fesm 里没找到 \`const ${angularName} = <n>\`。` +
+          `可能 Angular 改了声明形式或常量名——此时不能想当然沿用旧值，` +
+          `去 packages/core/src/render3/interfaces/{view,container}.ts 核对后再更新 lview-layout.ts`,
+      ).toBeDefined();
 
       expect({
         [key]: LVIEW[key],

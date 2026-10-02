@@ -95,18 +95,16 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     } catch {
       installedLib = '';
     }
-    expect(installedLib.length)
-      .withContext(
-        '读不到 node_modules/test-library；跑全量 `npm test`，' +
-          '或先单独跑 `vitest run src/builder/library/library.spec.ts` 生成副本',
-      )
-      .toBeGreaterThan(0);
-    expect(installedLib)
-      .withContext(
-        'node_modules/test-library 副本已过期（缺 LIB_TEST_LIBRARY_RENDERED），' +
-          '先跑 `vitest run src/builder/library/library.spec.ts` 重新生成',
-      )
-      .toContain('LIB_TEST_LIBRARY_RENDERED');
+    expect(
+      installedLib.length,
+      '读不到 node_modules/test-library；跑全量 `npm test`，' +
+        '或先单独跑 `vitest run src/builder/library/library.spec.ts` 生成副本',
+    ).toBeGreaterThan(0);
+    expect(
+      installedLib,
+      'node_modules/test-library 副本已过期（缺 LIB_TEST_LIBRARY_RENDERED），' +
+        '先跑 `vitest run src/builder/library/library.spec.ts` 重新生成',
+    ).toContain('LIB_TEST_LIBRARY_RENDERED');
 
     harness.useTarget('build', angularConfig);
     const r = await harness.executeOnce();
@@ -208,9 +206,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('库元数据 sidecar → wxml 事件绑定', () => {
     it('库根产出 mp-library-meta.json', async () => {
       await load();
-      expect(fs.existsSync(metaFilePath))
-        .withContext(`${LIBRARY_META_FILE_NAME} 应存在于库根`)
-        .toBeTrue();
+      expect(
+        fs.existsSync(metaFilePath),
+        `${LIBRARY_META_FILE_NAME} 应存在于库根`,
+      ).toBe(true);
     });
 
     it('schema 版本与结构正确', async () => {
@@ -241,15 +240,18 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const meta = await readMeta();
       const directives =
         meta.entries['types/angular-miniprogram-forms.d.ts'].directives;
-      expect(directives.DefaultValueAccessor.listeners).toEqual(
-        jasmine.arrayWithExactContents(['bindinput', 'bindblur']),
-      );
-      expect(directives.CheckBoxGroupValueAccessor.listeners).toEqual(
-        jasmine.arrayWithExactContents(['bindchange']),
-      );
-      expect(directives.DefaultValueAccessor.properties).toEqual(
-        jasmine.arrayWithExactContents(['value', 'disabled']),
-      );
+      // 监听器 / 输入属性的**集合**要一致，但声明顺序无关，所以两边都排序。
+      expect([...directives.DefaultValueAccessor.listeners].sort()).toEqual([
+        'bindblur',
+        'bindinput',
+      ]);
+      expect(
+        [...directives.CheckBoxGroupValueAccessor.listeners].sort(),
+      ).toEqual(['bindchange']);
+      expect([...directives.DefaultValueAccessor.properties].sort()).toEqual([
+        'disabled',
+        'value',
+      ]);
     });
 
     it('d.ts 不再被改写：里面没有任何内联标记（回归核心承诺）', async () => {
@@ -270,9 +272,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           offenders.push(name);
         }
       }
-      expect(offenders)
-        .withContext('d.ts 里不应再出现内联元数据标记')
-        .toEqual([]);
+      expect(offenders, 'd.ts 里不应再出现内联元数据标记').toEqual([]);
     });
 
     it('base-forms 的 wxml 里 input 有 bind:input / bind:blur', async () => {
@@ -309,13 +309,12 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         wxmlEvents.add(m2[1]);
       }
 
-      expect(wxmlEvents.size)
-        .withContext('wxml 应有事件绑定')
-        .toBeGreaterThan(0);
+      expect(wxmlEvents.size, 'wxml 应有事件绑定').toBeGreaterThan(0);
       wxmlEvents.forEach((e) =>
-        expect(metaEvents.has(e))
-          .withContext(`wxml 事件 bind:${e} 应能在 sidecar 元数据里找到来源`)
-          .toBeTrue(),
+        expect(
+          metaEvents.has(e),
+          `wxml 事件 bind:${e} 应能在 sidecar 元数据里找到来源`,
+        ).toBe(true),
       );
     });
   });
@@ -357,11 +356,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           tag.includes('bind:tap="bindEvent"') &&
           tag.includes('bind:touchstart="bindEvent"'),
       );
-      expect(both)
-        .withContext(
-          '应有一个 <lib-test-library libTestLibrary> 同时带两组元数据',
-        )
-        .toBeTruthy();
+      expect(
+        both,
+        '应有一个 <lib-test-library libTestLibrary> 同时带两组元数据',
+      ).toBeTruthy();
     });
 
     it('库组件 LibComp1Component 的 listeners → bind:tap', async () => {
@@ -401,12 +399,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
      */
     it('库组件 input 传值进了编译产物', async () => {
       const { demoJs } = await load();
-      expect(demoJs)
-        .withContext('demo 的 input 值应进产物')
-        .toContain('来自-app的input1');
-      expect(demoJs)
-        .withContext('input 绑定名应作为字符串字面量保留')
-        .toMatch(/["'`]input1["'`]/);
+      expect(demoJs, 'demo 的 input 值应进产物').toContain('来自-app的input1');
+      expect(demoJs, 'input 绑定名应作为字符串字面量保留').toMatch(
+        /["'`]input1["'`]/,
+      );
       expect(demoJs).toMatch(/["'`]input2["'`]/);
     });
 
@@ -434,9 +430,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         __dirname,
         '../../test/hello-world-app/node_modules/test-library/mp-library-meta.json',
       );
-      expect(fs.existsSync(libMetaPath))
-        .withContext('test-library 应先被构建并拷入 node_modules')
-        .toBeTrue();
+      expect(
+        fs.existsSync(libMetaPath),
+        'test-library 应先被构建并拷入 node_modules',
+      ).toBe(true);
       const libMeta: LibraryMetaFile = JSON.parse(
         fs.readFileSync(libMetaPath, 'utf8'),
       );
@@ -460,11 +457,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       }
       expect(wxmlEvents.size).toBeGreaterThan(0);
       wxmlEvents.forEach((e) =>
-        expect(metaEvents.has(e))
-          .withContext(
-            `demo 页事件 bind:${e} 应在 test-library sidecar 里有记录`,
-          )
-          .toBeTrue(),
+        expect(
+          metaEvents.has(e),
+          `demo 页事件 bind:${e} 应在 test-library sidecar 里有记录`,
+        ).toBe(true),
       );
     });
   });
@@ -517,13 +513,12 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       }
 
       for (const name of LIB_COMPONENTS) {
-        expect(counts.get(name))
-          .withContext(
-            `${name} 应被注入恰好 1 次 propertyChange，实际=${String(
-              counts.get(name),
-            )}（0 = 主构建没接上，>1 = 重复注入会双倍 setData）`,
-          )
-          .toBe(1);
+        expect(
+          counts.get(name),
+          `${name} 应被注入恰好 1 次 propertyChange，实际=${String(
+            counts.get(name),
+          )}（0 = 主构建没接上，>1 = 重复注入会双倍 setData）`,
+        ).toBe(1);
       }
     });
 
@@ -538,12 +533,14 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           continue;
         }
         for (const c of hit) {
-          expect(c.branch)
-            .withContext(`${c.componentName} 应被注入到更新块（A 或 B）`)
-            .toBeTruthy();
-          expect(c.isLastStatement)
-            .withContext(`${c.componentName} 的注入应在更新块最后`)
-            .toBeTrue();
+          expect(
+            c.branch,
+            `${c.componentName} 应被注入到更新块（A 或 B）`,
+          ).toBeTruthy();
+          expect(
+            c.isLastStatement,
+            `${c.componentName} 的注入应在更新块最后`,
+          ).toBe(true);
         }
       }
     });
@@ -562,16 +559,15 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
       for (const name of LIB_COMPONENTS) {
         const record = entry.components[name];
-        expect(record)
-          .withContext(`${name} 应在 sidecar 里有记录`)
-          .toBeTruthy();
+        expect(record, `${name} 应在 sidecar 里有记录`).toBeTruthy();
         // content 是 ${} 插值模板串（平台中立）
-        expect(typeof record.content)
-          .withContext(`${name} 的 content 应是 \${} 插值模板串`)
-          .toBe('string');
-        expect(record.content)
-          .withContext(`${name} 应带平台中立的模板文本`)
-          .toContain('hasLoad');
+        expect(
+          typeof record.content,
+          `${name} 的 content 应是 \${} 插值模板串`,
+        ).toBe('string');
+        expect(record.content, `${name} 应带平台中立的模板文本`).toContain(
+          'hasLoad',
+        );
         // 平台相关处留的是插值，不是写死的 wx: / a:
         expect(record.content).toContain('${directivePrefix}');
         expect(record.content).not.toContain('wx:');
@@ -595,9 +591,9 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('二级出口在主构建下', () => {
     it('二级出口组件产出自己的 wxml，内容只含它自己的模板', async () => {
       const { secCompWxml } = await load();
-      expect(secCompWxml)
-        .withContext('二级出口组件应有自己的 wxml 产物')
-        .toContain('secondary entry works!');
+      expect(secCompWxml, '二级出口组件应有自己的 wxml 产物').toContain(
+        'secondary entry works!',
+      );
       // 不能把一级出口组件的模板串进来
       expect(secCompWxml).not.toContain('other works!');
       expect(secCompWxml).not.toContain('lib-comp1 works!');
@@ -628,18 +624,16 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         paths.some((p) =>
           p.includes('/library/test-library/test-library-component/'),
         ),
-      )
-        .withContext('一级出口组件应在 usingComponents 里')
-        .toBeTrue();
+        '一级出口组件应在 usingComponents 里',
+      ).toBe(true);
       expect(
         paths.some((p) =>
           p.includes(
             '/library/test-library/src/secondary/secondary-entry-component/',
           ),
         ),
-      )
-        .withContext('二级出口组件应在 usingComponents 里')
-        .toBeTrue();
+        '二级出口组件应在 usingComponents 里',
+      ).toBe(true);
     });
 
     it('二级出口组件被注入恰好 1 次 propertyChange', async () => {
@@ -653,11 +647,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           }
         }
       }
-      expect(count)
-        .withContext(
-          `SecondaryEntryComponent 应被注入恰好 1 次，实际=${count}（0 = 二级出口没接上注入链路）`,
-        )
-        .toBe(1);
+      expect(
+        count,
+        `SecondaryEntryComponent 应被注入恰好 1 次，实际=${count}（0 = 二级出口没接上注入链路）`,
+      ).toBe(1);
     });
   });
 });

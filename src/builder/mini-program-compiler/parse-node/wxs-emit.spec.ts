@@ -34,7 +34,7 @@ async function compileHtml(html: string): Promise<string> {
   return transform.compile(metas).content;
 }
 
-/** 取报错文本（本仓库 jasmine 版本对 toThrow(RegExp) 支持不可靠） */
+/** 取报错文本，便于对报错内容做断言 */
 async function errOf(html: string): Promise<string> {
   try {
     await compileHtml(html);

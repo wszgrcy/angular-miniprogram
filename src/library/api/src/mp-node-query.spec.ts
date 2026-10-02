@@ -48,12 +48,10 @@ describe('节点查询 / 观察器', () => {
   function setup(overrides: Record<string, any> = {}) {
     initMiniProgramTestEnv();
     const fake = {
-      createSelectorQuery: jasmine
-        .createSpy('createSelectorQuery')
-        .and.returnValue(fakeSelectorQuery()),
-      createIntersectionObserver: jasmine
-        .createSpy('createIntersectionObserver')
-        .and.returnValue(fakeIntersectionObserver()),
+      createSelectorQuery: vi.fn().mockReturnValue(fakeSelectorQuery()),
+      createIntersectionObserver: vi
+        .fn()
+        .mockReturnValue(fakeIntersectionObserver()),
       getSystemInfoSync: () => ({ windowWidth: 400, windowHeight: 600 }),
       ...overrides,
     };
@@ -103,7 +101,7 @@ describe('节点查询 / 观察器', () => {
 
       const sub = observer.observe$('#box').subscribe();
       sub.unsubscribe();
-      expect(raw.state.disconnected).toBeTrue();
+      expect(raw.state.disconnected).toBe(true);
     });
 
     it('relativeTo 链式返回包装对象', () => {
@@ -119,23 +117,27 @@ describe('节点查询 / 观察器', () => {
       const observer = service.createMediaQueryObserver();
       let result: any;
       observer.observe({ minWidth: 300 }, (res) => (result = res));
-      expect(result.matches).toBeTrue();
+      expect(result.matches).toBe(true);
       observer.observe({ maxWidth: 300 }, (res) => (result = res));
-      expect(result.matches).toBeFalse();
+      expect(result.matches).toBe(false);
     });
 
     it('observe$ 首个值即当前匹配', async () => {
       const { service } = setup();
       const observer = service.createMediaQueryObserver();
-      const res = await firstValueFrom(observer.observe$({ orientation: 'portrait' }));
-      expect(res.matches).toBeTrue();
+      const res = await firstValueFrom(
+        observer.observe$({ orientation: 'portrait' }),
+      );
+      expect(res.matches).toBe(true);
     });
 
     it('matchMpMediaQuery 各条件求值', () => {
-      expect(matchMpMediaQuery({ minWidth: 100 }, 400, 600)).toBeTrue();
-      expect(matchMpMediaQuery({ maxWidth: 100 }, 400, 600)).toBeFalse();
-      expect(matchMpMediaQuery({ height: 600 }, 400, 600)).toBeTrue();
-      expect(matchMpMediaQuery({ orientation: 'landscape' }, 400, 600)).toBeFalse();
+      expect(matchMpMediaQuery({ minWidth: 100 }, 400, 600)).toBe(true);
+      expect(matchMpMediaQuery({ maxWidth: 100 }, 400, 600)).toBe(false);
+      expect(matchMpMediaQuery({ height: 600 }, 400, 600)).toBe(true);
+      expect(matchMpMediaQuery({ orientation: 'landscape' }, 400, 600)).toBe(
+        false,
+      );
     });
   });
 });

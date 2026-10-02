@@ -69,9 +69,9 @@ describe('app-config: 校验', () => {
       builtPages,
     );
     // 主包直接声明了 sub/a/a，而分包 root=sub + page=a/a 展开也是 sub/a/a
-    expect(
-      errors.some((e) => e.includes('分包页面与主包 pages 冲突')),
-    ).toBeTrue();
+    expect(errors.some((e) => e.includes('分包页面与主包 pages 冲突'))).toBe(
+      true,
+    );
   });
 
   it('分包页面相对路径与主包页面同名但全路径不同，合法', () => {
@@ -96,8 +96,8 @@ describe('app-config: 校验', () => {
       },
       builtPages,
     );
-    expect(errors.some((e) => e.includes('重复的 root'))).toBeTrue();
-    expect(errors.some((e) => e.includes('跨分包重复'))).toBeTrue();
+    expect(errors.some((e) => e.includes('重复的 root'))).toBe(true);
+    expect(errors.some((e) => e.includes('跨分包重复'))).toBe(true);
   });
 
   it('分包没有页面报错', () => {
@@ -108,7 +108,7 @@ describe('app-config: 校验', () => {
       },
       builtPages,
     );
-    expect(errors.some((e) => e.includes('没有页面'))).toBeTrue();
+    expect(errors.some((e) => e.includes('没有页面'))).toBe(true);
   });
 
   it('tabBar 指向分包页面报错（必须在主包）', () => {
@@ -122,7 +122,7 @@ describe('app-config: 校验', () => {
     );
     expect(
       errors.some((e) => e.includes('tabBar.pagePath "sub/a/a" 不在主包')),
-    ).toBeTrue();
+    ).toBe(true);
   });
 
   it('tabBar 缺 pagePath 报错', () => {
@@ -133,7 +133,7 @@ describe('app-config: 校验', () => {
       },
       builtPages,
     );
-    expect(errors.some((e) => e.includes('缺少 pagePath'))).toBeTrue();
+    expect(errors.some((e) => e.includes('缺少 pagePath'))).toBe(true);
   });
 
   it('preloadRule 指向不存在页面报错', () => {
@@ -145,7 +145,7 @@ describe('app-config: 校验', () => {
       },
       builtPages,
     );
-    expect(errors.some((e) => e.includes('preloadRule 的页面'))).toBeTrue();
+    expect(errors.some((e) => e.includes('preloadRule 的页面'))).toBe(true);
   });
 
   it('preloadRule 引用未声明分包报错', () => {
@@ -159,7 +159,7 @@ describe('app-config: 校验', () => {
       },
       builtPages,
     );
-    expect(errors.some((e) => e.includes('未声明的分包 "ghost"'))).toBeTrue();
+    expect(errors.some((e) => e.includes('未声明的分包 "ghost"'))).toBe(true);
   });
 
   it('preloadRule 合法（分包页 + 对象形态 packages）', () => {
@@ -201,7 +201,7 @@ describe('app-config: 校验', () => {
       errors.some((e) =>
         e.includes('页面 "sub/ghost/g" 声明了但本次构建没有产出入口'),
       ),
-    ).toBeTrue();
+    ).toBe(true);
   });
 
   it('builtPagePaths 为空时不做产出比对（避开「全部误报」）', () => {
@@ -244,12 +244,12 @@ describe('app-config: 启动页 entryPagePath', () => {
     );
     expect(
       errors.some((e) => e.includes('entryPagePath "pages/ghost/ghost"')),
-    ).toBeTrue();
+    ).toBe(true);
   });
 
   it('空字符串报错', () => {
     const errors = validateAppConfig({ ...config, entryPagePath: '' }, built);
-    expect(errors.some((e) => e.includes('entryPagePath 不能为空'))).toBeTrue();
+    expect(errors.some((e) => e.includes('entryPagePath 不能为空'))).toBe(true);
   });
 });
 
@@ -298,11 +298,11 @@ describe('app-config: 生成', () => {
       darkmode: true,
     };
     const text = generateAppJson(config);
-    expect(text.endsWith('\n')).toBeTrue();
+    expect(text.endsWith('\n')).toBe(true);
     const parsed = JSON.parse(text) as MpAppConfig;
     expect(parsed.pages).toEqual(['pages/index/index']);
     expect(parsed.lazyCodeLoading).toBe('requiredComponents');
     // 未知字段透传
-    expect(parsed.darkmode).toBeTrue();
+    expect(parsed.darkmode).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 export function nodeExist(
   query: WechatMiniprogram.SelectorQuery,
-  selector: string
+  selector: string,
 ) {
   return new Promise<boolean>((res, rej) => {
     try {
@@ -17,7 +17,7 @@ export function nodeExist(
 }
 export function nodeNotEmpty(
   query: WechatMiniprogram.SelectorQuery,
-  selector: string
+  selector: string,
 ) {
   return new Promise<boolean>((res, rej) => {
     try {
@@ -36,7 +36,7 @@ export function nodeNotEmpty(
 export function fields(
   query: WechatMiniprogram.SelectorQuery,
   selector: string,
-  fields: WechatMiniprogram.Fields
+  fields: WechatMiniprogram.Fields,
 ) {
   return new Promise<any>((res, rej) => {
     try {

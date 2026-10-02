@@ -17,9 +17,10 @@ describe('wxml 分块器', () => {
   function assertBalanced(content: string) {
     const opens = (content.match(/<template\b(?![^>]*\/>)/g) || []).length;
     const closes = (content.match(/<\/template>/g) || []).length;
-    expect({ opens, closes })
-      .withContext(`标签不平衡，说明有残尾: ${content.slice(0, 120)}`)
-      .toEqual({ opens: closes, closes: closes });
+    expect(
+      { opens, closes },
+      `标签不平衡，说明有残尾: ${content.slice(0, 120)}`,
+    ).toEqual({ opens: closes, closes: closes });
   }
 
   it('平铺：两个具名块 + 根区', () => {

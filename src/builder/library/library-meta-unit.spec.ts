@@ -57,7 +57,7 @@ describe('library-meta-store（写侧）', () => {
 
   it('空暂存区不产出文件', () => {
     expect(writeLibraryMetaFile(tmp)).toBeUndefined();
-    expect(fs.existsSync(path.join(tmp, LIBRARY_META_FILE_NAME))).toBeFalse();
+    expect(fs.existsSync(path.join(tmp, LIBRARY_META_FILE_NAME))).toBe(false);
   });
 
   it('key 是「扁平化 d.ts 相对库根的 posix 路径」', () => {
@@ -107,9 +107,11 @@ describe('library-meta-store（写侧）', () => {
 
   it('同名冲突时后者生效并告警', () => {
     const warnings: string[] = [];
-    const spy = spyOn(console, 'warn').and.callFake((...args: any[]) => {
-      warnings.push(args.join(' '));
-    });
+    const spy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation((...args: any[]) => {
+        warnings.push(args.join(' '));
+      });
     registerLibraryMetaEntry('demo/a', path.join(tmp, 'types', 'a.d.ts'), tmp);
     recordLibraryDirectiveMeta('demo/a', 'Dup', {
       listeners: ['bindtap'],
@@ -216,7 +218,7 @@ describe('library-meta-reader（读侧）', () => {
     writeSidecar(validFile());
     const r = lookupLibraryMeta(dtsPath, 'NoSuchDirective');
     expect(r.entry).toBeTruthy();
-    expect(r.entryMatchedButClassMissing).toBeTrue();
+    expect(r.entryMatchedButClassMissing).toBe(true);
     expect(r.record).toBeUndefined();
   });
 
@@ -515,9 +517,7 @@ describe('键的选择：组件名，不是文件路径', () => {
         n,
       ),
     );
-    expect(covered)
-      .withContext('检出的组件必须能在清单里查到，查不到就该报错')
-      .toBeTrue();
+    expect(covered, '检出的组件必须能在清单里查到，查不到就该报错').toBe(true);
   });
 
   it('检出组件不在清单里 → covered 为 false（就是主构建该报错的情形）', () => {
@@ -690,21 +690,21 @@ describe('mp-template（es-toolkit template + ${} 分隔符 + 白名单预检）
   });
 
   it('未登记插值抛错（未知名字）', () => {
-    expect(() =>
-      renderLibraryTemplate('<v ${bogus} />', wxValues),
-    ).toThrowError(/未登记的插值/);
+    expect(() => renderLibraryTemplate('<v ${bogus} />', wxValues)).toThrow(
+      /未登记的插值/,
+    );
   });
 
   it('全局逃逸 ${Math.random()} 被白名单挡掉（否则会静默出数）', () => {
     expect(() =>
       renderLibraryTemplate('<v ${Math.random()} />', wxValues),
-    ).toThrowError(/未登记的插值/);
+    ).toThrow(/未登记的插值/);
   });
 
   it('用户文本里的字面 ${100} 不会被静默求值', () => {
     expect(() =>
       renderLibraryTemplate('<view>价格${100}</view>', wxValues),
-    ).toThrowError(/未登记的插值/);
+    ).toThrow(/未登记的插值/);
   });
 
   it('多个未知名一次性全报出来', () => {
@@ -733,9 +733,9 @@ describe('mp-template（es-toolkit template + ${} 分隔符 + 白名单预检）
   });
 
   it('非字符串输入抛 TypeError', () => {
-    expect(() =>
-      renderLibraryTemplate(undefined as any, wxValues),
-    ).toThrowError(TypeError);
+    expect(() => renderLibraryTemplate(undefined as any, wxValues)).toThrow(
+      TypeError,
+    );
   });
 });
 
@@ -785,16 +785,16 @@ describe('library-meta-diagnostics（缺失诊断）', () => {
   });
 
   it('按路径段判定，不被同名目录误判', () => {
-    expect(isAngularFrameworkSource('/a/my-angular-common/x.ts')).toBeFalse();
-    expect(isAngularFrameworkSource('/a/angular/x.ts')).toBeFalse();
+    expect(isAngularFrameworkSource('/a/my-angular-common/x.ts')).toBe(false);
+    expect(isAngularFrameworkSource('/a/angular/x.ts')).toBe(false);
     expect(
       isAngularFrameworkSource('C:\\w\\node_modules\\@angular\\core\\x.mjs'),
-    ).toBeTrue();
+    ).toBe(true);
     expect(
       isAngularFrameworkSource(
         '/w/node_modules/.pnpm/@angular+common@1.0.0/node_modules/@angular/common/y.mjs',
       ),
-    ).toBeTrue();
+    ).toBe(true);
   });
 
   it('去重：同一类重复登记只记一次', () => {

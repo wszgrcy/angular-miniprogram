@@ -18,26 +18,22 @@ describe('MpApiService 域方法', () => {
   } {
     initMiniProgramTestEnv();
     const fake: Record<string, any> = {
-      scanCode: jasmine
-        .createSpy('scanCode')
-        .and.callFake((o: any) =>
+      scanCode: vi
+        .fn()
+        .mockImplementation((o: any) =>
           o.success?.({ result: 'ABC', scanType: 'qrCode' }),
         ),
-      setClipboardData: jasmine
-        .createSpy('setClipboardData')
-        .and.callFake((o: any) => o.success?.({})),
-      getClipboardData: jasmine
-        .createSpy('getClipboardData')
-        .and.callFake((o: any) => o.success?.({ data: 'hello' })),
-      getScreenBrightness: jasmine
-        .createSpy('getScreenBrightness')
-        .and.callFake((o: any) => o.success?.({ value: 0.5 })),
-      getAppAuthorizeSetting: jasmine
-        .createSpy('getAppAuthorizeSetting')
-        .and.returnValue({ cameraAuthorized: 'authorized' }),
-      createAnimation: jasmine
-        .createSpy('createAnimation')
-        .and.returnValue({ __animation: true }),
+      setClipboardData: vi.fn().mockImplementation((o: any) => o.success?.({})),
+      getClipboardData: vi
+        .fn()
+        .mockImplementation((o: any) => o.success?.({ data: 'hello' })),
+      getScreenBrightness: vi
+        .fn()
+        .mockImplementation((o: any) => o.success?.({ value: 0.5 })),
+      getAppAuthorizeSetting: vi
+        .fn()
+        .mockReturnValue({ cameraAuthorized: 'authorized' }),
+      createAnimation: vi.fn().mockReturnValue({ __animation: true }),
       ...overrides,
     };
     TestBed.resetTestingModule();
@@ -65,7 +61,7 @@ describe('MpApiService 域方法', () => {
     it('剪贴板 set / get', async () => {
       const { proxy, fake } = setup();
       await proxy.setClipboardData({ data: 'x' });
-      expect((fake.setClipboardData as any).calls.mostRecent().args[0].data).toBe(
+      expect((fake.setClipboardData as any).mock.calls.at(-1)[0].data).toBe(
         'x',
       );
       expect(await proxy.getClipboardData()).toEqual({ data: 'hello' });
@@ -78,15 +74,15 @@ describe('MpApiService 域方法', () => {
 
     it('setKeepScreenOn 收 { keepScreenOn }', async () => {
       const { service, proxy } = setup('wx', {
-        setKeepScreenOn: jasmine
-          .createSpy('setKeepScreenOn')
-          .and.callFake((o: any) => o.success?.({})),
+        setKeepScreenOn: vi
+          .fn()
+          .mockImplementation((o: any) => o.success?.({})),
       });
       await proxy.setKeepScreenOn({ keepScreenOn: true });
       expect(
-        (service.getRawApi('setKeepScreenOn') as any).calls.mostRecent().args[0]
+        (service.getRawApi('setKeepScreenOn') as any).mock.calls.at(-1)[0]
           .keepScreenOn,
-      ).toBeTrue();
+      ).toBe(true);
     });
 
     it('createBLEConnection 是异步的（create* 中的例外）', async () => {
@@ -95,58 +91,52 @@ describe('MpApiService 域方法', () => {
       });
       const ret = proxy.createBLEConnection({ deviceId: 'd1' });
       expect(typeof ret.then).toBe('function');
-      await expectAsync(ret).toBeResolved();
+      await expect(ret).resolves.toBeDefined();
     });
 
     it('平台失败时 Promise reject', async () => {
       const { proxy } = setup('wx', {
         scanCode: (o: any) => o.fail?.({ errMsg: 'scanCode:fail' }),
       });
-      await expectAsync(proxy.scanCode()).toBeRejectedWith({
+      await expect(proxy.scanCode()).rejects.toEqual({
         errMsg: 'scanCode:fail',
       });
     });
 
     it('getBLEDeviceRSSI 返回 { rssi }', async () => {
       const { proxy, fake } = setup('wx', {
-        getBLEDeviceRSSI: jasmine
-          .createSpy('getBLEDeviceRSSI')
-          .and.callFake((o: any) => o.success?.({ rssi: -63 })),
+        getBLEDeviceRSSI: vi
+          .fn()
+          .mockImplementation((o: any) => o.success?.({ rssi: -63 })),
       });
       const res = await proxy.getBLEDeviceRSSI({ deviceId: 'd1' });
       expect(res.rssi).toBe(-63);
-      expect((fake.getBLEDeviceRSSI as any).calls.mostRecent().args[0].deviceId).toBe(
+      expect((fake.getBLEDeviceRSSI as any).mock.calls.at(-1)[0].deviceId).toBe(
         'd1',
       );
     });
 
     it('setBLEMTU 透传 deviceId + mtu', async () => {
       const { proxy, fake } = setup('wx', {
-        setBLEMTU: jasmine
-          .createSpy('setBLEMTU')
-          .and.callFake((o: any) => o.success?.({})),
+        setBLEMTU: vi.fn().mockImplementation((o: any) => o.success?.({})),
       });
       await proxy.setBLEMTU({ deviceId: 'd1', mtu: 185 });
-      const arg = (fake.setBLEMTU as any).calls.mostRecent().args[0];
+      const arg = (fake.setBLEMTU as any).mock.calls.at(-1)[0];
       expect(arg.deviceId).toBe('d1');
       expect(arg.mtu).toBe(185);
     });
 
     it('preloadPage / unPreloadPage 收 { url }', async () => {
       const { proxy, fake } = setup('wx', {
-        preloadPage: jasmine
-          .createSpy('preloadPage')
-          .and.callFake((o: any) => o.success?.({})),
-        unPreloadPage: jasmine
-          .createSpy('unPreloadPage')
-          .and.callFake((o: any) => o.success?.({})),
+        preloadPage: vi.fn().mockImplementation((o: any) => o.success?.({})),
+        unPreloadPage: vi.fn().mockImplementation((o: any) => o.success?.({})),
       });
       await proxy.preloadPage({ url: '/pages/a/a' });
       await proxy.unPreloadPage({ url: '/pages/a/a' });
-      expect((fake.preloadPage as any).calls.mostRecent().args[0].url).toBe(
+      expect((fake.preloadPage as any).mock.calls.at(-1)[0].url).toBe(
         '/pages/a/a',
       );
-      expect((fake.unPreloadPage as any).calls.mostRecent().args[0].url).toBe(
+      expect((fake.unPreloadPage as any).mock.calls.at(-1)[0].url).toBe(
         '/pages/a/a',
       );
     });
@@ -162,7 +152,9 @@ describe('MpApiService 域方法', () => {
 
     it('createAnimation 透传平台对象', () => {
       const { proxy } = setup();
-      expect((proxy.createAnimation({ duration: 200 }) as any).__animation).toBeTrue();
+      expect(
+        (proxy.createAnimation({ duration: 200 }) as any).__animation,
+      ).toBe(true);
     });
   });
 
@@ -283,21 +275,21 @@ describe('MpApiService 域方法', () => {
 
     it('不支持的事件报错', async () => {
       const { service } = setup('wx', { getRecorderManager: () => ({}) });
-      await expectAsync(service.getRecorderManager().on('nope').toPromise()).toBeRejectedWithError(
-        /不支持事件/,
-      );
+      await expect(
+        service.getRecorderManager().on('nope').toPromise(),
+      ).rejects.toThrow(/不支持事件/);
     });
   });
 
   describe('canIUse 能力探测', () => {
     it('改名 API 用平台真名探测', () => {
       const { service, fake } = setup('my', {
-        canIUse: jasmine
-          .createSpy('canIUse')
-          .and.callFake((n: string) => n === 'setNavigationBar'),
+        canIUse: vi
+          .fn()
+          .mockImplementation((n: string) => n === 'setNavigationBar'),
       });
-      expect(service.canIUse('setNavigationBarTitle')).toBeTrue();
-      expect((fake.canIUse as any).calls.mostRecent().args[0]).toBe(
+      expect(service.canIUse('setNavigationBarTitle')).toBe(true);
+      expect((fake.canIUse as any).mock.calls.at(-1)[0]).toBe(
         'setNavigationBar',
       );
     });
@@ -307,42 +299,38 @@ describe('MpApiService 域方法', () => {
         canIUse: (n: string) => n === 'setNavigationBar',
       });
       // 直接拿统一名去问会得到 false，走表解析后为 true
-      expect(service.canIUse('setNavigationBarTitle')).toBeTrue();
+      expect(service.canIUse('setNavigationBarTitle')).toBe(true);
     });
 
     it('钉钉 request -> httpRequest 同样走解析', () => {
       const { service, fake } = setup('dd', {
-        canIUse: jasmine
-          .createSpy('canIUse')
-          .and.callFake((n: string) => n === 'httpRequest'),
+        canIUse: vi.fn().mockImplementation((n: string) => n === 'httpRequest'),
       });
-      expect(service.canIUse('request')).toBeTrue();
-      expect((fake.canIUse as any).calls.mostRecent().args[0]).toBe(
-        'httpRequest',
-      );
+      expect(service.canIUse('request')).toBe(true);
+      expect((fake.canIUse as any).mock.calls.at(-1)[0]).toBe('httpRequest');
     });
 
     it('custom 协议需全部合成 API 就位', () => {
       const { service } = setup('my', {
         canIUse: (n: string) => n === 'alert',
       });
-      expect(service.canIUse('showModal')).toBeFalse();
+      expect(service.canIUse('showModal')).toBe(false);
     });
 
     it('custom 协议全部就位为 true', () => {
       const { service } = setup('my', {
         canIUse: () => true,
       });
-      expect(service.canIUse('showModal')).toBeTrue();
+      expect(service.canIUse('showModal')).toBe(true);
     });
 
     it('平台无 canIUse 时落到函数存在性判断', () => {
       const { service } = setup('my', {
         setNavigationBar: () => {},
       });
-      expect(service.canIUse('setNavigationBarTitle')).toBeTrue();
+      expect(service.canIUse('setNavigationBarTitle')).toBe(true);
       // makePhoneCall 未在 fake 中提供，函数不存在 -> 不支持
-      expect(service.canIUse('makePhoneCall')).toBeFalse();
+      expect(service.canIUse('makePhoneCall')).toBe(false);
     });
 
     it('平台 canIUse 抛错时不致于误报不支持', () => {
@@ -352,15 +340,15 @@ describe('MpApiService 域方法', () => {
         },
         setNavigationBar: () => {},
       });
-      expect(service.canIUse('setNavigationBarTitle')).toBeTrue();
+      expect(service.canIUse('setNavigationBarTitle')).toBe(true);
     });
 
     it('无协议映射的 API 用统一名探测', () => {
       const { service, fake } = setup('wx', {
-        canIUse: jasmine.createSpy('canIUse').and.returnValue(true),
+        canIUse: vi.fn().mockReturnValue(true),
       });
-      expect(service.canIUse('scanCode')).toBeTrue();
-      expect((fake.canIUse as any).calls.mostRecent().args[0]).toBe('scanCode');
+      expect(service.canIUse('scanCode')).toBe(true);
+      expect((fake.canIUse as any).mock.calls.at(-1)[0]).toBe('scanCode');
     });
   });
 
@@ -380,7 +368,7 @@ describe('MpApiService 域方法', () => {
       expect(service.getLocale()).toBe('zh-Hans');
       const seen: any[] = [];
       service.onLocaleChange().subscribe((v) => seen.push(v));
-      expect(service.setLocale('en')).toBeTrue();
+      expect(service.setLocale('en')).toBe(true);
       expect(service.getLocale()).toBe('en');
       expect(seen).toEqual([{ locale: 'en' }]);
     });
@@ -390,7 +378,7 @@ describe('MpApiService 域方法', () => {
       service.setLocale('en');
       const seen: any[] = [];
       service.onLocaleChange().subscribe((v) => seen.push(v));
-      expect(service.setLocale('en')).toBeFalse();
+      expect(service.setLocale('en')).toBe(false);
       expect(seen.length).toBe(0);
     });
 

@@ -73,7 +73,7 @@ describe('MpEventBus', () => {
   it('emit 后通知变更检测', () => {
     const bus = setup();
     const scheduler = TestBed.inject(ChangeDetectionScheduler);
-    const spy = spyOn(scheduler, 'notify');
+    const spy = vi.spyOn(scheduler, 'notify');
     bus.on('e', () => undefined);
     bus.emit('e');
     expect(spy).toHaveBeenCalled();
@@ -82,8 +82,8 @@ describe('MpEventBus', () => {
   it('has/clear', () => {
     const bus = setup();
     bus.on('a', () => undefined);
-    expect(bus.has('a')).toBeTrue();
+    expect(bus.has('a')).toBe(true);
     bus.clear();
-    expect(bus.has('a')).toBeFalse();
+    expect(bus.has('a')).toBe(false);
   });
 });

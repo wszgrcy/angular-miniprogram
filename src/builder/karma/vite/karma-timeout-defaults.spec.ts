@@ -92,7 +92,7 @@ describe('applyKarmaTimeoutFallbacks（对已解析的 config 就地补）', () 
     applyKarmaTimeoutFallbacks(cfg);
     expect(cfg.port).toBe(9_999);
     expect(cfg.reporters).toEqual(['dots']);
-    expect(cfg.colors).toBeFalse();
+    expect(cfg.colors).toBe(false);
   });
 
   it('重复调用是幂等的（已补过不会再改）', async () => {

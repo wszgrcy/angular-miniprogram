@@ -848,9 +848,7 @@ export function expectFile<T>(
           `Expected file content but file does not exist: '${path}'`,
         );
       }
-      return expect(harness.readFile(path)).withContext(
-        `With file content for '${path}'`,
-      );
+      return expect(harness.readFile(path), `With file content for '${path}'`);
     },
     get size() {
       if (!harness.hasFile(path)) {
@@ -858,7 +856,8 @@ export function expectFile<T>(
           `Expected file size but file does not exist: '${path}'`,
         );
       }
-      return expect(Buffer.byteLength(harness.readFile(path))).withContext(
+      return expect(
+        Buffer.byteLength(harness.readFile(path)),
         `With file size for '${path}'`,
       );
     },

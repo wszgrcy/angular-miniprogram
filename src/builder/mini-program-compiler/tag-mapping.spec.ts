@@ -14,7 +14,14 @@ describe('HTML 标签 → wxml 标签', () => {
   });
 
   it('小程序有同名组件的标签原样透传', () => {
-    for (const tag of ['view', 'text', 'input', 'textarea', 'button', 'scroll-view']) {
+    for (const tag of [
+      'view',
+      'text',
+      'input',
+      'textarea',
+      'button',
+      'scroll-view',
+    ]) {
       expect(mapAngularTagToWxml(tag)).toBe(tag);
     }
   });

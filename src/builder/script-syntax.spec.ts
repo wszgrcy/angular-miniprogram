@@ -30,9 +30,7 @@ describe('script/*.ts 语法守卫', () => {
   let files: string[];
 
   beforeAll(() => {
-    expect(fs.existsSync(SCRIPT_DIR))
-      .withContext(`找不到 ${SCRIPT_DIR}`)
-      .toBeTrue();
+    expect(fs.existsSync(SCRIPT_DIR), `找不到 ${SCRIPT_DIR}`).toBe(true);
     files = fs
       .readdirSync(SCRIPT_DIR)
       .filter((f) => f.endsWith('.ts'))
@@ -40,9 +38,10 @@ describe('script/*.ts 语法守卫', () => {
   });
 
   it('应至少扫到 package-sync.ts 等脚本', () => {
-    expect(files.length)
-      .withContext('script/ 下没扫到 .ts 文件，本守卫空跑')
-      .toBeGreaterThan(3);
+    expect(
+      files.length,
+      'script/ 下没扫到 .ts 文件，本守卫空跑',
+    ).toBeGreaterThan(3);
     expect(files).toContain('package-sync.ts');
     expect(files).toContain('ensure-sync.ts');
   });
@@ -90,8 +89,9 @@ describe('script/*.ts 语法守卫', () => {
     const diags = (out.diagnostics ?? []).filter(
       (d) => d.category === ts.DiagnosticCategory.Error,
     );
-    expect(diags.length)
-      .withContext('这段就是当初漏网的 `])  ]);`，若抓不到说明守卫无效')
-      .toBeGreaterThan(0);
+    expect(
+      diags.length,
+      '这段就是当初漏网的 `])  ]);`，若抓不到说明守卫无效',
+    ).toBeGreaterThan(0);
   });
 });

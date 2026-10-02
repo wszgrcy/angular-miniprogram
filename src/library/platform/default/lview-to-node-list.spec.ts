@@ -56,19 +56,16 @@ describe('运行时 lView → nodeList 下标算术', () => {
     const ctx: any = getPageRefreshContext(lView as any);
 
     expect(ctx.hasLoad).toBe(true);
-    expect(ctx.nodeList.length)
-      .withContext('nodeList 长度应等于节点数')
-      .toBe(N);
+    expect(ctx.nodeList.length, 'nodeList 长度应等于节点数').toBe(N);
 
     for (let k = 0; k < N; k++) {
       const slot = ctx.nodeList[k];
-      expect(slot).withContext(`nodeList[${k}] 不应为空`).toBeDefined();
+      expect(slot, `nodeList[${k}] 不应为空`).toBeDefined();
       // 用 property.k 追踪节点身份（toView 会带 property，不带 attribute）
-      expect(slot.property?.k)
-        .withContext(
-          `nodeList[${k}] 应是 name=node-${k} 的节点，实际 property=${JSON.stringify(slot.property)}`,
-        )
-        .toBe(k);
+      expect(
+        slot.property?.k,
+        `nodeList[${k}] 应是 name=node-${k} 的节点，实际 property=${JSON.stringify(slot.property)}`,
+      ).toBe(k);
     }
   });
 
@@ -76,9 +73,7 @@ describe('运行时 lView → nodeList 下标算术', () => {
     const { lView } = makeLView();
     const ctx: any = getPageRefreshContext(lView as any);
     for (let k = 0; k < N; k++) {
-      expect(ctx.nodeList[k])
-        .withContext(`nodeList[${k}] 出现空洞`)
-        .toBeTruthy();
+      expect(ctx.nodeList[k], `nodeList[${k}] 出现空洞`).toBeTruthy();
     }
   });
 
@@ -98,9 +93,10 @@ describe('运行时 lView → nodeList 下标算术', () => {
         mismatched.push(k);
       }
     }
-    expect(mismatched.length)
-      .withContext('节点偏移一格后校验未报任何错位 → 本测试无法抓住下标漂移')
-      .toBeGreaterThan(0);
+    expect(
+      mismatched.length,
+      '节点偏移一格后校验未报任何错位 → 本测试无法抓住下标漂移',
+    ).toBeGreaterThan(0);
     // 偏移一格后，nodeList[k] 实际是 node-(k-1)
     expect(ctx.nodeList[1]?.property?.k).toBe(0);
   });
@@ -115,9 +111,10 @@ describe('运行时 lView → nodeList 下标算术', () => {
       lView[LVIEW.HEADER_OFFSET + k] = node;
     }
     const ctx: any = getPageRefreshContext(lView as any);
-    expect(ctx.nodeList.length)
-      .withContext('遍历上界应由 bindingStartIndex 决定，只产出 3 个')
-      .toBe(3);
+    expect(
+      ctx.nodeList.length,
+      '遍历上界应由 bindingStartIndex 决定，只产出 3 个',
+    ).toBe(3);
   });
 });
 
@@ -180,10 +177,11 @@ describe('运行时容器 → nodeList：嵌入视图要从 CONTAINER_HEADER_OFF
     );
     const slot = ctx.nodeList[0];
 
-    expect(Array.isArray(slot)).withContext('容器槽位应产出数组').toBe(true);
-    expect(slot.length)
-      .withContext('两个嵌入视图都要产出（旧实现读 VIEW_REFS 会得到 0 个）')
-      .toBe(2);
+    expect(Array.isArray(slot), '容器槽位应产出数组').toBe(true);
+    expect(
+      slot.length,
+      '两个嵌入视图都要产出（旧实现读 VIEW_REFS 会得到 0 个）',
+    ).toBe(2);
     expect(slot[0].__templateName).toBe('tpl-x');
     expect(slot[1].__templateName).toBe('tpl-y');
     expect(slot[0].nodeList[0].property.tag).toBe('x');
@@ -279,11 +277,10 @@ describe('事件路径回解析：directive 段要从 CONTAINER_HEADER_OFFSET �
       // 真实事件上的完整路径 = 嵌入视图的 nodePath + 被点节点在子模板里的槽号
       const nodePath = [...(items[i].nodePath as NodePath), 0];
       expect(nodePath).toEqual(['directive', 0, i, 0]);
-      expect(findCurrentElement(lView as any, nodePath))
-        .withContext(
-          `nodePath ${JSON.stringify(nodePath)} 应解析到 btn-${TAGS[i]}`,
-        )
-        .toBe(k.node);
+      expect(
+        findCurrentElement(lView as any, nodePath),
+        `nodePath ${JSON.stringify(nodePath)} 应解析到 btn-${TAGS[i]}`,
+      ).toBe(k.node);
     });
   });
 

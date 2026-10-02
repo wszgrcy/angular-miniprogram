@@ -111,9 +111,7 @@ describe('路径式 setData 快速通道', () => {
     const { lView, nodes, mp } = bootstrap(1);
     // 同一个 lView 再序列化一次，但不传 mpRef（外部只取快照的场景）
     getPageRefreshContext(lView as any);
-    expect(nodes[0].__mpRef)
-      .withContext('缺省 mpRef 不应把已打好的目标擦掉')
-      .toBe(mp);
+    expect(nodes[0].__mpRef, '缺省 mpRef 不应把已打好的目标擦掉').toBe(mp);
     // 前缀仍然会刷新（位置可能变）
     expect(nodes[0].__pathPrefix).toBe('nodeList[0]');
   });
@@ -126,7 +124,7 @@ describe('路径式 setData 快速通道', () => {
     renderer.setProperty(nodes[1], 'foo', 42);
 
     const calls = countToView(() => endRender());
-    expect(calls).withContext('快路径不应调用任何 toView()').toBe(0);
+    expect(calls, '快路径不应调用任何 toView()').toBe(0);
     expect(mp.calls).toEqual([{ 'nodeList[1].property.foo': 42 }]);
   });
 
@@ -208,7 +206,7 @@ describe('路径式 setData 快速通道', () => {
     const { lView, mp } = bootstrap(3);
     propertyChange(lView as any);
     const calls = countToView(() => endRender());
-    expect(calls).withContext('无变更不应序列化').toBe(0);
+    expect(calls, '无变更不应序列化').toBe(0);
     expect(mp.calls).toEqual([]);
   });
 
@@ -220,9 +218,10 @@ describe('路径式 setData 快速通道', () => {
     renderer.appendChild(nodes[0], new AgentNode('element'));
 
     const calls = countToView(() => endRender());
-    expect(calls)
-      .withContext('结构变更必须走全量序列化（而不是直接发缓存 key）')
-      .toBeGreaterThan(0);
+    expect(
+      calls,
+      '结构变更必须走全量序列化（而不是直接发缓存 key）',
+    ).toBeGreaterThan(0);
   });
 
   it('removeChild → 回退全量序列化', () => {
@@ -266,7 +265,7 @@ describe('路径式 setData 快速通道', () => {
     renderer.setProperty(orphan, 'x', 1);
 
     const calls = countToView(() => endRender());
-    expect(calls).withContext('拿不到前缀必须回退').toBeGreaterThan(0);
+    expect(calls, '拿不到前缀必须回退').toBeGreaterThan(0);
     const merged = Object.assign({}, ...mp.calls);
     expect(merged['nodeList[0].property.x']).toBeUndefined();
   });
@@ -279,7 +278,7 @@ describe('路径式 setData 快速通道', () => {
     propertyChange(lView as any);
     renderer.setProperty(nodes[0], 'x', 1);
     const calls = countToView(() => endRender());
-    expect(calls).withContext('关掉开关后必须走全量').toBeGreaterThan(0);
+    expect(calls, '关掉开关后必须走全量').toBeGreaterThan(0);
     /**
      * 旧管线在 `property` key 数变化时「整体送出」该对象；
      * 开关打开后同一变更只发 `'nodeList[0].property.x'` 一个叶子。
@@ -365,12 +364,11 @@ describe('路径式 setData 快速通道', () => {
     }
     const fastNs = Number(process.hrtime.bigint() - t1) / ITER;
 
-    expect(toViewTotal).withContext('快路径一个 toView 都不能有').toBe(0);
-    expect(fastNs)
-      .withContext(
-        `快路径(${fastNs.toFixed(0)}ns) 应明显快于全量(${fullNs.toFixed(0)}ns)`,
-      )
-      .toBeLessThan(fullNs);
+    expect(toViewTotal, '快路径一个 toView 都不能有').toBe(0);
+    expect(
+      fastNs,
+      `快路径(${fastNs.toFixed(0)}ns) 应明显快于全量(${fullNs.toFixed(0)}ns)`,
+    ).toBeLessThan(fullNs);
 
     console.log(
       `[path bench] ${N} 节点单点变更：全量 ${fullNs.toFixed(0)}ns / ` +
@@ -394,11 +392,10 @@ describe('路径式 setData 快速通道', () => {
     const small = measure(100);
     const big = measure(1000);
     // 允许 3 倍浮动（GC / 噪声），但绝不能随节点数线性增长到数量级
-    expect(big)
-      .withContext(
-        `1000 节点(${big.toFixed(0)}ns) 不应比 100 节点(${small.toFixed(0)}ns) 贵一个量级`,
-      )
-      .toBeLessThan(small * 3);
+    expect(
+      big,
+      `1000 节点(${big.toFixed(0)}ns) 不应比 100 节点(${small.toFixed(0)}ns) 贵一个量级`,
+    ).toBeLessThan(small * 3);
     console.log(
       `[path bench] 快路径 100 节点 ${small.toFixed(0)}ns vs 1000 节点 ${big.toFixed(0)}ns`,
     );
@@ -427,9 +424,9 @@ describe('路径式 setData 快速通道', () => {
      * `nodeList` 整块被整体送出。所以不断言具体 key，只断言：
      * 已发过的 x=42 仍然在全量结果里（自愈合，不丢数据）。
      */
-    expect(JSON.stringify(merged))
-      .withContext('旧快照导致重发，但绝不能丢')
-      .toContain('"x":42');
+    expect(JSON.stringify(merged), '旧快照导致重发，但绝不能丢').toContain(
+      '"x":42',
+    );
   });
 
   it('cleanAll 丢掉已销毁实例的待发包，避免向死实例 setData', () => {

@@ -109,7 +109,12 @@ describe('系统信息族（参考 enhanceSystemInfo 移植）', () => {
       expect(res.hostName).toBe('WeChat');
       expect(res.hostSDKVersion).toBe('8.0.30');
       expect(res.windowTop).toBe(0);
-      expect(res.safeAreaInsets).toEqual({ top: 47, left: 0, right: 0, bottom: 34 });
+      expect(res.safeAreaInsets).toEqual({
+        top: 47,
+        left: 0,
+        right: 0,
+        bottom: 34,
+      });
       expect(res.deviceId).toBe('cached-device');
       // 原始字段保留
       expect(res.model).toBe('iPhone 14');
@@ -188,7 +193,12 @@ describe('系统信息族（参考 enhanceSystemInfo 移植）', () => {
       });
       expect(res.windowTop).toBe(0);
       expect(res.windowBottom).toBe(0);
-      expect(res.safeAreaInsets).toEqual({ top: 20, left: 0, right: 0, bottom: 0 });
+      expect(res.safeAreaInsets).toEqual({
+        top: 20,
+        left: 0,
+        right: 0,
+        bottom: 0,
+      });
       expect(res.statusBarHeight).toBe(20);
     });
   });
@@ -196,11 +206,10 @@ describe('系统信息族（参考 enhanceSystemInfo 移植）', () => {
   // 编译期断言：确认 MpApiResultMap -> MpResultOf -> 服务方法 的推导链已接上。
   // 写法要点：把 true 赋给 Eq<...> 元组，任一 Eq 为 false 则赋值在编译期报错。
   describe('类型推导链（编译期）', () => {
-    type Eq<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B
-      ? 1
-      : 2
-      ? true
-      : false;
+    type Eq<A, B> =
+      (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+        ? true
+        : false;
 
     it('构建函数返回口径已绑定到具名类型', () => {
       const checks: [
@@ -232,10 +241,7 @@ describe('系统信息族（参考 enhanceSystemInfo 移植）', () => {
           Awaited<ReturnType<MpApiService['getSystemInfo']>>,
           MpEnhancedSystemInfo
         >,
-        Eq<
-          ReturnType<MpApiService['getSystemInfoSync']>,
-          MpEnhancedSystemInfo
-        >,
+        Eq<ReturnType<MpApiService['getSystemInfoSync']>, MpEnhancedSystemInfo>,
       ] = [true, true, true, true, true];
       expect(checks.length).toBe(5);
     });

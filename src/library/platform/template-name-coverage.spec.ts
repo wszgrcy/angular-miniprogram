@@ -144,17 +144,19 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
     const containers = collectContainerNames(ctxOf(fixture).nodeList as any[]);
     console.log('ngIf(then) 容器:', JSON.stringify(containers));
 
-    expect(containers.length)
-      .withContext('没找到容器，说明 ngIf 没建出嵌入视图')
-      .toBeGreaterThan(0);
+    expect(
+      containers.length,
+      '没找到容器，说明 ngIf 没建出嵌入视图',
+    ).toBeGreaterThan(0);
     // 每个容器项都应有 __templateName 字段，且**不得为 `undefined`**。
     // 微信 `setData` 对路径式 key 上的 `undefined` 直接拒掉整个调用，
     // 无名时用 `null`（wxml 的 `item.__templateName||'X'` 仍走兼底）。
     containers.forEach((c) =>
       c.names.forEach((n) =>
-        expect(n === null || typeof n === 'string')
-          .withContext(`slot${c.slot} 不得为 undefined`)
-          .toBeTrue(),
+        expect(
+          n === null || typeof n === 'string',
+          `slot${c.slot} 不得为 undefined`,
+        ).toBe(true),
       ),
     );
   });
@@ -177,7 +179,7 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
     console.log('ngFor 容器:', JSON.stringify(containers));
 
     const total = containers.reduce((acc, c) => acc + c.names.length, 0);
-    expect(total).withContext('ngFor 3 项应产生 3 个嵌入视图项').toBe(3);
+    expect(total, 'ngFor 3 项应产生 3 个嵌入视图项').toBe(3);
   });
 
   it('*ngSwitch：命中分支建出嵌入视图', () => {
@@ -199,11 +201,10 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
     ).flatMap((c) => c.names);
     console.log('OUTLET-STATIC names:', JSON.stringify(names));
 
-    expect(names)
-      .withContext(
-        '应推导出模板声明名 alpha（未 patch 环境下由 declTNode 顶上）',
-      )
-      .toContain('alpha');
+    expect(
+      names,
+      '应推导出模板声明名 alpha（未 patch 环境下由 declTNode 顶上）',
+    ).toContain('alpha');
   });
 
   /**
@@ -239,15 +240,13 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
       `PRECISION ctx=${JSON.stringify(ctxName)} derived=${JSON.stringify(derivedName)} picked=${JSON.stringify(picked)}`,
     );
 
-    expect(ctxName)
-      .withContext('context 应带上显式传入的 overrideName')
-      .toBe('overrideName');
-    expect(derivedName)
-      .withContext('declTNode 仍是模板声明名 alpha')
-      .toBe('alpha');
-    expect(picked)
-      .withContext('两级取值应优先取 context，而非 declTNode')
-      .toBe('overrideName');
+    expect(ctxName, 'context 应带上显式传入的 overrideName').toBe(
+      'overrideName',
+    );
+    expect(derivedName, 'declTNode 仍是模板声明名 alpha').toBe('alpha');
+    expect(picked, '两级取值应优先取 context，而非 declTNode').toBe(
+      'overrideName',
+    );
   });
 
   it('反向对照：抹掉 declTNode.localNames 后推导取不到名', () => {
@@ -277,9 +276,7 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
         }
       });
     }
-    expect(tampered)
-      .withContext('没找到可篡改的 declTNode，反向对照未真正生效')
-      .toBeTrue();
+    expect(tampered, '没找到可篡改的 declTNode，反向对照未真正生效').toBe(true);
 
     const after = collectContainerNames(
       ctxOf(fixture).nodeList as any[],
@@ -290,8 +287,9 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
       'after=',
       JSON.stringify(after),
     );
-    expect(after)
-      .withContext('抹掉 localNames 后仍能推出 alpha，说明推导不是走 declTNode')
-      .not.toContain('alpha');
+    expect(
+      after,
+      '抹掉 localNames 后仍能推出 alpha，说明推导不是走 declTNode',
+    ).not.toContain('alpha');
   });
 });

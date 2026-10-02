@@ -45,19 +45,19 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         const root = harness.host.root();
         const myTestProjectHost = new MyTestProjectHost(harness.host);
         const list = await myTestProjectHost.getFileList(
-          normalize(join(root, 'src', '__pages'))
+          normalize(join(root, 'src', '__pages')),
         );
         list.push(
           ...(await myTestProjectHost.getFileList(
-            normalize(join(root, 'src', '__components'))
-          ))
+            normalize(join(root, 'src', '__components')),
+          )),
         );
         await myTestProjectHost.importPathRename(list);
         await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
         await myTestProjectHost.moveDir(
           ALL_COMPONENT_NAME_LIST,
           '__components',
-          'components'
+          'components',
         );
         await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
         harness.useTarget('build', angularConfig);
@@ -67,7 +67,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         // Vite 链路可能不产生日志，logs[0] 会是 undefined；
         // 本意是「构建没报错」，那就查全部而不是只看第一条。
         expect(
-          result.logs.filter((l) => l.level === 'error').map((l) => l.value)
+          result.logs.filter((l) => l.level === 'error').map((l) => l.value),
         ).toEqual([]);
         expect(result.result?.success).toBeTruthy();
         const injectList = getBuildPlatformInjectConfig(angularConfig.platform);
@@ -77,17 +77,17 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           .expectFile(
             join(
               normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
-              `app${buildPlatform.fileExtname.style}`
-            )
+              `app${buildPlatform.fileExtname.style}`,
+            ),
           )
           .toExist();
         const libraryPath = join(
           normalize(DEFAULT_ANGULAR_CONFIG.outputPath),
           LIBRARY_OUTPUT_ROOTDIR,
-          'test-library'
+          'test-library',
         );
         const librarySelfTemplateFile = harness.expectFile(
-          join(libraryPath, `self${buildPlatform.fileExtname.contentTemplate}`)
+          join(libraryPath, `self${buildPlatform.fileExtname.contentTemplate}`),
         );
         librarySelfTemplateFile.toExist();
         librarySelfTemplateFile.content.toContain(`$$mp$$__self__$$`);
@@ -98,7 +98,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
             .toExist();
           harness
             .expectFile(
-              componentPath + (buildPlatform.fileExtname.config || '.json')
+              componentPath + (buildPlatform.fileExtname.config || '.json'),
             )
             .toExist();
           harness

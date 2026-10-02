@@ -19,7 +19,7 @@ export class LifeTimePage implements OnInit {
     },
     onReady: function (
       this: WechatMiniprogram.Page.Instance<{}, {}> &
-        MiniProgramComponentInstance<LifeTimePage>
+        MiniProgramComponentInstance<LifeTimePage>,
     ) {
       console.log('mp-onReady');
     },

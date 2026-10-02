@@ -10,15 +10,17 @@ import { MP_PLATFORM } from './platform';
 function createFakeGlobal(overrides: Record<string, any> = {}) {
   const listeners = new Set<(res: any) => void>();
   return {
-    showToast: jasmine
-      .createSpy('showToast')
-      .and.callFake((opts: any) => opts.success?.({ errMsg: 'showToast:ok' })),
-    navigateTo: jasmine
-      .createSpy('navigateTo')
-      .and.callFake((opts: any) => opts.success?.({ errMsg: 'navigateTo:ok' })),
-    getStorageSync: jasmine
-      .createSpy('getStorageSync')
-      .and.returnValue('stored'),
+    showToast: vi
+      .fn()
+      .mockImplementation((opts: any) =>
+        opts.success?.({ errMsg: 'showToast:ok' }),
+      ),
+    navigateTo: vi
+      .fn()
+      .mockImplementation((opts: any) =>
+        opts.success?.({ errMsg: 'navigateTo:ok' }),
+      ),
+    getStorageSync: vi.fn().mockReturnValue('stored'),
     onLocationChange: (cb: (res: any) => void) => listeners.add(cb),
     offLocationChange: (cb: (res: any) => void) => listeners.delete(cb),
     fireLocationChange(res: any) {
@@ -53,7 +55,7 @@ describe('MP_API_PROXY（uni 式兜底）', () => {
 
   it('已知 API：走 invoke 管线，异步返回 Promise', async () => {
     const { proxy } = setup();
-    await expectAsync(proxy.showToast({ title: 'hi' })).toBeResolved();
+    await expect(proxy.showToast({ title: 'hi' })).resolves.toBeDefined();
   });
 
   it('同步 API 直接返回值', () => {
@@ -68,8 +70,8 @@ describe('MP_API_PROXY（uni 式兜底）', () => {
 
   it('in 运算符：存在为 true，缺失为 false', () => {
     const { proxy } = setup();
-    expect('showToast' in proxy).toBeTrue();
-    expect('nope' in proxy).toBeFalse();
+    expect('showToast' in proxy).toBe(true);
+    expect('nope' in proxy).toBe(false);
   });
 
   it('on* 名字：不传参返回 Observable，退订自动 off', () => {
@@ -108,15 +110,13 @@ describe('MP_API_PROXY（uni 式兜底）', () => {
       ],
     });
     await (proxy.navigateTo as any)({ url: '/home' });
-    expect((fake.navigateTo as any).calls.mostRecent().args[0].url).toBe(
-      '/login',
-    );
+    expect((fake.navigateTo as any).mock.calls.at(-1)[0].url).toBe('/login');
   });
 
   it('协议归一同样生效：支付宝 getSetting -> getAuthSetting', async () => {
-    const getAuthSetting = jasmine
-      .createSpy('getAuthSetting')
-      .and.callFake((opts: any) =>
+    const getAuthSetting = vi
+      .fn()
+      .mockImplementation((opts: any) =>
         opts.success?.({ authSetting: { 'scope.userLocation': true } }),
       );
     const { proxy } = setup('my', { getAuthSetting });

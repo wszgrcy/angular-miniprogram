@@ -15,12 +15,12 @@ export type CustomWebpackBrowserSchema = BrowserBuilderOptions;
 export function buildWebpackBrowserGenerate(
   webpackConfiguration: (
     options: BrowserBuilderOptions,
-    context: BuilderContext
-  ) => ExecutionTransformer<webpack.Configuration>
+    context: BuilderContext,
+  ) => ExecutionTransformer<webpack.Configuration>,
 ) {
   return (
     options: CustomWebpackBrowserSchema,
-    context: BuilderContext
+    context: BuilderContext,
   ): ReturnType<typeof executeBrowserBuilder> => {
     return executeBrowserBuilder(options, context, {
       webpackConfiguration: webpackConfiguration(options, context),

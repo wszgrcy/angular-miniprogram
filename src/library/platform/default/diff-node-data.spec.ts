@@ -98,9 +98,7 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
 
     const d = diffNodeData(from as any, to as any);
 
-    expect(undefPaths(d))
-      .withContext('diff 里不允许出现 undefined')
-      .toEqual([]);
+    expect(undefPaths(d), 'diff 里不允许出现 undefined').toEqual([]);
     // 该路径应被显式清成 null
     expect((d as any)['nodeList[0][0].__templateName']).toBeNull();
   });

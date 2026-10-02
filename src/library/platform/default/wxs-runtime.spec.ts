@@ -99,9 +99,11 @@ describe('wxs 运行时: callMethod 回传通道', () => {
 
   it('暂存超过上限后丢弃并告警', () => {
     const warns: string[] = [];
-    const spy = spyOn(console, 'warn').and.callFake((...a: unknown[]) => {
-      warns.push(a.join(' '));
-    });
+    const spy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation((...a: unknown[]) => {
+        warns.push(a.join(' '));
+      });
     const mp: any = {};
     const fns = createWxsCallMethodForwarders(['onTap']);
     for (let i = 0; i < 30; i++) {
@@ -116,7 +118,7 @@ describe('wxs 运行时: callMethod 回传通道', () => {
   });
 
   it('组件上找不到方法时告警而不是抛错', () => {
-    const spy = spyOn(console, 'warn');
+    const spy = vi.spyOn(console, 'warn');
     const fns = createWxsCallMethodForwarders(['missing']);
     expect(() =>
       fns.missing.call({ __ngComponentInstance: {} }, 1),

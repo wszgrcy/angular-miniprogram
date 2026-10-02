@@ -115,10 +115,10 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
       const ours = exprs.reduce((sum, e) => sum + countWithOurs(e), 0);
       const angular = exprs.reduce((sum, e) => sum + countWithAngular(e), 0);
 
-      expect(ours).withContext(`我们数到的管道数 (${name})`).toBe(expected);
-      expect(ours)
-        .withContext(`必须与 Angular RecursiveAstVisitor 一致 (${name})`)
-        .toBe(angular);
+      expect(ours, `我们数到的管道数 (${name})`).toBe(expected);
+      expect(ours, `必须与 Angular RecursiveAstVisitor 一致 (${name})`).toBe(
+        angular,
+      );
     });
   }
 
@@ -154,9 +154,7 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
         return s + c.count;
       }, 0);
 
-      expect(broken)
-        .withContext(`旧写法应当少数（${html}）`)
-        .toBeLessThan(truth);
+      expect(broken, `旧写法应当少数（${html}）`).toBeLessThan(truth);
     }
   });
 });
@@ -180,20 +178,18 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
   }
 
   it('ICU 复数消息抛错（实测该节点会真实产出，留空即静默丢弃）', () => {
-    expect(() =>
-      run('<p>{count, plural, =1 {one} other {many}}</p>'),
-    ).toThrowError(/ICU/);
+    expect(() => run('<p>{count, plural, =1 {one} other {many}}</p>')).toThrow(
+      /ICU/,
+    );
   });
 
   it('ICU select 消息同样抛错', () =>
-    expect(() =>
-      run('<p>{gender, select, male {他} other {TA}}</p>'),
-    ).toThrowError(/ICU/));
+    expect(() => run('<p>{gender, select, male {他} other {TA}}</p>')).toThrow(
+      /ICU/,
+    ));
 
   it('ng-content 带 fallback 内容抛错（小程序 slot 无对应能力）', () => {
-    expect(() => run('<ng-content>fallback</ng-content>')).toThrowError(
-      /fallback/,
-    );
+    expect(() => run('<ng-content>fallback</ng-content>')).toThrow(/fallback/);
   });
 
   it('对照：ng-content 无 fallback 正常通过', () => {
@@ -207,8 +203,8 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
   });
 
   it('@defer / @content 仍按既有策略抛错', () => {
-    expect(() => run('@defer { <a></a> }')).toThrowError(/defer/);
-    expect(() => run('@content { @case (foo) { <a></a> } }')).toThrowError(
+    expect(() => run('@defer { <a></a> }')).toThrow(/defer/);
+    expect(() => run('@content { @case (foo) { <a></a> } }')).toThrow(
       /@content/,
     );
   });
@@ -223,9 +219,9 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
 
     expect(() =>
       def.visitComponent({ componentName: 'Foo', tagName: 'app-foo' }),
-    ).toThrowError(/Component AST 节点/);
+    ).toThrow(/Component AST 节点/);
 
-    expect(() => def.visitDirective({ name: 'MyDirective' })).toThrowError(
+    expect(() => def.visitDirective({ name: 'MyDirective' })).toThrow(
       /Directive AST 节点/,
     );
   });
@@ -298,9 +294,10 @@ describe('TemplateDefinition: 整模板槽位与 Angular 基准对齐', () => {
       expect(t.declIndex).toBeGreaterThanOrEqual(t.nodes);
       // declIndex 与「节点数 + 权威管道数」的差不应超过控制流锚点开销，
       // 关键是不允许出现「管道没数到」导致的欠计
-      expect(t.declIndex)
-        .withContext(`${name}: declIndex 应 >= 节点数 + 权威管道数`)
-        .toBeGreaterThanOrEqual(t.nodes + t.angularPipes);
+      expect(
+        t.declIndex,
+        `${name}: declIndex 应 >= 节点数 + 权威管道数`,
+      ).toBeGreaterThanOrEqual(t.nodes + t.angularPipes);
     });
   }
 

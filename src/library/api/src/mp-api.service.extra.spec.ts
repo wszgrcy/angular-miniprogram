@@ -13,19 +13,19 @@ describe('Proxy 补充面：授权 / 会话 / 启动参数 / 键盘 / soter', ()
   ): { proxy: MpApiProxy; service: MpApiService; fake: Record<string, any> } {
     initMiniProgramTestEnv();
     const fake = {
-      authorize: jasmine
-        .createSpy('authorize')
-        .and.callFake((opts: any) =>
+      authorize: vi
+        .fn()
+        .mockImplementation((opts: any) =>
           opts.success?.({ errMsg: 'authorize:ok' }),
         ),
-      getSetting: jasmine
-        .createSpy('getSetting')
-        .and.callFake((opts: any) =>
+      getSetting: vi
+        .fn()
+        .mockImplementation((opts: any) =>
           opts.success?.({ authSetting: { 'scope.userLocation': true } }),
         ),
-      getLaunchOptionsSync: jasmine
-        .createSpy('getLaunchOptionsSync')
-        .and.returnValue({ path: 'pages/index/index', scene: 1001 }),
+      getLaunchOptionsSync: vi
+        .fn()
+        .mockReturnValue({ path: 'pages/index/index', scene: 1001 }),
       ...overrides,
     };
     TestBed.configureTestingModule({
@@ -44,7 +44,7 @@ describe('Proxy 补充面：授权 / 会话 / 启动参数 / 键盘 / soter', ()
   it('authorize 透传 scope', async () => {
     const { proxy, fake } = setup();
     await proxy.authorize({ scope: 'scope.userLocation' });
-    expect((fake.authorize as any).calls.mostRecent().args[0].scope).toBe(
+    expect((fake.authorize as any).mock.calls.at(-1)[0].scope).toBe(
       'scope.userLocation',
     );
   });
@@ -52,13 +52,13 @@ describe('Proxy 补充面：授权 / 会话 / 启动参数 / 键盘 / soter', ()
   it('getSetting 返回 authSetting', async () => {
     const { proxy } = setup();
     const res = await proxy.getSetting();
-    expect(res.authSetting['scope.userLocation']).toBeTrue();
+    expect(res.authSetting['scope.userLocation']).toBe(true);
   });
 
   it('支付宝系 getSetting 经协议映射到 getAuthSetting', async () => {
-    const getAuthSetting = jasmine
-      .createSpy('getAuthSetting')
-      .and.callFake((opts: any) => opts.success?.({ authSetting: {} }));
+    const getAuthSetting = vi
+      .fn()
+      .mockImplementation((opts: any) => opts.success?.({ authSetting: {} }));
     const { proxy } = setup('my', { getAuthSetting });
     await proxy.getSetting();
     expect(getAuthSetting).toHaveBeenCalled();
@@ -76,7 +76,9 @@ describe('Proxy 补充面：授权 / 会话 / 启动参数 / 键盘 / soter', ()
       offKeyboardHeightChange: () => (handler = undefined),
     });
     const seen: any[] = [];
-    const sub = proxy.onKeyboardHeightChange().subscribe((r: any) => seen.push(r));
+    const sub = proxy
+      .onKeyboardHeightChange()
+      .subscribe((r: any) => seen.push(r));
     handler({ height: 250 });
     expect(seen.length).toBe(1);
     expect(seen[0].height).toBe(250);
@@ -97,8 +99,8 @@ describe('Proxy 补充面：授权 / 会话 / 启动参数 / 键盘 / soter', ()
     const { service } = setup('my', {
       getAuthSetting: () => undefined,
     });
-    expect(service.hasApi('getSetting')).toBeTrue();
-    expect(service.hasApi('totallyMissing')).toBeFalse();
+    expect(service.hasApi('getSetting')).toBe(true);
+    expect(service.hasApi('totallyMissing')).toBe(false);
   });
 
   it('event$ 无 off 配对时退订不抛错', () => {

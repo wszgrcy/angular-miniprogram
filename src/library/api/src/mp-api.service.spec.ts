@@ -2,14 +2,7 @@
 import { ɵChangeDetectionScheduler as ChangeDetectionScheduler } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram/platform';
-import {
-  catchError,
-  firstValueFrom,
-  map,
-  of,
-  switchMap,
-  tap,
-} from 'rxjs';
+import { catchError, firstValueFrom, map, of, switchMap, tap } from 'rxjs';
 import { initMiniProgramTestEnv } from '../../platform/test-util/init-env';
 import { MpApiService } from './mp-api.service';
 import { MP_API_PIPES, blockWith } from './pipe-registry';
@@ -18,16 +11,18 @@ import { MP_PLATFORM } from './platform';
 /** 可记录调用的假全局对象，替代 wx/my 等 */
 function createFakeGlobal(overrides: Record<string, any> = {}) {
   return {
-    navigateTo: jasmine
-      .createSpy('navigateTo')
-      .and.callFake((opts: any) => opts.success?.({ errMsg: 'navigateTo:ok' })),
-    showToast: jasmine
-      .createSpy('showToast')
-      .and.callFake((opts: any) => opts.success?.({ errMsg: 'showToast:ok' })),
-    getStorageSync: jasmine
-      .createSpy('getStorageSync')
-      .and.returnValue('stored-value'),
-    request: jasmine.createSpy('request').and.returnValue({
+    navigateTo: vi
+      .fn()
+      .mockImplementation((opts: any) =>
+        opts.success?.({ errMsg: 'navigateTo:ok' }),
+      ),
+    showToast: vi
+      .fn()
+      .mockImplementation((opts: any) =>
+        opts.success?.({ errMsg: 'showToast:ok' }),
+      ),
+    getStorageSync: vi.fn().mockReturnValue('stored-value'),
+    request: vi.fn().mockReturnValue({
       abort: () => undefined,
       onProgressUpdate: () => undefined,
     }),
@@ -54,18 +49,18 @@ describe('MpApiService', () => {
   describe('promise 化（对齐 uni 规则）', () => {
     it('未传回调返回 Promise，success 后 resolve', async () => {
       const { service } = setup();
-      await expectAsync(
+      await expect(
         service.invoke('showToast', { title: 'hi' }),
-      ).toBeResolved();
+      ).resolves.toBeDefined();
     });
 
     it('fail 回调触发时 reject', async () => {
       const { service } = setup('wx', {
         showToast: (opts: any) => opts.fail?.({ errMsg: 'showToast:fail' }),
       });
-      await expectAsync(
+      await expect(
         service.invoke('showToast', { title: 'hi' }),
-      ).toBeRejectedWith({ errMsg: 'showToast:fail' });
+      ).rejects.toEqual({ errMsg: 'showToast:fail' });
     });
 
     it('回调作为旁路观察者：Promise 与回调同时可用', async () => {
@@ -75,7 +70,7 @@ describe('MpApiService', () => {
         title: 'hi',
         success: (res: any) => (result = res),
       });
-      await expectAsync(ret).toBeResolved();
+      await expect(ret).resolves.toBeDefined();
       expect(result.errMsg).toBe('showToast:ok');
     });
 
@@ -94,10 +89,8 @@ describe('MpApiService', () => {
 
     it('平台缺失 API：Promise 模式 reject，同步模式抛错', async () => {
       const { service } = setup('wx', { getStorageSync: undefined });
-      await expectAsync(service.invoke('someMissingApi')).toBeRejected();
-      expect(() => service.getStorageSync('k')).toThrowError(
-        /不支持 API/,
-      );
+      await expect(service.invoke('someMissingApi')).rejects.toBeDefined();
+      expect(() => service.getStorageSync('k')).toThrow(/不支持 API/);
     });
   });
 
@@ -106,19 +99,20 @@ describe('MpApiService', () => {
       const { service, fake } = setup();
       service.setPipe('navigateTo', {
         pre: [
-          map((ctx) => ({ ...ctx, options: { ...ctx.options, url: '/login' } })),
+          map((ctx) => ({
+            ...ctx,
+            options: { ...ctx.options, url: '/login' },
+          })),
         ],
       });
       await service.navigateTo({ url: '/home' });
-      expect((fake.navigateTo as any).calls.mostRecent().args[0].url).toBe(
-        '/login',
-      );
+      expect((fake.navigateTo as any).mock.calls.at(-1)[0].url).toBe('/login');
     });
 
     it('blockWith 阻断：目标 API 不执行，Promise 以 MpBlockedError 落定', async () => {
       const { service, fake } = setup();
-      service.setPipe('navigateTo', { pre: [blockWith('未登录')]});
-      await expectAsync(service.navigateTo({ url: '/home' })).toBeRejectedWithError(
+      service.setPipe('navigateTo', { pre: [blockWith('未登录')] });
+      await expect(service.navigateTo({ url: '/home' })).rejects.toThrow(
         /未登录/,
       );
       expect(fake.navigateTo).not.toHaveBeenCalled();
@@ -136,7 +130,7 @@ describe('MpApiService', () => {
           success: (res: any) => (result = res),
         })
         .then(() => undefined);
-      expect(result.tagged).toBeTrue();
+      expect(result.tagged).toBe(true);
     });
 
     it('post 管道可 catchError 改写错误', async () => {
@@ -146,9 +140,9 @@ describe('MpApiService', () => {
       service.setPipe('showToast', {
         post: [catchError((err: any) => of({ recovered: err.errMsg }))],
       });
-      await expectAsync(
+      await expect(
         service.invoke('showToast', { title: 'x' }),
-      ).toBeResolvedTo({ recovered: 'showToast:fail boom' } as any);
+      ).resolves.toEqual({ recovered: 'showToast:fail boom' } as any);
     });
 
     it('作用域管道只影响目标 API', async () => {
@@ -219,9 +213,7 @@ describe('MpApiService', () => {
         ],
       });
       await service.navigateTo({ url: '/home' });
-      expect((fake.navigateTo as any).calls.mostRecent().args[0].url).toBe(
-        '/async',
-      );
+      expect((fake.navigateTo as any).mock.calls.at(-1)[0].url).toBe('/async');
     });
 
     it('DI 多 provider 声明式贡献管道（同 HTTP_INTERCEPTORS）', async () => {
@@ -253,10 +245,14 @@ describe('MpApiService', () => {
       });
       const service = TestBed.inject(MpApiService);
 
-      await expectAsync(service.invoke('navigateTo', { url: '/a' })).toBeResolvedTo(
-        { errMsg: 'navigateTo:ok', g1: true, g2: true } as any,
-      );
-      await expectAsync(service.invoke('showToast', { title: 'x' })).toBeRejectedWithError(
+      await expect(
+        service.invoke('navigateTo', { url: '/a' }),
+      ).resolves.toEqual({
+        errMsg: 'navigateTo:ok',
+        g1: true,
+        g2: true,
+      } as any);
+      await expect(service.invoke('showToast', { title: 'x' })).rejects.toThrow(
         /禁 toast/,
       );
     });
@@ -272,16 +268,20 @@ describe('MpApiService', () => {
           {
             provide: MP_API_PIPES,
             multi: true,
-            useValue: { global: { post: [map((r: any) => ({ ...r, fromDi: true }))] } },
+            useValue: {
+              global: { post: [map((r: any) => ({ ...r, fromDi: true }))] },
+            },
           },
         ],
       });
       const service = TestBed.inject(MpApiService);
-      service.setGlobalPipes({ post: [map((r: any) => ({ ...r, runtime: true }))] });
+      service.setGlobalPipes({
+        post: [map((r: any) => ({ ...r, runtime: true }))],
+      });
       service.clearGlobalPipes();
 
       const res = await service.invoke('showToast', { title: 'x' });
-      expect(res.fromDi).toBeTrue();
+      expect(res.fromDi).toBe(true);
       expect(res.runtime).toBeUndefined();
     });
 
@@ -291,14 +291,20 @@ describe('MpApiService', () => {
         post: [map((res: any) => ({ ...res, tagged: true }))],
       });
 
-      expect((await service.invoke('showToast', { title: 'a' })).tagged).toBeTrue();
+      expect((await service.invoke('showToast', { title: 'a' })).tagged).toBe(
+        true,
+      );
 
       handle.dispose();
-      expect((await service.invoke('showToast', { title: 'b' })).tagged).toBeUndefined();
+      expect(
+        (await service.invoke('showToast', { title: 'b' })).tagged,
+      ).toBeUndefined();
 
       // 幂等
       handle.dispose();
-      expect((await service.invoke('showToast', { title: 'c' })).tagged).toBeUndefined();
+      expect(
+        (await service.invoke('showToast', { title: 'c' })).tagged,
+      ).toBeUndefined();
     });
 
     it('dispose 只撤销自己，不影响其他注册', async () => {
@@ -327,11 +333,17 @@ describe('MpApiService', () => {
         post: [map((res: any) => ({ ...res, tracked: true }))],
       });
 
-      expect((await service.invoke('showToast', { title: 'a' })).tracked).toBeTrue();
-      expect((await service.invoke('navigateTo', { url: '/b' })).tracked).toBeTrue();
+      expect((await service.invoke('showToast', { title: 'a' })).tracked).toBe(
+        true,
+      );
+      expect((await service.invoke('navigateTo', { url: '/b' })).tracked).toBe(
+        true,
+      );
 
       h.dispose();
-      expect((await service.invoke('showToast', { title: 'a' })).tracked).toBeUndefined();
+      expect(
+        (await service.invoke('showToast', { title: 'a' })).tracked,
+      ).toBeUndefined();
     });
 
     it('invoke$ 冷流：不订阅不发起调用', async () => {
@@ -346,9 +358,9 @@ describe('MpApiService', () => {
       const { service, fake } = setup();
       const controller = new AbortController();
       controller.abort('取消');
-      await expectAsync(
+      await expect(
         service.invoke('showToast', { title: 'x', signal: controller.signal }),
-      ).toBeRejected();
+      ).rejects.toBeDefined();
       expect(fake.showToast).not.toHaveBeenCalled();
     });
 
@@ -362,7 +374,7 @@ describe('MpApiService', () => {
         signal: controller.signal,
       });
       controller.abort();
-      await expectAsync(promise).toBeRejected();
+      await expect(promise).rejects.toBeDefined();
     });
 
     it('task 类：signal 取消自动 task.abort()', () => {
@@ -372,7 +384,7 @@ describe('MpApiService', () => {
         url: 'https://x.com',
         signal: controller.signal,
       });
-      const spy = spyOn(task, 'abort');
+      const spy = vi.spyOn(task, 'abort');
       controller.abort();
       expect(spy).toHaveBeenCalled();
     });
@@ -393,7 +405,7 @@ describe('MpApiService', () => {
         success: (res: any) => (result = res),
       });
       await new Promise((r) => setTimeout(r, 10));
-      expect(result.tagged).toBeTrue();
+      expect(result.tagged).toBe(true);
     });
   });
 
@@ -431,7 +443,7 @@ describe('MpApiService', () => {
       await service.invoke('removeStorage', { key: 'k' });
       await service.invoke('clearStorage');
       expect(removed).toBe('k');
-      expect(cleared).toBeTrue();
+      expect(cleared).toBe(true);
     });
   });
 
@@ -439,7 +451,7 @@ describe('MpApiService', () => {
     it('回调执行后通知 scheduler', async () => {
       const { service } = setup();
       const scheduler = TestBed.inject(ChangeDetectionScheduler);
-      const spy = spyOn(scheduler, 'notify');
+      const spy = vi.spyOn(scheduler, 'notify');
       await service.invoke('showToast', { title: 'x' });
       expect(spy).toHaveBeenCalled();
     });
@@ -469,9 +481,12 @@ describe('MpApiService', () => {
     });
 
     it('getDeviceInfo 优先用平台原生拆分 API', () => {
-      const nativeSpy = jasmine
-        .createSpy('getDeviceInfo')
-        .and.returnValue({ brand: 'Apple', model: 'iPhone', system: 'iOS 16.6', platform: 'ios' });
+      const nativeSpy = vi.fn().mockReturnValue({
+        brand: 'Apple',
+        model: 'iPhone',
+        system: 'iOS 16.6',
+        platform: 'ios',
+      });
       const { service } = setup('wx', {
         getDeviceInfo: nativeSpy,
         getSystemInfoSync: () => ({ ...sysRaw }),
@@ -482,9 +497,7 @@ describe('MpApiService', () => {
     });
 
     it('无原生拆分 API 时从 getSystemInfoSync 拼', () => {
-      const sysSpy = jasmine
-        .createSpy('getSystemInfoSync')
-        .and.returnValue({ ...sysRaw });
+      const sysSpy = vi.fn().mockReturnValue({ ...sysRaw });
       const { service } = setup('my', { getSystemInfoSync: sysSpy });
       const res = service.getWindowInfo();
       expect(sysSpy).toHaveBeenCalled();
@@ -514,18 +527,16 @@ describe('MpApiService', () => {
     it('navigateTo 字符串参数（自动拼 __id__ 通道参数）', async () => {
       const { service, fake } = setup();
       const res = await service.navigateTo({ url: '/a' });
-      const url = (fake.navigateTo as any).calls.mostRecent().args[0].url;
+      const url = (fake.navigateTo as any).mock.calls.at(-1)[0].url;
       expect(url).toMatch(/^\/a\?__id__=\d+$/);
       expect(res.eventChannel).toBeDefined();
     });
 
     it('navigateBack 数字参数 -> delta', async () => {
-      const spy = jasmine
-        .createSpy('navigateBack')
-        .and.callFake((opts: any) => opts.success?.({}));
+      const spy = vi.fn().mockImplementation((opts: any) => opts.success?.({}));
       const { service } = setup('wx', { navigateBack: spy });
       await service.invoke('navigateBack', { delta: 2 });
-      expect(spy.calls.mostRecent().args[0].delta).toBe(2);
+      expect(spy.mock.calls.at(-1)[0].delta).toBe(2);
     });
   });
 });

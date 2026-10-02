@@ -82,12 +82,11 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         )
         .toPromise(),
     ).toString('utf8');
-    expect(installedLib)
-      .withContext(
-        'node_modules/test-library 副本已过期，' +
-          '先跑 `vitest run src/builder/library/library.spec.ts` 重新生成',
-      )
-      .toContain('LIB_TEST_LIBRARY_RENDERED');
+    expect(
+      installedLib,
+      'node_modules/test-library 副本已过期，' +
+        '先跑 `vitest run src/builder/library/library.spec.ts` 重新生成',
+    ).toContain('LIB_TEST_LIBRARY_RENDERED');
 
     // 关键：库**不重新构建**，只是主构建换了平台。
     // 库产物（含 sidecar）与 wx 那次用的是同一份。
@@ -133,10 +132,11 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('同一份库产物在 zfb 平台下', () => {
     it('库组件模板按目标平台扩展名产出（.axml 而不是 .wxml）', async () => {
       const r = await loadZfb();
-      expect(r.axml.length)
-        .withContext('zfb 应产出 .axml，说明库 content 被填成了目标平台模板')
-        .toBeGreaterThan(0);
-      expect(r.wxml).withContext('zfb 平台不该出现 .wxml').toBe('');
+      expect(
+        r.axml.length,
+        'zfb 应产出 .axml，说明库 content 被填成了目标平台模板',
+      ).toBeGreaterThan(0);
+      expect(r.wxml, 'zfb 平台不该出现 .wxml').toBe('');
     });
 
     it('指令前缀按平台转换（a:if 而不是 wx:if）', async () => {
@@ -169,11 +169,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           }
         }
       }
-      expect(count)
-        .withContext(
-          'propertyChange 注入走的是 JS 层，与模板平台无关，换平台也必须是 1 次',
-        )
-        .toBe(1);
+      expect(
+        count,
+        'propertyChange 注入走的是 JS 层，与模板平台无关，换平台也必须是 1 次',
+      ).toBe(1);
     });
   });
 });

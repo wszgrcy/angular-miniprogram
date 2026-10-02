@@ -7,7 +7,7 @@
 ```bash
 npm ci        # 安装依赖
 npm run build # 构建 library + builder + karma（会自动补齐同步源码）
-npm run test  # 运行全部 jasmine 用例
+npm run test  # 运行全部 vitest 用例
 ```
 
 其它常用命令：
@@ -29,7 +29,7 @@ npm run sync       # 手动从 angular/angular@17.3.1 同步源码（需要网�
 
 ### 两层测试的分工
 
-|                | Node jasmine（`npm test`）     | 小程序 karma（`npm run test:wechat`） |
+|                | Node vitest（`npm test`）      | 小程序 karma（`npm run test:wechat`） |
 | -------------- | ------------------------------ | ------------------------------------- |
 | 跑在哪         | Node 进程，`wx` 用 Proxy 桩    | 真·微信开发者工具里的小程序运行时     |
 | 覆盖           | 编译器、纯函数、可 mock 的逻辑 | 渲染、生命周期、`wx.*` 真实行为       |
@@ -399,14 +399,14 @@ Jasmine 5 默认用 `import()` 加载 spec 文件。Node 22/23/24 自带 `.ts` �
 
 ### 19 → 20
 
-| 项目                    | 变更                                                                                                                                                                                                                                           |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 版本                    | `@angular/*` 20.3.x、devkit 20.3.x（architect `0.2003.x`）、ng-packagr 20.3.x、TS 5.8、webpack 5.101、rxjs 7.8.2                                                                                                                               |
-| **ng-packagr 目录结构** | `lib/**` 全部移动到 `src/lib/**`，所有 `ng-packagr/lib/...` 深引用改为 `ng-packagr/src/lib/...`                                                                                                                                                |
-| 表达式 AST              | 移除 `KeyedWrite` / `PropertyWrite`（赋值改为带赋值运算符的 `Binary`）；新增 `visitVoidExpression` / `visitTaggedTemplateLiteral` / `visitParenthesizedExpression`                                                                             |
-| 模板 AST                | `Visitor` 新增 `visitComponent` / `visitDirective`                                                                                                                                                                                             |
-| webpack                 | `splitChunks.cacheGroups.test` 参数类型收紧为 `Module`（需向下转型 `NormalModule`），返回值必须是 `boolean`                                                                                                                                    |
-| 测试顺序                | `test/hello-world-app/node_modules/test-library` 是上一次 library 构建的拷贝，跨大版本时必须先跑 `npm run test:jasmine library`（即 `npm run test:ci`）刷新，否则会残留旧版本指令（如 v19 的 `ɵɵhostProperty` 在 v20 已删除）导致 app 构建失败 |
+| 项目                    | 变更                                                                                                                                                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 版本                    | `@angular/*` 20.3.x、devkit 20.3.x（architect `0.2003.x`）、ng-packagr 20.3.x、TS 5.8、webpack 5.101、rxjs 7.8.2                                                                                           |
+| **ng-packagr 目录结构** | `lib/**` 全部移动到 `src/lib/**`，所有 `ng-packagr/lib/...` 深引用改为 `ng-packagr/src/lib/...`                                                                                                            |
+| 表达式 AST              | 移除 `KeyedWrite` / `PropertyWrite`（赋值改为带赋值运算符的 `Binary`）；新增 `visitVoidExpression` / `visitTaggedTemplateLiteral` / `visitParenthesizedExpression`                                         |
+| 模板 AST                | `Visitor` 新增 `visitComponent` / `visitDirective`                                                                                                                                                         |
+| webpack                 | `splitChunks.cacheGroups.test` 参数类型收紧为 `Module`（需向下转型 `NormalModule`），返回值必须是 `boolean`                                                                                                |
+| 测试顺序                | `test/hello-world-app/node_modules/test-library` 是上一次 library 构建的拷贝，跨大版本时必须先跑 `npm run test:ci` 刷新，否则会残留旧版本指令（如 v19 的 `ɵɵhostProperty` 在 v20 已删除）导致 app 构建失败 |
 
 ### 升级操作清单（可复用）
 
@@ -425,7 +425,7 @@ git clean -xdfq src/library/common src/library/forms
 npm run sync && npm run build
 
 # 5. 先刷新 test-library 再跑全量
-npm run test:jasmine library && npm run test
+npm run build:library && npm test
 npm run lint && npm run coverage
 ```
 
@@ -684,7 +684,7 @@ ANGULAR_REPO=../angular npm run sync
 npm run build
 
 # 5. 先刷新 test-library 再跑全量
-npm run test:jasmine library && npm run test
+npm run build:library && npm test
 npm run lint && npm run coverage
 ```
 
@@ -2127,12 +2127,12 @@ app 侧 spec 读的是 `node_modules/test-library`，而它由
 **之前**（`library-` < `library/`），所以单跑 `npm test` 时可能读到**上一次残留的旧副本**。
 
 本 harness 的 builder 是 app builder，跑不了 library target，无法自己重建，
-所以 `load()` 里加了**新鲜度守卫**：读不到、或 JS 里没有当前模板标记，就直接报错
+所以 `load()` 里加了**新鲜度守卫**：读不到、或 JS 里没有当前模板标记，就直接报错。
 
-> `node_modules/test-library 副本已过期，请先跑 npm run test:jasmine library（或直接 npm run test:ci）`
+宁可大声失败，也不要测着旧副本给假绿灯。
 
-宁可大声失败，也不要测着旧副本给假绿灯。正规入口是 **`npm run test:ci`**，
-它开头就是 `build:library && test:jasmine library`，顺序天然是对的。
+顺序问题后来由 `vitest.config.mts` 的 sequencer 正面解决（见下文「文件执行顺序」），
+不再需要靠脚本先单独跑一个文件。守卫保留，它挡的是**只跑某一个 spec** 的场景。
 
 （读副本要用 devkit host + `Buffer.from(...)`：`host.root()` 是虚拟路径
 `/C/code/...`，Windows 下 Node 的 `fs` 解不了；`host.read()` 发的是 `ArrayBuffer`，
@@ -2305,11 +2305,14 @@ partial-Ivy 都是它做的，vite 没有等价物（`@analogjs/vite-plugin-angu
 ## 测试侧
 
 `npm test` = `vitest run`。配置 `vitest.config.mts`，
-环境准备 `test/vitest-setup.ts`，测试全局的类型声明
-`test/vitest-globals.d.ts`。
-75 个 spec 文件、843 个 spec，**一个 spec 文件都没改**。
+环境准备 `test/vitest-setup.ts`（**只装小程序全局，60 行**）。
+75 个 spec 文件、843 个 spec。
 
-### 必须补的四层兼容
+**没有任何断言 / spy 兼容层**，spec 全部用 vitest 原生 API。
+早期版本曾在 `setupFiles` 里挂一层 jasmine 兼容 shim 换取「零改写」，
+那等于把旧写法永久固化进新仓库，已整体改写掉，见下。
+
+### 必须补的两层兼容
 
 #### 1. 小程序全局
 
@@ -2353,25 +2356,43 @@ vitest 用 `vm.runInThisContext` 跑模块，里面再 `import()` 直接抛
 
 同样用插件在 transform 阶段换回真正的动态 import（只影响测试，不改源码）。
 
-### 历史 jasmine 风格 API 的兼容清单
+### spec 从 jasmine 写法改成 vitest 原生写法
 
-`test/vitest-setup.ts` 里补的，都是实测用量：
+兼容 shim 看着省事，实际是把 jasmine 的 API 形状（`.and.callFake`、
+`.calls.mostRecent()`、`expectAsync`）当成长期契约背下来，
+后来人读 spec 还得先懂 jasmine。所以全部改成了原生写法：
 
-| 写法                                                         | 用量 | vitest 对应                    |
-| ------------------------------------------------------------ | ---- | ------------------------------ |
-| `expect(x).toBeTrue()`                                       | 76   | 自定义 matcher                 |
-| `spyOn(o,k).and.callFake/returnValue/stub/callThrough`       | 70+  | `vi.spyOn` + `.and` 适配器     |
-| `spy.calls.mostRecent()/count()/length/any()`                | 36   | `spy.mock.calls` 适配器        |
-| `expectAsync(p).toBeResolved/To/toBeRejected/With/WithError` | 12   | 包 `expect().resolves/rejects` |
-| `expect(fn).toThrowError(...)`                               | 13   | `toThrow` 别名                 |
-| `jasmine.arrayWithExactContents`                             | 3    | 自定义 asymmetric matcher      |
-| `jasmine.createSpy`                                          | 3    | `vi.fn` + `.and`               |
+| 旧写法                                           | 新写法                                                |
+| ------------------------------------------------ | ----------------------------------------------------- |
+| `expect(x).toBeTrue()` / `.toBeFalse()`          | `toBe(true)` / `toBe(false)`                          |
+| `expect(fn).toThrowError(re)`                    | `toThrow(re)`                                         |
+| `expect(x).withContext(msg).m(...)`              | `expect(x, msg).m(...)`                               |
+| `spyOn(o,k).and.callFake(f)`                     | `vi.spyOn(o,k).mockImplementation(f)`                 |
+| `.and.returnValue(v)` / `.and.stub()`            | `.mockReturnValue(v)` / `.mockReturnValue(undefined)` |
+| `spy.calls.mostRecent().args`                    | `spy.mock.calls.at(-1)`                               |
+| `spy.calls.count()` / `.length` / `.any()`       | `spy.mock.calls.length`（`.any()` 用 `> 0`）          |
+| `jasmine.createSpy('x')`                         | `vi.fn()`                                             |
+| `expectAsync(p).toBeResolved()`                  | `await expect(p).resolves.toBeDefined()`              |
+| `.toBeResolvedTo(v)` / `.toBeRejectedWith(v)`    | `.resolves.toEqual(v)` / `.rejects.toEqual(v)`        |
+| `.toBeRejected()` / `.toBeRejectedWithError(re)` | `.rejects.toBeDefined()` / `.rejects.toThrow(re)`     |
+| `jasmine.arrayWithExactContents([...])`          | 两边 `.sort()` 后 `toEqual`（顺序无关的集合比较）     |
 
-`withContext()` vitest 5 本来就有（chai 提供），只是类型上要自己补声明。
+两个坑：
 
-`arrayWithExactContents` 里**不要**用 `expect.utils.equals`：
-vitest 5 不保证这个命名空间存在，之前就是在这里静默返回 false、
-matcher 永不匹配。
+- `expect(x, msg)` 是 vitest 的上下文消息位置，**不是** chai 的 `withContext`。
+  后者运行时确实存在（chai 带的），但类型上没有，补声明不如直接换掉。
+- `toBeResolved()` 换 `.resolves.toBeDefined()` 而不是 `.resolves.not.toThrow()`：
+  后者对「resolve 一个非函数值」语义含糊，`toBeDefined` 直白。
+
+改写用了一次性 codemod（括号配对扫描，不是纯正则），
+但 codemod 会咬人，两处值得记一笔：
+
+- **不幂等**：`.calls.length → .mock.calls.length` 跑第二遍会变成
+  `.mock.mock.calls.length`。codemod 要么只跑一遍，要么先加幂等保护。
+- **`.calls` 不一定是 spy**：`path-based-setdata.spec.ts` 里的
+  `mp = { setData(d){ calls.push(d) }, calls }` 是手写 stub，
+  它的 `.calls` 是普通数组，被误改成 `.mock.calls` 后 typecheck 才抓出来。
+  **有 typecheck 兜底才敢这么改。**
 
 ### 执行模型
 

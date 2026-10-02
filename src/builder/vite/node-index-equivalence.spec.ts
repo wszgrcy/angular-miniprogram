@@ -300,9 +300,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       for (const x of a.manifests) {
         x.manifest.indices.forEach((i) => angularUniverse.add(i));
       }
-      expect(angularUniverse.size)
-        .withContext('没从任何 JS 里提取到节点下标，提取器可能失效')
-        .toBeGreaterThan(0);
+      expect(
+        angularUniverse.size,
+        '没从任何 JS 里提取到节点下标，提取器可能失效',
+      ).toBeGreaterThan(0);
 
       const violations: string[] = [];
       for (const w of a.wxmls) {
@@ -349,7 +350,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     it('反向对照：人为制造下标错位时，校验必须失败', async () => {
       const a = await loadArtifacts();
       const real = a.wxmls.find((w) => wxmlReferencedIndices(w.wxml).size > 0);
-      expect(real).withContext('找不到带 nodeList 引用的 wxml').toBeDefined();
+      expect(real, '找不到带 nodeList 引用的 wxml').toBeDefined();
 
       // 整体 +1000，模拟「运行时多占槽导致整体错位」
       const shifted = real!.wxml.replace(
@@ -366,13 +367,12 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
       const orphans = [...shiftedIdx].filter((i) => !universe.has(i));
 
-      expect(orphans.length)
-        .withContext(
-          `人为把 wxml 下标整体 +1000 后，所有引用都应识别为错位。` +
-            `识别出 ${orphans.length}/${shiftedIdx.size} 个——` +
-            `若为 0 说明这套校验抓不住错位，是假测试`,
-        )
-        .toBe(shiftedIdx.size);
+      expect(
+        orphans.length,
+        `人为把 wxml 下标整体 +1000 后，所有引用都应识别为错位。` +
+          `识别出 ${orphans.length}/${shiftedIdx.size} 个——` +
+          `若为 0 说明这套校验抓不住错位，是假测试`,
+      ).toBe(shiftedIdx.size);
       expect(orphans.length).toBeGreaterThan(0);
     }, 600000);
   });
@@ -554,9 +554,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     it('反向对照：篡改某组件 wxml 下标后，精确校验必须失败', async () => {
       const c = await load();
       const rec = c.records.find((r) => wxmlReferencedIndices(r.wxml).size > 0);
-      expect(rec)
-        .withContext('注册表里没有带 nodeList 引用的组件')
-        .toBeDefined();
+      expect(rec, '注册表里没有带 nodeList 引用的组件').toBeDefined();
 
       const mine = c.manifests.filter(
         (x) => x.manifest.componentName === rec!.componentName,
@@ -573,12 +571,11 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect(tampered.size).toBeGreaterThan(0);
 
       const orphans = [...tampered].filter((i) => !own.has(i));
-      expect(orphans.length)
-        .withContext(
-          `篡改后应全部识别为错位。识别 ${orphans.length}/${tampered.size}。` +
-            `为 0 说明精确校验抓不住问题`,
-        )
-        .toBe(tampered.size);
+      expect(
+        orphans.length,
+        `篡改后应全部识别为错位。识别 ${orphans.length}/${tampered.size}。` +
+          `为 0 说明精确校验抓不住问题`,
+      ).toBe(tampered.size);
     }, 600000);
   });
 });
@@ -681,9 +678,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const cf = c.trees.find(
         (t) => t.componentName === 'ControlFlowComponent',
       );
-      expect(cf)
-        .withContext('没找到 ControlFlowComponent 的视图树')
-        .toBeDefined();
+      expect(cf, '没找到 ControlFlowComponent 的视图树').toBeDefined();
       // @if x4 + @for x3 + @switch 等，应远多于 1 个视图
       expect(cf!.views.length).toBeGreaterThan(3);
     }, 600000);
@@ -815,9 +810,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         c.declsByComponent,
       );
       console.log(`根块越界比对组件数: ${checked}`);
-      expect(checked)
-        .withContext('比对数为 0 说明本断言空跑')
-        .toBeGreaterThan(10);
+      expect(checked, '比对数为 0 说明本断言空跑').toBeGreaterThan(10);
       expect(violations).toEqual([]);
     });
 
@@ -839,9 +832,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           break;
         }
       }
-      expect(target)
-        .withContext('没找到可篡改的组件，无法构造反向对照')
-        .not.toBeNull();
+      expect(target, '没找到可篡改的组件，无法构造反向对照').not.toBeNull();
       const t = target as { cmp: string; decls: number };
 
       // 篡改：给该组件根块加一个越界下标（== decls，即 nodeList 之外第一位）
@@ -865,12 +856,11 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         c.declsByComponent,
       );
       const hit = violations.filter((v) => v.includes(t.cmp));
-      expect(hit.length)
-        .withContext(
-          `把 ${t.cmp} 根块最大下标推到 ${t.decls}（decls=${t.decls}）后 ` +
-            `未报越界 → 越界校验是摆设`,
-        )
-        .toBeGreaterThan(0);
+      expect(
+        hit.length,
+        `把 ${t.cmp} 根块最大下标推到 ${t.decls}（decls=${t.decls}）后 ` +
+          `未报越界 → 越界校验是摆设`,
+      ).toBeGreaterThan(0);
     });
 
     it('标签类型对应：wxml 承载某下标的标签，必须等于 Angular 该槽标签经映射', async () => {
@@ -889,9 +879,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         c.trees as never,
       );
       console.log(`标签比对对数: ${compared}`);
-      expect(compared)
-        .withContext('比对数为 0 说明本断言空跑，没有真正校验任何东西')
-        .toBeGreaterThan(50);
+      expect(
+        compared,
+        '比对数为 0 说明本断言空跑，没有真正校验任何东西',
+      ).toBeGreaterThan(50);
       expect(violations).toEqual([]);
     });
 
@@ -924,9 +915,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           }
         }
       }
-      expect(target)
-        .withContext('没找到可篡改的 view 承载元素，无法构造反向对照')
-        .not.toBeNull();
+      expect(
+        target,
+        '没找到可篡改的 view 承载元素，无法构造反向对照',
+      ).not.toBeNull();
       const t = target as {
         cmp: string;
         blockName: string;
@@ -961,11 +953,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         c.trees as never,
       );
       const hit = violations.filter((v) => v.includes(`下标 ${t.idx}`));
-      expect(hit.length)
-        .withContext(
-          `篡改 ${t.cmp} 下标 ${t.idx} 的承载标签为 <text> 后，校验未报违规 → 类型校验是摆设`,
-        )
-        .toBeGreaterThan(0);
+      expect(
+        hit.length,
+        `篡改 ${t.cmp} 下标 ${t.idx} 的承载标签为 <text> 后，校验未报违规 → 类型校验是摆设`,
+      ).toBeGreaterThan(0);
     });
 
     it('反向对照：篡改某个模板块下标后，必须识别为不覆盖', async () => {
@@ -975,24 +966,23 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         const t = c.trees.find((x) => x.componentName === cmp);
         return t && t.views.length > 1;
       });
-      expect(entry).withContext('找不到多视图组件').toBeDefined();
+      expect(entry, '找不到多视图组件').toBeDefined();
 
       const [cmp, blocks] = entry!;
       const tree = c.trees.find((x) => x.componentName === cmp)!;
       const block = blocks.find((b) => b.indices.size > 0);
-      expect(block).withContext('该组件没有带下标的模板块').toBeDefined();
+      expect(block, '该组件没有带下标的模板块').toBeDefined();
 
       const tampered = new Set([...block!.indices].map((i) => i + 5555));
       const covering = tree.views.filter((v) =>
         [...tampered].every((i) => v.indices.has(i)),
       );
 
-      expect(covering.length)
-        .withContext(
-          `篡改 ${cmp}/${block!.name} 下标 +5555 后不应有任何视图覆盖，` +
-            `实际覆盖 ${covering.length} 个（>0 说明校验抓不住）`,
-        )
-        .toBe(0);
+      expect(
+        covering.length,
+        `篡改 ${cmp}/${block!.name} 下标 +5555 后不应有任何视图覆盖，` +
+          `实际覆盖 ${covering.length} 个（>0 说明校验抓不住）`,
+      ).toBe(0);
     }, 600000);
   });
 });

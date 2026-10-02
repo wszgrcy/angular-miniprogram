@@ -20,9 +20,9 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
 
   describe('支付宝(my)', () => {
     it('showModal showCancel=false -> my.alert，结果归一为 confirm=true', async () => {
-      const alertSpy = jasmine
-        .createSpy('alert')
-        .and.callFake((opts: any) => opts.success?.({}));
+      const alertSpy = vi
+        .fn()
+        .mockImplementation((opts: any) => opts.success?.({}));
       const service = setup('my', { alert: alertSpy });
       const res = await service.invoke('showModal', {
         title: 't',
@@ -30,70 +30,62 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
         showCancel: false,
       });
       expect(alertSpy).toHaveBeenCalled();
-      expect(res.confirm).toBeTrue();
-      expect(res.cancel).toBeFalse();
+      expect(res.confirm).toBe(true);
+      expect(res.cancel).toBe(false);
     });
 
     it('showModal 双按钮 -> my.confirm，confirmText 映射为 confirmButtonText', async () => {
-      const confirmSpy = jasmine
-        .createSpy('confirm')
-        .and.callFake((opts: any) => opts.success?.({ confirm: true }));
+      const confirmSpy = vi
+        .fn()
+        .mockImplementation((opts: any) => opts.success?.({ confirm: true }));
       const service = setup('my', { confirm: confirmSpy });
       const res = await service.invoke('showModal', {
         content: 'c',
         confirmText: '好',
         cancelText: '不',
       });
-      const args = confirmSpy.calls.mostRecent().args[0];
+      const args = confirmSpy.mock.calls.at(-1)[0];
       expect(args.confirmButtonText).toBe('好');
       expect(args.cancelButtonText).toBe('不');
-      expect(res.confirm).toBeTrue();
-      expect(res.cancel).toBeFalse();
+      expect(res.confirm).toBe(true);
+      expect(res.cancel).toBe(false);
     });
 
     it('setNavigationBarTitle -> my.setNavigationBar', async () => {
-      const spy = jasmine
-        .createSpy('setNavigationBar')
-        .and.callFake((opts: any) => opts.success?.({}));
+      const spy = vi.fn().mockImplementation((opts: any) => opts.success?.({}));
       const service = setup('my', { setNavigationBar: spy });
       await service.invoke('setNavigationBarTitle', { title: 'T' });
-      expect(spy.calls.mostRecent().args[0].title).toBe('T');
+      expect(spy.mock.calls.at(-1)[0].title).toBe('T');
     });
 
     it('showToast: title->content, icon error->fail', async () => {
-      const spy = jasmine
-        .createSpy('showToast')
-        .and.callFake((opts: any) => opts.success?.({}));
+      const spy = vi.fn().mockImplementation((opts: any) => opts.success?.({}));
       const service = setup('my', { showToast: spy });
       await service.invoke('showToast', { title: 'hi', icon: 'error' });
-      const args = spy.calls.mostRecent().args[0];
+      const args = spy.mock.calls.at(-1)[0];
       expect(args.content).toBe('hi');
       expect(args.type).toBe('fail');
       expect(args.title).toBeUndefined();
     });
 
     it('showLoading: title->content', async () => {
-      const spy = jasmine
-        .createSpy('showLoading')
-        .and.callFake((opts: any) => opts.success?.({}));
+      const spy = vi.fn().mockImplementation((opts: any) => opts.success?.({}));
       const service = setup('my', { showLoading: spy });
       await service.invoke('showLoading', { title: '加载中' });
-      expect(spy.calls.mostRecent().args[0].content).toBe('加载中');
+      expect(spy.mock.calls.at(-1)[0].content).toBe('加载中');
     });
 
     it('setClipboardData: my.setClipboard + data->text', async () => {
-      const spy = jasmine
-        .createSpy('setClipboard')
-        .and.callFake((opts: any) => opts.success?.({}));
+      const spy = vi.fn().mockImplementation((opts: any) => opts.success?.({}));
       const service = setup('my', { setClipboard: spy });
       await service.invoke('setClipboardData', { data: 'copy-me' });
-      expect(spy.calls.mostRecent().args[0].text).toBe('copy-me');
+      expect(spy.mock.calls.at(-1)[0].text).toBe('copy-me');
     });
 
     it('getClipboardData: my.getClipboard + 结果 text->data', async () => {
-      const spy = jasmine
-        .createSpy('getClipboard')
-        .and.callFake((opts: any) => opts.success?.({ text: 'clip' }));
+      const spy = vi
+        .fn()
+        .mockImplementation((opts: any) => opts.success?.({ text: 'clip' }));
       const service = setup('my', { getClipboard: spy });
       const res = await service.invoke('getClipboardData');
       expect(res.data).toBe('clip');
@@ -123,37 +115,33 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
     });
 
     it('makePhoneCall phoneNumber -> number', async () => {
-      const spy = jasmine
-        .createSpy('makePhoneCall')
-        .and.callFake((opts: any) => opts.success?.({}));
+      const spy = vi.fn().mockImplementation((opts: any) => opts.success?.({}));
       const service = setup('my', { makePhoneCall: spy });
       await service.invoke('makePhoneCall', { phoneNumber: '10086' });
-      expect(spy.calls.mostRecent().args[0].number).toBe('10086');
+      expect(spy.mock.calls.at(-1)[0].number).toBe('10086');
     });
 
     it('previewImage current(url) -> 下标', async () => {
-      const spy = jasmine
-        .createSpy('previewImage')
-        .and.callFake((opts: any) => opts.success?.({}));
+      const spy = vi.fn().mockImplementation((opts: any) => opts.success?.({}));
       const service = setup('my', { previewImage: spy });
       await service.invoke('previewImage', {
         urls: ['a.png', 'b.png', 'c.png'],
         current: 'b.png',
       });
-      expect(spy.calls.mostRecent().args[0].current).toBe(1);
+      expect(spy.mock.calls.at(-1)[0].current).toBe(1);
     });
 
     it('showActionSheet 对象项归一为字符串', async () => {
-      const spy = jasmine
-        .createSpy('showActionSheet')
-        .and.callFake((opts: any) => opts.success?.({ tapIndex: 0 }));
+      const spy = vi
+        .fn()
+        .mockImplementation((opts: any) => opts.success?.({ tapIndex: 0 }));
       const service = setup('my', { showActionSheet: spy });
       await service.invoke('showActionSheet', {
         itemList: [{ name: 'A' }, 'B'],
       });
       // my 收 items（旧版协议误写 itemList，已对照 uni 修正）
-      expect(spy.calls.mostRecent().args[0].items).toEqual(['A', 'B']);
-      expect(spy.calls.mostRecent().args[0].itemList).toBeUndefined();
+      expect(spy.mock.calls.at(-1)[0].items).toEqual(['A', 'B']);
+      expect(spy.mock.calls.at(-1)[0].itemList).toBeUndefined();
     });
   });
 
@@ -182,8 +170,7 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
 
     it('fail 载荷同样被归一（保留其他字段）', async () => {
       const service = setup('my', {
-        someApi: (opts: any) =>
-          opts.fail?.({ error: 'E1', keep: 'v' }),
+        someApi: (opts: any) => opts.fail?.({ error: 'E1', keep: 'v' }),
       });
       let rejected: any;
       await service.invoke('someApi').catch((e) => (rejected = e));
@@ -206,7 +193,7 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
       });
       const res = await service.invoke('showToast', { title: 'x' });
       expect(res.errMsg).toBeUndefined();
-      expect(res.existed).toBeTrue();
+      expect(res.existed).toBe(true);
     });
 
     it('Error 实例不被归一污染', async () => {
@@ -238,7 +225,7 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
 
   describe('钉钉(dd)', () => {
     it('request -> dd.httpRequest', () => {
-      const spy = jasmine.createSpy('httpRequest').and.returnValue({ id: 1 });
+      const spy = vi.fn().mockReturnValue({ id: 1 });
       const service = setup('dd', { httpRequest: spy });
       const task = service.invoke('request', { url: 'https://x.com' });
       expect(spy).toHaveBeenCalled();
@@ -253,21 +240,24 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
     });
 
     it('showModal -> dd.alert / dd.confirm', async () => {
-      const alertSpy = jasmine
-        .createSpy('alert')
-        .and.callFake((opts: any) => opts.success?.({}));
+      const alertSpy = vi
+        .fn()
+        .mockImplementation((opts: any) => opts.success?.({}));
       const service = setup('dd', { alert: alertSpy });
-      const res = await service.invoke('showModal', { content: 'c', showCancel: false });
+      const res = await service.invoke('showModal', {
+        content: 'c',
+        showCancel: false,
+      });
       expect(alertSpy).toHaveBeenCalled();
-      expect(res.confirm).toBeTrue();
+      expect(res.confirm).toBe(true);
     });
   });
 
   describe('支付宝(my) 搬运自 uni-mp-alipay 的协议', () => {
     it('login -> my.getAuthCode，authCode 归一为 code', async () => {
-      const spy = jasmine
-        .createSpy('getAuthCode')
-        .and.callFake((o: any) => o.success?.({ authCode: 'A1' }));
+      const spy = vi
+        .fn()
+        .mockImplementation((o: any) => o.success?.({ authCode: 'A1' }));
       const service = setup('my', { getAuthCode: spy });
       const res = await service.invoke('login');
       expect(spy).toHaveBeenCalled();
@@ -275,12 +265,10 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
     });
 
     it('request header -> headers（key 小写化），结果 status -> statusCode', () => {
-      const spy = jasmine
-        .createSpy('request')
-        .and.callFake((o: any) => {
-          o.success?.({ status: 200, headers: { A: 'b' }, data: 'ok' });
-          return { abort: () => undefined };
-        });
+      const spy = vi.fn().mockImplementation((o: any) => {
+        o.success?.({ status: 200, headers: { A: 'b' }, data: 'ok' });
+        return { abort: () => undefined };
+      });
       const service = setup('my', { request: spy });
       // request 是 task 类：invoke 返回 task，结果走回调旁路
       let res: any;
@@ -289,7 +277,7 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
         header: { 'Content-Type': 'application/json' },
         success: (r: any) => (res = r),
       });
-      const arg = (spy as any).calls.mostRecent().args[0];
+      const arg = (spy as any).mock.calls.at(-1)[0];
       expect(arg.headers['content-type']).toBe('application/json');
       expect(arg.header).toBeUndefined();
       expect(res.statusCode).toBe(200);
@@ -307,13 +295,13 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
     });
 
     it('scanCode -> my.scan，onlyFromCamera -> hideAlbum，code -> result', async () => {
-      const spy = jasmine
-        .createSpy('scan')
-        .and.callFake((o: any) => o.success?.({ code: 'ABC' }));
+      const spy = vi
+        .fn()
+        .mockImplementation((o: any) => o.success?.({ code: 'ABC' }));
       const service = setup('my', { scan: spy });
       const res = await service.invoke('scanCode', { onlyFromCamera: true });
-      const arg = (spy as any).calls.mostRecent().args[0];
-      expect(arg.hideAlbum).toBeTrue();
+      const arg = (spy as any).mock.calls.at(-1)[0];
+      expect(arg.hideAlbum).toBe(true);
       expect(res.result).toBe('ABC');
     });
 
@@ -333,12 +321,10 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
     });
 
     it('saveFile 参数与结果双向映射 apFilePath', async () => {
-      const spy = jasmine
-        .createSpy('saveFile')
-        .and.callFake((o: any) => {
-          expect(o.apFilePath).toBe('/tmp/a');
-          o.success?.({ apFilePath: '/saved/a' });
-        });
+      const spy = vi.fn().mockImplementation((o: any) => {
+        expect(o.apFilePath).toBe('/tmp/a');
+        o.success?.({ apFilePath: '/saved/a' });
+      });
       const service = setup('my', { saveFile: spy });
       const res = await service.invoke('saveFile', { tempFilePath: '/tmp/a' });
       expect(res.savedFilePath).toBe('/saved/a');
@@ -356,12 +342,10 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
     });
 
     it('showActionSheet itemList -> items，index -> tapIndex', async () => {
-      const spy = jasmine
-        .createSpy('showActionSheet')
-        .and.callFake((o: any) => {
-          expect(o.items).toEqual(['a', 'b']);
-          o.success?.({ index: 1 });
-        });
+      const spy = vi.fn().mockImplementation((o: any) => {
+        expect(o.items).toEqual(['a', 'b']);
+        o.success?.({ index: 1 });
+      });
       const service = setup('my', { showActionSheet: spy });
       const res = await service.invoke('showActionSheet', {
         itemList: ['a', { name: 'b' }],
@@ -370,12 +354,10 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
     });
 
     it('getScreenBrightness brightness -> value；setScreenBrightness value -> brightness', async () => {
-      const setSpy = jasmine
-        .createSpy('setScreenBrightness')
-        .and.callFake((o: any) => {
-          expect(o.brightness).toBe(0.5);
-          o.success?.({});
-        });
+      const setSpy = vi.fn().mockImplementation((o: any) => {
+        expect(o.brightness).toBe(0.5);
+        o.success?.({});
+      });
       const service = setup('my', {
         setScreenBrightness: setSpy,
         getScreenBrightness: (o: any) => o.success?.({ brightness: 0.8 }),
@@ -386,25 +368,21 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
     });
 
     it('requestPayment -> my.tradePay', async () => {
-      const spy = jasmine
-        .createSpy('tradePay')
-        .and.callFake((o: any) => {
-          expect(o.tradeNO).toBe('T1');
-          o.success?.({ resultCode: '9000' });
-        });
+      const spy = vi.fn().mockImplementation((o: any) => {
+        expect(o.tradeNO).toBe('T1');
+        o.success?.({ resultCode: '9000' });
+      });
       const service = setup('my', { tradePay: spy });
       await service.invoke('requestPayment', { orderInfo: 'T1' });
       expect(spy).toHaveBeenCalled();
     });
 
     it('compressImage quality -> compressLevel，src -> apFilePaths', async () => {
-      const spy = jasmine
-        .createSpy('compressImage')
-        .and.callFake((o: any) => {
-          expect(o.compressLevel).toBe(2);
-          expect(o.apFilePaths).toEqual(['/a.png']);
-          o.success?.({ apFilePaths: ['/c.png'] });
-        });
+      const spy = vi.fn().mockImplementation((o: any) => {
+        expect(o.compressLevel).toBe(2);
+        expect(o.apFilePaths).toEqual(['/a.png']);
+        o.success?.({ apFilePaths: ['/c.png'] });
+      });
       const service = setup('my', { compressImage: spy });
       const res = await service.invoke('compressImage', {
         src: '/a.png',
@@ -414,12 +392,10 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
     });
 
     it('authorize scope -> scopeName', async () => {
-      const spy = jasmine
-        .createSpy('authorize')
-        .and.callFake((o: any) => {
-          expect(o.scopeName).toBe('scope.userLocation');
-          o.success?.({});
-        });
+      const spy = vi.fn().mockImplementation((o: any) => {
+        expect(o.scopeName).toBe('scope.userLocation');
+        o.success?.({});
+      });
       const service = setup('my', { authorize: spy });
       await service.invoke('authorize', { scope: 'scope.userLocation' });
       expect(spy).toHaveBeenCalled();
@@ -454,9 +430,7 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
     });
 
     it('stopAccelerometer -> my.offAccelerometerChange', async () => {
-      const spy = jasmine
-        .createSpy('offAccelerometerChange')
-        .and.callFake((o: any) => o.success?.({}));
+      const spy = vi.fn().mockImplementation((o: any) => o.success?.({}));
       const service = setup('my', { offAccelerometerChange: spy });
       await service.invoke('stopAccelerometer');
       expect(spy).toHaveBeenCalled();
@@ -555,47 +529,39 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
       const fs: any = service.invoke('getFileSystemManager');
       let stats: any;
       fs.stat({ recursive: true, success: (res: any) => (stats = res.stats) });
-      expect(Array.isArray(stats)).toBeTrue();
+      expect(Array.isArray(stats)).toBe(true);
       expect(stats.length).toBe(2);
       // 非 recursive 不动
       let raw: any;
       fs.stat({ path: '/x', success: (res: any) => (raw = res.stats) });
-      expect(Array.isArray(raw)).toBeFalse();
+      expect(Array.isArray(raw)).toBe(false);
     });
   });
 
   describe('支付宝补充协议（hideHomeButton/陀螺仪/系统信息）', () => {
     it('hideHomeButton -> my.hideBackHome', async () => {
-      const spy = jasmine
-        .createSpy('hideBackHome')
-        .and.callFake((o: any) => o.success?.({}));
+      const spy = vi.fn().mockImplementation((o: any) => o.success?.({}));
       const service = setup('my', { hideBackHome: spy });
       await service.invoke('hideHomeButton');
       expect(spy).toHaveBeenCalled();
     });
 
     it('showShareMenu -> my.showSharePanel', async () => {
-      const spy = jasmine
-        .createSpy('showSharePanel')
-        .and.callFake((o: any) => o.success?.({}));
+      const spy = vi.fn().mockImplementation((o: any) => o.success?.({}));
       const service = setup('my', { showSharePanel: spy });
       await service.invoke('showShareMenu');
       expect(spy).toHaveBeenCalled();
     });
 
     it('stopGyroscope -> my.offGyroscopeChange', async () => {
-      const spy = jasmine
-        .createSpy('offGyroscopeChange')
-        .and.callFake((o: any) => o.success?.({}));
+      const spy = vi.fn().mockImplementation((o: any) => o.success?.({}));
       const service = setup('my', { offGyroscopeChange: spy });
       await service.invoke('stopGyroscope');
       expect(spy).toHaveBeenCalled();
     });
 
     it('getDeviceInfo -> my.getDeviceBaseInfo', () => {
-      const spy = jasmine
-        .createSpy('getDeviceBaseInfo')
-        .and.returnValue({ brand: 'HUAWEI' });
+      const spy = vi.fn().mockReturnValue({ brand: 'HUAWEI' });
       const service = setup('my', { getDeviceBaseInfo: spy });
       service.getDeviceInfo();
       expect(spy).toHaveBeenCalled();
@@ -632,9 +598,7 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
 
   describe('wx 宿主 shim（shareVideoMessage）', () => {
     it('普通环境直接走 wx.shareVideoMessage', async () => {
-      const spy = jasmine
-        .createSpy('shareVideoMessage')
-        .and.callFake((o: any) => o.success?.({}));
+      const spy = vi.fn().mockImplementation((o: any) => o.success?.({}));
       const service = setup('wx', { shareVideoMessage: spy });
       await service.invoke('shareVideoMessage', { videoId: 'v' });
       expect(spy).toHaveBeenCalled();
@@ -659,7 +623,7 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
           },
         });
         void service.invoke('shareVideoMessage', { videoId: 'v' });
-        expect(viaMiniapp).toBeTrue();
+        expect(viaMiniapp).toBe(true);
       } finally {
         if (saved === undefined) {
           delete g.wx;
@@ -679,43 +643,44 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
         offThemeChange: () => (offed = true),
       });
       const seen: any[] = [];
-      const sub = service
-        .onHostThemeChange()
-        .subscribe((v) => seen.push(v));
+      const sub = service.onHostThemeChange().subscribe((v) => seen.push(v));
       handler({ theme: 'dark' });
       expect(seen[0].hostTheme).toBe('dark');
       sub.unsubscribe();
-      expect(offed).toBeTrue();
+      expect(offed).toBe(true);
     });
   });
 
   describe('钉钉(dd) 继承支付宝表 + 自有差异', () => {
     it('dd request 走 httpRequest', async () => {
-      const spy = jasmine
-        .createSpy('httpRequest')
-        .and.callFake((o: any) => o.success?.({ status: 200 }));
+      const spy = vi
+        .fn()
+        .mockImplementation((o: any) => o.success?.({ status: 200 }));
       const service = setup('dd', { httpRequest: spy });
       await service.invoke('request', { url: 'https://x.com' });
       expect(spy).toHaveBeenCalled();
     });
 
     it('dd 复用支付宝 login -> getAuthCode', async () => {
-      const spy = jasmine
-        .createSpy('getAuthCode')
-        .and.callFake((o: any) => o.success?.({ authCode: 'D1' }));
+      const spy = vi
+        .fn()
+        .mockImplementation((o: any) => o.success?.({ authCode: 'D1' }));
       const service = setup('dd', { getAuthCode: spy });
       const res = await service.invoke('login');
       expect(res.code).toBe('D1');
     });
 
     it('dd showModal showCancel=false -> alert', async () => {
-      const alertSpy = jasmine
-        .createSpy('alert')
-        .and.callFake((opts: any) => opts.success?.({}));
+      const alertSpy = vi
+        .fn()
+        .mockImplementation((opts: any) => opts.success?.({}));
       const service = setup('dd', { alert: alertSpy });
-      const res = await service.invoke('showModal', { content: 'c', showCancel: false });
+      const res = await service.invoke('showModal', {
+        content: 'c',
+        showCancel: false,
+      });
       expect(alertSpy).toHaveBeenCalled();
-      expect(res.confirm).toBeTrue();
+      expect(res.confirm).toBe(true);
     });
   });
 
@@ -769,7 +734,7 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
         getRecorderManager: () => manager,
       });
       const rec: any = service.invoke('getRecorderManager');
-      const err = spyOn(console, 'error');
+      const err = vi.spyOn(console, 'error');
       rec.onFrameRecorded();
       expect(err).toHaveBeenCalled();
     });
@@ -781,7 +746,7 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
       const saved = g.tt;
       g.tt = { pay: (o: any) => o.success?.({ result: 'ok' }) };
       try {
-        const service = setup('tt', (g.tt as any) as Record<string, any>);
+        const service = setup('tt', g.tt as any as Record<string, any>);
         const res: any = await service.invoke('requestPayment', {
           orderInfo: { a: 1 },
         });
@@ -817,7 +782,7 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
         },
       });
       await service.invoke('showTabBar');
-      expect(received.animation).toBeFalse();
+      expect(received.animation).toBe(false);
     });
 
     it('login 丢弃 tt 不支持的 scopes/timeout', async () => {
@@ -872,13 +837,13 @@ describe('平台协议归一化（uni 口径 -> 各家实际 API）', () => {
 
   describe('微信(wx) 无协议时直通', () => {
     it('showModal 直接调用 wx.showModal', async () => {
-      const spy = jasmine
-        .createSpy('showModal')
-        .and.callFake((opts: any) => opts.success?.({ confirm: true }));
+      const spy = vi
+        .fn()
+        .mockImplementation((opts: any) => opts.success?.({ confirm: true }));
       const service = setup('wx', { showModal: spy });
       const res = await service.invoke('showModal', { content: 'c' });
       expect(spy).toHaveBeenCalled();
-      expect(res.confirm).toBeTrue();
+      expect(res.confirm).toBe(true);
     });
   });
 });

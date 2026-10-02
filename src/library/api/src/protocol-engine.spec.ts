@@ -13,7 +13,10 @@ describe('协议引擎 applyFieldMap（key 级映射）', () => {
   });
 
   it('字符串规则 = 改名', () => {
-    const out = applyFieldMap({ phoneNumber: '10086' }, { phoneNumber: 'number' });
+    const out = applyFieldMap(
+      { phoneNumber: '10086' },
+      { phoneNumber: 'number' },
+    );
     expect(out).toEqual({ number: '10086' });
   });
 
@@ -71,10 +74,7 @@ describe('协议引擎 applyFieldMap（key 级映射）', () => {
   });
 
   it('函数形态可返回补充字段映射', () => {
-    const out = applyFieldMap(
-      { a: 1, b: 2 },
-      () => ({ b: 'c' }),
-    );
+    const out = applyFieldMap({ a: 1, b: 2 }, () => ({ b: 'c' }));
     expect(out).toEqual({ a: 1, c: 2 });
   });
 

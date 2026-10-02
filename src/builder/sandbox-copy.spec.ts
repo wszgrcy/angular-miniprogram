@@ -32,26 +32,26 @@ describe('sandbox 拷贝策略（性能回归）', () => {
       isExcludedFromSandbox(root, path.join(root, rel));
 
     it('构建产物与缓存目录被排除', () => {
-      expect(ex('dist')).toBeTrue();
-      expect(ex(path.join('dist', 'app', 'app.js'))).toBeTrue();
-      expect(ex(path.join('.angular', 'cache', 'x.json'))).toBeTrue();
-      expect(ex(path.join('__test-app', 'app.js'))).toBeTrue();
+      expect(ex('dist')).toBe(true);
+      expect(ex(path.join('dist', 'app', 'app.js'))).toBe(true);
+      expect(ex(path.join('.angular', 'cache', 'x.json'))).toBe(true);
+      expect(ex(path.join('__test-app', 'app.js'))).toBe(true);
     });
 
     it('源码 / 配置 / 依赖不被排除', () => {
-      expect(ex('angular.json')).toBeFalse();
-      expect(ex(path.join('src', 'main.ts'))).toBeFalse();
+      expect(ex('angular.json')).toBe(false);
+      expect(ex(path.join('src', 'main.ts'))).toBe(false);
       expect(
         ex(path.join('node_modules', 'test-library', 'package.json')),
-      ).toBeFalse();
+      ).toBe(false);
     });
 
     it('不误伤名字里带 dist / angular 的源码路径', () => {
       // 只匹配「整段目录名」，子串不算
-      expect(ex(path.join('src', 'dist-utils', 'main.ts'))).toBeFalse();
-      expect(ex(path.join('src', 'pages', 'district', 'page.ts'))).toBeFalse();
-      expect(ex('dist.ts')).toBeFalse();
-      expect(ex(path.join('src', 'my.angular', 'a.ts'))).toBeFalse();
+      expect(ex(path.join('src', 'dist-utils', 'main.ts'))).toBe(false);
+      expect(ex(path.join('src', 'pages', 'district', 'page.ts'))).toBe(false);
+      expect(ex('dist.ts')).toBe(false);
+      expect(ex(path.join('src', 'my.angular', 'a.ts'))).toBe(false);
     });
   });
 
@@ -89,37 +89,41 @@ describe('sandbox 拷贝策略（性能回归）', () => {
       const sandbox = getSystemPath(h.root());
       try {
         // 该进来的必须进来
-        expect(fs.existsSync(path.join(sandbox, 'src', 'main.ts')))
-          .withContext('src 必须进 sandbox')
-          .toBeTrue();
-        expect(fs.existsSync(path.join(sandbox, 'angular.json')))
-          .withContext('angular.json 必须进 sandbox')
-          .toBeTrue();
+        expect(
+          fs.existsSync(path.join(sandbox, 'src', 'main.ts')),
+          'src 必须进 sandbox',
+        ).toBe(true);
+        expect(
+          fs.existsSync(path.join(sandbox, 'angular.json')),
+          'angular.json 必须进 sandbox',
+        ).toBe(true);
         expect(
           fs.existsSync(
             path.join(sandbox, 'node_modules', 'pkg', 'package.json'),
           ),
-        )
-          .withContext('node_modules 必须进 sandbox，否则构建解析不到依赖')
-          .toBeTrue();
+          'node_modules 必须进 sandbox，否则构建解析不到依赖',
+        ).toBe(true);
 
         // 构建产物 / 缓存不得进来
-        expect(fs.existsSync(path.join(sandbox, 'dist')))
-          .withContext('dist 不该被拷进 sandbox')
-          .toBeFalse();
-        expect(fs.existsSync(path.join(sandbox, '.angular')))
-          .withContext('.angular 缓存不该被拷进 sandbox')
-          .toBeFalse();
+        expect(
+          fs.existsSync(path.join(sandbox, 'dist')),
+          'dist 不该被拷进 sandbox',
+        ).toBe(false);
+        expect(
+          fs.existsSync(path.join(sandbox, '.angular')),
+          '.angular 缓存不该被拷进 sandbox',
+        ).toBe(false);
 
         // 模板本体不能被改动过
-        expect(fs.existsSync(path.join(fixture, 'dist', 'app', 'stale.js')))
-          .withContext('模板本体不应被移动 / 删除')
-          .toBeTrue();
+        expect(
+          fs.existsSync(path.join(fixture, 'dist', 'app', 'stale.js')),
+          '模板本体不应被移动 / 删除',
+        ).toBe(true);
       } finally {
         await h.restore().toPromise();
       }
 
-      expect(fs.existsSync(sandbox)).toBeFalse();
+      expect(fs.existsSync(sandbox)).toBe(false);
     } finally {
       fs.rmSync(fixture, { recursive: true, force: true });
     }
@@ -134,25 +138,25 @@ describe('sandbox 拷贝策略（性能回归）', () => {
     try {
       const sandbox = getSystemPath(h.root());
 
-      expect(fs.existsSync(path.join(sandbox, 'angular.json')))
-        .withContext('angular.json 必须在 sandbox 里')
-        .toBeTrue();
-      expect(fs.existsSync(path.join(sandbox, 'src', 'main.ts')))
-        .withContext('src/main.ts 必须在 sandbox 里')
-        .toBeTrue();
+      expect(
+        fs.existsSync(path.join(sandbox, 'angular.json')),
+        'angular.json 必须在 sandbox 里',
+      ).toBe(true);
+      expect(
+        fs.existsSync(path.join(sandbox, 'src', 'main.ts')),
+        'src/main.ts 必须在 sandbox 里',
+      ).toBe(true);
       expect(
         fs.existsSync(
           path.join(sandbox, 'node_modules', 'test-library', 'package.json'),
         ),
-      )
-        .withContext(
-          'node_modules/test-library 必须在 sandbox 里（库依赖解析靠它）',
-        )
-        .toBeTrue();
+        'node_modules/test-library 必须在 sandbox 里（库依赖解析靠它）',
+      ).toBe(true);
 
-      expect(fs.existsSync(path.join(sandbox, 'dist')))
-        .withContext('模板里的 dist/ 不该被拷进 sandbox')
-        .toBeFalse();
+      expect(
+        fs.existsSync(path.join(sandbox, 'dist')),
+        '模板里的 dist/ 不该被拷进 sandbox',
+      ).toBe(false);
     } finally {
       await h.restore().toPromise();
     }

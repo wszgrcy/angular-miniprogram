@@ -57,9 +57,7 @@ describe('MpEventChannel（参考 uni-shared EventChannel）', () => {
 });
 
 describe('navigateTo 事件通道接线', () => {
-  function setup(
-    overrides: Record<string, any> = {},
-  ): MpApiService {
+  function setup(overrides: Record<string, any> = {}): MpApiService {
     initMiniProgramTestEnv();
     TestBed.configureTestingModule({
       providers: [
@@ -78,14 +76,10 @@ describe('navigateTo 事件通道接线', () => {
   }
 
   it('已有 query 用 & 拼接', async () => {
-    const navSpy = jasmine
-      .createSpy('navigateTo')
-      .and.callFake((o: any) => o.success?.({}));
+    const navSpy = vi.fn().mockImplementation((o: any) => o.success?.({}));
     const service = setup({ navigateTo: navSpy });
     await service.navigateTo({ url: '/b?id=1' });
-    expect(navSpy.calls.mostRecent().args[0].url).toMatch(
-      /^\/b\?id=1&__id__=\d+$/,
-    );
+    expect(navSpy.mock.calls.at(-1)[0].url).toMatch(/^\/b\?id=1&__id__=\d+$/);
   });
 
   it('opener 与 target 通过同一通道通信', async () => {

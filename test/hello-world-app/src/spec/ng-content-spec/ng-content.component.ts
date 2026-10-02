@@ -30,16 +30,14 @@ export class NgContentSpecComponent {
             >,
           ) => {
             let query = item.createSelectorQuery();
-            expect(await nodeExist(query, '.wrapper-1'))
-              .withContext('wrapper')
-              .toBe(true);
+            expect(await nodeExist(query, '.wrapper-1'), 'wrapper').toBe(true);
             // 投影进去的元素没有被正确的查询到,原因未知,但是父级元素高度却产生了变化
-            expect(await nodeNotEmpty(query, '.wrapper-1'))
-              .withContext('wrapper-1')
-              .toBe(true);
-            expect(await nodeNotEmpty(query, '.wrapper-2'))
-              .withContext('wrapper-2')
-              .toBe(false);
+            expect(await nodeNotEmpty(query, '.wrapper-1'), 'wrapper-1').toBe(
+              true,
+            );
+            expect(await nodeNotEmpty(query, '.wrapper-2'), 'wrapper-2').toBe(
+              false,
+            );
             this.__ngComponentInstance.testFinish$$.complete();
           },
         );

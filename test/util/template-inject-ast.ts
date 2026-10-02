@@ -60,7 +60,7 @@ function isRfBitTest(expr: ts.Expression, bit: number): boolean {
  */
 function findTopLevelRfBlock(
   fn: ts.FunctionLikeDeclaration,
-  bit: number
+  bit: number,
 ): ts.Statement | undefined {
   const body = fn.body;
   if (!body || !ts.isBlock(body)) {
@@ -85,7 +85,7 @@ function statementsOf(node: ts.Statement | undefined): ts.Statement[] {
 function pickProperty(
   sf: ts.SourceFile,
   meta: ts.ObjectLiteralExpression,
-  name: string
+  name: string,
 ): ts.PropertyAssignment | undefined {
   for (const prop of meta.properties) {
     if (ts.isPropertyAssignment(prop) && prop.name.getText(sf) === name) {
@@ -98,7 +98,7 @@ function pickProperty(
 /** 收集 `X.propertyChange(...)` / `propertyChange(...)` 形式的调用 */
 function collectPropertyChangeCalls(
   node: ts.Node,
-  sf: ts.SourceFile
+  sf: ts.SourceFile,
 ): ts.CallExpression[] {
   const out: ts.CallExpression[] = [];
   const walk = (n: ts.Node): void => {
@@ -135,14 +135,14 @@ function isInsideRf2Block(node: ts.Node): boolean {
 
 export function analyzeFileInjection(
   fileName: string,
-  content: string
+  content: string,
 ): FileInjectReport {
   const sf = ts.createSourceFile(
     fileName,
     content,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.JS
+    ts.ScriptKind.JS,
   );
 
   const components: TemplateInjectReport[] = [];
@@ -182,7 +182,7 @@ export function analyzeFileInjection(
 
 function analyzeDefineComponent(
   sf: ts.SourceFile,
-  meta: ts.ObjectLiteralExpression
+  meta: ts.ObjectLiteralExpression,
 ): TemplateInjectReport | null {
   const typeProp = pickProperty(sf, meta, 'type');
   const templateInit = pickProperty(sf, meta, 'template')?.initializer;
@@ -198,7 +198,7 @@ function analyzeDefineComponent(
   const updateStatements = statementsOf(updateBlock);
   const calls = updateBlock
     ? collectPropertyChangeCalls(updateBlock, sf).filter(
-        (c) => c.arguments.length > 0
+        (c) => c.arguments.length > 0,
       )
     : [];
 

@@ -143,7 +143,7 @@ function secondArgAsString(call: ts.CallExpression): string | undefined {
  */
 export function extractNodeManifest(
   fn: ts.FunctionLikeDeclaration,
-  componentName: string
+  componentName: string,
 ): NodeManifest {
   const entries: ManifestEntry[] = [];
   const seen = new Set<ts.Node>();
@@ -192,10 +192,10 @@ export function extractNodeManifest(
       entries
         .filter((e) =>
           ['elementStart', 'element', 'elementContainer'].includes(
-            e.instruction
-          )
+            e.instruction,
+          ),
         )
-        .map((e) => e.index)
+        .map((e) => e.index),
     ),
   };
 }
@@ -207,13 +207,13 @@ export function extractNodeManifest(
  */
 export function extractManifestsFromSource(
   source: string,
-  fileName: string
+  fileName: string,
 ): NodeManifest[] {
   const sf = ts.createSourceFile(
     fileName,
     source,
     ts.ScriptTarget.Latest,
-    true
+    true,
   );
   const manifests: NodeManifest[] = [];
 
@@ -226,7 +226,7 @@ export function extractManifestsFromSource(
           const typeProp = arg.properties.find(
             (p) =>
               ts.isPropertyAssignment(p) &&
-              p.name.getText(sf).replace(/['"]/g, '') === 'type'
+              p.name.getText(sf).replace(/['"]/g, '') === 'type',
           ) as ts.PropertyAssignment | undefined;
           const cmpName =
             typeProp && ts.isIdentifier(typeProp.initializer)
@@ -236,7 +236,7 @@ export function extractManifestsFromSource(
           const tplProp = arg.properties.find(
             (p) =>
               ts.isPropertyAssignment(p) &&
-              p.name.getText(sf).replace(/['"]/g, '') === 'template'
+              p.name.getText(sf).replace(/['"]/g, '') === 'template',
           ) as ts.PropertyAssignment | undefined;
 
           if (
@@ -304,7 +304,7 @@ const TEMPLATE_REF_INSTRUCTIONS = new Set([
 ]);
 
 function collectTopLevelFunctions(
-  sf: ts.SourceFile
+  sf: ts.SourceFile,
 ): Map<string, ts.FunctionLikeDeclaration> {
   const map = new Map<string, ts.FunctionLikeDeclaration>();
   const add = (name: string, fn: ts.FunctionLikeDeclaration) => {
@@ -338,7 +338,7 @@ export function extractViewTree(
   rootFn: ts.FunctionLikeDeclaration,
   rootViewName: string,
   fnMap: Map<string, ts.FunctionLikeDeclaration>,
-  componentName: string
+  componentName: string,
 ): ComponentViewTree {
   const views: ViewManifest[] = [];
   const visited = new Set<string>();
@@ -459,13 +459,13 @@ export function extractViewTree(
 /** 从源码提取每个组件的视图树 */
 export function extractViewTreesFromSource(
   source: string,
-  fileName: string
+  fileName: string,
 ): ComponentViewTree[] {
   const sf = ts.createSourceFile(
     fileName,
     source,
     ts.ScriptTarget.Latest,
-    true
+    true,
   );
   const fnMap = collectTopLevelFunctions(sf);
   const trees: ComponentViewTree[] = [];
@@ -480,7 +480,7 @@ export function extractViewTreesFromSource(
             arg.properties.find(
               (p) =>
                 ts.isPropertyAssignment(p) &&
-                p.name.getText(sf).replace(/['"]/g, '') === prop
+                p.name.getText(sf).replace(/['"]/g, '') === prop,
             ) as ts.PropertyAssignment | undefined;
 
           const typeProp = get('type');
@@ -534,19 +534,19 @@ export function extractViewTreesFromSource(
  */
 export function extractDeclsByComponent(
   source: string,
-  fileName: string
+  fileName: string,
 ): Map<string, number> {
   const sf = ts.createSourceFile(
     fileName,
     source,
     ts.ScriptTarget.Latest,
-    true
+    true,
   );
   const out = new Map<string, number>();
 
   const readNum = (
     obj: ts.ObjectLiteralExpression,
-    key: string
+    key: string,
   ): number | undefined => {
     for (const p of obj.properties) {
       if (
@@ -570,7 +570,7 @@ export function extractDeclsByComponent(
           const typeProp = arg.properties.find(
             (p) =>
               ts.isPropertyAssignment(p) &&
-              p.name.getText(sf).replace(/['"]/g, '') === 'type'
+              p.name.getText(sf).replace(/['"]/g, '') === 'type',
           ) as ts.PropertyAssignment | undefined;
           const cmpName =
             typeProp && ts.isIdentifier(typeProp.initializer)
