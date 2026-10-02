@@ -261,6 +261,7 @@ export class MiniProgramApplicationAnalysisService {
     let current = symbol;
     // alias 链最多走几层，防御性地防止环
     for (let i = 0; i < 5; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
       if ((current.flags & ts.SymbolFlags.Alias) === ts.SymbolFlags.Alias) {
         current = this.typeChecker.getAliasedSymbol(current);
         continue;
