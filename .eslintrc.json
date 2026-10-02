@@ -24,6 +24,14 @@
     "sourceType": "module"
   },
   "plugins": ["eslint-plugin-import", "@typescript-eslint"],
+  "settings": {
+    /**
+     * `angular-miniprogram` 就是本仓库自己（测试工程走 tsconfig paths 引用，
+     * 自链接后它又能真解析到），不是外部依赖，不该被
+     * `import/no-extraneous-dependencies` 要求写进 dependencies。
+     */
+    "import/core-modules": ["angular-miniprogram", "angular-miniprogram/platform"]
+  },
   "rules": {
     "@typescript-eslint/consistent-type-assertions": "warn",
     "@typescript-eslint/no-explicit-any": "warn",

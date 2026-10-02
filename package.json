@@ -2,6 +2,7 @@
   "name": "angular-miniprogram",
   "version": "0.0.0",
   "description": "",
+  "license": "MIT",
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
@@ -10,7 +11,7 @@
     "test:wechat": "node ./script/wechat-karma.cjs --project ./test/hello-world-app --dist ./test/hello-world-app/dist/karma/app",
     "coverage": "vitest run --coverage",
     "prebuild": "rimraf ./dist",
-    "build": "npm run build:library && npm run build:builder && npm run copy:assets && npm run build:karma && npm run build:schema",
+    "build": "npm run build:library && npm run build:builder && npm run copy:assets && npm run build:karma && npm run build:schema && node ./script/link-self.cjs",
     "build:schema": "tsx ./script/build-cli-schema.ts",
     "copy:assets": "cpx \"./src/builder/**/*.json\" ./dist/builder && cpx \"./src/builder/**/*.d.ts\" ./dist/builder && cpx \"./src/builder/**/*.js\" ./dist/builder && cpx ./readme.md ./dist",
     "build:library": "tsx ./script/ensure-sync.ts && tsx ./script/build-ng-package.ts",
@@ -30,7 +31,6 @@
   },
   "private": true,
   "author": "wszgrcy",
-  "license": "MIT",
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^2.7.2",
     "@angular-devkit/architect": "0.2201.8",

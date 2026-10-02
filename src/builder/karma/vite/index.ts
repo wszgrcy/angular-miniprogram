@@ -368,7 +368,21 @@ export function runKarmaViteBuilder(
           context.logger.warn(`[library-meta] ${metaSummary}`);
         }
 
-        const karma = await import('karma');
+        /**
+         * karma 是 CJS，而 builder 现在由 vite 编成 ESM。
+         *
+         * tsc 编 CommonJS 时 `await import()` 退化成 require，拿到的就是
+         * module.exports 本身；编成 ESM 后是真 dynamic import，要走 Node 的
+         * CJS interop。karma 的入口是 `module.exports = {...}` 整体赋值，
+         * cjs-module-lexer 认不出 `config` 是命名导出（只认出 VERSION/constants），
+         * 于是 `karma.config` 是 undefined、真身在 `karma.default`。
+         * 不兜这层就是 `Cannot read properties of undefined (reading 'parseConfig')`。
+         */
+        const karmaNs = await import('karma');
+        const karma: typeof karmaNs = karmaNs.config
+          ? karmaNs
+          : (karmaNs as unknown as { default?: typeof karmaNs }).default ??
+            karmaNs;
         const karmaOptions: Record<string, unknown> = {
           singleRun: options.watch ? false : true,
         };

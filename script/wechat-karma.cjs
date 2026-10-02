@@ -38,7 +38,7 @@ function parseArgs(argv) {
     autoPort: 9420,
     idePort: 0,
     timeout: 45,
-    cli: process.env.WX_DEVTOOLS_CLI || defaultCliPath(),
+    cli: process.env.WX_DEVTOOLS_CLI || '',
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -79,6 +79,13 @@ function parseArgs(argv) {
         throw new Error(`未知参数: ${a}`);
     }
   }
+  /**
+   * 默认路径只能在参数解析完之后再探。
+   *
+   * 写在上面的对象字面量里就是**无条件**调 defaultCliPath()，它找不到就
+   * 直接 throw——于是 `--cli` 永远来不及生效，传了也白传。
+   */
+  if (!out.cli && !out.help) out.cli = defaultCliPath();
   return out;
 }
 
@@ -539,6 +546,16 @@ async function main() {
   const distDir = path.resolve(opt.dist);
   if (!fs.existsSync(projectDir))
     throw new Error(`项目目录不存在: ${projectDir}`);
+
+  /**
+   * 下面要跑 `ng test`，而 angular.json 里的 builder 写的是包名
+   * `angular-miniprogram:karma`。没把 dist 链进 node_modules 的话，
+   * CLI 直接报 `Could not find the 'angular-miniprogram:karma' builder's
+   * node package`。这里顺手保证一下，别让人去猜链接。
+   */
+  spawnSync(process.execPath, [path.join(__dirname, 'link-self.cjs')], {
+    stdio: 'inherit',
+  });
   /**
    * **不能**在这里检查 distDir 存在。
    *
