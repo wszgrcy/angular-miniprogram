@@ -84,7 +84,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     ).toString('utf8');
     expect(installedLib)
       .withContext(
-        'node_modules/test-library 副本已过期，请先跑 `npm run test:jasmine library`',
+        'node_modules/test-library 副本已过期，请先跑 `npm run test:ci`',
       )
       .toContain('LIB_TEST_LIBRARY_RENDERED');
 

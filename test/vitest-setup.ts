@@ -1,15 +1,15 @@
 /**
- * vitest 版的全局环境准备，对标 `script/startup-jasmine.ts` 里那套。
+ * 测试环境的全局准备（`vitest.config.mts` 的 `setupFiles`）。
  *
  * 分两件事：
  *  1. 装小程序全局（`wx` / `App` / `Page` / `Component` / `getApp` / `getCurrentPages`）。
  *     `platform-core.ts` 里 `MINIPROGRAM_GLOBAL = wx` 是**模块求值时**就读全局，
  *     所以必须早于任何 spec 的 import，只能放 setupFiles。
- *  2. 补 jasmine 遗留 API。75 个 spec 文件、800+ 断言全是 jasmine 写法，
- *     逐个改写成 vitest 不现实也没必要，这里做一层薄兼容。
+ *  2. 补历史 spec 用的 jasmine 风格 API。现有 spec 里
+ *     `toBeTrue` 76 处、`spyOn().and.*` 70+ 处、`spy.calls.*` 36 处，
+ *     逐个改写不现实，这里做一层薄兼容；类型声明见 `vitest-globals.d.ts`。
  */
 import { expect, vi } from 'vitest';
-import { createRequire } from 'node:module';
 
 /* -------------------------------------------------------------------------- */
 /* 小程序全局                                                                  */
@@ -62,19 +62,7 @@ g.getApp = g.getApp || (() => ({ globalData: {} }));
 g.getCurrentPages = g.getCurrentPages || (() => []);
 
 /* -------------------------------------------------------------------------- */
-/* CJS 互操作                                                                  */
-/* -------------------------------------------------------------------------- */
-
-/**
- * `test/cyia-ngx-devkit` 里有 `require('fs')` 这种 CJS 写法，
- * vite 把模块转成 ESM 之后 `require` 不存在，这里补一个。
- */
-if (typeof g.require !== 'function') {
-  g.require = createRequire(process.cwd() + '/');
-}
-
-/* -------------------------------------------------------------------------- */
-/* jasmine 兼容层                                                              */
+/* jasmine 遗留 API 兼容层                                                     */
 /* -------------------------------------------------------------------------- */
 
 /**
@@ -160,22 +148,21 @@ function attachAnd(spy: any) {
 
 function jasmineSpyOn(obj: any, key: string) {
   const original = typeof obj?.[key] === 'function' ? obj[key] : undefined;
-  const spy = vi.spyOn(obj, key as never);
+  // 动态 key 走 vi.spyOn 的类型签名推不出来，这里只做运行时包装，
+  // 类型口径由 test/vitest-globals.d.ts 的 spyOn 声明负责。
+  const spyOnAny = vi.spyOn as unknown as (o: unknown, k: string) => any;
+  const spy = spyOnAny(obj, key);
   spy.__jasmineOriginal = original;
   return attachAnd(spy);
 }
 
+/** jasmine 的 `createSpy(name)` 收名字，`vi.fn` 收实现，名字没有语义，丢掉。 */
 function jasmineCreateSpy(name?: string) {
-  return attachAnd(vi.fn(name));
+  void name;
+  return attachAnd(vi.fn());
 }
 
-/**
- * `jasmine.DEFAULT_TIMEOUT_INTERVAL`：`describeBuilder` 会写它来放宽超时。
- * vitest 没有等价全局，这里存下来供 vitest.config 的 testTimeout 读取，
- * 保证「builder 全量构建要跑几分钟」这件事仍然生效。
- */
 const jasmineGlobal: Record<string, unknown> = {
-  DEFAULT_TIMEOUT_INTERVAL: 500 * 1000,
   createSpy: jasmineCreateSpy,
   spyOn: jasmineSpyOn,
   /** 数组内容相同、顺序无关。 */
@@ -299,10 +286,17 @@ expect.extend({
   },
 });
 
-declare module '@vitest/expect' {
-  interface Matchers<R = void> {
+declare module 'vitest' {
+  interface Matchers<
+    R extends void | Promise<void> = void | Promise<void>,
+    T = unknown,
+  > {
     toBeTrue(): R;
     toBeFalse(): R;
     toThrowError(expected?: unknown): R;
+  }
+  interface Assertion<R = void, T = unknown> {
+    /** jasmine 的 `expect(x).withContext(msg)`，失败时附带上下文。 */
+    withContext(context: unknown): Assertion<R, T>;
   }
 }

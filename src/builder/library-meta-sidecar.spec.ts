@@ -72,7 +72,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
     // 本 harness 的 builder 是 **app** builder，跑不了 library target，
     // 所以 test-library 只能靠外部先构建。
-    // `npm run test:ci` 开头就是 `test:jasmine library`，它会构建 test-library
+    // `npm run test:ci` 的第一步就是单独跑 library.spec 构建 test-library
     // 并拷进 `test/hello-world-app/node_modules/test-library`，后续 harness 再从
     // 那里拷副本。单独跑 `npm test` 时副本可能是旧的，所以这里显式验新鲜度：
     // 宁可大声报错，也不要静默地测一个旧副本而给出假绿灯。
@@ -94,13 +94,11 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       installedLib = '';
     }
     expect(installedLib.length)
-      .withContext(
-        '读不到 node_modules/test-library，请先跑 `npm run test:jasmine library`',
-      )
+      .withContext('读不到 node_modules/test-library，请先跑 `npm run test:ci`')
       .toBeGreaterThan(0);
     expect(installedLib)
       .withContext(
-        'node_modules/test-library 副本已过期，请先跑 `npm run test:jasmine library`（或直接 `npm run test:ci`）',
+        'node_modules/test-library 副本已过期，请先跑 `npm run test:ci`（或直接 `npm run test:ci`）',
       )
       .toContain('LIB_TEST_LIBRARY_RENDERED');
 
@@ -347,7 +345,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const { demoWxml } = await load();
       const merged = demoWxml.match(/<lib-test-library[^>]*>/g) ?? [];
       const both = merged.find(
-        (tag) =>
+        (tag: string) =>
           tag.includes('property1="') &&
           tag.includes('value="') &&
           tag.includes('bind:tap="bindEvent"') &&

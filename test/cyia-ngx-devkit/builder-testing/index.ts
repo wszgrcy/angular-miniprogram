@@ -29,8 +29,10 @@ import {
   logging,
   virtualFs,
 } from '@angular-devkit/core';
-import nodeFs from 'node:fs';
+import nodeFs, { readFileSync } from 'node:fs';
 import nodePath from 'node:path';
+import type { Assertion } from 'vitest';
+
 import {
   EMPTY,
   Observable,
@@ -164,22 +166,19 @@ const optionSchemaCache = new Map<string, json.JsonObject>();
 export function describeBuilder<T>(
   builderHandler: BuilderHandlerFn<T & json.JsonObject>,
   options: { name?: string; schemaPath: string },
-  specDefinitions: (harness: JasmineBuilderHarness<T>) => void,
+  specDefinitions: (harness: BuilderTestHarness<T>) => void,
 ): void {
-  jasmine.DEFAULT_TIMEOUT_INTERVAL = 500 * 1000;
-
   let optionSchema = optionSchemaCache.get(options.schemaPath);
   if (optionSchema === undefined) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     optionSchema = JSON.parse(
-      require('fs').readFileSync(options.schemaPath, 'utf8'),
-    );
+      readFileSync(options.schemaPath, 'utf8'),
+    ) as json.JsonObject;
     optionSchemaCache.set(options.schemaPath, optionSchema);
   }
   if (!host) {
     throw new Error('call setWorkspaceRoot first');
   }
-  const harness = new JasmineBuilderHarness<T>(builderHandler, host, {
+  const harness = new BuilderTestHarness<T>(builderHandler, host, {
     builderName: options.name,
     optionSchema,
   });
@@ -580,7 +579,7 @@ export class BuilderHarness<T> {
   }
 }
 
-export class JasmineBuilderHarness<T> extends BuilderHarness<T> {
+export class BuilderTestHarness<T> extends BuilderHarness<T> {
   expectFile(path: string): HarnessFileMatchers {
     return expectFile(path, this);
   }
@@ -589,8 +588,8 @@ export class JasmineBuilderHarness<T> extends BuilderHarness<T> {
 export interface HarnessFileMatchers {
   toExist(): boolean;
   toNotExist(): boolean;
-  readonly content: jasmine.ArrayLikeMatchers<string>;
-  readonly size: jasmine.Matchers<number>;
+  readonly content: Assertion<void, string>;
+  readonly size: Assertion<void, number>;
 }
 
 interface HarnessContextHost {
@@ -830,71 +829,38 @@ export function expectFile<T>(
   return {
     toExist() {
       const exists = harness.hasFile(path);
-      expect(exists).toBe(true, 'Expected file to exist: ' + path);
+      expect(exists, 'Expected file to exist: ' + path).toBe(true);
 
       return exists;
     },
     toNotExist() {
       const exists = harness.hasFile(path);
-      expect(exists).toBe(false, 'Expected file to not exist: ' + path);
+      expect(exists, 'Expected file to not exist: ' + path).toBe(false);
 
       return !exists;
     },
     get content() {
-      try {
-        return expect(harness.readFile(path)).withContext(
-          `With file content for '${path}'`,
-        );
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
-          throw e;
-        }
-        // File does not exist so always fail the expectation
-        return createFailureExpectation(
-          expect(''),
+      // 文件不存在就直接带上下文抛出去。
+      // 旧实现是往 jasmine 的 `expector.addFilter` 上挂一个「恒假」过滤器，
+      // 那是 jasmine 未公开的内部 API，vitest 下根本没有。
+      if (!harness.hasFile(path)) {
+        throw new Error(
           `Expected file content but file does not exist: '${path}'`,
         );
       }
+      return expect(harness.readFile(path)).withContext(
+        `With file content for '${path}'`,
+      );
     },
     get size() {
-      try {
-        return expect(Buffer.byteLength(harness.readFile(path))).withContext(
-          `With file size for '${path}'`,
-        );
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
-          throw e;
-        }
-        // File does not exist so always fail the expectation
-        return createFailureExpectation(
-          expect(0),
+      if (!harness.hasFile(path)) {
+        throw new Error(
           `Expected file size but file does not exist: '${path}'`,
         );
       }
+      return expect(Buffer.byteLength(harness.readFile(path))).withContext(
+        `With file size for '${path}'`,
+      );
     },
   };
-}
-
-/** jasmine 的类型里没有暴露 expector，这里只声明用到的部分 */
-interface ExpectorHost {
-  expector: {
-    addFilter(f: {
-      selectComparisonFunc(): () => { pass: boolean; message: string };
-    }): ExpectorHost['expector'];
-  };
-}
-
-function createFailureExpectation<T>(base: T, message: string): T {
-  const host = base as unknown as ExpectorHost;
-
-  host.expector = host.expector.addFilter({
-    selectComparisonFunc() {
-      return () => ({
-        pass: false,
-        message,
-      });
-    },
-  });
-
-  return base;
 }

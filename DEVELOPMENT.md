@@ -2218,21 +2218,44 @@ import {
 
 ---
 
-# 构建器改用 vite 出码，测试改用 vitest
+# 构建器改用 vite 出码，测试改用 vitest（旧 jasmine / tsc 链路已删除）
 
 ## 一句话
 
 `build:builder` / `build:karma` 的 JS 产物从 `tsc` 换成 vite（`script/vite-build.ts`），
-`npm test` 从 jasmine 换成 vitest。产物文件集与 spec 数量都做了逐项比对，
+`npm test` 从 jasmine 换成 vitest，**旧的 jasmine 运行器、ts-node 编译、nyc 覆盖率
+整套已删除**，不留并行路径。
+
+产物文件集与 spec 数量都做了逐项比对：
 **106/106 模块导出签名一致，843/843 spec 全绿**。
+
+## 删掉了什么
+
+| 删除                                                      | 原因                                                                                         |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `script/startup-jasmine.ts` / `.js`                       | jasmine 运行器本体（ts-node 注册 + `Module._resolveFilename` 钩子 + wx 全局替身 + 耗时统计） |
+| `jasmine.json`                                            | jasmine 的 spec 清单与顺序                                                                   |
+| `script/tsconfig.startup-jasmine.json`                    | 只为编译 startup-jasmine 而存在                                                              |
+| `.nycrc.json` + `nyc` 依赖                                | 覆盖率改由 `@vitest/coverage-v8` 出                                                          |
+| `test/cyia-ngx-devkit` 里的 `createFailureExpectation`    | 依赖 jasmine 未公开的 `expector.addFilter`，改成文件不存在时直接带上下文抛                   |
+| `describeBuilder` 里的 `jasmine.DEFAULT_TIMEOUT_INTERVAL` | 超时改由 `vitest.config.mts` 的 `testTimeout` / `hookTimeout` 独占                           |
+| 依赖 `jasmine`、`ts-node`、`nyc`                          | 只服务于旧链路                                                                               |
+
+**保留的 jasmine**（属于产品表面，不是旧测试链路）：
+
+- `src/builder/karma/**` —— karma builder 对外暴露的就是 jasmine 接口，
+  用户在小程序运行时里写的 spec 用的是 jasmine。
+  所以 `@types/jasmine` 与 `jasmine-core` 必须留着
+  （`test/hello-world-app/src/test.ts` 用 `jasmine-core` 在 wx 侧起 env）。
+- `test/hello-world-app/src/spec/**` —— karma builder 的 fixture spec。
 
 ## 构建侧
 
-| 脚本                | 现在                                                              |
-| ------------------- | ----------------------------------------------------------------- |
-| `build:builder`     | `typecheck:builder`（`tsc --noEmit`）+ `tsx script/vite-build.ts` |
-| `build:karma`       | 两个 karma tsconfig 改成 `--emitDeclarationOnly`，只出 `.d.ts`    |
-| `typecheck:builder` | 新增，纯类型检查                                                  |
+| 脚本            | 现在                                                              |
+| --------------- | ----------------------------------------------------------------- |
+| `build:builder` | `typecheck:builder`（`tsc --noEmit`）+ `tsx script/vite-build.ts` |
+| `build:karma`   | 两个 karma tsconfig 改成 `--emitDeclarationOnly`，只出 `.d.ts`    |
+| `typecheck`     | `typecheck:builder` + `typecheck:spec`                            |
 
 `script/vite-build.ts` 一次产出三棵树：
 
@@ -2262,6 +2285,12 @@ vite 走 oxc/esbuild，**只转译不检查**。原先 `tsconfig.builder.json` �
 `noEmitOnError: true` 提供的「类型不过就不落盘」保证会消失，
 所以 `build:builder` 显式串了一条 `tsc --noEmit` 在前面。
 
+顺带把 spec 侧的类型检查也补上了（`typecheck:spec`）。
+**旧链路里它从来不存在** —— ts-node 是逐文件转译、不做全量检查，
+`tsconfig.spec.json` 只被 ts-node 和 eslint 用。换成 vitest 后
+把它接进 `npm run typecheck`，并修掉了此前无人发现的 424 个类型错误
+（大头是 `withContext` / `toBeTrue` / `spy.calls` 这些没声明的测试全局）。
+
 ### vite 出不了 `.d.ts`
 
 `package.json#exports` 的 `./karma/plugin` 带 `types` 字段，
@@ -2275,9 +2304,9 @@ partial-Ivy 都是它做的，vite 没有等价物（`@analogjs/vite-plugin-angu
 
 ## 测试侧
 
-`npm test` = `vitest run`。jasmine 那条路保留为 `npm run test:jasmine`。
-
-配置 `vitest.config.mts`，环境准备 `test/vitest-setup.ts`。
+`npm test` = `vitest run`。配置 `vitest.config.mts`，
+环境准备 `test/vitest-setup.ts`，测试全局的类型声明
+`test/vitest-globals.d.ts`。
 75 个 spec 文件、843 个 spec，**一个 spec 文件都没改**。
 
 ### 必须补的四层兼容
@@ -2286,21 +2315,20 @@ partial-Ivy 都是它做的，vite 没有等价物（`@analogjs/vite-plugin-angu
 
 `platform-core.ts` 里 `MINIPROGRAM_GLOBAL = wx` 在**模块求值时**读全局，
 所以 `wx` / `App` / `Page` / `Component` / `getApp` / `getCurrentPages`
-的替身必须放 `setupFiles`，不能放 spec 里。照搬 `script/startup-jasmine.ts`
-那套 Proxy 兜底。
+的替身必须放 `setupFiles`，不能放 spec 里。
 
 #### 2. 包自引用
 
 `src/library` 里几十处 `import 'angular-miniprogram/platform/wx'`。
-jasmine 靠 `Module._resolveFilename` 钩子，vite 有自己的解析器、钩子不生效，
+旧链路靠 `Module._resolveFilename` 钩子，vite 有自己的解析器、钩子不生效，
 只能在 `resolve.alias` 再声明一遍。**长 key 必须排在短 key 前**，
 否则 `angular-miniprogram/platform` 会先把 `/platform/wx` 吃掉。
 
 #### 3. `@angular/core` 的 `const enum`（**这条是真发现**）
 
 `NotificationSource` 在 Angular 里是 `declare const enum`：
-tsc 编译时把 `NotificationSource.Listener` 内联成 `5`，产物里**根本没有这个导出**。
-oxc/esbuild **不做跨文件 const enum 内联**，于是 vitest 下
+tsc 编译时把 `NotificationSource.Listener` 直接内联成 `5`，
+产物里**根本没有这个导出**。oxc/esbuild **不做跨文件 const enum 内联**，于是
 
 ```
 TypeError: Cannot read properties of undefined (reading 'Listener')
@@ -2325,11 +2353,11 @@ vitest 用 `vm.runInThisContext` 跑模块，里面再 `import()` 直接抛
 
 同样用插件在 transform 阶段换回真正的动态 import（只影响测试，不改源码）。
 
-### jasmine API 兼容清单
+### 历史 jasmine 风格 API 的兼容清单
 
 `test/vitest-setup.ts` 里补的，都是实测用量：
 
-| jasmine                                                      | 用量 | vitest 对应                    |
+| 写法                                                         | 用量 | vitest 对应                    |
 | ------------------------------------------------------------ | ---- | ------------------------------ |
 | `expect(x).toBeTrue()`                                       | 76   | 自定义 matcher                 |
 | `spyOn(o,k).and.callFake/returnValue/stub/callThrough`       | 70+  | `vi.spyOn` + `.and` 适配器     |
@@ -2339,49 +2367,57 @@ vitest 用 `vm.runInThisContext` 跑模块，里面再 `import()` 直接抛
 | `jasmine.arrayWithExactContents`                             | 3    | 自定义 asymmetric matcher      |
 | `jasmine.createSpy`                                          | 3    | `vi.fn` + `.and`               |
 
-`withContext()` vitest 5 本来就有（chai 提供），不用补。
+`withContext()` vitest 5 本来就有（chai 提供），只是类型上要自己补声明。
 
 `arrayWithExactContents` 里**不要**用 `expect.utils.equals`：
-vitest 5 不保证这个命名空间存在，用了会静默返回 false、matcher 永不匹配。
+vitest 5 不保证这个命名空间存在，之前就是在这里静默返回 false、
+matcher 永不匹配。
 
 ### 执行模型
 
 `pool: 'forks'` + `maxWorkers: 1` + `sequence.concurrent: false`。
 architect 的 `TestProjectHost` 会在仓库里开真实临时目录并写文件，
-并发跑会互相踩。串行后行为与 jasmine 一致。
+并发跑会互相踩。
 
-`testTimeout` / `hookTimeout` 给到 500s，对齐
-`describeBuilder` 里的 `jasmine.DEFAULT_TIMEOUT_INTERVAL = 500 * 1000`。
+`testTimeout` / `hookTimeout` 给到 500s —— builder 类 spec 会真的跑一遍
+小程序全量构建。
 
 ### `test:ci` 的顺序依赖
 
 `node_modules/test-library` 由 `library.spec.ts` 构建后拷入，
 但按文件名排序 `library-meta-sidecar.spec.ts` 排在 `library/library.spec.ts` **之前**。
-jasmine 靠 `jasmine.json` 里把 `builder/library/library.spec.ts` 列在第一位解决。
+旧链路靠 `jasmine.json` 把它列在第一位解决。
 vitest 按文件排序，所以 `test:ci` 显式跑两遍：
 
 ```
-build:library && vitest run src/builder/library/library.spec.ts && vitest run
+build:library && vitest run src/builder/library/library.spec.ts && npm test
 ```
+
+### 覆盖率
+
+`npm run coverage` = `vitest run --coverage`（`@vitest/coverage-v8`）。
+`reportsDirectory` 指到 `docs/coverage`，因为
+`script/coverage-badge.ts` 读的是 `docs/coverage/coverage-summary.json`
+的 `total.lines.pct`，v8 的 `json-summary` reporter 形状正好对得上。
 
 ### 耗时
 
-|                    | 时长 | spec |
-| ------------------ | ---- | ---- |
-| jasmine（ts-node） | ~88s | 843  |
-| vitest             | ~91s | 843  |
+|                         | 时长 | spec |
+| ----------------------- | ---- | ---- |
+| 旧（jasmine + ts-node） | ~88s | 843  |
+| vitest                  | ~92s | 843  |
 
-vitest 的价值不在速度，在于：不再全量 ts-node 编译、有 per-file 并行能力
+价值不在速度，在于：不再全量 ts-node 编译、有 per-file 并行能力
 （当前被 architect harness 限制成串行）、以及标准的 reporter / watch / UI 生态。
 
 ## 相关测试
 
 本轮没有新增 spec —— 换的是跑测试的机器，不是测试内容。
-等价性靠两条外部验证：
+等价性靠几条外部验证：
 
 | 验证                                             | 结果                      |
 | ------------------------------------------------ | ------------------------- |
 | tsc 产物 vs vite 产物逐模块 `Object.keys()` 比对 | 106/106 一致              |
 | `npm run build` 全量                             | 通过                      |
+| `npm run typecheck`（builder + spec）            | 0 error                   |
 | `npm test`（vitest）                             | 75 files / 843 specs 全绿 |
-| `npm run test:jasmine`（保留路径）               | 843 specs 全绿            |

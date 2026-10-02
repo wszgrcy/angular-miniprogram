@@ -6,7 +6,7 @@
     // **使用 DOM 类型**（Document / HTMLElement / Node 等），
     // base 的 ES2019 没有这些，spec 侧必须补上，否则类型对不上。
     "lib": ["es2022", "dom", "dom.iterable"],
-    "types": ["jasmine", "node"],
+    "types": ["vitest/globals", "node"],
     "paths": {
       // @angular/core/testing 只靠 exports map，moduleResolution: node10
       // 认不出来（与 vite 同因），显式指到类型入口
@@ -40,7 +40,14 @@
       "static-injector": ["./node_modules/static-injector/import/index.d.ts"]
     }
   },
-  "exclude": ["**/fixture/**"],
+  "exclude": [
+    "**/fixture/**",
+    // hello-world-app 是构建 fixture，里面 src/spec/** 是
+    // karma builder 在小程序运行时里跑的 fixture spec，用的是 jasmine，
+    // 不属于本仓库的 vitest 套件
+    "test/hello-world-app/**",
+    "test/test-project-host-*/**"
+  ],
   "files": [],
-  "include": ["src/**/*.spec.ts"]
+  "include": ["src/**/*.spec.ts", "test/**/*.ts"]
 }

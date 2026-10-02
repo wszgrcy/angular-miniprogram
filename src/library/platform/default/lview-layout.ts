@@ -32,7 +32,7 @@
  *
  * ## 升级 Angular 时的操作
  *
- * 直接跑 `npm run test:jasmine lview-layout`。
+ * 直接跑 `npx vitest run lview-layout`。
  * 失败信息会给出「我们的值」vs「已安装 Angular 的值」，按后者更新本文件。
  */
 export const LVIEW = {

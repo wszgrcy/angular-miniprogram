@@ -2,6 +2,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
+ * 本仓库的类型环境里 `require` 被收窄成了不带 `resolve` / `main` 的形状，
+ * 只有 `NodeRequire` 是全量，这里显式取一次。
+ */
+const nodeRequire = require as unknown as NodeRequire;
+
+/**
  * 拼装发布用的 `dist/lib/config/schema.json`。
  *
  * 基底直接读 devDependencies 里的 `@angular/cli/lib/config/schema.json`
@@ -130,7 +136,7 @@ function assertRefsResolve(schema: any) {
 function readBaseSchema(): any {
   let basePath: string;
   try {
-    basePath = require.resolve('@angular/cli/lib/config/schema.json');
+    basePath = nodeRequire.resolve('@angular/cli/lib/config/schema.json');
   } catch {
     throw new Error(
       '读不到 @angular/cli/lib/config/schema.json，请确认 @angular/cli 已安装（devDependencies）',
@@ -225,7 +231,7 @@ function generate(outPath = path.resolve(process.cwd(), DEFAULT_OUTPUT)) {
   console.log(`[build:schema] 输出: ${outPath}`);
 }
 
-if (require.main === module) {
+if (nodeRequire.main === module) {
   try {
     generate(process.argv[2] ? path.resolve(process.argv[2]) : undefined);
   } catch (error) {

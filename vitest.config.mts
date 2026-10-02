@@ -119,15 +119,23 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['./test/vitest-setup.ts'],
     // builder 类 spec 会真的跑一遍小程序全量构建，单条几分钟很正常。
-    // jasmine 那边对应 `jasmine.DEFAULT_TIMEOUT_INTERVAL = 500 * 1000`。
     testTimeout: 500_000,
     hookTimeout: 500_000,
     // architect 的 TestProjectHost 会在仓库里开真实临时目录并写文件，
-    // 并发跑会互相踩；单进程串行，行为与 jasmine 一致。
+    // 并发跑会互相踩，所以强制单进程串行。
     pool: 'forks',
     maxWorkers: 1,
     isolate: false,
     sequence: { concurrent: false },
     slowTestThreshold: 10_000,
+    coverage: {
+      provider: 'v8',
+      include: ['src/builder/**/*.ts', 'src/library/**/*.ts'],
+      exclude: ['**/*.spec.ts', '**/fixture/**', '**/test-util/**'],
+      // script/coverage-badge.ts 读 docs/coverage/coverage-summary.json 的
+      // total.lines.pct 生成徽章，reportsDirectory 必须指到 docs/coverage
+      reportsDirectory: 'docs/coverage',
+      reporter: ['text', 'json-summary', 'html'],
+    },
   },
 });
