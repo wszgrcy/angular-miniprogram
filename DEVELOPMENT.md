@@ -29,7 +29,7 @@ npm run sync       # 手动从 angular/angular@17.3.1 同步源码（需要网�
 
 ### 两层测试的分工
 
-|                | Node vitest（`npm test`）      | 小程序 karma（`npm run test:wechat`） |
+|                | Node vitest（`npm test`）      | 小程序运行时（`npm run test:wechat`） |
 | -------------- | ------------------------------ | ------------------------------------- |
 | 跑在哪         | Node 进程，`wx` 用 Proxy 桩    | 真·微信开发者工具里的小程序运行时     |
 | 覆盖           | 编译器、纯函数、可 mock 的逻辑 | 渲染、生命周期、`wx.*` 真实行为       |
@@ -169,10 +169,12 @@ request:fail        status: undefined     ← 请求根本没发出
 ### 怎么跑
 
 ```bash
-# 1. 手动打开微信开发者工具并扫码登录
+# 1. 手动打开微信开发者工具并扫码登录（CLI 拉不起登录态）
 # 2. 跑（游客 appid 直接可用，不用 --appid）
-npm run test:wechat
-# 或显式：
+npm run test:wechat     # vitest 链路：编产物 → 起 WS → 开项目 → 收结果
+
+# karma 链路保留作参照（设备端主动连出 vs karma 反向控制，方向相反）：
+npm run test:karma
 node script/wechat-karma.cjs \
   --project ./test/hello-world-app \
   --dist    ./test/hello-world-app/dist/karma/app
@@ -2458,8 +2460,9 @@ vitest 用 `sequence.sequencer` 表达同一件事：`vitest.config.mts` 里的
 # 用 vitest 取代 karma 跑小程序运行时测试
 
 `npm test` 跑的是 **Node 侧**的测试（本仓库自己的逻辑）。
-小程序**运行时里**的测试原来是 karma 链路（`npm run test:wechat`），
-这里新增一条 vitest 链路，两者是**分开的两件事**，互不替代。
+小程序**运行时里**的测试原来是 karma 链路，现在 `npm run test:wechat`
+已经是 vitest 链路；karma 降级为 `npm run test:karma`，留着当参照，
+两条路方向相反（vitest 是设备主动连出，karma 是反向控制开发者工具）。
 
 代码在 `src/builder/vitest/`：
 

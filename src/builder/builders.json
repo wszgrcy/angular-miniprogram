@@ -18,7 +18,7 @@
     },
     "vitest": {
       "implementation": "./vitest/vite",
-      "schema": "./vitest/schema.json",
+      "schema": "./vitest/vite/schema.json",
       "description": "小程序测试构建（把 spec 编进产物，由 vitest 通过 WebSocket 驱动）"
     }
   }

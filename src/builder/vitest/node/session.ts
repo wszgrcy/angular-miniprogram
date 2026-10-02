@@ -81,7 +81,14 @@ export class MiniProgramVitestSession {
           ),
         );
       });
-      server.once('listening', () => resolve());
+      server.once('listening', () => {
+        // 给外部启动器当 ready 信号用（见 script/wechat-vitest.cjs）。
+        // 没这行的话脚本只能 sleep 一个固定时长去赌服务已绑上。
+        process.stdout.write(
+          `[mp-vitest] 已监听 ws://${host}:${port}，等设备连入\n`,
+        );
+        resolve();
+      });
       server.on('connection', (socket) => this.onConnection(socket));
     });
   }

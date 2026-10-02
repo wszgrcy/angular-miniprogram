@@ -8,10 +8,12 @@ import { miniProgramVitest } from 'angular-miniprogram/vitest';
  *  - 根配置：跑本仓库 Node 侧逻辑（`npm test`）
  *  - 本配置：把 spec 推进微信开发者工具里的小程序运行时执行
  *
- * 用法（两个进程）：
+ * 用法：`npm run test:wechat`（= script/wechat-vitest.cjs）一条命令搞定：
+ * 编产物 → 起 vitest（内部起 WS）→ 开发者工具打开产物 → 收结果。
+ * 手动分步则是：
  *   1. npx ng run app:test-vitest        # 把 spec 编进小程序产物
- *   2. 微信开发者工具打开 test/hello-world-app/dist/vitest/app
- *   3. npx vitest run --config vitest.config.mts   # 起 WS、等连接、收结果
+ *   2. npx vitest run --config vitest.config.mts
+ *   3. 开发者工具打开 dist/vitest/app（设备主动连回 ws://127.0.0.1:port）
  *
  * port 必须和 angular.json 里 test-vitest.options.port 一致。
  */

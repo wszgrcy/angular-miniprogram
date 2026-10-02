@@ -48,6 +48,9 @@
     "./karma/plugin": {
       "default": "./karma/plugin/index.js",
       "types": "./karma/plugin/index.d.ts"
+    },
+    "./vitest": {
+      "default": "./vitest/plugin/node/index.mjs"
     }
   },
   "builders": "./builder/builders.json"

@@ -32,6 +32,14 @@ interface BuildTarget {
    * 给了就只用这些入口，其余模块靠 preserveModules 按需带出。
    */
   entryFiles?: string[];
+  /**
+   * 产物模块格式，默认 cjs。
+   *
+   * builder 主链路必须是 cjs（Angular CLI 用 require 加载 builder），
+   * 但 vitest 的宿主侧插件是被 `vitest.config.mts` 用 ESM `import {}` 引的，
+   * 给 cjs 就得赌 cjs-module-lexer 能认出命名导出（实际认不出）。
+   */
+  format?: 'cjs' | 'esm';
 }
 
 /** builder 主链路里不含 karma 的 client / plugin：它们有自己的 tsconfig 与产物根。 */
@@ -72,6 +80,18 @@ const TARGETS: BuildTarget[] = [
     name: 'vitest-runtime',
     srcDir: 'src/builder/vitest/runtime',
     outDir: 'dist/vitest/runtime',
+  },
+  // vitest 的宿主侧插件（miniProgramVitest）。被测试工程的
+  // `vitest.config.mts` 以 ESM 命名导入引用，所以必须单独出 ESM，
+  // 不能复用 dist/builder 下的 cjs 产物。
+  // outDir 是 dist/vitest/plugin，和 vitest-runtime 的 dist/vitest/runtime
+  // 不重叠，两边各自的 emptyOutDir 不会互相洗掉。
+  {
+    name: 'vitest-plugin',
+    srcDir: 'src/builder/vitest',
+    entryFiles: ['node/index'],
+    outDir: 'dist/vitest/plugin',
+    format: 'esm',
   },
 ];
 
@@ -119,6 +139,12 @@ function makeConfig(target: BuildTarget): UserConfig {
   const srcDir = path.join(ROOT, target.srcDir);
   const outDir = path.join(ROOT, target.outDir);
   const entries = collectEntries(srcDir, target.exclude, target.entryFiles);
+  /**
+   * dist/package.json 没有 `"type": "module"`（发布包主体是 CJS），所以
+   * ESM 产物必须用 `.mjs`，否则 Node 按 CJS 解析，ESM 命名导入直接报
+   * `Named export 'xxx' not found`。
+   */
+  const ext = target.format === 'esm' ? 'mjs' : 'js';
   return {
     root: ROOT,
     configFile: false,
@@ -152,16 +178,16 @@ function makeConfig(target: BuildTarget): UserConfig {
       reportCompressedSize: false,
       lib: {
         entry: entries,
-        formats: ['cjs'],
-        fileName: (_f, name) => `${name}.js`,
+        formats: [target.format ?? 'cjs'],
+        fileName: (_f, name) => `${name}.${ext}`,
       },
       rollupOptions: {
         external: isExternal,
         output: {
           preserveModules: true,
           preserveModulesRoot: srcDir,
-          entryFileNames: '[name].js',
-          chunkFileNames: '[name].js',
+          entryFileNames: `[name].${ext}`,
+          chunkFileNames: `[name].${ext}`,
           exports: 'named',
           esModule: true,
         },
