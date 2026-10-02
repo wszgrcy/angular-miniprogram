@@ -8,15 +8,8 @@ import { miniProgramComponentTransformPlugin } from '../vite/plugins/component-t
 import { libraryTemplatePlugin } from '../vite/plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from '../vite/plugins/mini-program-assets.plugin';
 import { platformFileResolvePlugin } from '../vite/plugins/platform-file-resolve.plugin';
-import { requireContextShimPlugin } from '../vite/plugins/require-context-shim.plugin';
 import { wxsStripPlugin } from '../vite/plugins/wxs-strip.plugin';
 import { LibraryTemplateScopeService } from './library-template-scope.service';
-
-export interface DiscoveredSpecEntry {
-  /** 相对 sourceRoot、去扩展名，用作 rollup entry key */
-  rel: string;
-  abs: string;
-}
 
 export interface MiniProgramTestStackOptions {
   platform: PlatformType;
@@ -37,11 +30,13 @@ export interface MiniProgramTestStackOptions {
     pageList: unknown[];
     componentList: unknown[];
   };
-  specFiles: DiscoveredSpecEntry[];
 }
 
 export interface MiniProgramTestStack {
-  plugins: Plugin[];
+  /** analog 之前必须跑的：平台后缀解析、资源分析、wxs-strip */
+  preAnalogPlugins: Plugin[];
+  /** analog 之后跑的：库模板、组件产物 */
+  postAnalogPlugins: Plugin[];
   /** 与 analog 共享的 fileReplacements，wxs-strip 会就地 push */
   fileReplacements: Array<{ replace: string; with: string }>;
   templateScope: LibraryTemplateScopeService;
@@ -65,9 +60,7 @@ export interface MiniProgramTestStack {
  *     是「内联 wxs 从哪来」的唯一真相源，strip 只读不重新解析。
  *  3. `wxsStrip` 必须早于 analog：它往 `fileReplacements` 里 push 替换项，
  *     analog 建 Angular program 之后再 push 就晚了。
- *  4. `requireContextShim` 早于 analog：webpack 专有的 `require.context`
- *     要换成同步 require 映射，否则 spec 入口顶层直接 TypeError。
- *  5. `libraryTemplate` / `componentTransform` 收尾，处理库模板与组件产物。
+ *  4. `libraryTemplate` / `componentTransform` 收尾，处理库模板与组件产物。
  *
  * 顺序约束见下面各插件的注释，改动前先读。
  * 这套顺序约束一模一样；各写一份迟早会改漏一边。
@@ -95,7 +88,7 @@ export function createMiniProgramTestStack(
       experimental: { useAngularCompilationAPI: true },
       fileReplacements,
     },
-    plugins: [
+    preAnalogPlugins: [
       platformFileResolvePlugin({ platform: options.platform }),
       miniProgramAssetsPlugin({
         tsConfig: options.tsConfig,
@@ -119,14 +112,8 @@ export function createMiniProgramTestStack(
         analysisRef: wxsAnalysisRef,
         watch: false,
       }),
-      requireContextShimPlugin(
-        options.specFiles.map((f) => ({
-          // webpack 的 context key 相对 context dir、带扩展名
-          key: `./${f.rel}.ts`,
-          // entry 用的 key 是 specs/<rel>，产物就是 specs/<rel>.js
-          file: `specs/${f.rel}.js`,
-        })),
-      ),
+    ],
+    postAnalogPlugins: [
       libraryTemplatePlugin({
         buildPlatform: options.buildPlatform,
         templateScope,

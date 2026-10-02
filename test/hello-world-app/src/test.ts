@@ -1,11 +1,18 @@
 import { bootstrapApplication } from 'angular-miniprogram';
 import {
-  createRequireContextRegistry,
   startupMiniProgramTest,
+  type TestModuleMap,
 } from 'angular-miniprogram/vitest/runtime';
 
 /**
- * 测试引导入口：把 spec 全量登记进 require.context 形态的注册表，
+ * spec 清单，形如 `{ "./spec/x.spec.ts": () => require("./specs/spec/x.spec.js") }`。
+ * 值由构建期的 spec-modules 插件就地替换进来（见
+ * `src/builder/vite/plugins/spec-modules.plugin.ts`）。
+ */
+declare const __MP_SPEC_MODULES__: TestModuleMap;
+
+/**
+ * 测试引导入口。
  *
  * 顺序要求：**先 bootstrapApplication，再起 worker**。
  * spec 里 import 的组件要能拿到已初始化的 Angular 运行时；
@@ -14,13 +21,7 @@ import {
 async function main(): Promise<void> {
   await bootstrapApplication();
 
-  // 小程序没有 webpack 的 require.context，这行是给构建期的
-  // require-context-shim 插件看的，它把 spec 清单改写成同步 require 映射。
-  const context = (require as any).context('./', true, /\.spec\.ts$/);
-
-  startupMiniProgramTest({
-    registry: createRequireContextRegistry(context as never),
-  });
+  startupMiniProgramTest({ modules: __MP_SPEC_MODULES__ });
 }
 
 main().catch((error) => {

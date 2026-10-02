@@ -23,10 +23,15 @@ import {
   toRollupInput,
 } from '../../vite/entry-patterns';
 import { platformConditionDefine } from '../../vite/platform-flags';
+import { specModulesPlugin } from '../../vite/plugins/spec-modules.plugin';
 import {
   miniProgramVitestDefine,
   resolveMiniProgramVitestPluginOptions,
 } from '../node/options';
+import {
+  miniProgramBuiltinDefine,
+  miniProgramVitestGlobalDefine,
+} from './globals-define';
 
 export interface VitestViteBuilderOptions {
   /** 测试引导入口（test.ts），里面调 startupMiniProgramTest() */
@@ -136,7 +141,6 @@ export async function createVitestViteConfig(options: {
     absoluteProjectRoot,
     absoluteProjectSourceRoot,
     entryPatterns,
-    specFiles,
   });
 
   return {
@@ -148,6 +152,12 @@ export async function createVitestViteConfig(options: {
       ...buildPlatformDefine(buildPlatform, false),
       ...platformConditionDefine(vitestOptions.platform),
       ...miniProgramVitestDefine(resolvedPlugin),
+      // spec 里的裸 describe / it / expect 要能指到 registerApiGlobally
+      // 挂的那张表，否则每个 spec 都是 `describe is not defined`。
+      ...miniProgramVitestGlobalDefine(buildPlatform),
+      // tinybench 顶层就 `class extends EventTarget`，runner 的 failTask 又
+      // 直接 `instanceof AggregateError`，小程序这三样都没有。
+      ...miniProgramBuiltinDefine(buildPlatform),
     },
     resolve: {
       alias: [
@@ -167,10 +177,14 @@ export async function createVitestViteConfig(options: {
       dedupe: vitestOptions.dedupe ?? [],
     },
     plugins: [
-      ...stack.plugins.slice(0, 4),
-      // analog 必须排在 wxs-strip / require-context-shim 之后
+      ...stack.preAnalogPlugins,
+      // analog 必须排在 wxs-strip 之后：它建 Angular program 时要读
+      // fileReplacements，而 wxs-strip 会就地往里 push。
       ...angular(stack.angularOptions),
-      ...stack.plugins.slice(4),
+      ...stack.postAnalogPlugins,
+      // spec 必须事先全部编进包（小程序不能按 URL 动态 import），
+      // 这里把清单以懒 require 表的形式塞进 test.js。
+      specModulesPlugin(specFiles),
     ],
     build: {
       outDir: resolveOutputPath(vitestOptions, context),

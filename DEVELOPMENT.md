@@ -177,29 +177,70 @@ npm run test:wechat     # vitest 链路：编产物 → 起 WS → 开项目 →
 ```
 
 仓库里 `src/project.config.json` 提交的就是 `touristappid`，**直接就能跑
-测试**，不用换真实 AppID。想换成自己的也可以，用 `--appid` 注入，不进版本库。
+测试**，不用换真实 AppID（appid 只从 `project.config.json` 读，脚本没有
+`--appid` 参数，想换成自己的就改那个文件、别进版本库）。
 
-脚本做的事：**登录态预检** → **自动 close 残留项目窗口** → 起
-→ 等 server ready → `cli auto` → 轮询日志里的 `Executed X of Y`
-→ 杀进程 → 按结果 exit 0/1（可直接进 CI）。
+脚本做的事：**登录态/服务端口预检** → `ng run app:test` → 起 vitest 并等
+WS 监听就绪 → `cli auto --project <产物> --auto-port <p>` 开项目 →
+**等小程序连入（默认 20s）** → 等 vitest 跑完（默认 120s 上限）→
+透传 vitest 退出码（可直接进 CI）。
 
-**两个预检为什么重要**（都是踩过坑换来的）：
+**几个容易退回去的坑**（都是踩过换来的）：
 
-- **登录态**：未登录时 `cli auto` 会假成功，不预检就得干等 180s
-  超时且看不出原因。现在几秒内直接告诉你：
+- **开项目必须用 `cli auto`，不是 `cli open`**。`open` 会过 IDE 里的
+  `formatProject`，对空/游客 appid 直接 throw `CLI_INVALID_APPID`，就是
+  `不存在此 AppID (code 10)`；`auto` 走另一条路径，不校 appid。之前
+  vitest 脚本一度写成 `open`，于是同一个环境里 karma 能跑、vitest 跑不了。
+- **CLI 失败得当场断**。`auto`/`open` 失败时只打 `✖ 准备中` + `[error] {...}`
+  就返回 0 似的退回去，不检就得干等到超时且看不出原因。现在脚本看到
+  `[error]` / `✖` 直接报错退出，并把最能说明问题那行糊在脸上。
+- **连入超时要短**（默认 20s）。项目已经打开了，正常几秒内就连回来；迟迟
+  不连就是根本连不上（urlCheck 没关 / 产物里的 `MP_VITEST_PORT` 和 `--port`
+  不一致），多等只是白等。区分「已监听」和「真连上」靠的是 session 打的
+  `[mp-vitest] 设备已连接`。
+- **残留窗口**：`cli auto` 自己会先关掉同路径的旧窗口，所以不用像 karma
+  那样手动 close + 睡 8 秒；但自动化端口被占时脚本会直接报错，
+  而不是开一个抢不到会话的窗口。
+- **端口/超时只有一个来源**：脚本把 `--port` 和 `--connect-timeout` 透成
+  `MP_VITEST_PORT` / `MP_VITEST_CONNECT_TIMEOUT`，`vitest.config.mts` 读它们，
+  不然脚本日志里的端口和宿主真听的端口能是两回事（指错了还“莫名成功”）。
+  产物里的端口是构建期由 angular.json `test.options.port` define 进去的，
+  所以 `--port` 改了就得连 angular.json 一起改并重新编产物。
 
-```
-[wechat-vitest] 失败: 开发者工具未登录。
-CLI 拉起的 IDE 实例是登出状态（实测同 profile 也不带登录态，等待也不会恢复），
-必须手动打开微信开发者工具并扫码登录后再跑。
-EXIT=1
-```
+### 设备端运行时的四个硬前提
 
-- **残留窗口**：不先 close 上一轮，会话互斥会导致 `transport close`，
-  表现是 `Executed 0`。脚本现在自动 close + 等 8 秒。
+「项目打开了、宿主也在监听、设备就是不连 / 一连就报错」这一整类问题，根因
+都在**小程序运行时不是浏览器**：没有 `window`/`global`，`globalThis` 被
+`buildPlatformDefine` 改写成 `wx.__window`（app.js 自建的普通对象），
+ES 新内建也缺。少一样都是「静默不连」或「报错盖报错」，记清楚：
 
-IDE 服务端口与 `.ide` 记录不一致时，用 `--ide-port <端口>` 直接指定，
-不用去改文件。
+| 前提                                              | 少了什么表现                                                                                                                                                    | 在哪补                                                                                                                                                                                                                                       |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| spec 里的裸 `describe/it/expect` 要重定向到全局表 | `describe is not defined` / `wx.__window.describe is not a function`，宿主干等                                                                                  | `src/builder/vitest/vite/globals-define.ts` 的 `miniProgramVitestGlobalDefine`（对齐 karma 的 `jasmineGlobalDefine`）；值由 vitest `registerApiGlobally` 挂，开关是 `test.globals`——`miniProgramVitest()` 默认打开，不用在测试工程里再写一遍 |
+| `Event` / `EventTarget`                           | `Event is not defined` / `EventTarget is not defined`，把真错误整个盖掉（tinybench 顶层 `class extends EventTarget`，vite preload helper 失败路径 `new Event`） | `runtime/global-polyfills.ts` + `miniProgramBuiltinDefine`                                                                                                                                                                                   |
+| `Date` / 定时器 / `console` 在全局表上            | `The global scope doesn't have a Date object`（fake timers）→ `clearTimeout$1 is not a function`                                                                | 同上 `copyRealmGlobals`。**必须模块加载时执行**：`@vitest/runner` 在 `import` 阶段就把定时器抄成常量，等 `startupMiniProgramTest()` 再补就晚了                                                                                               |
+| `AggregateError`                                  | 每条失败用例变成 `Right-hand side of 'instanceof' is not an object`，断言差异全丢（`failTask` 里那句 `instanceof` 没做保护）                                    | 同上，表里放 `MpAggregateError`                                                                                                                                                                                                              |
+
+另外两条容易忽略的：
+
+- **spec 不能在 app 启动前被 eager `require`**。`spec-modules.plugin.ts` 注进去的
+  是惰性的（`key: () => require(...)`），改成急切 require 的话，spec 在 vitest
+  全局装好之前就执行，`main()` 直接炸，设备永远不连。
+- **require 的路径必须是字面量，而且必须是打包后才写进去**。两头都实测过：
+  字面量让 rolldown 看见 → `UNRESOLVED_IMPORT`（`specs/...` 是产物路径，源码里
+  没有，走 define 也一样，define 是打包前展开的）；用变量绕开静态分析 → 能
+  构建过，但微信的模块系统也是静态扫 `require` 决定哪些文件进包，运行时
+  `Error: module 'specs/...' is not defined`。所以只能在 `generateBundle` 里改
+  `chunk.code`（karma 时代同一个结论，见 `git log` 里的 `require-context-shim`）。
+- **worker 必须自己调 `onQueued` / `onCollected`**。Node 那边是 vitest 的
+  `resolveTestRunner` 包的，自定义 runner 得自己补，少了宿主报
+  `AssertionError: Entity must be found for task xxx`。
+
+排查这类问题最快的办法：把产物 `dist/vitest/app/test.js` 里
+`worker.reportError(\`处理 worker 请求失败：...\`)`那行临时拼上`error.stack`——宿主端默认只给你两帧，加上栈基本一眼定位。
+
+IDE 服务端口与 `.ide` 记录不一致时，本脚本没有 `--ide-port`（karma 时代才有），
+直接把真实端口写回 `.ide` 文件最快，见下一节。
 
 ### 端口机制（`.ide` 文件）
 
@@ -235,16 +276,20 @@ echo 41994 > "$LOCALAPPDATA/微信开发者工具/User Data/<hash>/Default/.ide"
 
 ### 故障速查表
 
-| 现象                                              | 原因                                   | 解法                                                  |
-| ------------------------------------------------- | -------------------------------------- | ----------------------------------------------------- |
-| `不存在此 AppID (code 10)`                        | 用了 `touristappid` 走 `cli open`      | 换真实 AppID                                          |
-| `需要重新登录 (code 10)`                          | IDE 登录态丢了                         | 手动登录 IDE                                          |
-| `✔ auto` 但无测试结果，最后超时                  | 登录态为 `false`（假成功）             | `islogin` 预检，登录后重跑                            |
-| `wait IDE port timeout`                           | `.ide` 与实际端口不一致                | 写回真实端口，或干净退出后 `--port` 重拉              |
-| `工具的服务端口已关闭`                            | IDE 安全设置里服务端口没开             | 设置 → 安全设置 → 服务端口 开                         |
-| `Connected on socket` 后 `no message in 30000 ms` | 上一轮 DevTools 实例还在，把新会话挤掉 | 脚本已自动 `cli close`；手动跑就先 close 旧项目等几秒 |
-| `Disconnected ... transport close` → `Executed 0` | 同上，**会话互斥**（不是 appid 问题）  | 同上                                                  |
-| 连上但零推进                                      | 产物里的端口和宿主不一致               | 核对 `--port` 与 `test.options.port` 是否同一个值     |
+| 现象                                                  | 原因                                          | 解法                                                  |
+| ----------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------- |
+| `不存在此 AppID (code 10)`                            | 用了 `touristappid` 走 `cli open`             | 改用 `cli auto`（脚本已改）；或换真实 AppID           |
+| `需要重新登录 (code 10)`                              | IDE 登录态丢了                                | 手动登录 IDE                                          |
+| `✔ auto` 但无测试结果，最后超时                      | 登录态为 `false`（假成功）                    | `islogin` 预检，登录后重跑                            |
+| `wait IDE port timeout`                               | `.ide` 与实际端口不一致                       | 写回真实端口，或干净退出后 `--port` 重拉              |
+| `工具的服务端口已关闭`                                | IDE 安全设置里服务端口没开                    | 设置 → 安全设置 → 服务端口 开                         |
+| `Connected on socket` 后 `no message in 30000 ms`     | 上一轮 DevTools 实例还在，把新会话挤掉        | 脚本已自动 `cli close`；手动跑就先 close 旧项目等几秒 |
+| `Disconnected ... transport close` → `Executed 0`     | 同上，**会话互斥**（不是 appid 问题）         | 同上                                                  |
+| 连上但零推进                                          | 产物里的端口和宿主不一致                      | 核对 `--port` 与 `test.options.port` 是否同一个值     |
+| `describe is not defined`（设备控制台）               | `test.globals` 被显式关掉了，或 define 没生效 | 见「设备端运行时的四个硬前提」                        |
+| `Event is not defined` / `EventTarget is not defined` | 全局表缺这俩，真错误被盖掉                    | 同上；先补 polyfill 再看下一条真错误                  |
+| `Right-hand side of 'instanceof' is not an object`    | `AggregateError` 缺失，只在失败路径炸         | 同上                                                  |
+| `Entity must be found for task xxx`                   | runner 没调 `onQueued`/`onCollected`          | 同上                                                  |
 
 ### 已验证的网络矩阵
 
@@ -2477,8 +2522,13 @@ vitest 宿主 ↔ worker 本来就是一套与传输无关的协议：
 - 中间再套一层 birpc 做双向 RPC（`onTaskUpdate` / `onQueued` / `onCollected`…）
 
 只要把这三样搬到 WebSocket 上，reporter 完全不知道对端是小程序。
-信封是 `{kind, slot, frame}`，`frame` 用 **flatted** 序列化 ——
+信封是 `{kind, frame}`，`frame` 用 **flatted** 序列化 ——
 task 结果里带循环引用（Error.cause、context），`JSON.stringify` 直接炸。
+
+**只有一条连接、一个 worker，所以并发恒为 1。**小程序一个 appservice 进程就一个
+常驻运行环境，`session.onConnection` 还是「新连接顶掉旧连接」，因此协议里没有
+分流编号这种东西（v1 曾有个 `slot`，永远恒 0，除了误导 `slots > 1` 以外毫无作用，
+v2 删了）。真并发得是多台设备各连一条 socket，那条路现在没接。
 
 设备端要点：
 
@@ -2524,11 +2574,11 @@ karma server 可以开在 builder 里，vitest 的 WS 必须开在 **vitest 进�
 
 ## 顺手抽出共用的插件栈
 
-karma 和 vitest 的测试构建只有 define 与 entry 不同，
-插件顺序约束一模一样（platformFileResolve → assets → wxsStrip →
-requireContextShim → analog → libraryTemplate → componentTransform）。
-各写一份迟早改漏一边，所以抽到 `shared/mini-program-test-stack.ts`，
-两条链路都走它。
+测试构建的插件顺序是硬约束（platformFileResolve → assets → wxsStrip →
+analog → libraryTemplate → componentTransform → specModules），
+所以抽到 `shared/mini-program-test-stack.ts`，只交两组数组
+（`preAnalogPlugins` / `postAnalogPlugins`）而不是一个数组加一个下标——
+analog 得插在中间，用 `slice(0, N)` 的话加个插件就得同步改下标，迟早改漏。
 
 ## 状态
 
@@ -2599,7 +2649,7 @@ vitest（`setupCommonEnv` 装全局），所以：
 - `dist/vitest/plugin`（宿主端 vite 插件）：**esm**，因为被
   `vitest.config.mts` 以 ESM 命名导入引用，且 `dist/package.json`
   没有 `type: module`，所以必须 `.mjs`
-- spec 加载走 `require.context` shim（`require(file)`），
+- spec 加载走构建期注入的懒 require 表（`vite/plugins/spec-modules.plugin.ts`），
   **不走** `vite/module-runner` 的动态 `import()`——那条路小程序里跑不了
 
 `BuildTarget` 因此多了 `format` 字段。

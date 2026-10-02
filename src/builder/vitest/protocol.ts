@@ -10,9 +10,13 @@
  *
  * 参考 @nativescript/unit-test-runner 的做法：不自造结果协议，
  * 只把 vitest 既有的 worker 协议换个传输层。
+ *
+ * **协议版本 2**：v1 每条帧带一个 `slot`（并发执行道编号）。一个小程序
+ * 进程只有一条连接、一个常驻运行环境，编号永远恒为 0，分流字段就是噪声，
+ * 而且配 `slots > 1` 只会得到一个「slot 1 没连上来」的假错。v2 把它删干净。
  */
 
-export const MP_VITEST_PROTOCOL_VERSION = 1 as const;
+export const MP_VITEST_PROTOCOL_VERSION = 2 as const;
 
 export const DEFAULT_MP_VITEST_PORT = 17_900;
 
@@ -23,16 +27,12 @@ export type MpVitestWireMessage =
       /** 小程序侧上报的平台，仅用于日志 */
       platform?: string;
     }
-  | { kind: 'worker-ready'; slot: number }
-  | { kind: 'worker-message'; slot: number; frame: string }
-  | { kind: 'error'; slot?: number; message: string };
+  | { kind: 'worker-ready' }
+  | { kind: 'worker-message'; frame: string }
+  | { kind: 'error'; message: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
-}
-
-function isSlot(value: unknown): boolean {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
 }
 
 export function isMpVitestWireMessage(
@@ -45,9 +45,9 @@ export function isMpVitestWireMessage(
     case 'hello':
       return value.protocol === MP_VITEST_PROTOCOL_VERSION;
     case 'worker-ready':
-      return isSlot(value.slot);
+      return true;
     case 'worker-message':
-      return isSlot(value.slot) && typeof value.frame === 'string';
+      return typeof value.frame === 'string';
     case 'error':
       return typeof value.message === 'string';
     default:

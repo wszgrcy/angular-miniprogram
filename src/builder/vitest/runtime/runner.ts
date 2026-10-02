@@ -17,6 +17,13 @@ export interface MiniProgramTestRunnerOptions {
     packs: RunnerTaskResultPack[],
     events: RunnerTaskEventPack[],
   ): void | Promise<void>;
+  /**
+   * 一个文件收集完了。宿主靠它建 file 实体，少调一次后面每条更新都是
+   * `AssertionError: Entity must be found for task xxx`。
+   */
+  onCollected?(files: RunnerTestFile[]): void | Promise<void>;
+  /** 文件开跑前的排队通知（Node 那边是 rpc.onQueued）。 */
+  onQueued?(file: RunnerTestFile): void | Promise<void>;
   onFileFinished?(filepath: string): void | Promise<void>;
 }
 
@@ -54,6 +61,17 @@ export class MiniProgramTestRunner implements VitestTestRunner {
   onCollectStart(file: RunnerTestFile): void {
     this.registeredFiles.add(file.filepath);
     this.cancelled.delete(file.filepath);
+    void this.options.onQueued?.(file);
+  }
+
+  /**
+   * `@vitest/runner` 在收集完一个文件后调这里。
+   *
+   * Node worker 不用自己管：vitest 的 `resolveTestRunner` 会把这个方法
+   * 包一层去调 rpc。我们自己拼 runner，所以得自己补上。
+   */
+  async onCollected(files: RunnerTestFile[]): Promise<void> {
+    await this.options.onCollected?.(files);
   }
 
   onBeforeRunFiles(files: RunnerTestFile[]): void {
