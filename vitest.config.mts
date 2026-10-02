@@ -1,8 +1,8 @@
-import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { JavaScriptTransformer } from '@angular/build/private';
 import type { Plugin } from 'vite';
+import type { TestProjectInlineConfiguration } from 'vitest/config';
 import { BaseSequencer, type TestSpecification } from 'vitest/node';
 import { defineConfig } from 'vitest/config';
 
@@ -34,37 +34,23 @@ const alias = Object.entries(SELF_IMPORTS)
 /**
  * 对 node_modules 里的 partial-IoC 产物跑 **Angular Linker**。
  *
- * `@angular/common` 发的是部分编译产物（`ɵɵngDeclareFactory` / `ɵɵngDeclareClassMetadata`
- * 等 linker 标记）。真实应用由 Angular 构建器在打包时把标记就地翻成
- * `ɵɵdefineInjectable` 等运行时定义；裸 vite 没这一步，Angular 会退化成
- * “运行时 JIT 编译”，于是模块求值直接抛
+ * `@angular/common` 发的是部分编译产物（`ɵɵngDeclareFactory` /
+ * `ɵɵngDeclareClassMetadata` 等 linker 标记）。真实应用由 Angular 构建器在
+ * 打包时把标记就地翻成 `ɵɵdefineInjectable` 等运行时定义；裸 vite 没这一步，
+ * Angular 会退化成“运行时 JIT 编译”，于是模块求值直接抛
  * `The service 'BrowserXhr' needs to be compiled using the JIT compiler,
  * but '@angular/compiler' is not available`。
  *
- * 这里用官方 `@angular/compiler-cli/linker/babel` 补上同一步，而不是把
- * `@angular/compiler`（1.1MB）整个拉进测试环境。需要配合
- * `test.server.deps.inline` —— vitest 默认外部化 node_modules，不内联就轮不到 transform。
+ * 直接用 `@angular/build` 自己导出的 `JavaScriptTransformer`（`@angular/build/private`），
+ * 官方构建器内部用的就是同一个类：linker 标记嗅探、`@angular/core|compiler`
+ * 误报排除、worker 池与缓存都在它里面，这里不再自己接 babel。
+ * `jit: false` 与官方应用构建一致 —— 产出完整 AOT 定义，不依赖 `@angular/compiler`。
+ *
+ * 需要配合 `test.server.deps.inline` —— vitest 默认外部化 node_modules，
+ * 不内联就轮不到 transform。
  */
-async function angularPartialIocLinker(): Promise<Plugin> {
-  const require = createRequire(import.meta.url);
-  const babel = await import('@babel/core');
-  const {
-    createEs2015LinkerPlugin,
-  } = require('@angular/compiler-cli/linker/babel');
-
-  const linkerPlugin = createEs2015LinkerPlugin({
-    linkerJitMode: false,
-    // 官方构建器同样关掉：https://github.com/angular/angular/issues/42769
-    sourceMapping: false,
-    logger: { level: 1, debug() {}, info() {}, warn() {}, error() {} },
-    fileSystem: {
-      resolve: path.resolve,
-      exists: fs.existsSync,
-      dirname: path.dirname,
-      relative: path.relative,
-      readFile: fs.readFileSync,
-    },
-  });
+function angularPartialIocLinker(): Plugin {
+  let transformer: JavaScriptTransformer | undefined;
 
   return {
     name: 'angular-partial-ioc-linker',
@@ -72,42 +58,15 @@ async function angularPartialIocLinker(): Promise<Plugin> {
     async transform(code, id) {
       const file = id.split('?')[0];
       if (!file.includes('node_modules')) return null;
-      // @angular/core / @angular/compiler 会误报，且本身不需要 linker
-      if (/[\\/]@angular[\\/](?:compiler|core)[\\/]/.test(file)) return null;
+      // 便宜的预筛，真正的 requiresLinking 判断在 transformer 里
       if (!code.includes('ɵɵngDeclare')) return null;
-      const out = await babel.transformAsync(code, {
-        babelrc: false,
-        configFile: false,
-        sourceType: 'module',
-        filename: file,
-        plugins: [linkerPlugin],
-      });
-      return out?.code ? { code: out.code, map: null } : null;
-    },
-  };
-}
 
-/**
- * 把 `loadEsmModule` 的 `new Function('return import(...))` 换回真正的动态 import。
- *
- * 这是 Angular 官方 `loadEsmModule` 的写法，目的是躲开打包器的静态分析。
- * vitest 用 `vm.runInThisContext` 跑模块，`new Function` 里再 `import()`
- * 会直接抛 `ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING`（模块求值就炸，
- * 于是 `angularCompilerCliPromise` 是个 rejected promise，
- * 所有跑真实构建的 builder spec 连带失败）。
- *
- * 语义等价，只是不再躲分析；只影响测试环境，不改源码。
- */
-function dynamicImportEscapeHatch(): Plugin {
-  return {
-    name: 'dynamic-import-escape-hatch',
-    enforce: 'pre',
-    transform(code) {
-      if (!code.includes('return import(modulePath)')) return null;
-      return code.replace(
-        /new Function\(\s*'modulePath',\s*`return import\(modulePath\);`,?\s*\)\(modulePath\)/,
-        'import(/* @vite-ignore */ modulePath)',
+      transformer ??= new JavaScriptTransformer(
+        { sourcemap: false, thirdPartySourcemaps: false, jit: false },
+        1,
       );
+      const out = await transformer.transformData(file, code, false, false);
+      return { code: Buffer.from(out).toString('utf8'), map: null };
     },
   };
 }
@@ -140,27 +99,100 @@ class OrderedSequencer extends BaseSequencer {
   }
 }
 
-export default defineConfig({
-  resolve: { alias },
-  plugins: [angularPartialIocLinker(), dynamicImportEscapeHatch()],
+/**
+ * 两类测试用 vitest 官方 `test.projects` 彻底分开，互不干扰。
+ *
+ * ### `library` —— Angular 运行时
+ * `TestBed` + `initMiniProgramTestEnv()`，纯内存，不碰磁盘也不碰 `dist/`。
+ * 所以吃 vitest 默认值：并行、5s 超时、每文件隔离。
+ *
+ * ### `builder` —— 构建链路
+ * 真的跑一遍小程序构建：architect 的 `TestProjectHost` 会在仓库里开真实
+ * 临时目录写文件，并发会互相踩；产物又来自 `dist/`，彼此有读写依赖。
+ * 所以必须：单进程串行 + 隔离关掉 + 分钟级超时 + 固定执行顺序。
+ *
+ * 两边共用的是根配置：`resolve.alias`（包自引用）与 `setupFiles` 里的小程序全局。
+ * linker plugin 和 `server.deps.inline` **只给 library**，见下面注释。
+ */
+const LIBRARY_PROJECT: TestProjectInlineConfiguration = {
+  extends: true,
+  /**
+   * 只对 node_modules 里的 partial-IoC 产物跑 linker，而需要它的只有 library：
+   * builder spec 里出现的 `@angular/common` 全部是**字符串字面量**（写进临时
+   * fixture 的源码文本），测试进程本身并不 import 它。
+   *
+   * 挂在根上还有反作用：配套的 `server.deps.inline: [/@angular\//]` 会把
+   * `@angular/build` 也强行内联进 vitest 的 vm 沙箱 —— 那是 builder 最不该
+   * 走的路径（它就该被 Node 原生加载）。所以两者一起收进本 project。
+   */
+  plugins: [angularPartialIocLinker()],
   test: {
-    include: ['src/**/*.spec.ts'],
-    exclude: ['**/fixture/**', 'node_modules/**'],
+    name: 'library',
+    include: ['src/library/**/*.spec.ts'],
     // linker 插件要能转到 @angular/common，就不能被 vitest 外部化给 node 直接加载
     server: { deps: { inline: [/@angular\//] } },
-    globals: true,
-    environment: 'node',
-    setupFiles: ['./test/vitest-setup.ts'],
-    // builder 类 spec 会真的跑一遍小程序全量构建，单条几分钟很正常。
-    testTimeout: 500_000,
-    hookTimeout: 500_000,
+    // vitest 要求 maxWorkers 不同的 project 必须给不同的 groupOrder
+    // （它们不能共用同一个调度池），顺手也把“先轻后重”的跑序固定下来。
+    sequence: { groupOrder: 1 },
+  },
+};
+
+const BUILDER_PROJECT: TestProjectInlineConfiguration = {
+  extends: true,
+  test: {
+    name: 'builder',
+    include: ['src/builder/**/*.spec.ts'],
+    // 单条上限 60s。关键是**必须有界**：之前写的 500_000（8 分钟）等于没有上限，
+    // 真卡住就是零反馈干等，而不是报超时。
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     // architect 的 TestProjectHost 会在仓库里开真实临时目录并写文件，
     // 并发跑会互相踩，所以强制单进程串行。
     pool: 'forks',
     maxWorkers: 1,
+    /**
+     * 把 `src/builder/util/load_esm.ts` 交给 **Node 原生加载**，不走 vitest 的模块运行器。
+     *
+     * 那个文件用 `new Function('modulePath', 'return import(modulePath)')` 加载
+     * `@angular/compiler` / `@angular/compiler-cli`。这是 Angular 官方自己的写法
+     * （`@angular/build/src/utils/load-esm.js`、core schematics 里的
+     * `schematics/utils/load_esm.ts` 都是同一套），目的是挡 tsc 把 `import()`
+     * 无条件降级成 `require()`。纯 Node 下它完全正常，线上 builder 就这么跑。
+     *
+     * 坏在测试链路：vitest 把第一方源码也丢进
+     * `vm.runInThisContext(code, { filename, lineOffset, columnOffset })`
+     * （见 `vitest/dist/module-evaluator.js`），**不传 `importModuleDynamically`**，
+     * 于是 vm 里抛 `ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING`。
+     *
+     * 试过但**不行**的路子，别再走：
+     *   不传那个 vm 选项，flag 改变不了。
+     * - `pool: 'vmForks'` / `'vmThreads'`：它们确实接了 importModuleDynamically，
+     *   但 builder spec 要开真实临时目录、起子进程，换池风险大于收益。
+     *
+     * `server.deps.external` 的官方语义就是 "pass the package to native Node"，
+     * Node 24 自带 TS 类型剥离，.ts 也能直接加载。
+     * 结果：源码不动、不改源码文本、跑的是真实代码路径。
+     */
+    server: { deps: { external: [/util[\/]load_esm[.]ts$/] } },
     isolate: false,
-    sequence: { concurrent: false, sequencer: OrderedSequencer },
-    slowTestThreshold: 10_000,
+    sequence: { concurrent: false, sequencer: OrderedSequencer, groupOrder: 2 },
+  },
+};
+
+export default defineConfig({
+  resolve: { alias },
+  test: {
+    projects: [LIBRARY_PROJECT, BUILDER_PROJECT],
+    exclude: ['**/fixture/**', 'node_modules/**'],
+    globals: true,
+    environment: 'node',
+    setupFiles: ['./test/vitest-setup.ts'],
+    // 只能在根配置上给（vitest 把 slowTestThreshold 归入 NonProjectOptions）。
+    // 超过就标慢，让“变慢”在日志里先于“超时”暴露出来。
+    slowTestThreshold: 20_000,
+    // 同样属于 NonProjectOptions，只能放根：跑完了但 worker 收不掉
+    // （子进程挂死、句柄没关）时强杀，默认 10s 对真建项目的 spec 偏紧。
+    teardownTimeout: 30_000,
     coverage: {
       provider: 'v8',
       include: ['src/builder/**/*.ts', 'src/library/**/*.ts'],

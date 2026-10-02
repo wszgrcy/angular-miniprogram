@@ -6,6 +6,8 @@
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
+    "test:library": "vitest run --project library",
+    "test:builder": "vitest run --project builder",
     "test:ci": "npm run build:library && npm test",
     "test:watch": "vitest",
     "test:wechat": "node ./script/wechat-vitest.cjs --project ./test/hello-world-app --dist ./test/hello-world-app/dist/vitest/app",
@@ -16,7 +18,7 @@
     "copy:assets": "cpx \"./src/builder/**/*.json\" ./dist/builder && cpx \"./src/builder/**/*.d.ts\" ./dist/builder && cpx \"./src/builder/**/*.js\" ./dist/builder && cpx ./readme.md ./dist",
     "build:library": "tsx ./script/ensure-sync.ts && tsx ./script/build-ng-package.ts",
     "build:builder": "npm run typecheck:builder && tsx ./script/vite-build.ts",
-    "typecheck": "npm run typecheck:builder && npm run typecheck:spec",
+    "typecheck": "npm run typecheck:builder && npm run typecheck:spec && npm run typecheck:config",
     "typecheck:builder": "tsc -p ./tsconfig.builder.json --noEmit",
     "typecheck:spec": "tsc -p ./tsconfig.spec.json --noEmit",
     "prepare": "husky install",
@@ -26,7 +28,8 @@
     "docs:build": "npm --prefix ./astro-docs run build",
     "typedoc": "typedoc",
     "deploy": "npm run typedoc && npm run build:library && npm test && npm run coverage-badge -- init && cpx \"./deploy/doc/**/*\" ./docs && cpx \"./deploy/api-doc/**/*\" ./docs/api-doc && npm run coverage && npm run coverage-badge -- success && cpx ./deploy/doc/assets/img/badge.svg ./docs/assets/img",
-    "coverage-badge": "tsx ./script/coverage-badge.ts"
+    "coverage-badge": "tsx ./script/coverage-badge.ts",
+    "typecheck:config": "tsc -p ./tsconfig.config.json --noEmit"
   },
   "private": true,
   "author": "wszgrcy",
