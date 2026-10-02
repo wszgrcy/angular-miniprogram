@@ -12,7 +12,7 @@
  *
  * 流程：
  *   1. 保证 node_modules/angular-miniprogram 链到 dist
- *   2. ng run app:test-vitest  把 spec 编进小程序产物
+ *   2. ng run app:test  把 spec 编进小程序产物
  *   3. 后台起 vitest（它内部起 WS server），等它打印监听就绪
  *   4. 用开发者工具打开产物目录，设备连回来开始跑
  *   5. 透传 vitest 的输出与退出码
@@ -20,7 +20,7 @@
  * 用法：
  *   node script/wechat-vitest.cjs \
  *     --project <测试工程目录> --dist <产物目录> \
- *     [--config vitest.config.mts] [--target app:test-vitest] \
+ *     [--config vitest.config.mts] [--target app:test] \
  *     [--port 17900] [--cli <cli.bat>] [--timeout 180] [--skip-build]
  */
 
@@ -37,7 +37,7 @@ function parseArgs(argv) {
     timeout: 300,
     cli: process.env.WX_DEVTOOLS_CLI || '',
     config: 'vitest.config.mts',
-    target: 'app:test-vitest',
+    target: 'app:test',
     skipBuild: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -141,7 +141,7 @@ async function main() {
         '用法: node script/wechat-vitest.cjs \\',
         '  --project <测试工程目录> \\',
         '  --dist <测试产物目录> \\',
-        '  [--config vitest.config.mts] [--target app:test-vitest] \\',
+        '  [--config vitest.config.mts] [--target app:test] \\',
         '  [--port 17900] [--cli <开发者工具 cli 路径>] [--timeout 300] \\',
         '  [--skip-build]   产物已是最新时跳过 ng run',
         '',

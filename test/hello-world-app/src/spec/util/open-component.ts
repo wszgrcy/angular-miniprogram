@@ -24,7 +24,7 @@ export async function openComponent(url: string) {
    * 必须**先订阅再跳转**。
    *
    * onAppRoute 是事件流，不会重发历史。等 reLaunch 完了再去注册，
-   * 路由事件早就发出去了，这个 await 会一直挂到 jasmine 超时。
+   * 路由事件早就发出去了，这个 await 会一直挂到 vitest 超时。
    */
   const routed = routeEvent()
     .pipe(

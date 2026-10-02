@@ -1,6 +1,6 @@
 import { buildSchema } from '../../script/build-cli-schema';
 
-const BUILDERS = ['application', 'library', 'karma', 'vitest'];
+const BUILDERS = ['application', 'library', 'vitest'];
 
 interface TargetBranch {
   $comment?: string;
@@ -86,9 +86,9 @@ describe('cli workspace schema：本包 builder 注入', () => {
     }
     const library = schema.definitions[definitionName('library')];
     expect(library.properties.project).toBeTruthy();
-    const karma = schema.definitions[definitionName('karma')];
-    for (const key of ['main', 'tsConfig', 'karmaConfig']) {
-      expect(karma.properties[key]).toBeTruthy();
+    const vitest = schema.definitions[definitionName('vitest')];
+    for (const key of ['main', 'tsConfig', 'outputPath', 'port']) {
+      expect(vitest.properties[key]).toBeTruthy();
     }
   });
 });

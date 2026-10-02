@@ -6,7 +6,7 @@
 
 ```bash
 npm ci        # 安装依赖
-npm run build # 构建 library + builder + karma（会自动补齐同步源码）
+npm run build # 构建 library + builder（会自动补齐同步源码）
 npm run test  # 运行全部 vitest 用例
 ```
 
@@ -20,12 +20,12 @@ npm run sync       # 手动从 angular/angular@17.3.1 同步源码（需要网�
 ```
 
 > **上面都是 Node 侧用例**。还有一层「在真·微信开发者工具里跑」的
-> 小程序 karma 用例，见下面 [微信真机 karma 测试](#微信真机-karma-测试)。
+> 小程序运行时用例，见下面 [微信真机测试（vitest）](#微信真机测试vitest)。
 > 那层需要开发者工具 + 真实 AppID + 手动登录，不能纯命令行无人值守。
 
 ---
 
-## 微信真机 karma 测试
+## 微信真机测试（vitest）
 
 ### 两层测试的分工
 
@@ -37,6 +37,7 @@ npm run sync       # 手动从 angular/angular@17.3.1 同步源码（需要网�
 | 需要真实 AppID | 否                             | **是**（游客模式不行）                |
 | 需要手动登录   | 否                             | **是**（见下）                        |
 | 速度           | 全量约 4 分钟                  | 13 个 spec 约 17 秒                   |
+| 连接方向       | ——                             | 设备 `wx.connectSocket` 主动连出宿主  |
 
 两层不能互相替代。典型例子：内建控制流 `@if` 的 `nodeList` 填充 bug，
 Node 侧合成 lView 测不出来，只有真机跑才暴露。
@@ -74,7 +75,7 @@ userDirPath  C:\Users\<user>\AppData\Local\微信开发者工具\User Data\<hash
 
 ```
 cli auto  →  ✔ auto          ← 假成功
-# 然后小程序永远不连 karma，脚本干等到超时
+# 然后小程序永远连不上宿主，脚本干等到超时
 ```
 
 **3. AppID 用游客的就行**
@@ -100,8 +101,8 @@ LAN      >> status=200 marker回传=true
 **之前反复失败的真正原因：会话互斥。**
 
 DevTools 的自动化会话**同一时刻只能有一个**。上一轮跑完脚本只杀了
-node/karma，**项目窗口还开在 IDE 里**；新一轮 `cli auto` 去抢会话，
-旧连接被强制关掉，karma 那边刚连上就断：
+node/vitest，**项目窗口还开在 IDE 里**；新一轮 `cli auto` 去抢会话，
+旧连接被强制关掉，设备端刚连上就断：
 
 ```
 Connected on socket
@@ -173,17 +174,12 @@ request:fail        status: undefined     ← 请求根本没发出
 # 2. 跑（游客 appid 直接可用，不用 --appid）
 npm run test:wechat     # vitest 链路：编产物 → 起 WS → 开项目 → 收结果
 
-# karma 链路保留作参照（设备端主动连出 vs karma 反向控制，方向相反）：
-npm run test:karma
-node script/wechat-karma.cjs \
-  --project ./test/hello-world-app \
-  --dist    ./test/hello-world-app/dist/karma/app
 ```
 
 仓库里 `src/project.config.json` 提交的就是 `touristappid`，**直接就能跑
 测试**，不用换真实 AppID。想换成自己的也可以，用 `--appid` 注入，不进版本库。
 
-脚本做的事：**登录态预检** → **自动 close 残留项目窗口** → 起 karma
+脚本做的事：**登录态预检** → **自动 close 残留项目窗口** → 起
 → 等 server ready → `cli auto` → 轮询日志里的 `Executed X of Y`
 → 杀进程 → 按结果 exit 0/1（可直接进 CI）。
 
@@ -193,7 +189,7 @@ node script/wechat-karma.cjs \
   超时且看不出原因。现在几秒内直接告诉你：
 
 ```
-[wechat-karma] 失败: 开发者工具未登录。
+[wechat-vitest] 失败: 开发者工具未登录。
 CLI 拉起的 IDE 实例是登出状态（实测同 profile 也不带登录态，等待也不会恢复），
 必须手动打开微信开发者工具并扫码登录后再跑。
 EXIT=1
@@ -248,7 +244,7 @@ echo 41994 > "$LOCALAPPDATA/微信开发者工具/User Data/<hash>/Default/.ide"
 | `工具的服务端口已关闭`                            | IDE 安全设置里服务端口没开             | 设置 → 安全设置 → 服务端口 开                         |
 | `Connected on socket` 后 `no message in 30000 ms` | 上一轮 DevTools 实例还在，把新会话挤掉 | 脚本已自动 `cli close`；手动跑就先 close 旧项目等几秒 |
 | `Disconnected ... transport close` → `Executed 0` | 同上，**会话互斥**（不是 appid 问题）  | 同上                                                  |
-| `Executed N of null`                              | karma adapter 的 `total` 竞态（已知）  | 脚本已按日志静默判定，不影响结果                      |
+| 连上但零推进                                      | 产物里的端口和宿主不一致               | 核对 `--port` 与 `test.options.port` 是否同一个值     |
 
 ### 已验证的网络矩阵
 
@@ -260,7 +256,7 @@ external  https://registry.npmjs.org  ✅           ✅
 ```
 
 **局域网可通**：手机连同 WiFi 就能打本机 dev server，真机联调不用改代码
-（把 karma 的 `clientHost` 指到本机局域网 IP 即可）。
+（把 `test.options.clientHost` 指到本机局域网 IP 即可）。
 
 游客与真实 AppID 在网络上**没有区别**，两者都需要：已登录 + `urlCheck:false`。
 
@@ -268,7 +264,7 @@ external  https://registry.npmjs.org  ✅           ✅
 
 原来打的是 `https://api.realworld.io/api/articles`，该域名已返
 **HTTP 530**（Cloudflare 源站不在，宿主机 `curl` 同样 530），测试会
-长期红且与代码无关。现在由 `karma.conf.js` 起一个本地 fixture 服务，
+长期红且与代码无关。现在由 vitest 宿主（`src/builder/vitest/node/fixture-server.ts`）在同一端口上出 fixture，
 请求仍是真的 `wx.request → 127.0.0.1`，**适配层链路一字不变**，
 只是响应可控、可重复。见 `src/spec/util/fixture-server.ts`。
 
@@ -279,18 +275,18 @@ external  https://registry.npmjs.org  ✅           ✅
 `src/library/package.json` 里显式写了 `"type": "commonjs"`，**不要删**。
 
 ng-packagr 生成产物时是 `packageJson.type ??= 'module'`——你没写它就给你 `module`。
-而 `builder/**` 和 `karma/**` 是 `tsc -p ./tsconfig.builder.json` 用 CommonJS 编出来的
+而 `builder/**` 是 `tsc -p ./tsconfig.builder.json` 用 CommonJS 编出来的
 （`require` / `exports` + 无扩展名的相对 import）。一旦包顶层是 `type: module`，
 Node 会把所有 `.js` 当 ESM，于是：
 
 ```
-require('angular-miniprogram/karma/plugin')
+require('angular-miniprogram/vitest')
   → exports is not defined in ES module scope
   → Cannot find module './main'   // ESM 解析要求带扩展名
 ```
 
 库自己的产物是 `.mjs`（扩展名优先，永远是 ESM），所以顶层写 `commonjs`
-**不影响 ESM 消费方**，只是让 `builder/` 和 `karma/` 的 CJS 能正常加载。
+**不影响 ESM 消费方**，只是让 `builder/` 的 CJS 能正常加载。
 线上 1.5.2 没有 `type` 字段（等价 commonjs），就是同一个道理。
 
 发布前自检（`npm run build` 之后）：
@@ -298,14 +294,9 @@ require('angular-miniprogram/karma/plugin')
 ```bash
 cd dist && npm pack && cd /tmp && mkdir s && cd s && npm init -y
 npm i <绝对路径>/dist/angular-miniprogram-1.5.2.tgz @angular-devkit/architect --legacy-peer-deps
-node -e "console.log(Object.keys(require('angular-miniprogram/karma/plugin')))"
-# 期望：[ 'framework:@angular-devkit/build-angular', 'launcher:miniprogram' ]
+node -e "console.log(Object.keys(require('angular-miniprogram/package.json').exports))"
+# 期望含 ./vitest 与 ./vitest/runtime
 ```
-
-另：`src/builder/karma/plugin/tsconfig.json` 的 `outDir` 是 `dist/karma` 而不是
-`dist/karma/plugin`——因为 `index.ts` import 了 `../vite/karma-framework`，
-TS 把 rootDir 推断到 `src/builder/karma`，outDir 多写一层会让产物变成
-`karma/plugin/plugin/index.js`，与 `exports["./karma/plugin"]` 对不上。
 
 ## 🔴 开工前先读这一条
 
@@ -337,7 +328,7 @@ TS6053: File '.../src/library/common/http/index.ts' not found.
 自动补跑一次 `npm run sync`，因此直接 `npm run build` 即可。
 
 > 注意：`ng-packagr` 的 `deleteDestPath: true`，单独跑 `npm run build:library`
-> 会清空 `dist`，其中包含 builder/karma 的产物。需要完整产物时请跑 `npm run build`。
+> 会清空 `dist`，其中包含 builder 的产物。需要完整产物时请跑 `npm run build`。
 
 ### 2. Node 22+ 原生 TS 加载会绕过 ts-node
 
@@ -351,25 +342,16 @@ Jasmine 5 默认用 `import()` 加载 spec 文件。Node 22/23/24 自带 `.ts` �
 `require()`，由 ts-node 编译（等价于 Node 21 及以下的行为），因此不再需要
 `NODE_OPTIONS=--no-experimental-strip-types`。
 
-## 关于 karma 用例（2 个 pending）
-
-`src/builder/karma/index.spec.ts` 里的 `karma 运行` / `karma watch` 用例是作者标记
-为 `xdescribe` / `xit` 的本地用例：它需要真实的小程序运行环境（微信开发者工具）
-连上 karma server 才能跑完，CI/容器环境下无法执行，保持 pending 属正常状态。
-
-`karma` builder 本身的编译链路（`npm run build:karma`、`dist/karma/client`、
-`dist/karma/plugin`）在 `npm run build` 中已验证可用。
-
 ## 验证结果（Node v24.21.0）
 
-| 命令               | 结果                                            |
-| ------------------ | ----------------------------------------------- |
-| `npm ci`           | ✅ 1432 packages                                |
-| `npm run build`    | ✅ library + builder + karma 全部产出到 `dist/` |
-| `npm run test`     | ✅ 26 specs, 0 failures, 2 pending              |
-| `npm run test:ci`  | ✅                                              |
-| `npm run coverage` | ✅                                              |
-| `npm run lint`     | ✅ 0 error / 0 warning                          |
+| 命令               | 结果                                    |
+| ------------------ | --------------------------------------- |
+| `npm ci`           | ✅ 1432 packages                        |
+| `npm run build`    | ✅ library + builder 全部产出到 `dist/` |
+| `npm run test`     | ✅ 26 specs, 0 failures, 2 pending      |
+| `npm run test:ci`  | ✅                                      |
+| `npm run coverage` | ✅                                      |
+| `npm run lint`     | ✅ 0 error / 0 warning                  |
 
 ## Angular 版本升级记录（17 → 18 → 19 → 20）
 
@@ -478,7 +460,7 @@ Angular 的模板插值不会自动 unwrap signal。
   覆盖返回值、通知次数、抛错时仍然通知、自定义通知来源。
 - `src/builder/zoneless.spec.ts`：构建整个 fixture 后扫描产物，
   断言没有 `__zone_symbol__` / `zone.js/dist`，且包含 `ChangeDetectionSchedulerImpl`。
-- `test/hello-world-app/src/spec/signal-io-spec/`：小程序内 karma 用例，
+- `test/hello-world-app/src/spec/signal-io-spec/`：小程序内运行时用例，
   验证 signal input 渲染 + signal output 回传（需微信开发者工具，容器内跑不了）。
 
 ### 已知限制
@@ -653,20 +635,20 @@ Options<{}, {}, {}>            ->  Options<{}, {}, {}, []>
 
 ### 21 → 22
 
-| 项目                                 | 说明                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 版本                                 | `@angular/*` 22.1.7 / `@angular-devkit/*` 22.1.8 / ng-packagr 22.1.1 / TS 6.0.3 / webpack 5.109.2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **TS 6.0：strict 默认开启**          | 空 tsconfig 也会开 `noImplicitAny`。本仓库 `tsconfig.base.json` 已显式 `strict: false`，但 fixture 的没写，直接继承新默认值，冒出成堆 TS7006 / TS7008 / TS2564。显式补 `strict: false`（单独设置的 `strictNullChecks` 不受影响）                                                                                                                                                                                                                                                                                                                                                                               |
-| TS 6.0：废弃项变硬错误               | `baseUrl` / `moduleResolution=node10` / `downlevelIteration` / `target=ES5` 全部报错，加 `"ignoreDeprecations": "6.0"`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| TS 6.0：根 tsconfig                  | 根 `tsconfig.json` 是 solution-style（只有 references），但 `code-recycle` 跑 sync 时 ts-node 会拿它直接用。空 `compilerOptions` 让 TS 6 用默认 `target=ES5` 并因缺 `rootDir` 报 TS5107 / TS5011，补上 `target` / `module` / `rootDir`                                                                                                                                                                                                                                                                                                                                                                         |
-| TS 6.0：@types 不再自动全量注入      | karma client 的 tsconfig 显式声明 `typeRoots` 与 `types`（`jasmine` 命名空间、`node` 的 `Console`）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `createNgModuleRef` 移除             | 改用 `createNgModule`（签名一致）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `ComponentFactoryResolver` 整体移除  | `NgModuleRef.componentFactoryResolver` 也没了。当时为废弃的 `pageStartup(module, component)` 路径改用模块 injector 当 `environmentInjector` 走 `createComponent`（该路径已随 `pageStartup` 一并删除）                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `@content` 新块                      | 内容查询块，依赖运行时 content query 观察投影内容并重渲染。小程序 slot / self 模板是静态的，对不上，按 `@defer` 先例显式抛错                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **ICU 消息**（`{x, plural/select}`） | 编译成 `ɵɵpipe` + `I18nSelect` 动态切换子模板。**实测该节点会真的出现在 `parseTemplate` 结果里**，而 `visitIcu` 曾是空实现 → 整段内容静默消失 + 后续节点槽位错位且不报错。现显式抛错。注：这**不是「做不到」**——本 fork 已有的 `__templateName`（`<template is="{{item.__templateName}}">`）恰好就是它需要的能力，只是未实现                                                                                                                                                                                                                                                                                   |
-| **`<ng-content>` fallback 内容**     | 实测空标签与纯空白会被 Angular 归一成 `children = []`，只有写了兜底才有子节点。小程序 `<slot>` 无 fallback 能力，对非空 children 显式抛错（已确认仓内无此用法，不打破现有代码）                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `Object.hasOwn`                      | 同步过来的 `@angular/common` 用到 ES2022 的 `Object.hasOwn`，库的 `lib` 从 es2019 提到 es2022                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **CLI workspace schema**             | 发布包自带 `lib/config/schema.json`（`npm run build:schema` → `script/build-cli-schema.ts`），让 `angular.json` 的 `$schema` 指到本包时也能拿到 `angular-miniprogram:application / library / karma` 的补全与校验。基底直接读 devDependencies 里的 `@angular/cli/lib/config/schema.json`（不入库也不缓存），**跟的也就是 `package.json` 里钉住的那个 CLI 版本**，升 CLI 时产物自动跟着走。拼装逻辑对齐 CLI 的 `tools/ng_cli_schema_generator.js`（内联时剥掉 `required` / `$schema` / `x-prompt`，内部 `$ref` 命名空间化），并把本包 builder 加进兜底分支的 `not.enum`——漏了会让 `oneOf` 同时命中两条而校验失败 |
+| 项目                                 | 说明                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 版本                                 | `@angular/*` 22.1.7 / `@angular-devkit/*` 22.1.8 / ng-packagr 22.1.1 / TS 6.0.3 / webpack 5.109.2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **TS 6.0：strict 默认开启**          | 空 tsconfig 也会开 `noImplicitAny`。本仓库 `tsconfig.base.json` 已显式 `strict: false`，但 fixture 的没写，直接继承新默认值，冒出成堆 TS7006 / TS7008 / TS2564。显式补 `strict: false`（单独设置的 `strictNullChecks` 不受影响）                                                                                                                                                                                                                                                                                                                                                                                |
+| TS 6.0：废弃项变硬错误               | `baseUrl` / `moduleResolution=node10` / `downlevelIteration` / `target=ES5` 全部报错，加 `"ignoreDeprecations": "6.0"`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| TS 6.0：根 tsconfig                  | 根 `tsconfig.json` 是 solution-style（只有 references），但 `code-recycle` 跑 sync 时 ts-node 会拿它直接用。空 `compilerOptions` 让 TS 6 用默认 `target=ES5` 并因缺 `rootDir` 报 TS5107 / TS5011，补上 `target` / `module` / `rootDir`                                                                                                                                                                                                                                                                                                                                                                          |
+| TS 6.0：@types 不再自动全量注入      | 测试工程 `tsconfig.spec.json` 显式声明 `types: ["vitest/globals"]`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `createNgModuleRef` 移除             | 改用 `createNgModule`（签名一致）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `ComponentFactoryResolver` 整体移除  | `NgModuleRef.componentFactoryResolver` 也没了。当时为废弃的 `pageStartup(module, component)` 路径改用模块 injector 当 `environmentInjector` 走 `createComponent`（该路径已随 `pageStartup` 一并删除）                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `@content` 新块                      | 内容查询块，依赖运行时 content query 观察投影内容并重渲染。小程序 slot / self 模板是静态的，对不上，按 `@defer` 先例显式抛错                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **ICU 消息**（`{x, plural/select}`） | 编译成 `ɵɵpipe` + `I18nSelect` 动态切换子模板。**实测该节点会真的出现在 `parseTemplate` 结果里**，而 `visitIcu` 曾是空实现 → 整段内容静默消失 + 后续节点槽位错位且不报错。现显式抛错。注：这**不是「做不到」**——本 fork 已有的 `__templateName`（`<template is="{{item.__templateName}}">`）恰好就是它需要的能力，只是未实现                                                                                                                                                                                                                                                                                    |
+| **`<ng-content>` fallback 内容**     | 实测空标签与纯空白会被 Angular 归一成 `children = []`，只有写了兜底才有子节点。小程序 `<slot>` 无 fallback 能力，对非空 children 显式抛错（已确认仓内无此用法，不打破现有代码）                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `Object.hasOwn`                      | 同步过来的 `@angular/common` 用到 ES2022 的 `Object.hasOwn`，库的 `lib` 从 es2019 提到 es2022                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **CLI workspace schema**             | 发布包自带 `lib/config/schema.json`（`npm run build:schema` → `script/build-cli-schema.ts`），让 `angular.json` 的 `$schema` 指到本包时也能拿到 `angular-miniprogram:application / library / vitest` 的补全与校验。基底直接读 devDependencies 里的 `@angular/cli/lib/config/schema.json`（不入库也不缓存），**跟的也就是 `package.json` 里钉住的那个 CLI 版本**，升 CLI 时产物自动跟着走。拼装逻辑对齐 CLI 的 `tools/ng_cli_schema_generator.js`（内联时剥掉 `required` / `$schema` / `x-prompt`，内部 `$ref` 命名空间化），并把本包 builder 加进兜底分支的 `not.enum`——漏了会让 `oneOf` 同时命中两条而校验失败 |
 
 ### 升级操作清单（21/22 修订版）
 
@@ -1235,7 +1217,7 @@ wxml 里没有对应元素是正常的。
 
 真实组件在小程序运行时里的完整渲染（`getCurrentPages()` / DevTools）。
 本环境无法运行微信开发者工具。`test/hello-world-app/src/spec/**`
-那些 karma spec 需要小程序模拟器，属于另一条链路。
+那些运行时 spec 需要小程序模拟器，属于另一条链路。
 
 但下标算术、节点身份、类型映射这三段已在 Node 侧覆盖，
 真实渲染若出问题，出在这三段之外的概率已大幅降低。
@@ -1849,7 +1831,7 @@ if (residue.indexOf('${') !== -1) throw new Error('未登记的插值…');
                                     ↓
                     <库根>/mp-library-meta.json  (schemaVersion 3)
                                     ↓
-主构建（vite / karma）
+主构建（vite）
   ├─ component-transform.plugin  给库 fesm 注 amp.propertyChange
   └─ library-template.plugin     读 sidecar → emit wxml / wxss / library entry chunk
 ```
@@ -2555,3 +2537,69 @@ requireContextShim → analog → libraryTemplate → componentTransform）。
 **未验证**：真机 / 开发者工具里的端到端 —— 沙箱里没有微信开发者工具。
 `WorkerGlobalState` 的字段是照 vitest 5.0.3 的 `init` chunk 拼的，
 升级 vitest 时这块最容易漂。
+
+---
+
+# 抹除 karma：小程序运行时测试只剩 vitest 一条路
+
+karma 链路此前一直保留作参照，但「保留参照」实际变成了「两条并行、
+`test:wechat` 还是 karma」——和「用 vitest 替换 karma」的初衷相反。
+这次把 karma 整个拿掉，只留 vitest。
+
+## 删掉的东西
+
+| 删除                                                         | 说明                                              |
+| ------------------------------------------------------------ | ------------------------------------------------- |
+| `src/builder/karma/**`                                       | builder / launcher / client / jasmine-define 全链 |
+| `script/wechat-karma.cjs`                                    | 971 行的 karma 启动器                             |
+| `test/hello-world-app/karma.conf.js`                         | 含挂在 karma server 上的 fixture 中间件           |
+| `angular.json` 的 `test`（karma）目标                        | 由 vitest 目标顶替，仍叫 `test`                   |
+| `builders.json` 的 `karma` 条目                              | 只剩 application / library / vitest               |
+| `karma` / `@types/karma` / `jasmine-core` / `@types/jasmine` | 依赖                                              |
+| `weapp.socket.io`                                            | karma 客户端的传输层，没别人用                    |
+| `exports` 的 `./karma/client`、`./karma/plugin`              | 只剩 `./vitest`、`./vitest/runtime`               |
+
+## 搬走而不是删掉的两个模块
+
+`vitest/vite/index.ts` 还在用它们，先搬到 `src/builder/shared/`：
+
+- `derived-tsconfig.ts`
+- `spec-discovery.ts`
+
+搬完记得改相对路径——`../../util/asset-path` 这类是从旧目录深度算出来的。
+
+## fixture 服务换了东家
+
+http spec 要真 `wx.request`，所以必须有真 HTTP 端点。原来那个中间件挂在
+karma server 上；现在由 `src/builder/vitest/node/fixture-server.ts` 出，
+**和 WS 共用同一个端口**（upgrade 走 WS，普通请求走 fixture）。
+
+端口仍然只有一个来源：`MP_VITEST_PORT`。spec 侧的 `fixture-url.ts`
+从 `KARMA_HOST/KARMA_PORT` 改成 `MP_VITEST_HOST/MP_VITEST_PORT`。
+
+分两个端口是以前踩过的坑（两头各写一个 9899，改一处必须改另一处），
+共用端口从结构上消掉了这类错。
+
+## 运行时 spec 改用 vitest 原生 API
+
+`test/hello-world-app/src/spec/**` 原来跑在 jasmine 下，现在设备端是
+vitest（`setupCommonEnv` 装全局），所以：
+
+- `it('run', (done) => ...)` → `it('run', () => componentTestComplete(...))`。
+  **vitest 不支持 `done` 回调**，返回 promise 即可。
+- `jasmine.DEFAULT_TIMEOUT_INTERVAL` → per-test 的第三个参数。
+  vitest 没有那种全局开关。
+- `tsconfig.spec.json` 的 `types: ["jasmine"]` → `["vitest/globals"]`。
+
+## 设备侧必须是 CJS
+
+微信小程序只能执行 CJS，这条约束下产物形态是：
+
+- `dist/vitest/runtime`（设备端）：cjs
+- `dist/vitest/plugin`（宿主端 vite 插件）：**esm**，因为被
+  `vitest.config.mts` 以 ESM 命名导入引用，且 `dist/package.json`
+  没有 `type: module`，所以必须 `.mjs`
+- spec 加载走 `require.context` shim（`require(file)`），
+  **不走** `vite/module-runner` 的动态 `import()`——那条路小程序里跑不了
+
+`BuildTarget` 因此多了 `format` 字段。

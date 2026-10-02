@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import ts from 'typescript';
-import { resolveNative, toNativePath } from '../../util/asset-path';
+import { resolveNative, toNativePath } from '../util/asset-path';
 
 /** 派生时要读写的 tsconfig 形状（其余字段原样透传） */
 interface TsConfigShape {
@@ -48,8 +48,8 @@ function resolveTypeRoots(workspaceRoot: string): string[] {
 /**
  * 生成一个派生 tsconfig：继承原配置，但把 typeRoots 钉死。
  *
- * 为什么需要：测试跑在临时 host 目录里，`types: ["jasmine"]` 会因为
- * 找不到 @types/jasmine 报 TS2688。显式指 typeRoots 就不依赖目录 walk-up。
+ * 为什么需要：测试跑在临时 host 目录里，`types: ["vitest/globals"]` 会因为
+ * 找不到该包报 TS2688。显式指 typeRoots 就不依赖目录 walk-up。
  *
  * 关键：派生文件必须写在**原 tsconfig 旁边**。tsconfig 里的 extends /
  * include / files / outDir 都是相对自身所在目录解析的，写到 /tmp 里

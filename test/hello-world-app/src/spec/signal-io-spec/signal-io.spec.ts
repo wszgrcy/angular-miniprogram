@@ -5,12 +5,10 @@ describe('SignalIoSPecComponent', () => {
   beforeEach(async () => {
     await openComponent(`/pages/signal-io-spec/signal-io-spec-entry`);
   });
-  it('run', (done) => {
+  it('run', () => {
     const pages = getCurrentPages();
     const page = pages[0];
     const component = getComponent<SignalIoSPecComponent>(page);
-    componentTestComplete(component.testFinish$$).then(() => {
-      done();
-    });
+    return componentTestComplete(component.testFinish$$);
   });
 });

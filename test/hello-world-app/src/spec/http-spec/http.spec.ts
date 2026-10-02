@@ -7,19 +7,19 @@ import {
 import { HttpSpecComponent } from './http.component';
 
 describe('http', () => {
-  let oldTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
   beforeEach(async () => {
-    // 跨网请求给 25s：够慢网跑完，又不至于像原来 100s 那样把整轮拖死
-    jasmine.DEFAULT_TIMEOUT_INTERVAL = 25 * 1000;
     await openComponent(`/pages/http-spec/http-spec-entry`);
   });
-  afterEach(() => {
-    jasmine.DEFAULT_TIMEOUT_INTERVAL = oldTimeout;
-  });
+  /**
+   * 跨网请求给 25s：够慢网跑完，又不至于白等到全局的 120s。
+   *
+   * vitest 没有 `jasmine.DEFAULT_TIMEOUT_INTERVAL` 那种全局开关，
+   * 超时是 per-test 的第三个参数。
+   */
   it('run', async () => {
-    let pages = getCurrentPages();
-    let page = pages[0];
-    let component = getComponent<HttpSpecComponent>(page);
+    const pages = getCurrentPages();
+    const page = pages[0];
+    const component = getComponent<HttpSpecComponent>(page);
     await componentTestComplete(component.testFinish$$, 20000);
     // 请求失败不能默默吞掉，到这儿显式报出来
     expect(component.testError).toBeUndefined();
@@ -31,5 +31,5 @@ describe('http', () => {
     expect(component.response?.articles?.[0]?.slug).toBe(
       FIXTURE_ARTICLES_EXPECTED.firstSlug,
     );
-  });
+  }, 25_000);
 });

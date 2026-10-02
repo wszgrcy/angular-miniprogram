@@ -4,12 +4,10 @@ describe('NgSwitchSPecComponent', () => {
   beforeEach(async () => {
     await openComponent(`/pages/ng-switch-spec/ng-switch-spec-entry`);
   });
-  it('run', (done) => {
+  it('run', () => {
     let pages = getCurrentPages();
     let page = pages[0];
     let component = getComponent<NgSwitchSPecComponent>(page);
-    componentTestComplete(component.testFinish$$).then(() => {
-      done();
-    });
+    return componentTestComplete(component.testFinish$$);
   });
 });

@@ -5,13 +5,13 @@ import { getSystemPath } from '@angular-devkit/core';
 import * as path from 'path';
 import { Observable } from 'rxjs';
 import type { InlineConfig } from 'vite';
-import { writeDerivedTsConfig } from '../../karma/vite/derived-tsconfig';
-import { globSpecFiles } from '../../karma/vite/spec-discovery';
 import {
   clearLibraryMetaMisses,
   formatLibraryMetaSummary,
 } from '../../library/library-meta-diagnostics';
+import { writeDerivedTsConfig } from '../../shared/derived-tsconfig';
 import { createMiniProgramTestStack } from '../../shared/mini-program-test-stack';
+import { globSpecFiles } from '../../shared/spec-discovery';
 import {
   buildPlatformDefine,
   buildViteAlias,
@@ -214,7 +214,7 @@ export async function createVitestViteConfig(options: {
 /**
  * vitest 链路的构建 builder —— **只编译，不跑测试**。
  *
- * 和 karma builder 的关键差别：karma builder 自己起 karma server，
+ * 和 application builder 的关键差别：本 builder 不起服务，
  * 而 vitest 的 WS 服务必须开在 **vitest 进程**里（pool 在那儿），
  * 所以这里只负责把测试小程序编到磁盘，运行由 `vitest run` 驱动：
  *

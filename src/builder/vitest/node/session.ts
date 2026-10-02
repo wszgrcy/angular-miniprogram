@@ -1,6 +1,8 @@
 import { parse as flatParse, stringify as flatStringify } from 'flatted';
+import { createServer } from 'http';
 import { type RawData, WebSocket, WebSocketServer } from 'ws';
 import { type MpVitestWireMessage, isMpVitestWireMessage } from '../protocol';
+import { tryServeFixture } from './fixture-server';
 import type { ResolvedMiniProgramVitestPluginOptions } from './options';
 
 type MessageListener = (message: unknown) => void;
@@ -40,6 +42,7 @@ function rawToString(data: RawData): string {
  */
 export class MiniProgramVitestSession {
   private server: WebSocketServer | undefined;
+  private httpServer: ReturnType<typeof createServer> | undefined;
   private socket: WebSocket | undefined;
   private startPromise: Promise<void> | undefined;
   private references = 0;
@@ -71,9 +74,23 @@ export class MiniProgramVitestSession {
   private listen(): Promise<void> {
     const { port, host } = this.options;
     return new Promise((resolve, reject) => {
-      const server = new WebSocketServer({ host, port });
+      /**
+       * HTTP 和 WS 共用同一个端口：upgrade 请求走 WS，普通请求走 fixture。
+       *
+       * http spec 要的是真 `wx.request`，得有个真 HTTP 端点；另起一个端口
+       * 就得再维护一份常量，两边飘了就是「连得上但请求 404」这种难查的坑。
+       */
+      const httpServer = createServer((req, res) => {
+        if (tryServeFixture(req, res)) {
+          return;
+        }
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('angular-miniprogram vitest host');
+      });
+      this.httpServer = httpServer;
+      const server = new WebSocketServer({ server: httpServer });
       this.server = server;
-      server.once('error', (err) => {
+      httpServer.once('error', (err) => {
         reject(
           new Error(
             `监听 ${host}:${port} 失败：${err.message}。` +
@@ -81,7 +98,7 @@ export class MiniProgramVitestSession {
           ),
         );
       });
-      server.once('listening', () => {
+      httpServer.once('listening', () => {
         // 给外部启动器当 ready 信号用（见 script/wechat-vitest.cjs）。
         // 没这行的话脚本只能 sleep 一个固定时长去赌服务已绑上。
         process.stdout.write(
@@ -89,6 +106,7 @@ export class MiniProgramVitestSession {
         );
         resolve();
       });
+      httpServer.listen({ host, port });
       server.on('connection', (socket) => this.onConnection(socket));
     });
   }
@@ -233,12 +251,21 @@ export class MiniProgramVitestSession {
     this.startPromise = undefined;
     const server = this.server;
     this.server = undefined;
+    const httpServer = this.httpServer;
+    this.httpServer = undefined;
     await new Promise<void>((resolve) => {
       if (!server) {
         resolve();
         return;
       }
-      server.close(() => resolve());
+      server.close(() => {
+        // WS 挂在 httpServer 上，光关 WS 不关 HTTP 会把端口留着。
+        if (!httpServer) {
+          resolve();
+          return;
+        }
+        httpServer.close(() => resolve());
+      });
     });
   }
 }

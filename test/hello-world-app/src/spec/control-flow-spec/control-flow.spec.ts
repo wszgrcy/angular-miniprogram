@@ -5,12 +5,10 @@ describe('ControlFlowSPecComponent', () => {
   beforeEach(async () => {
     await openComponent(`/pages/control-flow-spec/control-flow-spec-entry`);
   });
-  it('run', (done) => {
+  it('run', () => {
     const pages = getCurrentPages();
     const page = pages[0];
     const component = getComponent<ControlFlowSPecComponent>(page);
-    componentTestComplete(component.testFinish$$).then(() => {
-      done();
-    });
+    return componentTestComplete(component.testFinish$$);
   });
 });

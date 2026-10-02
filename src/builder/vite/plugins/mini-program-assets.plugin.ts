@@ -105,7 +105,7 @@ export interface MiniProgramAssetsPluginOptions {
   /**
    * app.js 从哪个 chunk 出发做可达性分析。
    *
-   * 应用构建是 `main.js`；karma 链路的应用入口叫 `test.js`，
+   * 测试链路的应用入口叫 `test.js`，
    * 不把它说清楚的话 app.js 会认为「没有引导入口」，
    * 退化成「除 entry 类 chunk 外全 require」，
    * 引导 chunk 反而进不了 app.js，小程序启动时什公都不会发生。
@@ -469,7 +469,7 @@ export function miniProgramAssetsPlugin(
         (item) => item.type === 'chunk' && item.fileName.endsWith('.js'),
       ) as unknown as JsChunk[];
       const byFileName = new Map(jsChunks.map((c) => [c.fileName, c]));
-      // app.js 的引导 chunk（应用 = main.js，karma = test.js）
+      // app.js 的引导 chunk（应用 = main.js，测试 = test.js）
       const bootstrapChunk = options.bootstrapChunk ?? 'main.js';
       const emittedOrder: string[] = [];
       const visiting = new Set<string>();

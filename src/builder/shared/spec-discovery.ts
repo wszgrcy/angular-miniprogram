@@ -21,7 +21,7 @@ export interface DiscoveredSpec {
  *
  * webpack 侧是 FindTestsPlugin 干的。Vite 这边必须自己做：
  * `*.spec.ts` 不被任何 entry import，不显式加为 entry 的话
- * bundle 里根本没有 describe / it，jasmine 全局替换也就无从生效。
+ * bundle 里根本没有 describe / it，全局替换也就无从生效。
  */
 export async function globSpecFiles(options: {
   cwd: string;

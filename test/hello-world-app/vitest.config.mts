@@ -11,7 +11,7 @@ import { miniProgramVitest } from 'angular-miniprogram/vitest';
  * 用法：`npm run test:wechat`（= script/wechat-vitest.cjs）一条命令搞定：
  * 编产物 → 起 vitest（内部起 WS）→ 开发者工具打开产物 → 收结果。
  * 手动分步则是：
- *   1. npx ng run app:test-vitest        # 把 spec 编进小程序产物
+ *   1. npx ng run app:test        # 把 spec 编进小程序产物
  *   2. npx vitest run --config vitest.config.mts
  *   3. 开发者工具打开 dist/vitest/app（设备主动连回 ws://127.0.0.1:port）
  *

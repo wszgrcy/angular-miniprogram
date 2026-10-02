@@ -4,12 +4,10 @@ describe('SelfTemplateSPecComponent', () => {
   beforeEach(async () => {
     await openComponent(`/pages/self-template-spec/self-template-spec-entry`);
   });
-  it('run', (done) => {
+  it('run', () => {
     let pages = getCurrentPages();
     let page = pages[0];
     let component = getComponent<SelfTemplateSPecComponent>(page);
-    componentTestComplete(component.testFinish$$).then(() => {
-      done();
-    });
+    return componentTestComplete(component.testFinish$$);
   });
 });

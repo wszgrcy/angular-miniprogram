@@ -11,8 +11,7 @@
     "fs-extra",
     "glob",
     "ora",
-    "vite",
-    "weapp.socket.io"
+    "vite"
   ],
   "lib": {
     "entryFile": "./platform/index.ts"

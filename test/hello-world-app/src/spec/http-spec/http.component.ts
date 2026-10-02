@@ -25,7 +25,7 @@ export class HttpSpecComponent implements OnInit {
   }
   request() {
     /**
-     * 打本地 fixture 服务（由 karma.conf.js 起），不再挨外部域名。
+     * 打本地 fixture 服务（由 测试宿主.conf.js 起），不再挨外部域名。
      *
      * 请求仍是真的 `wx.request` → 127.0.0.1，适配层链路完全一致，
      * 只是响应可控。原来挨的 api.realworld.io 已返 530，
@@ -42,7 +42,7 @@ export class HttpSpecComponent implements OnInit {
        * 必须接 error。
        *
        * 之前只传了 next：请求一失败（域名不可达 / 超时 / 非 2xx）
-       * 就没人调 complete()，spec 始终挂到 jasmine 超时，把整轮
+       * 就没人调 complete()，spec 始终挂到 vitest 超时，把整轮
        * 测试的时长和错误信息都搞没了。
        */
       error: (e: unknown) => {

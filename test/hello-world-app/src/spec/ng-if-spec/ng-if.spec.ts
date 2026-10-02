@@ -4,12 +4,10 @@ describe('NgIfSPecComponent', () => {
   beforeEach(async () => {
     await openComponent(`/pages/ng-if-spec/ng-if-spec-entry`);
   });
-  it('run', (done) => {
+  it('run', () => {
     let pages = getCurrentPages();
     let page = pages[0];
     let component = getComponent<NgIfSPecComponent>(page);
-    componentTestComplete(component.testFinish$$).then(() => {
-      done();
-    });
+    return componentTestComplete(component.testFinish$$);
   });
 });

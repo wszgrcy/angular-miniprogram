@@ -5,12 +5,10 @@ describe('StyleClassSpecComponent', () => {
   beforeEach(async () => {
     await openComponent(`/pages/style-class-spec/style-class-spec-entry`);
   });
-  it('run', (done) => {
+  it('run', () => {
     let pages = getCurrentPages();
     let page = pages[0];
     let component = getComponent<StyleClassSpecComponent>(page);
-    componentTestComplete(component.testFinish$$).then(() => {
-      done();
-    });
+    return componentTestComplete(component.testFinish$$);
   });
 });

@@ -4,12 +4,10 @@ describe('NgContentSpecComponent', () => {
   beforeEach(async () => {
     await openComponent(`/pages/ng-content-spec/ng-content-spec-entry`);
   });
-  it('run', (done) => {
+  it('run', () => {
     let pages = getCurrentPages();
     let page = pages[0];
     let component = getComponent<NgContentSpecComponent>(page);
-    componentTestComplete(component.testFinish$$).then(() => {
-      done();
-    });
+    return componentTestComplete(component.testFinish$$);
   });
 });

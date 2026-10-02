@@ -1,36 +1,29 @@
 import { bootstrapApplication } from 'angular-miniprogram';
-import { startupTest } from 'angular-miniprogram/karma/client';
+import {
+  createRequireContextRegistry,
+  startupMiniProgramTest,
+} from 'angular-miniprogram/vitest/runtime';
 
-let jasmineRequire = require('jasmine-core/lib/jasmine-core/jasmine.js');
+/**
+ * 测试引导入口：把 spec 全量登记进 require.context 形态的注册表，
+ *
+ * 顺序要求：**先 bootstrapApplication，再起 worker**。
+ * spec 里 import 的组件要能拿到已初始化的 Angular 运行时；
+ * 反过来（先起 worker）会因为宿主下发 run 太快而拿到半初始化的 injector。
+ */
+async function main(): Promise<void> {
+  await bootstrapApplication();
 
-function bootWithoutGlobals() {
-  let jasmineInterface;
-  const jasmine = jasmineRequire.core(jasmineRequire);
-  const env = jasmine.getEnv({ suppressLoadErrors: true });
-  jasmineInterface = jasmineRequire.interface(jasmine, env);
+  // 小程序没有 webpack 的 require.context，这行是给构建期的
+  // require-context-shim 插件看的，它把 spec 清单改写成同步 require 映射。
+  const context = (require as any).context('./', true, /\.spec\.ts$/);
 
-  return jasmineInterface;
+  startupMiniProgramTest({
+    registry: createRequireContextRegistry(context as never),
+  });
 }
 
-let obj = bootWithoutGlobals();
-for (const key in obj) {
-  if (Object.prototype.hasOwnProperty.call(obj, key)) {
-    (wx as any).__global[key] = obj[key];
-  }
-}
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 10 * 1000;
-
-bootstrapApplication().catch((e) => console.error(e));
-
-// Then we find all the tests.
-// 小程序端没有 webpack 的 require.context，这里写出来是给构建期的
-// require-context-shim 插件看的，它会把已发现的 spec 列表改写成同步
-// require 映射。直接跑（不经本仓库 builder）是不会有这个能力的。
-const context = (require as any).context('./', true, /\.spec\.ts$/);
-// And load the modules.
-context.keys().map(context);
-
-// 因为ng修改了test的获取实例的时机,改为拼在最后面,而启动操作要在最后面的后面,所以使用了延时(网页端正常是因为spec=>component,而小程序目前设计是component spec平行)
-setTimeout(() => {
-  startupTest();
-}, 1000);
+main().catch((error) => {
+  // eslint-disable-next-line no-console
+  console.error('[vitest] 引导失败', error);
+});

@@ -11,11 +11,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
  *
  * 全部走 `preserveModules`：产物目录与源码目录一比一。
  * 这不是审美选择，而是硬约束——
- *  - `builders.json` 的 implementation 是 `./vite` / `./library/builder` / `./karma/vite`，
+ *  - `builders.json` 的 implementation 是 `./vite` / `./library/builder` / `./vitest/vite`，
  *    Angular CLI 按**文件路径**加载 builder；
  *  - `path.resolve(__dirname, '../template/app-template.js')`
  *    这类「按相对路径取自己的产物」散落在 7 个 platform 实现里；
- *  - `package.json#exports` 的 `./karma/plugin` 也指到具体文件。
+ *  - `package.json#exports` 的 `./vitest` 也指到具体文件。
  * 打包成单文件会同时打断这三处。
  */
 interface BuildTarget {
@@ -42,10 +42,6 @@ interface BuildTarget {
   format?: 'cjs' | 'esm';
 }
 
-/** builder 主链路里不含 karma 的 client / plugin：它们有自己的 tsconfig 与产物根。 */
-const isKarmaSide = (rel: string) =>
-  rel.startsWith('karma/client/') || rel.startsWith('karma/plugin/');
-
 /** vitest 的设备端跑在小程序里，产物根独立于 dist/builder。 */
 const isVitestRuntime = (rel: string) => rel.startsWith('vitest/runtime/');
 
@@ -54,28 +50,11 @@ const TARGETS: BuildTarget[] = [
     name: 'builder',
     srcDir: 'src/builder',
     outDir: 'dist/builder',
-    exclude: (rel) => isKarmaSide(rel) || isVitestRuntime(rel),
-  },
-  // 顺序有讲究：plugin 的产物根是 `dist/karma`，client 是它的子目录，
-  // 先 client 后 plugin 会把 client 的产物连带清掉。
-  {
-    name: 'karma-plugin',
-    srcDir: 'src/builder/karma',
-    outDir: 'dist/karma',
-    // 对齐 karma/plugin/tsconfig.json 的 `files: ["./index.ts"]`：
-    // 产物只有 plugin/{index,launcher} 与 vite/karma-framework 三个模块。
-    // 这里不能「全量扫 karma 目录」，否则会把 client/ 和 vite/ 下
-    // 一堆跑 Node 构建用的模块一起塞进 dist/karma。
-    entryFiles: ['plugin/index', 'vite/karma-framework'],
-  },
-  {
-    name: 'karma-client',
-    srcDir: 'src/builder/karma/client',
-    outDir: 'dist/karma/client',
+    exclude: isVitestRuntime,
   },
   // vitest 的设备端：被测试工程的 vite 打进小程序包，
   // 所以裸依赖（vitest/browser、birpc、flatted）一律 external，
-  // 由应用侧的 vite 去解析 —— 和 karma/client 外置 socket.io-client 同理。
+  // 由应用侧的 vite 去解析 —— 和以往客户端外置传输库同理。
   {
     name: 'vitest-runtime',
     srcDir: 'src/builder/vitest/runtime',
@@ -124,7 +103,7 @@ function collectEntries(
  * 裸标识符一律 external。
  *
  * builder 是 Node 侧代码，依赖必须留在 node_modules：
- * 一是 `@angular/compiler-cli` / `ng-packagr` / `karma` 本来就是运行时
+ * 一是 `@angular/compiler-cli` / `ng-packagr` 本来就是运行时
  * `await import()` 进来的，打进产物反而会因为 rollup 静态分析而报错；
  * 二是 `abortcontroller-polyfill/dist/abortcontroller` 那个 ponyfill
  * 要交给**小程序侧**的 vite 去解析，构建期不能吞。
@@ -197,7 +176,7 @@ function makeConfig(target: BuildTarget): UserConfig {
 }
 
 /**
- * 用 vite 构建全部 Node 侧产物（builder + karma）。
+ * 用 vite 构建全部 Node 侧产物。
  *
  * 类型检查不在这里：vite 走 esbuild，只转译不检查。
  * `npm run typecheck:builder` 负责把 `tsc --noEmit` 补上，

@@ -29,7 +29,7 @@ export interface MiniProgramTestStackOptions {
   assets?: AssetPattern[];
   styles?: (string | { input: string })[];
   watch: boolean;
-  /** 引导入口的 chunk 名（karma 用 test.js，vitest 也用 test.js） */
+  /** 引导入口的 chunk 名 */
   bootstrapChunk: string;
   absoluteProjectRoot: Path;
   absoluteProjectSourceRoot: Path;
@@ -56,7 +56,7 @@ export interface MiniProgramTestStack {
 }
 
 /**
- * 测试链路（karma / vitest）共用的插件栈。
+ * 测试链路的插件栈。
  *
  * **顺序是硬约束，不是排版偏好**：
  *
@@ -69,7 +69,7 @@ export interface MiniProgramTestStack {
  *     要换成同步 require 映射，否则 spec 入口顶层直接 TypeError。
  *  5. `libraryTemplate` / `componentTransform` 收尾，处理库模板与组件产物。
  *
- * 抽出来是因为 karma 和 vitest 只有 define 与 entry 不同，
+ * 顺序约束见下面各插件的注释，改动前先读。
  * 这套顺序约束一模一样；各写一份迟早会改漏一边。
  */
 export function createMiniProgramTestStack(

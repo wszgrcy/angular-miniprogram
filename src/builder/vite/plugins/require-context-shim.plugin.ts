@@ -6,8 +6,8 @@ import type { Plugin } from 'vite';
  *   TypeError: require.context is not a function
  *
  * 坑在于它一般写在 test.ts 模块顶层，抛异常会把**同模块里它之后的所有代码**
- * 一起带走。典型表现：jasmine 全局装好了、app 也起来了、页面也渲染了，但
- * `setTimeout(startupTest)` 那行根本没执行，karma 客户端永远不连服务器，
+ * 一起带走。典型表现：测试全局装好了、app 也起来了、页面也渲染了，但
+ * `setTimeout(startupTest)` 那行根本没执行，测试客户端永远连不上宿主，
  * 日志停在 "Starting browser miniprogram" 直到超时——从日志完全看不出断在哪。
  *
  * 为什么在 generateBundle 改产物，而不是在 transform 改源码：
@@ -110,7 +110,7 @@ function buildReplacement(
 /**
  * 把产物里残留的 require.context 换成等价的同步 require 映射。
  *
- * modules 由调用方（karma builder）传入——它本来就已经把 spec 全量 glob
+ * modules 由调用方（测试 builder）传入——它本来就已经把 spec 全量 glob
  * 出来并加进 entry 了，这里直接复用那份清单，保证「发现」只有一处真相。
  */
 export function requireContextShimPlugin(

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "title": "MiniProgram Vitest Target",
-  "description": "把 spec 编进小程序产物，由 vitest 通过 WebSocket 驱动执行（替代 karma）。",
+  "description": "把 spec 编进小程序产物，由 vitest 通过 WebSocket 驱动执行。",
   "type": "object",
   "properties": {
     "main": {
