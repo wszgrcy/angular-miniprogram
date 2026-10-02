@@ -2382,16 +2382,26 @@ architect 的 `TestProjectHost` 会在仓库里开真实临时目录并写文件
 `testTimeout` / `hookTimeout` 给到 500s —— builder 类 spec 会真的跑一遍
 小程序全量构建。
 
-### `test:ci` 的顺序依赖
+### 文件执行顺序（sequencer）
 
-`node_modules/test-library` 由 `library.spec.ts` 构建后拷入，
-但按文件名排序 `library-meta-sidecar.spec.ts` 排在 `library/library.spec.ts` **之前**。
-旧链路靠 `jasmine.json` 把它列在第一位解决。
-vitest 按文件排序，所以 `test:ci` 显式跑两遍：
+`node_modules/test-library` 由 `library/library.spec.ts` 构建后拷入，
+`library-meta-sidecar.spec.ts` / `library-multiplatform.spec.ts` 读的就是这份副本。
+按文件名排序 `library-` < `library/`（`-` 是 0x2D，`/` 是 0x2F），
+**默认顺序下读到的会是上一轮残留的旧副本 —— 假绿灯**。
 
-```
-build:library && vitest run src/builder/library/library.spec.ts && npm test
-```
+旧 jasmine 链路靠 `jasmine.json` 的 `spec_files` 声明顺序解决，
+vitest 用 `sequence.sequencer` 表达同一件事：`vitest.config.mts` 里的
+`OrderedSequencer extends BaseSequencer`，重写 `sort()` 把 `RUN_FIRST`
+列出的文件提到最前。
+
+所以 `test:ci` 就是 `build:library && npm test`，**不需要先单独跑一个文件**。
+实测（删掉 `test/hello-world-app/node_modules/test-library` 后跑全量）：
+`library/library.spec.ts` 排第 1 执行，sidecar 第 11、multiplatform 第 14，
+843 specs 全绿。
+
+两个 spec 里保留的「副本新鲜度」守卫仍然有意义 —— 它挡的是
+**单独跑某一个文件**（`vitest run library-meta-sidecar`）的场景，
+那时 sequencer 帮不上忙。
 
 ### 覆盖率
 

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
+import { BaseSequencer, type TestSpecification } from 'vitest/node';
 import { defineConfig } from 'vitest/config';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -109,6 +110,33 @@ function dynamicImportEscapeHatch(): Plugin {
   };
 }
 
+/**
+ * 文件执行顺序。
+ *
+ * `library.spec.ts` 会把 test-library 的构建产物拷进
+ * `test/hello-world-app/node_modules/test-library`，
+ * 而 `library-meta-sidecar.spec.ts` / `library-multiplatform.spec.ts`
+ * 读的就是这份副本。按文件名排序 `library-` < `library/`，
+ * 默认顺序下读到的会是上一次残留的旧副本 —— 假绿灯。
+ *
+ * 旧 jasmine 链路靠 `jasmine.json` 的 `spec_files` 声明顺序解决，
+ * vitest 用 sequencer 表达同一件事。
+ */
+const RUN_FIRST = [/[/\\]src[/\\]builder[/\\]library[/\\]library\.spec\.ts$/];
+
+function firstRank(spec: TestSpecification): number {
+  const id = spec.moduleId.replace(/\\/g, '/');
+  const i = RUN_FIRST.findIndex((re) => re.test(id));
+  return i < 0 ? RUN_FIRST.length : i;
+}
+
+class OrderedSequencer extends BaseSequencer {
+  override async sort(files: TestSpecification[]) {
+    const list = await super.sort(files);
+    return [...list].sort((a, b) => firstRank(a) - firstRank(b));
+  }
+}
+
 export default defineConfig({
   resolve: { alias },
   plugins: [angularCoreConstEnumShim(), dynamicImportEscapeHatch()],
@@ -126,7 +154,7 @@ export default defineConfig({
     pool: 'forks',
     maxWorkers: 1,
     isolate: false,
-    sequence: { concurrent: false },
+    sequence: { concurrent: false, sequencer: OrderedSequencer },
     slowTestThreshold: 10_000,
     coverage: {
       provider: 'v8',

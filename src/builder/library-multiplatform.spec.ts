@@ -84,7 +84,8 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     ).toString('utf8');
     expect(installedLib)
       .withContext(
-        'node_modules/test-library 副本已过期，请先跑 `npm run test:ci`',
+        'node_modules/test-library 副本已过期，' +
+          '先跑 `vitest run src/builder/library/library.spec.ts` 重新生成',
       )
       .toContain('LIB_TEST_LIBRARY_RENDERED');
 

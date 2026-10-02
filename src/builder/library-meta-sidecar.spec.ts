@@ -71,10 +71,12 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     await h.addPageEntry(ALL_PAGE_NAME_LIST);
 
     // 本 harness 的 builder 是 **app** builder，跑不了 library target，
-    // 所以 test-library 只能靠外部先构建。
-    // `npm run test:ci` 的第一步就是单独跑 library.spec 构建 test-library
-    // 并拷进 `test/hello-world-app/node_modules/test-library`，后续 harness 再从
-    // 那里拷副本。单独跑 `npm test` 时副本可能是旧的，所以这里显式验新鲜度：
+    // 所以 test-library 由 `library/library.spec.ts` 构建后拷进
+    // `test/hello-world-app/node_modules/test-library`，这里读那份副本。
+    // 谁先跑由 `vitest.config.mts` 的 sequencer 保证，不在脚本里排序。
+    //
+    // 但单独跑本文件（`vitest run library-meta-sidecar`）时 sequencer 帮不上忙，
+    // 副本可能缺失或是上一轮残留，所以这里显式验新鲜度：
     // 宁可大声报错，也不要静默地测一个旧副本而给出假绿灯。
     //
     // 用 devkit host 读，不用 `fs` + host.root()：root 是虚拟路径
@@ -94,11 +96,15 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       installedLib = '';
     }
     expect(installedLib.length)
-      .withContext('读不到 node_modules/test-library，请先跑 `npm run test:ci`')
+      .withContext(
+        '读不到 node_modules/test-library；跑全量 `npm test`，' +
+          '或先单独跑 `vitest run src/builder/library/library.spec.ts` 生成副本',
+      )
       .toBeGreaterThan(0);
     expect(installedLib)
       .withContext(
-        'node_modules/test-library 副本已过期，请先跑 `npm run test:ci`（或直接 `npm run test:ci`）',
+        'node_modules/test-library 副本已过期（缺 LIB_TEST_LIBRARY_RENDERED），' +
+          '先跑 `vitest run src/builder/library/library.spec.ts` 重新生成',
       )
       .toContain('LIB_TEST_LIBRARY_RENDERED');
 
