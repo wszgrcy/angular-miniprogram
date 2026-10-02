@@ -111,22 +111,23 @@ function dynamicImportEscapeHatch(): Plugin {
 }
 
 /**
- * 文件执行顺序。
+ * 必须先执行的文件：**相对仓库根的 posix 路径**，按声明顺序。
+ * 新增条目直接加一行路径，后缀匹配。
  *
- * `library.spec.ts` 会把 test-library 的构建产物拷进
- * `test/hello-world-app/node_modules/test-library`，
- * 而 `library-meta-sidecar.spec.ts` / `library-multiplatform.spec.ts`
- * 读的就是这份副本。按文件名排序 `library-` < `library/`，
- * 默认顺序下读到的会是上一次残留的旧副本 —— 假绿灯。
- *
- * 旧 jasmine 链路靠 `jasmine.json` 的 `spec_files` 声明顺序解决，
+ * 为什么需要它：`library/library.spec.ts` 会把 test-library 的构建产物拷进
+ * `test/hello-world-app/node_modules/test-library`，而
+ * `library-meta-sidecar.spec.ts` / `library-multiplatform.spec.ts`
+ * 读的就是这份副本。按文件名排序 `library-` < `library/`
+ * （`-` 是 0x2D，`/` 是 0x2F），默认顺序下读到的会是上一次残留的旧副本
+ * —— 假绿灯。旧 jasmine 链路靠 `jasmine.json` 的 `spec_files` 声明顺序解决，
  * vitest 用 sequencer 表达同一件事。
  */
-const RUN_FIRST = [/[/\\]src[/\\]builder[/\\]library[/\\]library\.spec\.ts$/];
+const RUN_FIRST = ['src/builder/library/library.spec.ts'];
 
+/** 把 Windows 路径归一成 posix，再按 RUN_FIRST 的下标定序；不在表里的排背。 */
 function firstRank(spec: TestSpecification): number {
-  const id = spec.moduleId.replace(/\\/g, '/');
-  const i = RUN_FIRST.findIndex((re) => re.test(id));
+  const id = spec.moduleId.split(path.win32.sep).join(path.posix.sep);
+  const i = RUN_FIRST.findIndex((suffix) => id.endsWith(suffix));
   return i < 0 ? RUN_FIRST.length : i;
 }
 
