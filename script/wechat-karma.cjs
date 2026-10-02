@@ -539,20 +539,40 @@ async function main() {
   const distDir = path.resolve(opt.dist);
   if (!fs.existsSync(projectDir))
     throw new Error(`项目目录不存在: ${projectDir}`);
-  if (!fs.existsSync(distDir)) throw new Error(`产物目录不存在: ${distDir}`);
+  /**
+   * **不能**在这里检查 distDir 存在。
+   *
+   * 产物是下面 `ng test` 现编的（见后面「产物是 ng test 现编的」那段轮询），
+   * 提前要求它存在 = 干净检出永远跑不了，只能先手动 mkdir 骗过去。
+   * 真出问题时由后面的 waitUntil(app.json) 报，那里才能带上 ng test 的上下文。
+   */
 
-  // 没传 --appid 就从产物的 project.config.json 里读，省得重复指定
+  // 没传 --appid 就从 project.config.json 里读，省得重复指定。
+  // 产物此时还不存在，所以先看产物、再看源文件，最后兜游客 appid
+  // （脚本 help 里写了：touristappid 实测能跑完全部用例）。
   if (!opt.appid) {
-    const pc = path.join(distDir, 'project.config.json');
-    if (fs.existsSync(pc)) {
-      opt.appid = JSON.parse(fs.readFileSync(pc, 'utf8')).appid;
-      console.log(`[karma] 从 project.config.json 读到 appid=${opt.appid}`);
+    const candidates = [
+      path.join(distDir, 'project.config.json'),
+      path.join(projectDir, 'src', 'project.config.json'),
+    ];
+    for (const pc of candidates) {
+      if (!fs.existsSync(pc)) continue;
+      try {
+        opt.appid = JSON.parse(fs.readFileSync(pc, 'utf8')).appid;
+      } catch {
+        continue;
+      }
+      if (opt.appid) {
+        console.log(
+          `[karma] 从 ${path.relative(process.cwd(), pc) || pc} 读到 appid=${opt.appid}`,
+        );
+        break;
+      }
     }
   }
   if (!opt.appid) {
-    throw new Error(
-      '没拿到 appid，用 --appid 指定，或先构建出 project.config.json',
-    );
+    opt.appid = 'touristappid';
+    console.log('[karma] 没找到 appid，用游客 appid 兜底');
   }
 
   // ---- 0. 预检登录态
