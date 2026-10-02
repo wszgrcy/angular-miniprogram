@@ -1,14 +1,18 @@
 import { parse as flatParse, stringify as flatStringify } from 'flatted';
 import { createServer } from 'http';
 import { type RawData, WebSocket, WebSocketServer } from 'ws';
-import { type MpVitestWireMessage, isMpVitestWireMessage } from '../protocol';
+import {
+  MP_VITEST_PROTOCOL_VERSION,
+  type MpVitestWireMessage,
+  isMpVitestWireMessage,
+} from '../protocol';
 import { tryServeFixture } from './fixture-server';
 import type { ResolvedMiniProgramVitestPluginOptions } from './options';
 
 type MessageListener = (message: unknown) => void;
 
 /**
- * 一个 slot 的「已就绪」信号。小程序侧每个 worker 起来后发 `worker-ready`，
+ * 小程序 worker 的「已就绪」信号。设备端 worker 起来后发 `worker-ready`，
  * 在那之前宿主下发的 `WorkerRequest` 必须排队，否则第一帧 `start` 会丢。
  */
 interface ReadyDeferred {
@@ -37,8 +41,12 @@ function rawToString(data: RawData): string {
 /**
  * 宿主侧的 WebSocket 会话。
  *
- * 引用计数：一个 slot 一个 pool worker，全部 worker stop 后才关服务，
- * 否则先结束的 worker 会把还在跑的同事的连接掐了。
+ * **只有一个 worker、只有一条连接。**小程序一个 appservice 进程就一个
+ * 常驻运行环境，`onConnection` 还是「后来者顶掉前一个」，所以上面不需要
+ * 任何分流／编号，帧就是「下一帧」。
+ *
+ * 引用计数：每个 pool worker 引用一次，全部 stop 后才关服务，
+ * 否则先结束的会把还在跑的同事的连接掐了。
  */
 export class MiniProgramVitestSession {
   private server: WebSocketServer | undefined;
@@ -46,10 +54,9 @@ export class MiniProgramVitestSession {
   private socket: WebSocket | undefined;
   private startPromise: Promise<void> | undefined;
   private references = 0;
-  private readonly ready = new Map<number, ReadyDeferred>();
-  private readonly readySlots = new Set<number>();
-  private readonly listeners = new Map<number, Set<MessageListener>>();
-  private readonly socketOpen = createDeferred();
+  private workerReady = false;
+  private ready: ReadyDeferred = createDeferred();
+  private readonly listeners = new Set<MessageListener>();
 
   constructor(
     private readonly options: ResolvedMiniProgramVitestPluginOptions,
@@ -120,7 +127,9 @@ export class MiniProgramVitestSession {
     socket.once('close', () => {
       if (this.socket === socket) {
         this.socket = undefined;
-        this.readySlots.clear();
+        this.workerReady = false;
+        // 重连后得重新等一次 worker-ready，旧的 deferred 已经 resolve 了。
+        this.ready = createDeferred();
       }
     });
     socket.once('error', () => {
@@ -135,16 +144,32 @@ export class MiniProgramVitestSession {
     } catch {
       return;
     }
+    // 协议对不上要当场说清楚：否则 hello 会被下面的校验静默丢掉，
+    // 表现是「设备根本没连上」，而真原因只是产物是旧版编的。
+    const hello = parsed as { kind?: string; protocol?: unknown } | null;
+    if (
+      hello?.kind === 'hello' &&
+      hello.protocol !== MP_VITEST_PROTOCOL_VERSION
+    ) {
+      process.stderr.write(
+        `[mp-vitest] 协议版本不匹配：设备端 ${String(hello.protocol)}，宿主 ${MP_VITEST_PROTOCOL_VERSION}。` +
+          '重新构建测试产物（ng run app:test）。\n',
+      );
+      return;
+    }
     if (!isMpVitestWireMessage(parsed)) {
       return;
     }
     switch (parsed.kind) {
       case 'hello':
-        this.emit('hello', parsed);
+        // 给外部启动器当「设备真连上了」的信号（见 script/wechat-vitest.cjs）。
+        // 没这行的话脚本只能区分「已监听」和「跑完了」，中间那段黑盒只能
+        // 拿长超时去赌——小程序根本没连上来时，表现是「一直等」。
+        process.stdout.write('[mp-vitest] 设备已连接\n');
         break;
       case 'worker-ready': {
-        this.readySlots.add(parsed.slot);
-        this.getReady(parsed.slot).resolve();
+        this.workerReady = true;
+        this.ready.resolve();
         break;
       }
       case 'worker-message': {
@@ -156,53 +181,28 @@ export class MiniProgramVitestSession {
         } catch {
           break;
         }
-        this.listeners.get(parsed.slot)?.forEach((cb) => cb(frame));
+        this.listeners.forEach((cb) => cb(frame));
         break;
       }
       case 'error':
-        this.emit('error', new Error(parsed.message));
+        process.stderr.write(`[mp-vitest] 设备报错：${parsed.message}\n`);
         break;
     }
   }
 
-  private readonly channelListeners = new Map<string, Set<MessageListener>>();
-
-  private emit(name: string, payload: unknown): void {
-    this.channelListeners.get(name)?.forEach((cb) => cb(payload));
-  }
-
-  on(name: 'hello' | 'error', listener: (payload: never) => void): () => void {
-    let set = this.channelListeners.get(name);
-    if (!set) {
-      set = new Set();
-      this.channelListeners.set(name, set);
-    }
-    set.add(listener as MessageListener);
-    return () => set?.delete(listener as MessageListener);
-  }
-
-  private getReady(slot: number): ReadyDeferred {
-    let deferred = this.ready.get(slot);
-    if (!deferred) {
-      deferred = createDeferred();
-      this.ready.set(slot, deferred);
-    }
-    return deferred;
-  }
-
-  /** 等某个 slot 的小程序 worker 上线。 */
-  async waitForWorker(slot: number): Promise<void> {
-    if (this.readySlots.has(slot)) {
+  /** 等设备端 worker 上线。 */
+  async waitForWorker(): Promise<void> {
+    if (this.workerReady) {
       return;
     }
     await this.start();
-    const deferred = this.getReady(slot);
+    const deferred = this.ready;
     const { connectTimeout } = this.options;
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(
           new Error(
-            `slot ${slot} 在 ${connectTimeout}ms 内没连上来。` +
+            `小程序在 ${connectTimeout}ms 内没连上来。` +
               '确认微信开发者工具已打开构建产物目录，且 project.config.json 允许 ws 连接。',
           ),
         );
@@ -222,31 +222,26 @@ export class MiniProgramVitestSession {
     });
   }
 
-  send(slot: number, message: unknown): void {
+  send(message: unknown): void {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       throw new Error('小程序端未连接，无法下发 vitest 指令');
     }
     const frame: MpVitestWireMessage = {
       kind: 'worker-message',
-      slot,
       frame: flatStringify(message),
     };
     this.socket.send(JSON.stringify(frame));
   }
 
-  subscribe(slot: number, listener: MessageListener): () => void {
-    let set = this.listeners.get(slot);
-    if (!set) {
-      set = new Set();
-      this.listeners.set(slot, set);
-    }
-    set.add(listener);
-    return () => set?.delete(listener);
+  subscribe(listener: MessageListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   private async close(): Promise<void> {
-    this.readySlots.clear();
-    this.ready.clear();
+    this.workerReady = false;
+    this.ready = createDeferred();
+    this.listeners.clear();
     this.socket?.close();
     this.socket = undefined;
     this.startPromise = undefined;

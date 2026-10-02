@@ -31,12 +31,28 @@ export interface MpTransportHandlers {
 
 export type MpSocketFactory = (url: string) => MpSocketLike;
 
+interface MpWxLike {
+  connectSocket?(options: { url: string }): MpSocketLike;
+  getSystemInfoSync?(): { host?: { name?: string } };
+}
+
+/**
+ * 拿宿主的 `wx`。
+ *
+ * 必须用**裸标识符**，不能走 `globalThis`：打包时 `globalThis` 会被平台层
+ * 改写成 `wx.__window`，而那是 app.js 自建的普通对象
+ * （`wx.__global = wx.__window = obj`），上头并没有 `wx`。写成
+ * `globalThis.wx` 就是永远是 undefined，表现是「项目开了、宿主也在监听，
+ * 但设备永远不连」，报错只落在小程序控制台里。
+ */
+export function hostWx(): MpWxLike | undefined {
+  return typeof wx === 'undefined'
+    ? undefined
+    : (wx as unknown as MpWxLike | undefined);
+}
+
 function defaultFactory(url: string): MpSocketLike {
-  const api = (
-    globalThis as unknown as {
-      wx?: { connectSocket(options: { url: string }): MpSocketLike };
-    }
-  ).wx;
+  const api = hostWx();
   if (!api?.connectSocket) {
     throw new Error(
       `找不到 wx.connectSocket，无法连回 vitest 宿主（url=${url}）`,

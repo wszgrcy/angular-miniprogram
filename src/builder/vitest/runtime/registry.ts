@@ -4,7 +4,7 @@
  * 小程序不能像浏览器那样按 URL 动态 import 一个文件，spec 必须事先全部
  * 编进包。宿主下发的 `WorkerRequest` 里带的是**宿主机上的绝对路径**，
  * 所以这里要能把那个路径映射回包内的模块 —— 用「路径后缀」匹配，
- * 因为包内模块的 key 是构建期给的短名（`specs/foo/bar`），
+ * 因为表里的 key 是构建期给的相对短名（`spec/foo/bar.spec.ts`），
  * 而宿主给的是 `<repo>/test/.../foo/bar.spec.ts`。
  */
 export interface TestModuleRegistry {
@@ -50,22 +50,4 @@ export function createTestModuleRegistry(
       return matches[0][1]();
     },
   };
-}
-
-/**
- * 兼容 webpack 风格 `require.context()` 的注册表。
- *
- * 本仓库的 require-context-shim 插件会把 `require.context(...)` 改写成
- * `{ key: () => require(file) }` 形态，这里直接吃那个形状，
- * 让已有的 spec 发现机制不用改。
- */
-export function createRequireContextRegistry(context: {
-  keys(): string[];
-  (key: string): unknown;
-}): TestModuleRegistry {
-  const modules: Record<string, () => unknown> = {};
-  for (const key of context.keys()) {
-    modules[key] = () => context(key);
-  }
-  return createTestModuleRegistry(modules);
 }

@@ -4,7 +4,7 @@ import type { MiniProgramVitestSession } from './session';
 type EventCallback = (argument: unknown) => void;
 
 /**
- * 一个 slot 对应一个 PoolWorker。
+ * 设备端那个常驻运行环境的 PoolWorker 代理。
  *
  * vitest 只认「worker 是个能 send/on 的双向通道」，不关心对端是子进程还是
  * 微信开发者工具里的小程序运行时 —— 这里就是把这条通道接到 WebSocket 上。
@@ -17,12 +17,9 @@ export class MiniProgramPoolWorker implements PoolWorker {
   private readonly unsubscribe: () => void;
   private stopped = false;
 
-  constructor(
-    private readonly slot: number,
-    private readonly session: MiniProgramVitestSession,
-  ) {
+  constructor(private readonly session: MiniProgramVitestSession) {
     session.retain();
-    this.unsubscribe = session.subscribe(slot, (message) => {
+    this.unsubscribe = session.subscribe((message) => {
       this.emit('message', message);
     });
   }
@@ -58,7 +55,7 @@ export class MiniProgramPoolWorker implements PoolWorker {
   }
 
   /**
-   * 小程序端一个 slot 是常驻运行环境，换文件不用重建，
+   * 小程序端是常驻运行环境，换文件不用重建，
    * 复用可以省掉每次重开开发者工具的十几秒。
    */
   canReuse(_task: PoolTask): boolean {
@@ -80,8 +77,8 @@ export class MiniProgramPoolWorker implements PoolWorker {
   private async forwardWhenReady(message: WorkerRequest): Promise<void> {
     try {
       await this.session.start();
-      await this.session.waitForWorker(this.slot);
-      this.session.send(this.slot, message);
+      await this.session.waitForWorker();
+      this.session.send(message);
     } catch (error) {
       // 连不上也要给 vitest 一个收尾响应，否则整个 run 挂在 pending 上。
       this.emit('message', {

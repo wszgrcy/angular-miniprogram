@@ -16,8 +16,8 @@ import type { WorkerRequest, WorkerResponse } from 'vitest/node';
 import type { TestModuleRegistry } from './registry';
 import { MiniProgramTestRunner } from './runner';
 /**
- * 把一帧 payload 发给宿主。信封（slot / kind）由调用方拼，
- * worker 不该知道自己在第几个 slot。
+ * 把一帧 payload 发给宿主。信封（kind / frame）由调用方拼，
+ * worker 不操心传输层长什么样。
  */
 export type MpSendFrame = (payload: unknown) => void;
 
@@ -27,7 +27,6 @@ const NAME_WORKER_STATE = '__vitest_worker__';
 export interface MiniProgramWorkerOptions {
   sendFrame: MpSendFrame;
   registry: TestModuleRegistry;
-  slot?: number;
   /** 每条 spec 跑完后的回调，用于日志 */
   onFileFinished?(filepath: string): void;
 }
@@ -165,6 +164,13 @@ export class MiniProgramWorker {
         onTaskUpdate: async (packs, events) => {
           await this.rpc.onTaskUpdate(packs, events);
         },
+        // Node worker 这些是 vitest 的 resolveTestRunner 包的，自定义 runner
+        // 得自己调；少了 onCollected 宿主就认不得任务 id。
+        onQueued: (file) => {
+          // birpc 把每个方法都包成 Promise，发完不等（宿主那边是 fire-and-forget）。
+          void this.rpc.onQueued(file);
+        },
+        onCollected: (files) => this.rpc.onCollected(files),
         onFileFinished: (filepath) => {
           this.options.onFileFinished?.(filepath);
         },

@@ -11,8 +11,6 @@ export interface MiniProgramVitestPluginOptions {
   port?: number;
   /** 监听地址，默认 127.0.0.1。开发者工具在同机，不需要对外。 */
   host?: string;
-  /** 并发槽位数。小程序一个进程只有一个运行环境，默认 1。 */
-  slots?: number;
   /** 等小程序连上来的毫秒数，默认 120_000（开发者工具冷启动慢）。 */
   connectTimeout?: number;
   /** 要跑的 spec，默认由 builder 生成。 */
@@ -23,7 +21,6 @@ export interface MiniProgramVitestPluginOptions {
 export interface ResolvedMiniProgramVitestPluginOptions {
   port: number;
   host: string;
-  slots: number;
   connectTimeout: number;
   include?: string[];
   exclude?: string[];
@@ -32,14 +29,9 @@ export interface ResolvedMiniProgramVitestPluginOptions {
 export function resolveMiniProgramVitestPluginOptions(
   options: MiniProgramVitestPluginOptions = {},
 ): ResolvedMiniProgramVitestPluginOptions {
-  const slots = options.slots ?? 1;
-  if (!Number.isInteger(slots) || slots < 1) {
-    throw new Error(`slots 必须是正整数，收到 ${options.slots}`);
-  }
   return {
     port: options.port ?? DEFAULT_MP_VITEST_PORT,
     host: options.host ?? '127.0.0.1',
-    slots,
     connectTimeout: options.connectTimeout ?? 120_000,
     include: options.include,
     exclude: options.exclude,

@@ -1,29 +1,28 @@
 import { parse as flatParse, stringify as flatStringify } from 'flatted';
 import {
+  DEFAULT_MP_VITEST_PORT,
   MP_VITEST_PROTOCOL_VERSION,
   type MpVitestWireMessage,
 } from '../protocol';
+// 必须排在 ./worker 前面：本模块的副作用要给后面的 vitest chunk 铺好全局能力。
+import { installMiniProgramGlobals } from './global-polyfills';
+import { type TestModuleMap, createTestModuleRegistry } from './registry';
 import {
-  type TestModuleMap,
-  type TestModuleRegistry,
-  createRequireContextRegistry,
-  createTestModuleRegistry,
-} from './registry';
-import { type MpSocketFactory, MpTransport, buildSocketUrl } from './transport';
+  type MpSocketFactory,
+  MpTransport,
+  buildSocketUrl,
+  hostWx,
+} from './transport';
 import { MiniProgramWorker } from './worker';
 
 export interface StartupMiniProgramTestOptions {
   /**
-   * spec 模块表：key 是构建期给的模块标识，value 是懒加载函数。
-   * 宿主下发的是宿主机绝对路径，这里按后缀匹配，所以 key 用
-   * `src/spec/foo.spec.ts` 这种相对形式即可。
+   * spec 模块表：key 是构建期给的相对短名（`spec/foo/bar.spec.ts`），value 是
+   * 懒加载函数。宿主下发的是宿主机上的绝对路径，这里按后缀匹配。
    */
-  modules?: TestModuleMap;
-  /** 已经建好的注册表，给了它就忽略 modules */
-  registry?: TestModuleRegistry;
+  modules: TestModuleMap;
   host?: string;
   port?: number;
-  slot?: number;
   /** 覆盖 Socket 构造，测试或换平台时用 */
   createSocket?: MpSocketFactory;
   /** 连上之后是否自动发 hello，正常流程都要发 */
@@ -44,19 +43,26 @@ export interface MiniProgramTestSession {
  * 由测试工程的引导入口（`test.ts`）调用，**必须在 app 启动之后**：
  * spec 里 `import` 的组件要能拿到已初始化的 Angular 运行时。
  *
- * 典型用法：
+ * 典型用法（spec 清单由构建期 define 注入，见 `shared/spec-modules.ts`）：
  *
  * ```ts
+ * declare const __MP_SPEC_MODULES__: TestModuleMap;
+ *
  * bootstrapApplication().then(() =>
- *   startupMiniProgramTest({
- *     modules: import.meta.glob('./**\/*.spec.ts'),
- *   }),
+ *   startupMiniProgramTest({ modules: __MP_SPEC_MODULES__ }),
  * );
  * ```
+ *
+ * 不能在这里 `import.meta.glob`：spec 走的是 Angular 自己的编译，vite 的
+ * transform 不作用于它，glob 不会被展开。
  */
 export function startupMiniProgramTest(
-  options: StartupMiniProgramTestOptions = {},
+  options: StartupMiniProgramTestOptions,
 ): MiniProgramTestSession {
+  // 先补全局：后面 `config.globals` 动态拉进来的 chunk 在**加载时**就要求
+  // EventTarget 存在，等不到第一个 spec。
+  installMiniProgramGlobals();
+
   const log =
     options.log ??
     ((...a: unknown[]) => {
@@ -64,20 +70,10 @@ export function startupMiniProgramTest(
       console.log(...a);
     });
   // 没显式传参时，退回 builder 的 define 注入的同名编译期常量。
-  const g = globalThis as unknown as Record<string, unknown>;
-  const host = options.host ?? (g['MP_VITEST_HOST'] as string) ?? '127.0.0.1';
-  const port = options.port ?? (g['MP_VITEST_PORT'] as number) ?? 17900;
-  const slot = options.slot ?? 0;
+  const host = options.host ?? definedHost() ?? '127.0.0.1';
+  const port = options.port ?? definedPort() ?? DEFAULT_MP_VITEST_PORT;
 
-  const registry =
-    options.registry ??
-    (options.modules
-      ? createTestModuleRegistry(options.modules)
-      : createRequireContextRegistry(
-          // 没有显式给模块表时，退回 require.context 形态（本仓库既有机制）
-          (globalThis as unknown as { __MP_VITEST_CONTEXT__?: never })
-            .__MP_VITEST_CONTEXT__!,
-        ));
+  const registry = createTestModuleRegistry(options.modules);
 
   const url = buildSocketUrl(String(host), Number(port));
   const workerRef: { current?: MiniProgramWorker } = {};
@@ -94,7 +90,7 @@ export function startupMiniProgramTest(
             platform: platformName(),
           });
         }
-        send({ kind: 'worker-ready', slot });
+        send({ kind: 'worker-ready' });
       },
       onMessage: (data) => session.onMessage(data),
       onClose: (reason) => log(`[vitest] 连接断开：${reason}`),
@@ -117,7 +113,6 @@ export function startupMiniProgramTest(
   function sendFrame(payload: unknown): void {
     send({
       kind: 'worker-message',
-      slot,
       frame: flatStringify(payload),
     });
   }
@@ -125,7 +120,6 @@ export function startupMiniProgramTest(
   const worker = new MiniProgramWorker({
     sendFrame,
     registry,
-    slot,
     onFileFinished: (filepath) => log(`[vitest] 完成 ${filepath}`),
   });
   workerRef.current = worker;
@@ -175,11 +169,7 @@ export function startupMiniProgramTest(
 }
 
 function platformName(): string {
-  const info = (
-    globalThis as unknown as {
-      wx?: { getSystemInfoSync?(): { host?: { name?: string } } };
-    }
-  ).wx;
+  const info = hostWx();
   try {
     return info?.getSystemInfoSync?.()?.host?.name ?? 'miniprogram';
   } catch {
@@ -187,8 +177,26 @@ function platformName(): string {
   }
 }
 
+/**
+ * builder 用 vite `define` 注进来的编译期常量。
+ *
+ * 只能拿裸标识符：`globalThis['MP_VITEST_PORT']` 不会被 define 替换，而
+ * `globalThis` 在小程序产物里又指向 app.js 自建的普通对象——两条都落空，
+ * 最后就是静默用掉写死的默认值，改 angular.json 里的 port 根本不生效。
+ * `typeof` 包一层是为了让没带 define 的场合（比如本仓自己的 runtime 产物）
+ * 不致于抛 ReferenceError。
+ */
+declare const MP_VITEST_HOST: string | undefined;
+declare const MP_VITEST_PORT: number | undefined;
+
+function definedHost(): string | undefined {
+  return typeof MP_VITEST_HOST === 'string' ? MP_VITEST_HOST : undefined;
+}
+function definedPort(): number | undefined {
+  return typeof MP_VITEST_PORT === 'number' ? MP_VITEST_PORT : undefined;
+}
+
 export {
-  createRequireContextRegistry,
   createTestModuleRegistry,
   type TestModuleMap,
   type TestModuleRegistry,
