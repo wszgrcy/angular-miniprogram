@@ -178,7 +178,6 @@ describe('diffNodeData: 优化后正确性与性能', () => {
     expect(Object.keys(d).length).toBe(N);
     // 宽松阈值：线性实现应远小于 O(N^2)。N=2000 全变更应在百毫秒级。
     expect(elapsed).toBeLessThan(1500);
-    // eslint-disable-next-line no-console
     console.log(`[diff bench] N=${N} 全变更耗时 ${elapsed}ms`);
   });
 
@@ -197,7 +196,6 @@ describe('diffNodeData: 优化后正确性与性能', () => {
     const elapsed = Date.now() - t0;
     expect(Object.keys(d).length).toBe(1);
     expect(elapsed).toBeLessThan(500);
-    // eslint-disable-next-line no-console
     console.log(`[diff bench] 单点变更 N=${N} 耗时 ${elapsed}ms`);
   });
 
@@ -238,7 +236,6 @@ describe('diffNodeData: 优化后正确性与性能', () => {
     };
     const oldMs = time(() => diffNodeDataOld(from, to));
     const newMs = time(() => diffNodeData(from, to));
-    // eslint-disable-next-line no-console
     console.log(
       `[diff 对比] N=${N}  旧=${oldMs}ms  新=${newMs}ms  加速≈${(
         oldMs / Math.max(newMs, 1)

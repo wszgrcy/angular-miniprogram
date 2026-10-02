@@ -215,6 +215,7 @@ export class MiniProgramVitestSession {
         },
         (err: unknown) => {
           clearTimeout(timer);
+          // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
           reject(err);
         },
       );

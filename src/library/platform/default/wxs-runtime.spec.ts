@@ -101,7 +101,7 @@ describe('wxs 运行时: callMethod 回传通道', () => {
     const warns: string[] = [];
     const spy = vi
       .spyOn(console, 'warn')
-      .mockImplementation((...a: unknown[]) => {
+      .mockImplementation((...a: string[]) => {
         warns.push(a.join(' '));
       });
     const mp: any = {};

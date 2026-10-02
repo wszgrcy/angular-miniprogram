@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 多平台：一份库产物，通吃非 wx 平台。
  *

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 export interface ExtraTemplateData {
   useComponents: Record<string, string>;
   /** `${}` 插值模板串 */

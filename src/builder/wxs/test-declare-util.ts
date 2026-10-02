@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 /**
  * 测试辅助：给模板自动补 `<wxs module src>` 声明。
  *

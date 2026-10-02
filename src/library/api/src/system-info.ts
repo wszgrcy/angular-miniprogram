@@ -66,8 +66,8 @@ export function getOSInfo(
   system = '',
   platformField = '',
 ): { osName: string; osVersion: string; system: string } {
-  let osName = '';
-  let osVersion = '';
+  let osName: string;
+  let osVersion: string;
 
   if (
     platformField &&

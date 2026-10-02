@@ -4,7 +4,7 @@ import type {
 } from 'angular-miniprogram/platform/type';
 
 export class AgentNode {
-  selector!: string | unknown;
+  selector!: unknown;
   name!: string;
   parent!: AgentNode | undefined;
   nextSibling!: AgentNode | undefined;
@@ -52,6 +52,7 @@ export class AgentNode {
     if (oldParent) {
       const index = oldParent.children.findIndex((item) => item === this);
       if (index === -1) {
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
         throw new Error('没有在之前的父级上找到该节点' + this);
       }
       oldParent.children.splice(index, 1);
@@ -61,6 +62,7 @@ export class AgentNode {
   insertBefore(newChild: AgentNode, refChild: AgentNode) {
     const refIndex = this.children.findIndex((item) => item === refChild);
     if (refIndex === -1) {
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
       throw new Error('未找到引用子节点' + refChild);
     }
 

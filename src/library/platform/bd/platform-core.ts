@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { MiniProgramCoreFactory as BaseFactory } from 'angular-miniprogram/platform/default';
 
 class MiniProgramCoreFactory extends BaseFactory {}

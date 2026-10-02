@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { BindingType } from '@angular/compiler';
 import type { Element } from '../../angular-internal/ast.type';
 import {
   WxsHandlerMeta,
@@ -63,7 +64,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       });
 
     this.node.inputs.forEach((input) => {
-      if (input.type !== 0) {
+      if (input.type !== BindingType.Property) {
         return;
       }
       this.collectWxsProp(input);

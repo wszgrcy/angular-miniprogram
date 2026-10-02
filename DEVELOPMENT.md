@@ -2603,3 +2603,41 @@ vitest（`setupCommonEnv` 装全局），所以：
   **不走** `vite/module-runner` 的动态 `import()`——那条路小程序里跑不了
 
 `BuildTarget` 因此多了 `format` 字段。
+
+## eslint 7 → 10：eslintrc 换成 flat config
+
+eslint 7 只吃 `.eslintrc.json`，v10 里那条路已经彻底拆掉，所以配置整体
+搬进 `eslint.config.mjs`，`.eslintrc.json` / `.eslintignore` 删除，
+ignore 列表并进 config 的 `ignores`。
+
+依赖侧的对应关系：
+
+| 旧                                            | 新                                  | 备注                                                                             |
+| --------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------- |
+| `eslint@7`                                    | `eslint@10`                         |                                                                                  |
+| `@typescript-eslint/{parser,eslint-plugin}@5` | `typescript-eslint@8`（含上面两个） | v5 的 `recommended-requiring-type-checking` = v8 的 `recommendedTypeChecked`     |
+| `eslint-plugin-import`                        | `eslint-plugin-import-x`            | 前者 peer 只到 eslint 9；import-x 自带 TS 解析，规则名 `import/*` → `import-x/*` |
+| `env: {node, es6}`                            | `globals` + `@eslint/js`            | flat config 没有 `env`                                                           |
+
+`parserOptions.project` 按文件集分三份（spec / builder / library），
+和原来 overrides 一一对应；根 `tsconfig.json` 兜底，落在三份之外的文件
+会直接报「not found in project」而不是静默丢掉类型信息。
+
+代码侧被新版本揪出来的问题，**一律只改类型，不改行为**；确实无法用类型消掉的，
+保留原代码 + 行内 disable：
+
+- 一堆**已经失效的 `eslint-disable`**（文件顶上的 `no-explicit-any` 之类，
+  文件里早就不用 `any` 了）。v9 起 `reportUnusedDisableDirectives` 默认开，
+  `--fix` 直接清掉。
+- `no-useless-assignment`（v9 新核规则）：`let x = ''` 紧接着每个分支都重新赋值
+  → 去掉初值，strict 的 definite-assignment 检查负责兜底。
+- `no-redundant-type-constituents`：`string | unknown`、`unknown | Promise<unknown>`
+  这种被 `unknown` 吞掉的联合类型。
+- `no-unsafe-enum-comparison`：`input.type !== 0` 改成 `BindingType.Property`
+  （枚举成员就是 0，值等价），`Object.entries` 出来的 `string` key 加断言。
+- `no-base-to-string`：`'…' + this` 这类会打成 `[object Object]` 的拼串**保持原样**，
+  行内 disable——改文案属于改行为。
+- `prefer-promise-reject-errors`：小程序 API 的错误载荷本来就是平台原始对象
+  （`{errMsg: ...}`），原样 reject 是刻意的，行内 disable。
+- `ban-types` 在 v8 拆成 `no-empty-object-type` / `no-unsafe-function-type`，
+  沿用原来 `ban-types: off` 的取舍一并关掉。

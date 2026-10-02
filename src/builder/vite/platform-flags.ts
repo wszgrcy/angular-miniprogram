@@ -34,7 +34,10 @@ export function platformConditionDefine(
   const define: Record<string, string> = {
     __MP_PLATFORM__: `"${platform}"`,
   };
-  for (const [candidate, flag] of Object.entries(PLATFORM_FLAG_NAMES)) {
+  for (const [candidate, flag] of Object.entries(PLATFORM_FLAG_NAMES) as [
+    PlatformType,
+    string,
+  ][]) {
     define[flag] = candidate === platform ? 'true' : 'false';
   }
   return define;

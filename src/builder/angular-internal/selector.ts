@@ -1,7 +1,5 @@
 /* eslint-disable @typescript-eslint/no-this-alias */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable no-useless-escape */
-/* eslint-disable no-irregular-whitespace */
 /**
  * @license
  * Copyright Google LLC All Rights Reserved.
@@ -77,7 +75,6 @@ export class CssSelector {
     let current = cssSelector;
     let inNot = false;
     _SELECTOR_REGEXP.lastIndex = 0;
-    // eslint-disable-next-line no-cond-assign
     while ((match = _SELECTOR_REGEXP.exec(selector))) {
       if (match[SelectorRegexp.NOT]) {
         if (inNot) {

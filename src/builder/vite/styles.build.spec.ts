@@ -91,7 +91,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     if (!result.result?.success) {
       const errLogs = (result.logs || [])
         .filter((l: { level: string }) => l.level === 'error')
-        .map((l: { message?: unknown }) => String(l.message));
+        .map((l: { message?: string }) => String(l.message));
       throw new Error(`构建失败: ${errLogs.join(' ~~ ').slice(0, 4000)}`);
     }
   };

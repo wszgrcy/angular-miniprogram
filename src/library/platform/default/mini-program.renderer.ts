@@ -88,10 +88,7 @@ export class MiniProgramRenderer implements Renderer2 {
       parent.removeChild(oldChild);
     }
   }
-  selectRootElement(
-    selectorOrNode: string | unknown,
-    preserveContent?: boolean,
-  ) {
+  selectRootElement(selectorOrNode: unknown, preserveContent?: boolean) {
     const root = new AgentNode('element');
     root.selector = selectorOrNode;
     this.root = root;
