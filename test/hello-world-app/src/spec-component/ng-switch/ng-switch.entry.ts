@@ -1,3 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { NgSwitchComponent } from './ng-switch.component';
-componentRegistry(NgSwitchComponent);
+export { NgSwitchComponent as default } from './ng-switch.component';

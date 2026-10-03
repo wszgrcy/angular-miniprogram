@@ -84,7 +84,6 @@ describe('AbortController polyfill 接入', () => {
         tsConfig: 'src/tsconfig.app.json',
         outputPath: 'dist/vite-polyfill',
         pages: DEFAULT_ANGULAR_CONFIG.pages,
-        components: DEFAULT_ANGULAR_CONFIG.components,
         platform: PlatformType.wx,
         sourceMap: false,
       });

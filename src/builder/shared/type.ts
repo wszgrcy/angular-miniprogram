@@ -1,4 +1,5 @@
 import type { AssetPattern } from '@angular-devkit/build-angular';
+import type { MpEntryType } from './entry-component';
 
 export interface PagePattern extends Exclude<AssetPattern, string> {
   /** 入口名 */
@@ -19,7 +20,8 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
   inputFiles: {
     config: string;
   };
-  type: 'component' | 'page';
+  /** 入口类型，决定构建器注入哪个注册函数 */
+  type: MpEntryType;
 }
 
 /**

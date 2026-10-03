@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { ControlFlowSPecComponent } from './control-flow.component';
-
-bootstrapPage(ControlFlowSPecComponent);
+export { ControlFlowSPecComponent as default } from './control-flow.component';

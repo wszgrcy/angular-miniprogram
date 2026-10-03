@@ -29,10 +29,9 @@
         "$ref": "#/definitions/assetPattern"
       }
     },
-    "components": {
+    "customTabbar": {
       "type": "array",
-      "description": "组件配置",
-      "default": [],
+      "description": "自定义 tabBar 入口的源文件位置。产物目录由平台决定（微信系 custom-tab-bar，支付宝 customize-tab-bar），output 字段会被覆盖；不配则默认取 <sourceRoot>/custom-tab-bar 下的 *.entry.ts",
       "items": {
         "$ref": "#/definitions/assetPattern"
       }

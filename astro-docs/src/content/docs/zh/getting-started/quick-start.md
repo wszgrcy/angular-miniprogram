@@ -43,14 +43,14 @@ export class HelloPage {
 }
 ```
 
-入口文件 `hello.entry.ts`：
+入口文件 `hello.entry.ts` 只声明「这个入口是哪个组件」：
 
 ```ts
-import { bootstrapPage } from 'angular-miniprogram';
-import { HelloPage } from './hello.component';
-
-bootstrapPage(HelloPage);
+export { HelloPage as default } from './hello.component';
 ```
+
+`bootstrapPage` / `componentRegistry` 由构建器按入口来源（`pages` 里的是页面，
+其余都是组件）自动注入，用户代码里不需要出现框架 API。详见[入口：页面 / 组件 / tabBar](../../guide/entry/)。
 
 ## 3. 构建
 

@@ -373,19 +373,27 @@ export class MiniProgramCoreFactory {
    *
    * ```ts
    * // foo.entry.ts
-   * import { bootstrapPage } from 'angular-miniprogram';
-   * import { FooComponent } from './foo.component';
-   * bootstrapPage(FooComponent);
+   * export { FooComponent as default } from './foo.component';
    * ```
+   *
+   * 构建器会替这一行生成 `bootstrapPage(FooComponent)`（见
+   * `builder/vite/plugins/entry-bootstrap.plugin.ts`），显式调用也仍然支持。
+   *
+   * `useComponent` 不传时按组件是否声明了 `mpComponentOptions` 推断：
+   * 那份配置只走 `Component()` 分支，声明了它却走 `Page()` 就是静默丢弃。
    */
   public bootstrapPage = (
     component: Type<unknown>,
-    pageOptions?: { useComponent: boolean },
+    pageOptions?: { useComponent?: boolean },
   ) => {
     return this.createPageBootstrap(
       component,
       (instance) => getApp<AppOptions>().__ngStartPage(component, instance),
-      pageOptions,
+      {
+        ...pageOptions,
+        useComponent:
+          pageOptions?.useComponent ?? !!this.getComponentOptions(component),
+      },
     );
   };
   protected addNgComponentLinkLogic(

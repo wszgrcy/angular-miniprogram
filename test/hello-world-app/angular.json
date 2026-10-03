@@ -23,13 +23,6 @@
                 "output": "pages"
               }
             ],
-            "components": [
-              {
-                "glob": "**/*.entry.ts",
-                "input": "./src/spec-component",
-                "output": "components"
-              }
-            ],
             "platform": "wx",
             "outputPath": "dist/app",
             "index": "",
@@ -48,9 +41,7 @@
                 "output": "./"
               }
             ],
-            "styles": [
-              "src/styles.css"
-            ],
+            "styles": ["src/styles.css"],
             "scripts": []
           }
         },
@@ -69,13 +60,6 @@
                 "output": "pages"
               }
             ],
-            "components": [
-              {
-                "glob": "**/*.entry.ts",
-                "input": "./src/spec-component",
-                "output": "components"
-              }
-            ],
             "assets": [
               {
                 "glob": "project.config.json",
@@ -88,9 +72,7 @@
                 "output": "./"
               }
             ],
-            "styles": [
-              "src/styles.css"
-            ],
+            "styles": ["src/styles.css"],
             "tsConfig": "src/tsconfig.spec.json"
           }
         }

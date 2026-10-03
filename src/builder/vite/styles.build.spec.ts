@@ -86,7 +86,6 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       outputPath: 'dist/vite-styles',
       main: DEFAULT_ANGULAR_CONFIG.main,
       pages: DEFAULT_ANGULAR_CONFIG.pages,
-      components: DEFAULT_ANGULAR_CONFIG.components,
       styles: DEFAULT_ANGULAR_CONFIG.styles,
       assets: DEFAULT_ANGULAR_CONFIG.assets.filter(
         (a) => a.glob !== 'app.json',
@@ -136,9 +135,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     await write(
       'src/pages/styled/styled.entry.ts',
       [
-        "import { bootstrapPage } from 'angular-miniprogram';",
-        "import { StyledComponent } from './styled.component';",
-        'bootstrapPage(StyledComponent);',
+        "export { StyledComponent as default } from './styled.component';",
         '',
       ].join('\n'),
     );

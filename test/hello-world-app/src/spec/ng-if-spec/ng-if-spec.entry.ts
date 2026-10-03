@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { NgIfSPecComponent } from './ng-if.component';
-
-bootstrapPage(NgIfSPecComponent);
+export { NgIfSPecComponent as default } from './ng-if.component';

@@ -1,3 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { NgContentComponent } from './ng-content.component';
-componentRegistry(NgContentComponent);
+export { NgContentComponent as default } from './ng-content.component';

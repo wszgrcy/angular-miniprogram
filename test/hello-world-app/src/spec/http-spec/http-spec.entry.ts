@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { HttpSpecComponent } from './http.component';
-
-bootstrapPage(HttpSpecComponent);
+export { HttpSpecComponent as default } from './http.component';

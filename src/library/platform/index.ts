@@ -9,8 +9,11 @@ export {
   propertyChange,
   ComponentFinderService,
 } from 'angular-miniprogram/platform/wx';
+/** @internal */
 export const bootstrapPage = MiniProgramCore.bootstrapPage;
+/** @internal */
 export const componentRegistry = MiniProgramCore.componentRegistry;
+/** @internal */
 export const bootstrapCustomTabbar = MiniProgramCore.bootstrapCustomTabbar;
 export * from './token';
 export { PAGE_TOKEN } from 'angular-miniprogram/platform/wx';

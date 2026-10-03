@@ -1,3 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { NgTemplateOutletComponent } from './ng-template-outlet.component';
-componentRegistry(NgTemplateOutletComponent);
+export { NgTemplateOutletComponent as default } from './ng-template-outlet.component';

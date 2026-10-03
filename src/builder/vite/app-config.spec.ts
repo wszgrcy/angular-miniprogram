@@ -9,6 +9,7 @@ import {
 
 describe('app-config: 校验', () => {
   const builtPages = ['pages/index/index', 'pages/about/about'];
+  const WX_TABBAR = { dir: 'custom-tab-bar', flag: 'custom' } as const;
 
   it('合法配置通过校验', () => {
     const config: MpAppConfig = {
@@ -134,6 +135,79 @@ describe('app-config: 校验', () => {
       builtPages,
     );
     expect(errors.some((e) => e.includes('缺少 pagePath'))).toBe(true);
+  });
+
+  it('tabBar.custom 为真但没产出 custom-tab-bar/index 报错', () => {
+    const errors = validateAppConfig(
+      {
+        pages: ['pages/index/index'],
+        tabBar: {
+          custom: true,
+          list: [{ pagePath: 'pages/index/index', text: 'x' }],
+        },
+      },
+      builtPages,
+      [],
+      WX_TABBAR,
+    );
+    expect(
+      errors.some((e) => e.includes('没有产出 custom-tab-bar/index')),
+    ).toBe(true);
+  });
+
+  it('tabBar.custom 为真且已产出 tabBar 入口时不报错', () => {
+    const errors = validateAppConfig(
+      {
+        pages: ['pages/index/index'],
+        tabBar: {
+          custom: true,
+          list: [{ pagePath: 'pages/index/index', text: 'x' }],
+        },
+      },
+      builtPages,
+      ['custom-tab-bar/index'],
+      WX_TABBAR,
+    );
+    expect(errors).toEqual([]);
+  });
+
+  // 支付宝的目录名和开关字段都和微信系不同，校验必须跟着平台走
+  it('支付宝看 tabBar.customize 和 customize-tab-bar/index', () => {
+    const zfb = { dir: 'customize-tab-bar', flag: 'customize' } as const;
+    const config: MpAppConfig = {
+      pages: ['pages/index/index'],
+      tabBar: {
+        customize: true,
+        list: [{ pagePath: 'pages/index/index', text: 'x' }],
+      },
+    };
+    expect(validateAppConfig(config, builtPages, [], zfb)).toEqual([
+      expect.stringContaining('没有产出 customize-tab-bar/index'),
+    ]);
+    expect(
+      validateAppConfig(config, builtPages, ['customize-tab-bar/index'], zfb),
+    ).toEqual([]);
+    // 微信的 custom 在支付宝上不算数
+    expect(
+      validateAppConfig(
+        { ...config, tabBar: { custom: true, list: [] } },
+        builtPages,
+        [],
+        zfb,
+      ),
+    ).toEqual([]);
+  });
+
+  it('平台不支持自定义 tabBar 时不校验这一项', () => {
+    const errors = validateAppConfig(
+      {
+        pages: ['pages/index/index'],
+        tabBar: { custom: true, list: [{ pagePath: 'pages/index/index' }] },
+      },
+      builtPages,
+      [],
+    );
+    expect(errors).toEqual([]);
   });
 
   it('preloadRule 指向不存在页面报错', () => {

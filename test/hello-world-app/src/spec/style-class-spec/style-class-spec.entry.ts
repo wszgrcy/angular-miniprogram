@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { StyleClassSpecComponent } from './style-class-spec.component';
-
-bootstrapPage(StyleClassSpecComponent);
+export { StyleClassSpecComponent as default } from './style-class-spec.component';

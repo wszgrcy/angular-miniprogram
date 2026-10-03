@@ -1,3 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { LifeTimeComponent } from './life-time.component';
-componentRegistry(LifeTimeComponent);
+export { LifeTimeComponent as default } from './life-time.component';

@@ -1,5 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-
-import { ComplexStructureComponent } from './complex-structure.component';
-
-bootstrapPage(ComplexStructureComponent);
+export { ComplexStructureComponent as default } from './complex-structure.component';

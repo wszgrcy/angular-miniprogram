@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { BaseDirectiveComponent } from './base-directive.component';
-
-bootstrapPage(BaseDirectiveComponent);
+export { BaseDirectiveComponent as default } from './base-directive.component';

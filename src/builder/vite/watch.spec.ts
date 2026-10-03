@@ -150,7 +150,6 @@ describeBuilder(
                 void harness.writeFiles({
                   'src/app.json': JSON.stringify(appJson),
                   'src/pages/watch-new/watch-new.entry.ts': `import { Component } from '@angular/core';
-import { bootstrapPage } from 'angular-miniprogram';
 
 @Component({
   selector: 'app-watch-new',
@@ -161,7 +160,7 @@ export class WatchNewComponent {
   title = 'watch-new';
 }
 
-bootstrapPage(WatchNewComponent);
+export default WatchNewComponent;
 `,
                 });
               }

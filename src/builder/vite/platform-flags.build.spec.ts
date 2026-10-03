@@ -79,10 +79,8 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     await write(
       'src/pages/root/root.entry.ts',
       [
-        "import { bootstrapPage } from 'angular-miniprogram';",
-        "import { RootComponent } from './root.component';",
+        "export { RootComponent as default } from './root.component';",
         "import { PLATFORM_VALUE } from './platform-value';",
-        'bootstrapPage(RootComponent, { useComponent: true });',
         '// 全局赋值是副作用，不会被 tree-shaking 移除，作为产物探针',
         '(globalThis as any).__platformProbe = PLATFORM_VALUE;',
         '',
@@ -96,7 +94,6 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       outputPath,
       main: DEFAULT_ANGULAR_CONFIG.main,
       pages: DEFAULT_ANGULAR_CONFIG.pages,
-      components: DEFAULT_ANGULAR_CONFIG.components,
       assets: (DEFAULT_ANGULAR_CONFIG.assets as Array<{ glob: string }>).filter(
         (a) => a.glob !== 'app.json',
       ),

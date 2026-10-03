@@ -93,9 +93,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       await write(
         'src/pages/native-host/native-host.entry.ts',
         [
-          "import { bootstrapPage } from 'angular-miniprogram';",
-          "import { NativeHostComponent } from './native-host.component';",
-          'bootstrapPage(NativeHostComponent);',
+          "export { NativeHostComponent as default } from './native-host.component';",
           '',
         ].join('\n'),
       );
@@ -115,7 +113,6 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
         outputPath: 'dist/vite-native',
         main: DEFAULT_ANGULAR_CONFIG.main,
         pages: DEFAULT_ANGULAR_CONFIG.pages,
-        components: DEFAULT_ANGULAR_CONFIG.components,
         assets: (
           DEFAULT_ANGULAR_CONFIG.assets as Array<{ glob: string }>
         ).filter((a) => a.glob !== 'app.json'),

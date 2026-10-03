@@ -1,9 +1,11 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { BuildPlatform } from '../platform';
+import { BuildPlatform, type CustomTabbarSpec } from '../platform';
 
 export class WxBuildPlatform extends BuildPlatform {
   packageName = 'wx';
+  customTabbar: CustomTabbarSpec = { dir: 'custom-tab-bar', flag: 'custom' };
+
   globalObject = 'wx';
   globalVariablePrefix = 'wx.__window';
   fileExtname = {

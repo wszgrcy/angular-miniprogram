@@ -1,3 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { TagViewConvertComponent } from './tag-view-convert.component';
-componentRegistry(TagViewConvertComponent);
+export { TagViewConvertComponent as default } from './tag-view-convert.component';

@@ -11,6 +11,8 @@
  * 两者同时出现视为配置冲突，直接报错，避免「改了没效果」的玄学。
  */
 
+import type { CustomTabbarSpec } from '../platform/platform';
+
 /** 分包内的页面条目：字符串或带 path 的对象（各家小程序均支持） */
 export type MpSubPackagePage =
   | string
@@ -45,6 +47,10 @@ export interface MpAppConfig {
   window?: Record<string, unknown>;
   tabBar?: {
     list?: Array<{ pagePath?: string; [key: string]: unknown }>;
+    /** 微信系开关 */
+    custom?: boolean;
+    /** 支付宝开关 */
+    customize?: boolean;
     [key: string]: unknown;
   };
   /** 微信风格 key */
@@ -104,10 +110,14 @@ function preloadPackagesOf(
  * @param config 结构化 app 配置
  * @param builtPagePaths 本次构建实际产出的页面路径（不含扩展名，分包页为
  *   已拼上 root 的全路径），来自 PagePattern.outputFiles.path
+ * @param builtTabbarPaths 本次构建产出的自定义 tabBar 入口路径（同上口径）
+ * @param customTabbar 平台的自定义 tabBar 约定；不传即不校验这一项
  */
 export function validateAppConfig(
   config: MpAppConfig,
   builtPagePaths: string[],
+  builtTabbarPaths: string[] = [],
+  customTabbar?: CustomTabbarSpec,
 ): string[] {
   const errors: string[] = [];
   const mainPages = (config.pages ?? []).map(pagePathOf);
@@ -179,6 +189,19 @@ export function validateAppConfig(
     if (!seen.has(pagePath)) {
       errors.push(
         `tabBar.pagePath "${pagePath}" 不在主包 pages 中（tabBar 页面必须在主包）`,
+      );
+    }
+  }
+
+  // 自定义 tabBar：产物目录和开关字段都是平台写死的（微信系 custom-tab-bar +
+  // tabBar.custom，支付宝 customize-tab-bar + tabBar.customize），
+  // 开了开关却没产出对应组件，运行时就是一个空白条且不报错
+  if (customTabbar && config.tabBar?.[customTabbar.flag]) {
+    const expected = `${customTabbar.dir}/index`;
+    if (!builtTabbarPaths.includes(expected)) {
+      errors.push(
+        `tabBar.${customTabbar.flag} 为 true，但本次构建没有产出 ${expected} 入口` +
+          '（检查 angular.json 的 customTabbar 配置，以及入口所在目录是否被 tsconfig 覆盖）',
       );
     }
   }

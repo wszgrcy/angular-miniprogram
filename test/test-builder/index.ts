@@ -50,9 +50,6 @@ export const DEFAULT_ANGULAR_CONFIG = {
       output: './',
     },
   ],
-  components: [
-    { glob: '**/*.entry.ts', input: './src/components', output: 'components' },
-  ],
   pages: [{ glob: '**/*.entry.ts', input: './src/pages', output: 'pages' }],
   styles: [
     {

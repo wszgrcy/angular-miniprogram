@@ -79,9 +79,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     await write(
       `src/packageA/pages/${name}/${name}.entry.ts`,
       [
-        "import { bootstrapPage } from 'angular-miniprogram';",
-        `import { SubPageComponent } from './${name}.component';`,
-        `bootstrapPage(SubPageComponent);`,
+        `export { SubPageComponent as default } from './${name}.component';`,
         '',
       ].join('\n'),
     );
@@ -115,7 +113,6 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
             output: 'packageA',
           },
         ],
-        components: DEFAULT_ANGULAR_CONFIG.components,
         assets: (
           DEFAULT_ANGULAR_CONFIG.assets as Array<{ glob: string }>
         ).filter((a) => a.glob !== 'app.json'),
@@ -174,9 +171,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       await write(
         'src/packageB/pages/sub-b/sub-b.entry.ts',
         [
-          "import { bootstrapPage } from 'angular-miniprogram';",
-          "import { SubBComponent } from './sub-b.component';",
-          'bootstrapPage(SubBComponent);',
+          "export { SubBComponent as default } from './sub-b.component';",
           '',
         ].join('\n'),
       );
@@ -208,7 +203,6 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
             output: 'packageB',
           },
         ],
-        components: DEFAULT_ANGULAR_CONFIG.components,
         assets: (
           DEFAULT_ANGULAR_CONFIG.assets as Array<{ glob: string }>
         ).filter((a) => a.glob !== 'app.json'),

@@ -2,7 +2,6 @@ import type { NgtscProgram, ParsedConfiguration } from '@angular/compiler-cli';
 import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
 import { join, normalize, resolve } from '@angular-devkit/core';
 import { createHash } from 'crypto';
-import { createCssSelectorForTs } from 'cyia-code-util';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Injector, inject } from 'static-injector';
@@ -17,6 +16,7 @@ import { BuildPlatform } from '../platform/platform';
 import { angularCompilerCliPromise } from '../util/load_esm';
 import { planSharedWxsEmit } from '../wxs/wxs-declare';
 import { parseWxsSource } from '../wxs/wxs-source';
+import { detectEntryComponent } from './entry-component';
 import {
   COMPILER_HOST,
   OLD_BUILDER,
@@ -202,7 +202,9 @@ export class MiniProgramApplicationAnalysisService {
         })),
       );
       config.set(entryPattern.outputFiles.config, {
-        component: entryPattern.type === 'component' || undefined,
+        // 页面走 Page()；组件与自定义 tabBar 都是 Component()，
+        // json 必须带 component: true，否则小程序不把它当组件
+        component: entryPattern.type === 'page' ? undefined : true,
         usingComponents: list,
         existConfig: entryPattern.inputFiles.config,
       });
@@ -247,10 +249,28 @@ export class MiniProgramApplicationAnalysisService {
   }
 
   /**
-   * 取 entry 里 `componentRegistry(XxxComponent)` / `bootstrapPage(XxxComponent)`
-   * 真正指向的组件类名。
+   * 取 entry 绑定的组件类表达式。
    *
-   * `getSymbolAtLocation` 拿到的声明通常是 ImportSpecifier（`import { X } from ...`），
+   * 只有一个来源：入口的 `export default`（见 entry-component.ts）。
+   */
+  private getEntryComponentExpression(
+    sourceFile: ts.SourceFile,
+  ): ts.Expression {
+    const expression = detectEntryComponent(sourceFile);
+    if (!expression) {
+      throw new Error(
+        `${sourceFile.fileName} 没声明入口组件：` +
+          `需要 export default 组件类（或 export { 组件类 as default } from './x'）`,
+      );
+    }
+    return expression;
+  }
+
+  /**
+   * 取入口绑定的组件类名。
+   *
+   * `getSymbolAtLocation` 拿到的声明通常是 ImportSpecifier / ExportSpecifier
+   * （`import { X } from ...`、`export { X as default } from ...`），
    * 不是类声明本身，所以要先沿 alias 解到原始 symbol 再取类名。
    * `import { X as Y }` 的情况以原始类名为准。
    */
@@ -273,6 +293,27 @@ export class MiniProgramApplicationAnalysisService {
       return '';
     }
     return '';
+  }
+
+  /**
+   * 从 import / export 说明符往上找到携带 moduleSpecifier 的那层。
+   *
+   * `import { X } from './y'` 与 `export { X as default } from './y'`
+   * 到 ImportDeclaration / ExportDeclaration 的层数不一样（前者多一层
+   * NamedNodeArray），所以逐层往上找，不数固定层数。
+   */
+  private findModuleSpecifier(
+    node: ts.Node | undefined,
+  ): ts.Expression | undefined {
+    let current = node;
+    // 层级最多几层，防御性地防环
+    for (let i = 0; i < 5 && current; i++) {
+      if (ts.isImportDeclaration(current) || ts.isExportDeclaration(current)) {
+        return current.moduleSpecifier;
+      }
+      current = current.parent;
+    }
+    return undefined;
   }
 
   private initHost(config: ParsedConfiguration) {
@@ -323,48 +364,28 @@ export class MiniProgramApplicationAnalysisService {
           (item) => path.normalize(item.src) === path.normalize(module!),
         );
         if (maybeEntryPath) {
-          const sourceFile = this.tsProgram.getSourceFile(maybeEntryPath.src)!;
-          const selector = createCssSelectorForTs(sourceFile);
-          let importComponent: ts.Expression;
-          if (maybeEntryPath.type === 'page') {
-            // 页面入口认 `bootstrapPage(Component)`，组件在第一个参数。
-            const standaloneNode = selector.queryOne(
-              `CallExpression[expression=bootstrapPage]`,
-            ) as ts.CallExpression;
-            if (standaloneNode) {
-              importComponent = standaloneNode.arguments[0];
-            } else {
-              throw new Error(
-                `${maybeEntryPath.src} 找不到 bootstrapPage 调用`,
-              );
-            }
-          } else {
-            // 组件入口认 `componentRegistry(X)`；自定义 tabBar 入口认
-            // `bootstrapCustomTabbar(X)`——两者参数位置相同。
-            const node =
-              (selector.queryOne(
-                `CallExpression[expression=componentRegistry]`,
-              ) as ts.CallExpression) ||
-              (selector.queryOne(
-                `CallExpression[expression=bootstrapCustomTabbar]`,
-              ) as ts.CallExpression);
-            if (!node) {
-              throw new Error(
-                `${maybeEntryPath.src} 找不到 componentRegistry / bootstrapCustomTabbar 调用`,
-              );
-            }
-            importComponent = node.arguments[0];
+          const sourceFile = this.tsProgram.getSourceFile(maybeEntryPath.src);
+          if (!sourceFile) {
+            throw new Error(
+              `${maybeEntryPath.src} 不在 ${this.tsConfig} 的编译范围内，` +
+                `入口文件必须被 tsconfig 的 files / include 覆盖`,
+            );
           }
+          const importComponent = this.getEntryComponentExpression(sourceFile);
           const symbol = this.typeChecker.getSymbolAtLocation(importComponent);
           const node = symbol?.getDeclarations()?.[0];
 
-          // bootstrapPage(InlineComponent) 这种组件就在 entry 文件里、
+          // `export default InlineComponent` 这种组件就在 entry 文件里、
           // 不是 import 进来的，根本没有 ImportDeclaration，
-          // 不能再往下走 parent.parent.parent（会 undefined.parent 崩）。
+          // 不能再往下走 parent 链（会 undefined.parent 崩）。
           // 组件声明文件就是 entry 本身，直接命中。
+          // 注意 re-export（export { X as default } from './y'）的声明节点也在
+          // entry 文件里，但它是别名不是声明，必须排除，否则同文件多组件时
+          // 会错把别人的 entry 认成自己的。
           if (
             node &&
             !ts.isImportSpecifier(node) &&
+            !ts.isExportSpecifier(node) &&
             path.normalize(node.getSourceFile().fileName) ===
               path.normalize(maybeEntryPath.src)
           ) {
@@ -395,18 +416,19 @@ export class MiniProgramApplicationAnalysisService {
             maybeEntryPath = undefined;
             continue;
           }
-          const importDeclaration = node?.parent?.parent
-            ?.parent as ts.ImportDeclaration;
-          if (
-            !importDeclaration ||
-            !ts.isImportDeclaration(importDeclaration)
-          ) {
-            // 解析不到 import（组件不是 import 进来的），这个候选 entry 不匹配，
-            // 继续找下一个而不是直接崩
+          const moduleSpecifier =
+            // 优先从引用点往上找：`export { X as default } from './y'` 的
+            // symbol 声明可能已经跳到 './y' 里的类声明上，从那里往上就找不到
+            // 模块说明符了
+            this.findModuleSpecifier(importComponent) ??
+            this.findModuleSpecifier(node);
+          if (!moduleSpecifier) {
+            // 解析不到 import / re-export（组件不是外部模块引进来的），
+            // 这个候选 entry 不匹配，继续找下一个而不是直接崩
             maybeEntryPath = undefined;
             continue;
           }
-          const relativeImportComponentPath = importDeclaration.moduleSpecifier
+          const relativeImportComponentPath = moduleSpecifier
             .getText()
             .slice(1, -1);
 

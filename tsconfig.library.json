@@ -6,6 +6,10 @@
     "noImplicitThis": true,
     "outDir": "dist",
     "declaration": true,
+    // 入口注册函数（`bootstrapPage` / `componentRegistry` / `bootstrapCustomTabbar`）
+    // 标了 `@internal`：它们只给构建器生成的入口模块调用，不该出现在用户的
+    // import 补全里。只剔类型，运行时仍照常导出（见 fesm 产物）。
+    "stripInternal": true,
     "target": "ES2015",
     "module": "esnext",
     "strict": true,

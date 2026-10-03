@@ -1,9 +1,11 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { BuildPlatform } from '../platform';
+import { BuildPlatform, type CustomTabbarSpec } from '../platform';
 
 export class QqBuildPlatform extends BuildPlatform {
   packageName = 'qq';
+  customTabbar: CustomTabbarSpec = { dir: 'custom-tab-bar', flag: 'custom' };
+
   globalObject = 'qq';
   globalVariablePrefix = 'qq.__window';
   fileExtname = {

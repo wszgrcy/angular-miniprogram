@@ -13,6 +13,7 @@
     "spec/**/*.entry.ts",
     "spec/**/*.spec.ts",
     "spec-component/**/*.entry.ts",
-    "spec-component/**/*.module.ts"
+    "spec-component/**/*.module.ts",
+    "custom-tab-bar/**/*.entry.ts"
   ]
 }

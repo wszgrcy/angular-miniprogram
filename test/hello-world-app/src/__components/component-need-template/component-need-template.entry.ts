@@ -1,4 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { ComponentNeedTemplateComponent } from './component-need-template.component';
-
-componentRegistry(ComponentNeedTemplateComponent);
+export { ComponentNeedTemplateComponent as default } from './component-need-template.component';

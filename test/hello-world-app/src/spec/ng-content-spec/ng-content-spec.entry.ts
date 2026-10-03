@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { NgContentSpecComponent } from './ng-content.component';
-
-bootstrapPage(NgContentSpecComponent);
+export { NgContentSpecComponent as default } from './ng-content.component';

@@ -39,7 +39,8 @@ export interface VitestViteBuilderOptions {
   tsConfig: string;
   outputPath?: string;
   pages?: AssetPattern[];
-  components?: AssetPattern[];
+  /** 自定义 tabBar 入口，语义与 application builder 的同名字段一致 */
+  customTabbar?: AssetPattern[];
   platform: import('../../platform/platform').PlatformType;
   assets?: AssetPattern[];
   styles?: (string | { input: string })[];
@@ -82,10 +83,11 @@ export async function createVitestViteConfig(options: {
 
   const entryPatterns = await generateEntryPatterns({
     pages: vitestOptions.pages || [],
-    components: vitestOptions.components || [],
+    customTabbar: vitestOptions.customTabbar,
     workspaceRoot: context.workspaceRoot,
     context,
     buildPlatform,
+    tsConfig: vitestOptions.tsConfig,
   });
 
   const { absoluteProjectRoot, absoluteProjectSourceRoot } =
@@ -133,7 +135,6 @@ export async function createVitestViteConfig(options: {
     context,
     tsConfig: derivedTs.path,
     pages: vitestOptions.pages || [],
-    components: vitestOptions.components || [],
     assets: vitestOptions.assets,
     styles: vitestOptions.styles,
     watch: !!vitestOptions.watch,
@@ -203,6 +204,7 @@ export async function createVitestViteConfig(options: {
           ...toRollupInput([
             ...entryPatterns.pageList,
             ...entryPatterns.componentList,
+            ...entryPatterns.tabbarList,
           ]),
           // 测试引导入口
           test: path.resolve(context.workspaceRoot, vitestOptions.main),

@@ -35,6 +35,13 @@ export default defineConfig({
           ],
         },
         {
+          label: '构建配置',
+          translations: { en: 'Build' },
+          items: [
+            nav('入口：页面 / 组件 / tabBar', 'Entries', '/guide/entry/'),
+          ],
+        },
+        {
           label: '模板语法',
           translations: { en: 'Template Syntax' },
           items: [

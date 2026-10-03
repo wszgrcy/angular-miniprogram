@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { SelfTemplateSPecComponent } from './self-template.component';
-
-bootstrapPage(SelfTemplateSPecComponent);
+export { SelfTemplateSPecComponent as default } from './self-template.component';

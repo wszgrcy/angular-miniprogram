@@ -24,6 +24,7 @@ import {
 } from './entry-patterns';
 import { platformConditionDefine } from './platform-flags';
 import { miniProgramComponentTransformPlugin } from './plugins/component-transform.plugin';
+import { entryBootstrapPlugin } from './plugins/entry-bootstrap.plugin';
 import { libraryTemplatePlugin } from './plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from './plugins/mini-program-assets.plugin';
 import { nativeComponentsPlugin } from './plugins/native-components.plugin';
@@ -45,7 +46,16 @@ export interface ViteMiniProgramBuildOptions {
   tsConfig: string;
   outputPath: string;
   pages: AssetPattern[];
-  components: AssetPattern[];
+  /**
+   * 自定义 tabBar 入口的**源文件位置**。
+   *
+   * 产物目录由平台定（`BuildPlatform.customTabbar.dir`：微信系 `custom-tab-bar`，
+   * 支付宝 `customize-tab-bar`），这里配了 `output` 也会被覆盖；
+   * 平台不支持自定义 tabBar 时扫到入口直接报错。
+   *
+   * 不配则默认取 `<sourceRoot>/custom-tab-bar` 下的 `*.entry.ts`。
+   */
+  customTabbar?: AssetPattern[];
   platform: PlatformType;
   assets?: AssetPattern[];
   styles?: (string | { input: string })[];
@@ -209,19 +219,22 @@ export async function createMiniProgramViteConfig(options: {
 
   const entryPatterns = await generateEntryPatterns({
     pages: viteOptions.pages || [],
-    components: viteOptions.components || [],
+    customTabbar: viteOptions.customTabbar,
     workspaceRoot: context.workspaceRoot,
     context,
     buildPlatform,
+    tsConfig: viteOptions.tsConfig,
   });
   const allEntries = [
     ...entryPatterns.pageList,
     ...entryPatterns.componentList,
+    ...entryPatterns.tabbarList,
   ];
   context.logger.info(
     `[小程序构建] 平台 ${viteOptions.platform}，` +
       `页面 ${entryPatterns.pageList.length} 个、` +
-      `组件 ${entryPatterns.componentList.length} 个，` +
+      `组件 ${entryPatterns.componentList.length} 个、` +
+      `自定义 tabBar ${entryPatterns.tabbarList.length} 个，` +
       `输出 ${viteOptions.outputPath}` +
       `（${isProduction ? 'production' : 'development'}）`,
   );
@@ -325,6 +338,9 @@ export async function createMiniProgramViteConfig(options: {
         }
       : {},
     plugins: [
+      // 入口注册（bootstrapPage / componentRegistry / bootstrapCustomTabbar）
+      // 由构建器注入，所以必须 enforce: 'pre' 抢在 vite 解析器前面认领虚拟 id
+      entryBootstrapPlugin({ entries: allEntries }),
       // 文件级条件编译（foo.wx.ts 优先），必须 enforce: 'pre' 抢在
       // 其他 resolver 前，故放数组首位
       platformFileResolvePlugin({ platform: viteOptions.platform }),
@@ -528,10 +544,11 @@ export function runViteBuilder(
         // 不用 Vite 原生 watch，因为 Rolldown watch 不支持动态加 input。
         const entryPatterns = await generateEntryPatterns({
           pages: options.pages || [],
-          components: options.components || [],
+          customTabbar: options.customTabbar,
           workspaceRoot: context.workspaceRoot,
           context,
           buildPlatform,
+          tsConfig: options.tsConfig,
         });
         const { absoluteProjectSourceRoot } = await resolveProjectRoots({
           workspaceRoot: context.workspaceRoot,
@@ -580,6 +597,7 @@ export function runViteBuilder(
             entrySrcPaths: [
               ...entryPatterns.pageList,
               ...entryPatterns.componentList,
+              ...entryPatterns.tabbarList,
             ].map((p) => p.src),
           }),
           factory,

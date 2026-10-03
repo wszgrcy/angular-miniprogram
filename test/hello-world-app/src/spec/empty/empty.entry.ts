@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { EmptyComponent } from './empty.component';
-
-bootstrapPage(EmptyComponent);
+export { EmptyComponent as default } from './empty.component';

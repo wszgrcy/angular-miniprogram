@@ -60,7 +60,6 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
         tsConfig: 'src/tsconfig.app.json',
         outputPath: 'dist/vite-app',
         pages: DEFAULT_ANGULAR_CONFIG.pages,
-        components: DEFAULT_ANGULAR_CONFIG.components,
         platform: PlatformType.wx,
         sourceMap: false,
       });
@@ -171,7 +170,6 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       await harness.writeFile(
         'src/pages/env-probe/env-probe.entry.ts',
         `import { Component } from '@angular/core';
-import { bootstrapPage } from 'angular-miniprogram';
 import { environment } from '../../environments/environment';
 
 @Component({
@@ -183,7 +181,7 @@ export class EnvProbeComponent {
   isProd = environment.production;
 }
 
-bootstrapPage(EnvProbeComponent);
+export default EnvProbeComponent;
 `,
       );
     };
@@ -203,7 +201,6 @@ bootstrapPage(EnvProbeComponent);
         tsConfig: 'src/tsconfig.app.json',
         outputPath: 'dist/vite-env',
         pages: DEFAULT_ANGULAR_CONFIG.pages,
-        components: DEFAULT_ANGULAR_CONFIG.components,
         platform: PlatformType.wx,
         sourceMap: false,
         fileReplacements: [
@@ -237,7 +234,6 @@ bootstrapPage(EnvProbeComponent);
         tsConfig: 'src/tsconfig.app.json',
         outputPath: 'dist/vite-noenv',
         pages: DEFAULT_ANGULAR_CONFIG.pages,
-        components: DEFAULT_ANGULAR_CONFIG.components,
         platform: PlatformType.wx,
         sourceMap: false,
       });

@@ -210,6 +210,32 @@ export function emitWxs(
   });
 }
 
+/**
+ * 是不是 page / component / tabbar / library 的入口 chunk。
+ *
+ * 这类 chunk 必须由小程序运行时在**正确上下文**里加载，不能从 app.js 里
+ * require（那等于在 app 上下文调 Page() / Component()）。
+ *
+ * 入参是**产物路径**（rollup chunk 的 fileName，相对产物根），不是源路径；
+ * 前缀就是各类入口的约定产物目录，tabBar 那个由平台给。
+ */
+function isEntryChunk(
+  fileName: string,
+  bootstrapChunk: string,
+  tabbarDir: string | undefined,
+): boolean {
+  const posix = toPosixPath(fileName);
+  if (posix === bootstrapChunk) {
+    return false;
+  }
+  return (
+    posix.startsWith('pages/') ||
+    posix.startsWith('components/') ||
+    posix.startsWith('library/') ||
+    (!!tabbarDir && posix.startsWith(`${tabbarDir}/`))
+  );
+}
+
 export function miniProgramAssetsPlugin(
   options: MiniProgramAssetsPluginOptions,
 ): Plugin {
@@ -445,7 +471,15 @@ export function miniProgramAssetsPlugin(
         const builtPagePaths = options.entryPatterns
           .filter((p) => p.type === 'page')
           .map((p) => toPosixPath(p.outputFiles.path));
-        const errors = validateAppConfig(appConfig, builtPagePaths);
+        const builtTabbarPaths = options.entryPatterns
+          .filter((p) => p.type === 'tabbar')
+          .map((p) => toPosixPath(p.outputFiles.path));
+        const errors = validateAppConfig(
+          appConfig,
+          builtPagePaths,
+          builtTabbarPaths,
+          options.buildPlatform.customTabbar,
+        );
         if (errors.length) {
           this.error(
             `app 配置校验失败（${options.appJson}）:\n  - ` +
@@ -471,6 +505,7 @@ export function miniProgramAssetsPlugin(
       const byFileName = new Map(jsChunks.map((c) => [c.fileName, c]));
       // app.js 的引导 chunk（应用 = main.js，测试 = test.js）
       const bootstrapChunk = options.bootstrapChunk ?? 'main.js';
+      const tabbarDir = options.buildPlatform.customTabbar?.dir;
       const emittedOrder: string[] = [];
       const visiting = new Set<string>();
       const visited = new Set<string>();
@@ -514,19 +549,6 @@ export function miniProgramAssetsPlugin(
        * 只含 app 主入口依赖的那几个 chunk（main/runtime/vendor/...），
        * 不含 page/component entry。
        */
-      const isEntryChunk = (fileName: string) => {
-        const posix = toPosixPath(fileName);
-        // page / component / library 的 entry 产物都落在这几个目录下，
-        // 且不是引导入口
-        if (posix === bootstrapChunk) {
-          return false;
-        }
-        return (
-          posix.startsWith('pages/') ||
-          posix.startsWith('components/') ||
-          posix.startsWith('library/')
-        );
-      };
       // 从 main.js 出发收集可达 chunk（含自身）
       const reachable = new Set<string>();
       const collect = (fileName: string) => {
@@ -550,7 +572,11 @@ export function miniProgramAssetsPlugin(
       if (!byFileName.has(bootstrapChunk)) {
         // 没有 main 引导入口时退化成「排除 entry 类 chunk」，
         // 至少不会再把 Page()/Component() 拉进 app 上下文
-        required.push(...emittedOrder.filter((f) => !isEntryChunk(f)));
+        required.push(
+          ...emittedOrder.filter(
+            (f) => !isEntryChunk(f, bootstrapChunk, tabbarDir),
+          ),
+        );
       }
       /**
        * polyfill 必须在最前面。

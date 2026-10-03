@@ -31,13 +31,10 @@ export class HelloComponent {
 }
 ```
 
-以页面身份启动：
+以页面身份启动（入口只需声明绑哪个组件，`bootstrapPage` 由构建器注入）：
 
 ```ts
-import { bootstrapPage } from 'angular-miniprogram';
-import { HelloComponent } from './hello.component';
-
-bootstrapPage(HelloComponent);
+export { HelloComponent as default } from './hello.component';
 ```
 
 构建后得到的 wxml：

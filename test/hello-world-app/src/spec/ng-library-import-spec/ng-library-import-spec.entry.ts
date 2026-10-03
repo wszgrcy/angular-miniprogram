@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { NgLibraryImportSPecComponent } from './ng-library-import.component';
-
-bootstrapPage(NgLibraryImportSPecComponent);
+export { NgLibraryImportSPecComponent as default } from './ng-library-import.component';

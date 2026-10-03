@@ -1,3 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { NgLibraryImportComponent } from './ng-library-import.component';
-componentRegistry(NgLibraryImportComponent);
+export { NgLibraryImportComponent as default } from './ng-library-import.component';

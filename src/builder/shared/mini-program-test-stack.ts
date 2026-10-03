@@ -5,6 +5,7 @@ import * as path from 'path';
 import type { Plugin } from 'vite';
 import type { BuildPlatform, PlatformType } from '../platform/platform';
 import { miniProgramComponentTransformPlugin } from '../vite/plugins/component-transform.plugin';
+import { entryBootstrapPlugin } from '../vite/plugins/entry-bootstrap.plugin';
 import { libraryTemplatePlugin } from '../vite/plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from '../vite/plugins/mini-program-assets.plugin';
 import { platformFileResolvePlugin } from '../vite/plugins/platform-file-resolve.plugin';
@@ -18,7 +19,6 @@ export interface MiniProgramTestStackOptions {
   context: BuilderContext;
   tsConfig: string;
   pages: AssetPattern[];
-  components: AssetPattern[];
   assets?: AssetPattern[];
   styles?: (string | { input: string })[];
   watch: boolean;
@@ -29,6 +29,7 @@ export interface MiniProgramTestStackOptions {
   entryPatterns: {
     pageList: unknown[];
     componentList: unknown[];
+    tabbarList?: unknown[];
   };
 }
 
@@ -76,6 +77,7 @@ export function createMiniProgramTestStack(
   const allEntries = [
     ...options.entryPatterns.pageList,
     ...options.entryPatterns.componentList,
+    ...(options.entryPatterns.tabbarList ?? []),
   ] as never;
 
   return {
@@ -89,6 +91,8 @@ export function createMiniProgramTestStack(
       fileReplacements,
     },
     preAnalogPlugins: [
+      // 入口注册由构建器注入（虚拟入口模块），必须 enforce: 'pre'
+      entryBootstrapPlugin({ entries: allEntries }),
       platformFileResolvePlugin({ platform: options.platform }),
       miniProgramAssetsPlugin({
         tsConfig: options.tsConfig,

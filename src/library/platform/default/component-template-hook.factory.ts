@@ -99,7 +99,17 @@ export function resetCycleState(): void {
   waitingRefreshLViewList = [];
 }
 
-/** @internal */
+/**
+ * 模板更新钩子回调：把本轮变更批量 `setData` 下去。
+ *
+ * 只能算「框架内部」——构建器给每个组件注入的 `amp.propertyChange(...)` 调的就是
+ * 它——但**不能打 internal 标记**：它被 `platform/default` → `platform/wx` →
+ * 主入口逐级**具名**再导出，而 `stripInternal` 只剔声明不剔 re-export，
+ * ng-packagr 打 d.ts 时会报「propertyChange is not exported by ...」。
+ *
+ * （注：这段注释里不能出现那个以 at 号开头的词，JSDoc 会把它当标签，
+ * `stripInternal` 就又作用到本函数上了。）
+ */
 export function propertyChange(lView: LView) {
   if (linkMap.has(lView)) {
     waitingRefreshLViewList.push(() => {

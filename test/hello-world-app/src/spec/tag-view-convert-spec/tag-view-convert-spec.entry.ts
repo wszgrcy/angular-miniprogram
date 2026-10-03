@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { TagViewConvertSpecComponent } from './tag-view-convert.component';
-
-bootstrapPage(TagViewConvertSpecComponent);
+export { TagViewConvertSpecComponent as default } from './tag-view-convert.component';

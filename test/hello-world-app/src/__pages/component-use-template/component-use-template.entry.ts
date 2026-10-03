@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { ComponentUseTemplateComponent } from './component-use-template.component';
-
-bootstrapPage(ComponentUseTemplateComponent);
+export { ComponentUseTemplateComponent as default } from './component-use-template.component';

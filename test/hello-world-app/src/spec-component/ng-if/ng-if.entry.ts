@@ -1,3 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { NgIfComponent } from './ng-if.component';
-componentRegistry(NgIfComponent);
+export { NgIfComponent as default } from './ng-if.component';

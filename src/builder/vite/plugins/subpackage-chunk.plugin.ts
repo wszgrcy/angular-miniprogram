@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Plugin } from 'vite';
 import { MpAppConfig, resolveSubPackages } from '../app-config';
+import { unwrapEntryVirtualId } from './entry-bootstrap.plugin';
 
 /** 只处理这些扩展名的源文件归属判定 */
 const SOURCE_EXT = /\.(t|j)sx?$/;
@@ -67,7 +68,8 @@ export function subpackageChunkPlugin(
 
   /** 一个模块源路径属于哪个分包（源码目录前缀匹配），undefined=主包 */
   const zoneOfModule = (moduleId: string) => {
-    const id = normalizeId(moduleId);
+    // 入口虚拟模块带着它包装的入口文件的路径，脱壳后才能参与归属判定
+    const id = normalizeId(unwrapEntryVirtualId(moduleId));
     return subSrcDirs.find((d) => id.startsWith(`${d.srcDir}/`));
   };
 

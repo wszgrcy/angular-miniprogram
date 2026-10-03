@@ -51,17 +51,11 @@ export class TwoBComponent {
 `;
 
 const ENTRY_A_TS = `
-import { componentRegistry } from 'angular-miniprogram';
-import { TwoAComponent } from '../two-in-file.component';
-
-componentRegistry(TwoAComponent);
+export { TwoAComponent as default } from '../two-in-file.component';
 `;
 
 const ENTRY_B_TS = `
-import { componentRegistry } from 'angular-miniprogram';
-import { TwoBComponent } from '../two-in-file.component';
-
-componentRegistry(TwoBComponent);
+export { TwoBComponent as default } from '../two-in-file.component';
 `;
 
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
