@@ -39,6 +39,7 @@ export default defineConfig({
           translations: { en: 'Template Syntax' },
           items: [
             nav('标签映射', 'Tag Mapping', '/template/tag-mapping/'),
+            nav('事件修饰符', 'Event Modifiers', '/template/event/'),
             nav(
               '富文本 innerHTML',
               'Rich Text innerHTML',

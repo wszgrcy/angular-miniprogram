@@ -4,13 +4,15 @@ import type {
   MiniProgramComponentInstance,
   NodePath,
 } from 'angular-miniprogram/platform/type';
+import { wxEventNamesOf } from './event-name';
 
 class MiniProgramCoreFactory extends BaseFactory {
   override eventPrefixList = [
     { listener: 'on', prefix: 'on' },
     { listener: 'catch', prefix: 'catch' },
   ];
-  override getListenerEventMapping(prefix: string, name: string) {
+  /** 一个事件名在 `listener` 表里允许占的键 */
+  private eventKeys(prefix: string, name: string) {
     const upperName = name[0].toLocaleUpperCase() + name.substr(1);
     const isOn = prefix === 'on';
     return [
@@ -28,6 +30,18 @@ class MiniProgramCoreFactory extends BaseFactory {
           ]
         : ['capture-catch' + name, 'capture-catch' + upperName]),
     ];
+  }
+  /**
+   * 支付宝的 `e.type` 是驼峰名（`touchStart`），而模板写的是微信名
+   * （`(touchstart)` → 监听键 `touchstart`）。先把 `e.type` 反查回微信名，
+   * 两套候选一起铺：两种写法都接得住，普通事件（`tap`）候选一个不多。
+   */
+  override getListenerEventMapping(prefix: string, name: string) {
+    const keys = new Set(this.eventKeys(prefix, name));
+    wxEventNamesOf(name).forEach((alias) => {
+      this.eventKeys(prefix, alias).forEach((key) => keys.add(key));
+    });
+    return [...keys];
   }
   override addNgComponentLinkLogic(config: any) {
     const _this = this;

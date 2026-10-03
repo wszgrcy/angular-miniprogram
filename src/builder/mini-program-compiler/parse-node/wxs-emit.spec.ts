@@ -185,7 +185,7 @@ describe('wxs 端到端产出: class / style 整体下推', () => {
     const w = await compileHtml(`<div class="s1 s2" [class]="u.cls(a)"></div>`);
     const c = carrierOf(w);
     expect(w).toContain(
-      `class="{{[u.cls(nodeList[0].property.${c}[0]), 's1 s2']}}"`,
+      `class="{{u.cls(nodeList[0].property.${c}[0]) + ' ' + 's1 s2'}}"`,
     );
   });
 
@@ -238,6 +238,14 @@ describe('wxs 端到端产出: 对象语法 class / style（uni-app 主用形态
     );
   });
 
+  it('数组语法下推遇静态 class，一样相加', async () => {
+    const w = await compileHtml(`<div class="a" [class]="[m.f(x)]"></div>`);
+    const c = carrierOf(w);
+    expect(w).toContain(
+      `class="{{[m.f(nodeList[0].property.${c}[0])] + ' ' + 'a'}}"`,
+    );
+  });
+
   it('对象语法多个 key，只把 wxs 那侧当脊柱', async () => {
     const w = await compileHtml(
       `<div [class]="{active: m.f(x), big: 'large'}"></div>`,
@@ -263,7 +271,7 @@ describe('wxs 端到端产出: 对象语法 class / style（uni-app 主用形态
     );
     const c = carrierOf(w);
     expect(w).toContain(
-      `class="{{[{'active': m.f(nodeList[0].property.${c}[0])}, 'base']}}"`,
+      `class="{{{'active': m.f(nodeList[0].property.${c}[0])} + ' ' + 'base'}}"`,
     );
   });
 

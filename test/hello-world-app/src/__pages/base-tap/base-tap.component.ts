@@ -28,6 +28,27 @@ export class BaseTagComponent implements OnInit {
   captureBindTap1(event) {
     console.log('capture-bind事件', event);
   }
+  tapStop1(event) {
+    console.log('tap.stop事件', event);
+  }
+  tapPrevent1(event) {
+    console.log('tap.prevent事件', event);
+  }
+  tapCapture1(event) {
+    console.log('tap.capture事件', event);
+  }
+  tapCaptureCatch1(event) {
+    console.log('tap.stop.capture事件', event);
+  }
+  tapOnce1(event) {
+    console.log('tap.once事件', event);
+  }
+  touchStart1(event) {
+    console.log('touchstart事件', event);
+  }
+  longPress1(event) {
+    console.log('longpress事件', event);
+  }
   // captureCatchTap1(event) {
   //   console.log('capture-catch事件', event);
   // }

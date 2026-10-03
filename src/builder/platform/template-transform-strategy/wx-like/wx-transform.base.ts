@@ -3,8 +3,14 @@ import type { NgNodeMeta } from '../../../mini-program-compiler';
 import { TemplateTransformBase } from '../transform.base';
 import { WxContainer } from './wx-container';
 
+/**
+ * 事件名上的 wx 系绑定前缀。
+ *
+ * `:?` 不可省：前缀与事件名之间约定用冒号分隔（`catch:tap`），
+ * 少了它 `(.*)` 会把冒号当成事件名的一部分，拼出 `catch::tap`。
+ */
 export const EVENT_PREFIX_REGEXP =
-  /^(bind|catch|mut-bind|capture-bind|capture-catch)(.*)$/;
+  /^(bind|catch|mut-bind|capture-bind|capture-catch):?(.*)$/;
 
 /**
  * 渲染层脚本引入标签的平台方言。

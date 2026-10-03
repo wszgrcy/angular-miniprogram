@@ -251,7 +251,7 @@ export class WxContainer {
      * `setProperty` 通道——所以改写层根本不需要为它们特事特办，
      * 只是容器原先把这两个 key 硬编码成了 AgentNode 的聚合串。
      *
-     * 静态部分按 uni-app 的方式合并：class 进数组，style 用 `+ ';' +` 串。
+     * 静态部分用字符串相加合并：class 用 `' '`，style 用 `';'`。
      */
     const classPlan = node.wxsClass ?? wxsProps['class'];
     if (classPlan) {
@@ -262,7 +262,9 @@ export class WxContainer {
       );
       propertyMap.set(
         'class',
-        node.staticClass ? `[${expr}, ${wxmlLiteral(node.staticClass)}]` : expr,
+        node.staticClass
+          ? `${expr} + ' ' + ${wxmlLiteral(node.staticClass)}`
+          : expr,
       );
     } else {
       propertyMap.set('class', `nodeList[${index}].class`);

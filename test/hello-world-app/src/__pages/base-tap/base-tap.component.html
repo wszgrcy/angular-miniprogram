@@ -11,4 +11,14 @@
 <div (mut-bindtap)="mutBindTap1($event)">mut-bind使用</div>
 <div (catchtap)="catchTap1($event)">catch使用</div>
 <div (capture-bindtap)="captureBindTap1($event)">capture-bind使用</div>
+<!-- 与上面等价的小程序修饰符写法：编译期把修饰符翻成绑定前缀 -->
+<div (tap.stop)="tapStop1($event)">tap.stop -> catch:tap</div>
+<div (tap.prevent)="tapPrevent1($event)">tap.prevent -> catch:tap</div>
+<div (tap.capture)="tapCapture1($event)">tap.capture -> capture-bind:tap</div>
+<div (tap.stop.capture)="tapCaptureCatch1($event)">
+  tap.stop.capture -> capture-catch:tap
+</div>
+<div (tap.once)="tapOnce1($event)">tap.once -> 只响一次</div>
+<div (touchstart)="touchStart1($event)">支付宝下翻成 onTouchStart</div>
+<div (longpress)="longPress1($event)">支付宝下翻成 onLongTap</div>
 <!-- <div (capture-catch)="captureCatchTap1($event)">capture-catch使用</div> -->

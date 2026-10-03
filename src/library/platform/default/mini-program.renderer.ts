@@ -4,6 +4,7 @@ import {
   markStructuralChange,
   pushPathData,
 } from './component-template-hook.factory';
+import { mpListenerKeys, mpListenerOnce } from './event-name';
 
 export class MiniProgramRenderer implements Renderer2 {
   root!: AgentNode;
@@ -160,7 +161,19 @@ export class MiniProgramRenderer implements Renderer2 {
     if (!(target instanceof AgentNode)) {
       throw new Error('不支持其他类型监听');
     }
-    target.listener[eventName] = callback;
+    // 模板原文（`tap.stop`）与小程序语义键（`catchtap`）一起登记：
+    // 事件派发时只查后者，前者保证既有写法不变。
+    const keys = mpListenerKeys(eventName);
+    let fn = callback;
+    if (mpListenerOnce(eventName)) {
+      fn = (event) => {
+        keys.forEach((key) => delete target.listener[key]);
+        return callback(event);
+      };
+    }
+    keys.forEach((key) => {
+      target.listener[key] = fn;
+    });
     return () => {};
   }
 }

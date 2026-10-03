@@ -10,6 +10,7 @@ import type { DeclaredWxsModules } from '../../wxs/wxs-call';
 import { isWxsCarrier } from '../../wxs/wxs-expr';
 import type { WxsExprPlan } from '../../wxs/wxs-expr';
 import { getDeclaredWxs, getWxsPlan } from '../../wxs/wxs-rewrite';
+import { parseMpEvent } from '../event-name';
 import { mapAngularTagToWxml } from '../tag-mapping';
 import { ComponentContext } from './component-context';
 import { NgElementMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
@@ -82,8 +83,14 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       this.inputs.push(input.name);
     });
     this.node.outputs.forEach((output) => {
-      this.outputs.push(output.name);
-      this.collectWxsEvent(output);
+      // `(tap.stop)` 之类的小程序修饰符在这里落地成 `catch:tap`。
+      // 修饰符只存在于模板写法，wxml 与逻辑层监听键都得用解析后的名字，
+      // 所以解析一次，两边共用。
+      const event = parseMpEvent(output.name, {
+        isOwnEvent: this.isOwnEvent(output.name),
+      });
+      this.outputs.push(event.name);
+      this.collectWxsEvent(output, event.name);
     });
 
     if (
@@ -101,6 +108,19 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
    */
   private get isRichTextHost() {
     return !this.componentMeta && !this.directiveMeta;
+  }
+
+  /**
+   * 这个事件名是不是宿主自己声明的。
+   *
+   * 自定义组件（以及声明了同名 `@Output` 的指令）上的 `click` 是它自己的
+   * 输出，不是原生 tap，映射成 tap 就把这条绑定解掉了。
+   */
+  private isOwnEvent(name: string): boolean {
+    return (
+      !!this.componentMeta ||
+      this.directiveMeta?.outputs.includes(name) === true
+    );
   }
 
   private getTagName() {
@@ -142,7 +162,10 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
    * 命中后 wxml 直接 `bind:tap="{{mod.fn}}"`，不再输出
    * `data-node-index` + `bindEvent`，整条事件链路不过桥。
    */
-  private collectWxsEvent(output: Element['outputs'][number]): void {
+  private collectWxsEvent(
+    output: Element['outputs'][number],
+    eventName: string,
+  ): void {
     const declared =
       this.declaredWxs ?? getDeclaredWxs(this.componentMeta?.filePath);
     if (!declared.size) {
@@ -151,7 +174,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     const ast = (output as any).handler?.ast;
     const handler = matchWxsHandler(ast, declared);
     if (handler) {
-      this.wxsEvents[output.name] = handler;
+      this.wxsEvents[eventName] = handler;
       return;
     }
     if (containsWxsRoot(ast, declared)) {
