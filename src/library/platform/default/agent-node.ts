@@ -2,16 +2,32 @@ import type {
   MPElementData,
   MPTextData,
 } from 'angular-miniprogram/platform/type';
+import clsx from 'clsx';
 
 export class AgentNode {
   selector!: unknown;
   name!: string;
   parent!: AgentNode | undefined;
   nextSibling!: AgentNode | undefined;
+  /**
+   * 原样存一份 attribute，只有 `class` / `style` 会参与渲染。
+   *
+   * `class` / `style` 每次都是整体重设一个串（`setAttribute` 就是这个语义），
+   * 没有单个 token / 声明的增删，所以不切割、不解析，存什么就拼什么。
+   */
   attribute: Record<string, string> = {};
+  /**
+   * 动态 class（`Renderer2.addClass` / `removeClass`：`[class]`、`[class.x]`、
+   * `class="a {{x}}"` 插值）。
+   *
+   * 与 `attribute.class`（模板静态 class / 指令 host class / `[attr.class]`）
+   * 各自存自己的：动态那半是逐个 token 增删，属性那半每次整体重设一个串，
+   * 两边只在 {@link classString} 见一次面。
+   */
+  classList = new Set<string>();
+  /** 动态 style（`setStyle` / `removeStyle`），与 {@link classList} 对称 */
   style: Record<string, string> = {};
   property: Record<string, unknown> = {};
-  classList = new Set<string>();
   value!: string;
   children: AgentNode[] = [];
   listener: Record<string, Function> = {};
@@ -38,7 +54,7 @@ export class AgentNode {
   /** `suffix -> 完整 setData key` 缓存，避免每次变更重复拼串 */
   __keyCache: Record<string, string> = {};
 
-  constructor(public type: 'element' | 'comment' | 'text') {}
+  constructor(public type: 'element' | 'comment' | 'text') { }
   appendChild(child: AgentNode) {
     const lastChildIndex = this.children.length - 1;
     this.children.push(child);
@@ -89,26 +105,29 @@ export class AgentNode {
     child.parent = undefined;
   }
   /**
-   * 聚合后的 class 串。
+   * 两个 class 来源的**唯一**合并点：动态那半 + 属性那串，各自原样。
    *
    * 单独抽出来是因为 `addClass`/`removeClass` 这类**增量** API
    * 最终要发的是整个聚合串——路径式 setData 需要能只重算这一个字段，
    * 而不是造一整个 `toView()` 对象。
    */
   classString(): string {
-    return (
-      Array.from(this.classList).join(' ') +
-      (this.attribute.class ? ' ' + this.attribute.class : '')
-    );
+    return clsx([...this.classList], this.attribute.class);
   }
 
-  /** 聚合后的 style 串，语义与 `toView()` 里的拼接逐字一致 */
+  /**
+   * 两个 style 来源的**唯一**合并点，与 {@link classString} 同构。
+   *
+   * 属性那半在前、动态那半在后：CSS 里同一个声明块内后写的赢，而 Angular
+   * 就是先写静态 style 属性、后写动态绑定，这个顺序就是浏览器里的生效顺序。
+   */
   styleString(): string {
-    return (
-      Object.entries(this.style)
-        .map(([style, value]) => `${style}:${value}`)
-        .join(';') + (this.attribute.style ? ';' + this.attribute.style : '')
-    );
+    const dynamic = Object.entries(this.style)
+      .map(([prop, value]) => `${prop}:${value}`)
+      .join(';');
+    // Angular 递过来的静态 style 串自带尾分号，不剔掉会拼出 `;;`
+    const attr = (this.attribute.style ?? '').replace(/;+$/, '');
+    return [attr, dynamic].filter((part) => !!part).join(';');
   }
 
   toView(): MPTextData | MPElementData {

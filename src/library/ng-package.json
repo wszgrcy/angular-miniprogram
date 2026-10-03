@@ -11,7 +11,8 @@
     "fs-extra",
     "glob",
     "ora",
-    "vite"
+    "vite",
+    "clsx"
   ],
   "lib": {
     "entryFile": "./platform/index.ts"

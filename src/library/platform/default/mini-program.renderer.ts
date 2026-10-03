@@ -6,6 +6,18 @@ import {
 } from './component-template-hook.factory';
 import { mpListenerKeys, mpListenerOnce } from './event-name';
 
+/**
+ * `zIndex` → `z-index`。
+ *
+ * `[style]` 映射的键可以是 camelCase，而 wxml 的行内样式只认 CSS 写法。
+ * 已经带 `-` 的一律原样返回，CSS 自定义属性（`--myColor`）靠这条免遭改写。
+ */
+function dashCase(prop: string): string {
+  return prop.includes('-')
+    ? prop
+    : prop.replace(/[A-Z]/g, (upper) => '-' + upper.toLowerCase());
+}
+
 export class MiniProgramRenderer implements Renderer2 {
   root!: AgentNode;
   constructor() {}
@@ -138,11 +150,16 @@ export class MiniProgramRenderer implements Renderer2 {
     value: string,
     flags?: RendererStyleFlags2,
   ) {
-    el.style[style] = value;
+    // Angular 把 `!important` 从值里剔掉、改用 flag 传（DOM renderer 拿它去调
+    // `setProperty(prop, value, 'important')`），这里得拼回来。
+    el.style[dashCase(style)] =
+      (flags ?? 0) & RendererStyleFlags2.Important
+        ? `${String(value).trim()} !important`
+        : value;
     this.emitStyle(el);
   }
-  removeStyle(el: AgentNode, style: string, flags?: RendererStyleFlags2) {
-    delete el.style[style];
+  removeStyle(el: AgentNode, style: string) {
+    delete el.style[dashCase(style)];
     this.emitStyle(el);
   }
   setProperty(el: AgentNode, name: string, value: unknown) {

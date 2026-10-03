@@ -168,7 +168,7 @@ describe('路径式 setData 快速通道', () => {
     propertyChange(lView as any);
     renderer.setAttribute(nodes[0], 'class', 'from-attr');
     countToView(() => endRender());
-    expect(mp.calls).toEqual([{ 'nodeList[0].class': ' from-attr' }]);
+    expect(mp.calls).toEqual([{ 'nodeList[0].class': 'from-attr' }]);
   });
 
   it('同 key 同周期多次写 → 后写覆盖前写', () => {

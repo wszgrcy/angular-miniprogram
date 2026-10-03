@@ -69,10 +69,13 @@ describe('AgentNode', () => {
     element.classList.add('class1');
     element.style['color'] = 'red';
     element.property['property1'] = 1;
+    // class / style 属性就是整体重设一个串
+    element.attribute.class = 'from-attr';
     element.attribute.style = 'display:flex';
     expect(element.toView()).toEqual({
-      class: 'class1',
-      style: 'color:red;display:flex',
+      class: 'class1 from-attr',
+      // 属性在前、动态在后：CSS 里后写的声明赢
+      style: 'display:flex;color:red',
       property: { property1: 1 },
     });
     const text = new AgentNode('text');
