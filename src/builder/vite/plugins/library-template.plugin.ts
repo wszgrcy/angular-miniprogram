@@ -20,6 +20,7 @@ import type {
 } from '../../shared/library-template-scope.service';
 import { libraryTemplateScopeName, stripModuleQuery } from '../../util';
 import { toPosixPath } from '../../util/asset-path';
+import { transformMiniProgramStyle } from '../../util/mini-program-style';
 
 /**
  * 产物路径归一：正斜杠 + 剥前导 `/`。
@@ -167,6 +168,7 @@ export function libraryTemplatePlugin(
     entry: LibraryMetaEntry,
     classNames: string[],
     emit: EmitFns,
+    warn: (message: string) => void,
   ): void => {
     const rootDir = normalize(LIBRARY_OUTPUT_ROOTDIR);
     const globalTemplatePath = join(
@@ -222,9 +224,15 @@ export function libraryTemplatePlugin(
       }
 
       if (record.style) {
+        const styleFileName = toRollupFileName(
+          join(rootDir, libraryPath + fileExtname.style),
+        );
+        // 库组件的样式同样需要 `@charset` / `@import` 置顶和标签选择器告警
         emit.asset(
-          toRollupFileName(join(rootDir, libraryPath + fileExtname.style)),
-          record.style,
+          styleFileName,
+          transformMiniProgramStyle(record.style, {
+            warn: (message) => warn(`${styleFileName}: ${message}`),
+          }),
         );
       }
 
@@ -345,7 +353,7 @@ export function libraryTemplatePlugin(
       for (const [entry, names] of byEntry) {
         assertTemplatePayload(entry);
         emitGlobalTemplates(entry, emit);
-        emitComponents(entry, names, emit);
+        emitComponents(entry, names, emit, (message) => this.warn(message));
       }
       // 只读不改动模块代码
       return null;

@@ -129,6 +129,19 @@ export function mapAngularTagToWxml(tag: string): string {
 }
 
 /**
+ * 「只在 HTML 里存在、wxml 里被换掉了」的标签名单。
+ *
+ * 样式产物要用它判 `div{}` 这类标签选择器在小程序里必然落空
+ * （模板里那个位置已经是 `view` 了）。判定必须和 `mapAngularTagToWxml`
+ * 同源，否则模板改了映射而样式告警还在按老名单走。
+ */
+export const HTML_ONLY_TAGS: ReadonlySet<string> = new Set<string>([
+  ...VIEW_TAGS,
+  ...Object.keys(TAG_RENAMES),
+  'ng-container',
+]);
+
+/**
  * 文本节点在 wxml 里没有承载元素（是内联文本），
  * 不参与「标签 vs 下标承载体」的比对。
  */

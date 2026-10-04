@@ -2,6 +2,7 @@ import type { BuilderContext } from '@angular-devkit/architect';
 import type { AssetPattern } from '@angular-devkit/build-angular';
 import type { Path } from '@angular-devkit/core';
 import * as fs from 'fs';
+import { CssUrl } from 'ng-packagr/src/lib/styles/stylesheet-processor';
 import * as path from 'path';
 import { Injector } from 'static-injector';
 import ts from 'typescript';
@@ -28,6 +29,7 @@ import {
 } from '../../shared/token';
 import type { PagePattern } from '../../shared/type';
 import { toPosixPath } from '../../util/asset-path';
+import { transformMiniProgramStyle } from '../../util/mini-program-style';
 import { MpAppConfig, generateAppJson, validateAppConfig } from '../app-config';
 import { collectAssets } from '../copy-assets';
 
@@ -154,6 +156,11 @@ export interface MiniProgramAssetsPluginOptions {
  */
 /**
  * 样式编译器。一轮构建里复用同一个实例，避免每个文件重建 sass 环境。
+ *
+ * `cssUrl: inline` 不是优化，是小程序的硬限制：wxss 拿不到本地文件，
+ * `url()` 里写相对路径在真机上就是一张图都出不来，只剩网络图和 base64 两条路。
+ * 交给 esbuild 的 dataurl loader 内联，比事后正则替 base64 可靠；
+ * `/static/x.png` 这种绝对地址不受影响（小程序自己会去包里找）。
  */
 function createStyleProcessor(
   options: MiniProgramAssetsPluginOptions,
@@ -161,12 +168,22 @@ function createStyleProcessor(
   return new CustomStyleSheetProcessor(
     options.workspaceRoot,
     options.workspaceRoot,
-    undefined,
+    CssUrl.inline,
     undefined,
     undefined,
     false,
     !!options.watch,
   );
+}
+
+/**
+ * 样式告警的定位包装：把「哪个产物」拼到每条告警前面。
+ */
+function createStyleWarnOf(
+  options: MiniProgramAssetsPluginOptions,
+): (outPath: string) => (message: string) => void {
+  return (outPath) => (message) =>
+    options.context.logger.warn(`[样式 ${toPosixPath(outPath)}] ${message}`);
 }
 
 /**
@@ -263,11 +280,15 @@ async function compileResolvedStyles(
  *
  * 一个产物样式可能同时来自样式文件和内联样式（两边都拼，不是二选一），
  * 所以先汇到同一份列表里再写。
+ *
+ * 拼接完必须过 `transformMiniProgramStyle`：多份样式拼一起正是
+ * `@charset` / `@import` 跑到文件中部的原因。
  */
 function emitStyles(
   resolved: StyleSlice,
   compiled: { files: Map<string, string>; inline: Map<string, string> },
   emit: (fileName: string, source: string) => void,
+  warnOf: (outPath: string) => (message: string) => void,
 ) {
   const parts = new Map<string, string[]>();
   const append = (outPath: string, css: string) => {
@@ -288,7 +309,12 @@ function emitStyles(
       append(outPath, compiled.inline.get(s.key) ?? '');
     }
   });
-  parts.forEach((list, outPath) => emit(outPath, list.join('\n')));
+  parts.forEach((list, outPath) =>
+    emit(
+      outPath,
+      transformMiniProgramStyle(list.join('\n'), { warn: warnOf(outPath) }),
+    ),
+  );
 }
 
 /**
@@ -364,6 +390,8 @@ export function miniProgramAssetsPlugin(
   const ensureStyleProcessor = () =>
     (styleProcessor ??= createStyleProcessor(options));
 
+  const warnStyleOf = createStyleWarnOf(options);
+
   return {
     name: 'mini-program:assets',
     enforce: 'pre',
@@ -423,8 +451,8 @@ export function miniProgramAssetsPlugin(
       // 1.5 wxs：渲染层脚本原样落盘 + watch 登记
       emitWxs(resolved, emit, (p) => this.addWatchFile(p));
 
-      // 2. wxss：按组件把编译后的样式拼起来
-      emitStyles(resolved, compiledStyles, emit);
+      // 2. wxss：按组件把编译后的样式拼起来，再过一遍小程序兼容处理
+      emitStyles(resolved, compiledStyles, emit, warnStyleOf);
 
       // 3. json：合并组件目录里已存在的配置文件
       resolved.config.forEach((value, outPath) => {
@@ -689,9 +717,17 @@ export function miniProgramAssetsPlugin(
               )}`,
             ),
         );
-        const globalCss = globalStyleSources
-          .map((s) => compiledGlobal.get(path.normalize(s)) ?? '')
-          .join('\n');
+        const globalCss = transformMiniProgramStyle(
+          globalStyleSources
+            .map((s) => compiledGlobal.get(path.normalize(s)) ?? '')
+            .join('\n'),
+          {
+            warn: (message) =>
+              options.context.logger.warn(
+                `[样式 app${options.buildPlatform.fileExtname.style}] ${message}`,
+              ),
+          },
+        );
         // 文件名跟着平台走：wx 是 app.wxss，bdzn 是 app.css，
         // zfb 是 app.acss……写死 wxss 会让其他平台拿不到全局样式。
         emit('app' + options.buildPlatform.fileExtname.style, globalCss);
