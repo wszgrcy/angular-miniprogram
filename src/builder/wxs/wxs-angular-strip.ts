@@ -14,7 +14,7 @@ import { getWxsPlan, syntheticCarrierInputs } from './wxs-rewrite';
  *
  * | 字段 | 坐标系 | 用途 |
  * | --- | --- | --- |
- * | TmplAst 节点 `.sourceSpan` | 原始文件 | 替换区间 |
+ * | TmplAst 节点 `.sourceSpan` | 原始文件；inline `template` 被 ngtsc 平到宿主 .ts，差一个常量，见 `spanBase` | 替换区间 |
  * | 表达式 `.sourceSpan` | **交给解析器的那段文本**（`preserveWhitespaces:false` 下是折叠后的） | 只能配合 `carrier.source` 用 |
  * | 表达式 `.span` | 相对父表达式节点 | 不单独使用 |
  *
@@ -119,6 +119,16 @@ export function stripWxsFromAst(
    * 已经被第一轮改过了，会切错位置。
    */
   extraEdits: Edit[] = [],
+  /**
+   * `nodes` 的 span 比 `source` 多出的常量平移量，默认 `0`。
+   *
+   * `templateUrl`：两边都是 .html 自己的坐标，`0`。
+   * inline `template`：ngtsc 把整棵 AST 的 span 平到了宿主 .ts 坐标系，而
+   * `source` 仍是模板文本，得减掉。详见调用侧 `inlineTemplateSpanBase`。
+   *
+   * 不减会整批静默切坏：越界被 `slice` 钳成「追加到末尾」，不报错。
+   */
+  spanBase = 0,
 ): string {
   const edits: Edit[] = [...extraEdits];
   /**
@@ -128,6 +138,9 @@ export function stripWxsFromAst(
    * key 相同（key 只由表达式决定）。不去重就会产出重复属性。
    */
   const carrierWritten = new Map<any, Set<string>>();
+
+  /** 把 span 偏移换回 `source` 坐标系 */
+  const rel = (offset: number): number => offset - spanBase;
 
   const rewrite = (list: any[], host: any): void => {
     for (const node of list ?? []) {
@@ -147,13 +160,17 @@ export function stripWxsFromAst(
         }
         if (!plan.freeVars.length) {
           const span = exprSpan(input.value);
-          edits.push({ start: span.start, end: span.end, text: '[]' });
+          edits.push({
+            start: rel(span.start),
+            end: rel(span.end),
+            text: '[]',
+          });
           continue;
         }
         if (isWxsCarrier(input.name)) {
           edits.push({
-            start: tmplOffset(input.sourceSpan),
-            end: tmplOffset(input.sourceSpan, true),
+            start: rel(tmplOffset(input.sourceSpan)),
+            end: rel(tmplOffset(input.sourceSpan, true)),
             text: `[${plan.carrier}]="${leafArray(input.value, plan.freeVars, `[${input.name}]`)}"`,
           });
           if (plan.carrier) {
@@ -165,8 +182,8 @@ export function stripWxsFromAst(
         }
         const span = exprSpan(input.value);
         edits.push({
-          start: span.start,
-          end: span.end,
+          start: rel(span.start),
+          end: rel(span.end),
           text: leafArray(input.value, plan.freeVars, `[${input.name}]`),
         });
       }
@@ -183,12 +200,12 @@ export function stripWxsFromAst(
            */
           const literal: string = (plan as any).literal ?? '';
           edits.push({
-            start: tmplOffset(node.sourceSpan),
-            end: tmplOffset(node.sourceSpan, true),
+            start: rel(tmplOffset(node.sourceSpan)),
+            end: rel(tmplOffset(node.sourceSpan, true)),
             text: /^\s*$/.test(literal) ? '\u200b' : literal,
           });
           if (plan.carrier && !carrierWritten.get(scope)?.has(plan.carrier)) {
-            const open = tmplOffset(scope?.startSourceSpan);
+            const open = rel(tmplOffset(scope?.startSourceSpan));
             if (!scope?.name) {
               throw new Error(`wxs 插值找不到宿主元素: ${fileName}`);
             }

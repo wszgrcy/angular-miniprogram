@@ -39,6 +39,52 @@ const TRICKY = `<div class="card">
   </div>
 </div>`;
 
+/**
+ * 把整棵 AST 的 span 整体平移 `n`，模拟 ngtsc 对 inline 模板做的那步平移。
+ *
+ * 不区分节点类型，见到「带数字偏移的 span」就移：TmplAst 节点的
+ * `sourceSpan` / `startSourceSpan` / `endSourceSpan` 是 `{start:{offset},end:{offset}}`，
+ * 表达式的是 `{start:number,end:number}`，两种都吃。
+ */
+function shiftSpans(root: unknown, n: number, seen = new Set<unknown>()): void {
+  if (root === null || typeof root !== 'object' || seen.has(root)) {
+    return;
+  }
+  seen.add(root);
+  if (Array.isArray(root)) {
+    for (const item of root) {
+      shiftSpans(item, n, seen);
+    }
+    return;
+  }
+  const obj = root as Record<string, unknown>;
+  const shiftOne = (span: any): void => {
+    if (!span || typeof span !== 'object') {
+      return;
+    }
+    for (const side of ['start', 'end']) {
+      const pos = span[side];
+      if (typeof pos === 'number') {
+        span[side] = pos + n;
+      } else if (pos && typeof pos.offset === 'number') {
+        // ParseLocation 在多个 span 之间是共享的（元素的 sourceSpan.end 与
+        // endSourceSpan.end 是同一个对象），不去重就会加好几次。
+        if (seen.has(pos)) {
+          continue;
+        }
+        seen.add(pos);
+        pos.offset += n;
+      }
+    }
+  };
+  for (const key of ['sourceSpan', 'startSourceSpan', 'endSourceSpan']) {
+    shiftOne(obj[key]);
+  }
+  for (const value of Object.values(obj)) {
+    shiftSpans(value, n, seen);
+  }
+}
+
 describe('stripWxsFromAst', () => {
   for (const preserveWhitespaces of [true, false]) {
     describe(`preserveWhitespaces = ${preserveWhitespaces}`, () => {
@@ -103,5 +149,50 @@ describe('stripWxsFromAst', () => {
     const b = payloads(await strip(TRICKY, false));
     expect(a.length).toBeGreaterThan(0);
     expect(b).toEqual(a);
+  });
+
+  /**
+   * inline `template` 的坐标系钉。
+   *
+   * ngtsc 解析 inline 模板后会把整棵 AST 的 span 平到宿主 .ts 坐标系，
+   * 而 `meta.template.content` 仍是模板文本。两边不同坐标系时，所有替换区间
+   * 都落在字符串尾巴之后，`slice` 把越界钳成「追加到末尾」：不报错，但
+   * wxs 改写全部跑到尾部，Angular 编出来的 update 函数里留着 `ctx.fmt.xxx()`。
+   *
+   * 所以：平移后的输出必须与不平移逐字节相同。
+   */
+  it('span 整体平移后，剥离结果与不平移逐字节相同', async () => {
+    const html = withDeclarations(TRICKY);
+    const base = 344;
+    const parsed: any = parseTemplate(html, 'p.html', {
+      preserveWhitespaces: false,
+    });
+    if (parsed.errors?.length) {
+      throw new Error('模板解析失败: ' + parsed.errors[0].message);
+    }
+    shiftSpans(parsed.nodes, base);
+    await rewriteWxsTemplates(parsed.nodes, 'p.html');
+    const shifted = stripWxsFromAst(parsed.nodes, html, 'p.html', [], base);
+
+    expect(shifted).toBe(await strip(TRICKY, false));
+    expect(shifted).not.toContain('format.');
+  });
+
+  /**
+   * 反向钉：传了平移量却按 `0` 切，必须能当场发现，不能静默产出坏模板。
+   */
+  it('该平移却按 0 切时，输出会残留 wxs 表达式', async () => {
+    const html = withDeclarations(TRICKY);
+    const parsed: any = parseTemplate(html, 'p.html', {
+      preserveWhitespaces: false,
+    });
+    shiftSpans(parsed.nodes, 344);
+    await rewriteWxsTemplates(parsed.nodes, 'p.html');
+    const wrong = stripWxsFromAst(parsed.nodes, html, 'p.html');
+
+    expect(wrong).toContain('format.');
+    expect(wrong).not.toBe(
+      stripWxsFromAst(parsed.nodes, html, 'p.html', [], 344),
+    );
   });
 });

@@ -57,6 +57,57 @@ type ComponentTemplateMeta = NonNullable<
   errors?: unknown[];
 };
 
+/**
+ * inline `template` 的坐标平移量。
+ *
+ * ngtsc 解析 inline 模板时，把整棵 AST 的 `sourceSpan` 平移到**宿主 .ts 文件**
+ * 坐标系里（平移量 = 模板字面量内容起点，即反引号后一位）；`templateUrl` 那条
+ * 路不平移，span 就是 .html 自己的偏移。而 `meta.template.content` 两种情况
+ * 下都是**模板文本本身**。
+ *
+ * 于是 inline 下两边不同坐标系：拿 span 去切 `content`，区间全部落在字符串
+ * 尾巴之后，`slice` 把越界钳成「追加到末尾」—— 不报错，产出一份模板结构完好、
+ * wxs 改写全跑到尾部的东西，Angular 编出来的 update 函数里留着 `ctx.fmt.xxx()`
+ * （逻辑层没有 `fmt`，运行时靠 `ApplicationRef.tick()` 把异常吞了才没暴罱）。
+ *
+ * 所以这里把平移量算出来，交给 `stripWxsFromAst` 减掉。判定只看装饰器写了
+ * `template` 还是 `templateUrl`，不去比对文本 —— 字面量里有转义时求值后的
+ * `content` 与原文长度不等，但 ngtsc 的平移仍是同一个常量，比对反而会误判。
+ *
+ * 返回 `0` = 无需平移（`templateUrl` / 非字面量 `template`）。
+ */
+function inlineTemplateSpanBase(classDeclaration: ClassDeclaration): number {
+  for (const dec of ts.getDecorators(classDeclaration) ?? []) {
+    const expr = dec.expression;
+    if (!ts.isCallExpression(expr) || expr.arguments.length !== 1) {
+      continue;
+    }
+    const arg = expr.arguments[0];
+    if (!ts.isObjectLiteralExpression(arg)) {
+      continue;
+    }
+    const sf = classDeclaration.getSourceFile();
+    for (const prop of arg.properties) {
+      if (!ts.isPropertyAssignment(prop) || !prop.name) {
+        continue;
+      }
+      const name = prop.name.getText();
+      if (name === 'templateUrl') {
+        // 两种都写了时 ngtsc 以 templateUrl 为准，这里跟着它走
+        return 0;
+      }
+      if (
+        name === 'template' &&
+        (ts.isStringLiteral(prop.initializer) ||
+          ts.isNoSubstitutionTemplateLiteral(prop.initializer))
+      ) {
+        return prop.initializer.getStart(sf) + 1;
+      }
+    }
+  }
+  return 0;
+}
+
 /** `R3TemplateDependencyKind.NgModule`，compiler 没有把这个枚举导出到运行时 */
 const R3_TEMPLATE_DEPENDENCY_KIND_NG_MODULE = 2;
 
@@ -252,6 +303,9 @@ export class MiniProgramCompilerService {
        * 必须紧跟在 wxs 改写后面：此时 AST 已带枝叶数组，一次走树同时喂给
        * wxml 和 Angular 两侧，不存在第二个真相源。
        * 只按内容登记（`file.fileName` 为 null）。
+       *
+       * inline 模板的 span 被 ngtsc 平到了 .ts 坐标系，得把平移量递下去，
+       * 见 `inlineTemplateSpanBase`。
        */
       if (declarations.length && typeof template?.content === 'string') {
         recordStrippedTemplate(
@@ -260,6 +314,8 @@ export class MiniProgramCompilerService {
             template.nodes ?? [],
             template.content,
             componentSourceFile,
+            [],
+            inlineTemplateSpanBase(classDeclaration),
           ),
         );
       }
