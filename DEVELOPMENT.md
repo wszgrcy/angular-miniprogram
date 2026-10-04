@@ -2375,15 +2375,31 @@ TypeError: Cannot read properties of undefined (reading 'Listener')
 测试侧用一个 vite 插件把 `@angular/core` 转发到
 `export * from '@angular/core'` + 手工补的 `ɵNotificationSource` 常量。
 
-#### 4. `new Function('return import(m)')`
+#### 4. ESM-only 的 `@angular/compiler` / `@angular/compiler-cli`
 
-`src/builder/util/load_esm.ts` 用的是 Angular 官方 `loadEsmModule` 写法，
-`new Function` 包一层 `import()` 是为了躲打包器的静态分析。
-vitest 用 `vm.runInThisContext` 跑模块，里面再 `import()` 直接抛
-`ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING` →
-`angularCompilerCliPromise` 变成 rejected → 所有跑真实构建的 spec 连带失败。
+两个包都只有 ESM（`exports` 里只有一个 `default` → `.mjs`），builder 产物是 CJS。
+早期有个 `src/builder/util/load_esm.ts`，抄的是 Angular 官方的 `loadEsmModule`：
+`new Function('modulePath', 'return import(modulePath)')`，包一层是为了躲打包器的
+静态分析。**这个文件已经删了**，中间层没了，谁用谁哪里拿：
 
-同样用插件在 transform 阶段换回真正的动态 import（只影响测试，不改源码）。
+- `@angular/compiler`：谁用谁在文件顶部静态 `import`（CJS 产物里就是 require）。
+  用到的只有 `wxs/wxs-rewrite.ts` 和
+  `mini-program-compiler/mini-program-compiler.service.ts`。
+- `@angular/compiler-cli`：只有 `shared/mini-program-application-analysis.service.ts`
+  的 `initTscProgram` 用得到，就在那一行 `await import('@angular/compiler-cli')`，
+  保持 lazy。
+
+`@angular/compiler` 不能写成 `import()`：`parse-node/element.ts` 顶层就 require 它，
+而 Node 的 require(esm) 处理不了“同一个模块已被 `import()` 起载、但还没
+link/evaluate”这个状态（`internal/modules/esm/loader.js:341` 直接 `assert.fail`，
+即 `Unexpected module status 0`）。条件三条，缺一不可：同一个 URL +
+`import()` 先起且未 settle + 同一拍里 require。跟文件多大、有没有循环无关，
+零依赖的一行 `.mjs` 一样炸。
+
+测试侧以前还得给它单独配
+`server.deps.external: [/util[\/]load_esm[.]ts$/]`（`new Function` 那层壳 vite
+看不见，落在 `vm.runInThisContext` 里 `import()` 会抛
+`ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING`）。现在源码里没有壳了，那条配置也删了。
 
 ### spec 从 jasmine 写法改成 vitest 原生写法
 
@@ -2513,9 +2529,7 @@ alphanumeric string"，实测长度 7~14 不等），那是概率，不是保证
 
 `globalSetup` 挂在 `BUILDER_PROJECT` 上而不是根配置：读这份副本的全在
 `src/builder/` 下，library 那边纯内存，不该为它白跑一次构建（实测
-`vitest run --project library` 单文件 7.7s → 1.8s）。同理，
-`server.deps.external`（`load_esm.ts` 交给 Node 原生加载）也得跟它待在同一层
-—— `globalSetup` 用的就是本 project 的 runner。
+`vitest run --project library` 单文件 7.7s → 1.8s）。
 
 **globalSetup 走的是出厂的那个 builder，不是底层 ng-packagr。** 它调
 `execute()`（`builders.json` 里 `library` 指向的实现），产物落在
