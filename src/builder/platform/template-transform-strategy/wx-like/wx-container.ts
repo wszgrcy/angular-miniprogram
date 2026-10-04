@@ -179,8 +179,17 @@ export class WxContainer {
 
     return content;
   }
+  /**
+   * 静态文本节点。
+   *
+   * 不带 `i18n` 时烘成字面量（少一个 setData 字段，也是本来就应该的）。
+   * 带 `i18n` 时必须改成绑定：译文在 `nodeList[i].value` 上，烘进 wxml
+   * 就等于「切语言永远看不到效果」。见 `NgTextMeta.i18n`。
+   */
   private ngTextTransform(node: NgTextMeta): string {
-    return `${node.value}`;
+    return node.i18n
+      ? this.interp(`nodeList[${node.index}].value`)
+      : `${node.value}`;
   }
 
   private getTemplateDataStr(directiveIndex: number, indexName: string) {

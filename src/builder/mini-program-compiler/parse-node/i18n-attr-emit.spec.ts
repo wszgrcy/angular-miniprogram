@@ -87,3 +87,48 @@ describe('i18n 属性的 wxml 产出', () => {
     ).toEqual(['title']);
   });
 });
+
+/**
+ * 元素级 `i18n`（裸属性，带消息 id）在 wxml 里的产出。
+ *
+ * 与 `i18n-*` 是同一个坑的另一半：静态文本被烘进 wxml 后，
+ * `loadTranslations` 就再也影响不到渲染结果——切语言永远看不到效果。
+ * Angular 会为它发 `ɵɵtext` + `ɵɵi18nApply`，译文落在
+ * `nodeList[i].value`，所以 wxml 必须改成读它。
+ *
+ * 这个坑特别容易漏：`nodeList` 里的译文一直是对的，只查 `nodeList`
+ * 的测试永久绿，而屏上始织是源文案。
+ */
+describe('元素级 i18n 文本的 wxml 产出', () => {
+  it('静态 i18n 文本改成读 value 的绑定', async () => {
+    const w = await compileHtml(`<p i18n="@@a.title">标题</p>`);
+    expect(w).toContain(`>{{nodeList[1].value}}<`);
+    expect(w).not.toContain('标题');
+  });
+
+  it('没 i18n 的静态文本照旧内联，不产生绑定', async () => {
+    const w = await compileHtml(`<p>标题</p>`);
+    expect(w).toContain('>标题<');
+    expect(w).not.toContain('nodeList[1].value');
+  });
+
+  it('i18n-<attr> 不会把子级文本一并变成绑定', async () => {
+    // 只有裸 `i18n` 才管子级；`i18n-title` 只管那个属性
+    const w = await compileHtml(`<p i18n-title="说明">正文</p>`);
+    expect(w).toContain('>正文<');
+    expect(w).not.toContain('nodeList[1].value');
+  });
+
+  it('带插值的 i18n 消息仍走原有绑定，不重复发包', async () => {
+    // i18n pass 已把它变成 BoundText，不需要特判，这里只是钉住不回退
+    const w = await compileHtml(`<p i18n="@@a.count">共 {{ n }} 项</p>`);
+    expect(w).toContain('{{');
+    expect(w).not.toContain('共 ');
+  });
+
+  it('i18n 元素里的非文本子节点不受影响', async () => {
+    const w = await compileHtml(`<p i18n-title="t" title="x">文案</p>`);
+    expect(w).toContain(`title="{{nodeList[0].attribute.title}}"`);
+    expect(w).toContain('>文案<');
+  });
+});

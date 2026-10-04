@@ -50,6 +50,13 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     private declaredWxs?: DeclaredWxsModules,
     /** 静态 `i18n-<attr>` 的属性名，见 `NgElementMeta.i18nAttrs` */
     private i18nAttrs: string[] = [],
+    /**
+     * 开始标签上带了裸 `i18n`（不是 `i18n-xxx`）。
+     *
+     * 子级里的静态文本因此变成运行时文本节点，见 `NgTextMeta.i18n`。
+     * 公开是因为 `visitText` 只能从 `parentNode` 读到它。
+     */
+    public i18nHost = false,
   ) {}
   private analysis() {
     this.getTagName();

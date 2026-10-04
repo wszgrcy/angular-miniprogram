@@ -96,6 +96,18 @@ export interface NgBoundTextMeta extends NgNodeMeta {
 export interface NgTextMeta extends NgNodeMeta {
   kind: NgNodeKind.Text;
   value: string;
+  /**
+   * 这段静态文本属于宿主元素的 `i18n` 消息。
+   *
+   * 译文只有运行时知道（`$localize` 查表），wxml 里内联源文案就等于
+   * **永远翻不了**——不是翻错，是根本不翻。Angular 会为其发一条
+   * `ɵɵtext` + `ɵɵi18nApply`，译文落在 `nodeList[i].value` 上，所以这里
+   * 必须改成绑定。与 {@link NgElementMeta.i18nAttrs} 是同一个道理。
+   *
+   * 带插值的消息不在这里：那条在 i18n pass 后已经是 `BoundText`，
+   * 绑定本来就指着 `value`。
+   */
+  i18n: boolean;
 }
 
 export interface NgTemplateMeta extends NgNodeMeta {

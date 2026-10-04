@@ -100,18 +100,28 @@ import { MatchedComponent, MatchedDirective } from './type';
  * - **静态**：不发那条指令、不占槽；译文在建元素时 `setAttribute`，落在
  *   `attribute` 上。wxml 若照旧内联源文案，就永远翻不了——所以必须改成绑定。
  */
-function i18nAttributesOf(
+function startTagOf(
   element: t.Element,
   templateText?: string,
-): { name: string; dynamic: boolean }[] {
+): string | undefined {
   if (!templateText || !element.startSourceSpan) {
-    return [];
+    return undefined;
   }
   const span = element.startSourceSpan as unknown as {
     start: { offset: number };
     end: { offset: number };
   };
-  const tag = templateText.slice(span.start.offset, span.end.offset);
+  return templateText.slice(span.start.offset, span.end.offset);
+}
+
+function i18nAttributesOf(
+  element: t.Element,
+  templateText?: string,
+): { name: string; dynamic: boolean }[] {
+  const tag = startTagOf(element, templateText);
+  if (tag === undefined) {
+    return [];
+  }
   const attr = /i18n-([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
   const out: { name: string; dynamic: boolean }[] = [];
   for (let m = attr.exec(tag); m; m = attr.exec(tag)) {
@@ -119,6 +129,18 @@ function i18nAttributesOf(
     out.push({ name: m[1], dynamic: value.includes('{{') });
   }
   return out;
+}
+
+/**
+ * 元素开始标签上是否带了裸 `i18n`（消息 id / 描述那个，不是 `i18n-<attr>`）。
+ *
+ * 同样只能切原文：i18n pass 会把 `i18n` 从 AST 上吃掉，换成节点上的
+ * `I18nMeta`，分析侧再也看不到它。`i18n-` 前缀不会误命中——`i18n` 后面
+ * 紧跟的是 `-`，被 `[^\s=]` 卡住了。
+ */
+function hasBareI18n(element: t.Element, templateText?: string): boolean {
+  const tag = startTagOf(element, templateText);
+  return tag !== undefined && /(^|\s)i18n\s*=/.test(tag);
 }
 
 export class TemplateDefinition implements TmplAstRecursiveVisitor {
@@ -213,6 +235,8 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       this.componentContext?.declaredWxsModules,
       // 静态那半要改成绑定（译文在 `attribute` 上），见 `NgElementMeta.i18nAttrs`
       i18nAttrs.filter((item) => !item.dynamic).map((item) => item.name),
+      // 裸 `i18n` 让子级静态文本也变成运行时文本，见 `NgTextMeta.i18n`
+      hasBareI18n(element, this.componentContext?.templateText),
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
@@ -679,7 +703,14 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    */
   visitText(text: t.Text) {
     const nodeIndex = this.declIndex++;
-    const instance = new ParsedNgText(text, this.parentNode, nodeIndex);
+    const instance = new ParsedNgText(
+      text,
+      this.parentNode,
+      nodeIndex,
+      // 宿主带 `i18n` 时，这段静态文本在运行时是 `$localize` 查出来的，
+      // 不能烘进 wxml，见 `NgTextMeta.i18n`
+      this.parentNode instanceof ParsedNgElement && this.parentNode.i18nHost,
+    );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
     } else {
@@ -893,13 +924,20 @@ export class CustomAstVisitor implements AstVisitor {
    * ```html
    * {{ title | uppercase }}            → 1 个
    * {{ a | date:(b | number) }}       → 2 个（参数里还能再嵌管道）
+   * {{ a | foo | bar }}               → 2 个（接收者本身就是管道）
    * ```
    *
-   * **必须继续访问 `args`**：管道参数本身可以是另一条带管道的表达式，
-   * 漏掉 args 就会少算槽位。
+   * **两个子树都得走**，对齐 `RecursiveAstVisitor.visitPipe`：
+   * - `exp`（接收者）—— 链式管道 `a | foo | bar` 在 AST 里是
+   *   `BindingPipe{ exp: BindingPipe{a, foo}, name: bar }`，漏掉就少算槽位
+   * - `args`（参数）—— 参数本身可以是另一条带管道的表达式
+   *
+   * 少算一个管道 = 少占一个槽 = 后续所有节点下标整体前移一位，
+   * wxml 的 `nodeList[i]` 就指到别的节点上了。
    */
   visitPipe(ast: BindingPipe) {
     this.pipeCallback();
+    this.visit(ast.exp);
     this.visitAll(ast.args);
   }
 
