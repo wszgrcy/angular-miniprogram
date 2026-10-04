@@ -343,6 +343,39 @@ node -e "console.log(Object.keys(require('angular-miniprogram/package.json').exp
 # 期望含 ./vitest 与 ./vitest/runtime
 ```
 
+## 🔴 builder 的运行时依赖必须写在 `src/library/package.json`
+
+发布产物的根是 `src/library/package.json`（ng-packagr 生成 `dist/package.json`，
+`copy:assets` 把 builder 塞进 `dist/builder`）。仓库根的 `package.json` 是
+`private: true` 的开发依赖表，**发布时不会被安装**。
+
+所以 `src/builder/**` 里运行时 `import`（`import type` 不算，编译后就没了）
+用到的包，必须出现在 `src/library/package.json` 的 `dependencies` 或
+`peerDependencies` 里。只写在根 devDependencies = 装包的人拿不到。
+
+真实形状：`ng new` v22 的 devDependencies 只有 `@angular/cli` /
+`@angular/compiler-cli` / `prettier` / `typescript`，builder 默认走
+`@angular/build` —— `@angular-devkit/build-angular` 在新工作区里根本不存在，
+而 `library/builder.ts`、`util/asset-path.ts` 模块加载时就要 require 它。
+
+分工：
+
+- `dependencies`：我们自己实现要用的（`ws`、`fs-extra`、`glob`…）。新增要同步
+  `src/library/ng-package.json` 的 `allowedNonPeerDependencies`，否则 ng-packagr
+  直接报错（`Dependency xxx must be explicitly allowed…`）
+- `peerDependencies`：宿主工作区提供的工具链（`@angular/*`、`@angular-devkit/*`、
+  `typescript`、`ng-packagr`）
+- `peerDependenciesMeta.optional`：只有某条链路才需要（`vitest` 只有
+  `angular-miniprogram:vitest` 用到），ng-packagr 会原样带进 dist
+
+改 `src/builder/**` 的 import 时扫一眼新增的包名（动态 `import()` 也算）：
+
+```bash
+grep -rn "^import \|await import(" src/builder --include=*.ts | grep -v "import type"
+```
+
+出现的包名在发布 package.json 里就得有。
+
 ## 🔴 开工前先读这一条
 
 **进 `setData` 的数据里绝不允许 `undefined`，无值一律用 `null`。**

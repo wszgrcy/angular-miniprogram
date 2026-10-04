@@ -21,6 +21,7 @@ import {
   extractManifestsFromSource,
   extractViewTreesFromSource,
 } from '../../../test/util/node-manifest';
+import { BUILD_TIMEOUT_MS } from '../../../test/util/shared-build';
 import {
   nodeListIndices,
   splitWxmlTopLevelBlocks,
@@ -418,7 +419,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect({ newlyUnverifiableWxml: newGaps }).toEqual({
         newlyUnverifiableWxml: [],
       });
-    }, 600000);
+    }, BUILD_TIMEOUT_MS);
 
     /**
      * 反向对照：证明这套断言**真的能抓到错位**，不是只会通过的摆设。
@@ -455,7 +456,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           `若为 0 说明这套校验抓不住错位，是假测试`,
       ).toBe(shiftedIdx.size);
       expect(orphans.length).toBeGreaterThan(0);
-    }, 600000);
+    }, BUILD_TIMEOUT_MS);
   });
 });
 
@@ -479,7 +480,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     it('注册表应记录到组件（否则本测试空跑）', async () => {
       const c = await load();
       expect(c.records.length).toBeGreaterThan(5);
-    }, 600000);
+    }, BUILD_TIMEOUT_MS);
 
     it('每个组件的 wxml 下标，必须落在该组件自己的 Angular 节点下标集合内', async () => {
       const c = await load();
@@ -585,7 +586,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect({ newlyFailingComponents: newViolations }).toEqual({
         newlyFailingComponents: [],
       });
-    }, 600000);
+    }, BUILD_TIMEOUT_MS);
 
     it('反向对照：篡改某组件 wxml 下标后，精确校验必须失败', async () => {
       const c = await load();
@@ -612,7 +613,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         `篡改后应全部识别为错位。识别 ${orphans.length}/${tampered.size}。` +
           `为 0 说明精确校验抓不住问题`,
       ).toBe(tampered.size);
-    }, 600000);
+    }, BUILD_TIMEOUT_MS);
   });
 });
 
@@ -671,7 +672,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect(cf, '没找到 ControlFlowComponent 的视图树').toBeDefined();
       // @if x4 + @for x3 + @switch 等，应远多于 1 个视图
       expect(cf!.views.length).toBeGreaterThan(3);
-    }, 600000);
+    }, BUILD_TIMEOUT_MS);
 
     it('每个 wxml 模板块的下标，必须被某个视图的下标空间覆盖', async () => {
       const c = await load();
@@ -754,7 +755,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect({ newlyUncoveredComponents: newGaps }).toEqual({
         newlyUncoveredComponents: [],
       });
-    }, 600000);
+    }, BUILD_TIMEOUT_MS);
 
     it('具名模板块（ifBlock / forBlock 等）必须全部被覆盖', async () => {
       const c = await load();
@@ -782,7 +783,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect({ uncoveredNamedBlocks: violations }).toEqual({
         uncoveredNamedBlocks: [],
       });
-    }, 600000);
+    }, BUILD_TIMEOUT_MS);
 
     it('运行时 nodeList 长度（=decls）必须严格大于 wxml 根块引用的最大下标', async () => {
       /**
@@ -973,6 +974,6 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         `篡改 ${cmp}/${block!.name} 下标 +5555 后不应有任何视图覆盖，` +
           `实际覆盖 ${covering.length} 个（>0 说明校验抓不住）`,
       ).toBe(0);
-    }, 600000);
+    }, BUILD_TIMEOUT_MS);
   });
 });

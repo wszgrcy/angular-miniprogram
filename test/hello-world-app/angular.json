@@ -25,9 +25,8 @@
             ],
             "platform": "wx",
             "outputPath": "dist/app",
-            "index": "",
             "main": "src/main.ts",
-            "polyfills": ["@angular/localize"],
+            "polyfills": ["@angular/localize/init"],
             "tsConfig": "src/tsconfig.app.json",
             "assets": [
               {
@@ -41,8 +40,7 @@
                 "output": "./"
               }
             ],
-            "styles": ["src/styles.css"],
-            "scripts": []
+            "styles": ["src/styles.css"]
           }
         },
         "test": {

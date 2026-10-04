@@ -81,7 +81,7 @@ describe('cli workspace schema：本包 builder 注入', () => {
 
   it('本包 builder 的 options 属性来自各自的 schema.json', () => {
     const app = schema.definitions[definitionName('application')];
-    for (const key of ['outputPath', 'index', 'main', 'tsConfig']) {
+    for (const key of ['outputPath', 'main', 'tsConfig', 'platform']) {
       expect(app.properties[key]).toBeTruthy();
     }
     const library = schema.definitions[definitionName('library')];

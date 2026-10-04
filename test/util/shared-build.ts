@@ -5,6 +5,15 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 /**
+ * 构建类用例的超时。
+ *
+ * 别写 600000：真出问题（模块解析不了、watch 没退出、harness 卡住）时，
+ * CI 要挂十分钟才报出来，本地看着就是整个进程死了。实测一次全量构建
+ * ≈ 2s，60s 已经是 30 倍余量；再慢就该去查为什么慢，而不是继续加大超时。
+ */
+export const BUILD_TIMEOUT_MS = 60_000;
+
+/**
  * 「构建一次，多个用例断言」的构建缓存。
  *
  * 一次小程序全量构建 ≈ 2s，其中约一半是 Angular AOT（analog 插件在

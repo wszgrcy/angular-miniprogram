@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  /**
+   * `script/` 里产出要提交进仓库的生成器。
+   *
+   * `gen-builder-schema.ts` 生成的是提交进仓库的 schema.json，写错了 CI 只会
+   * 报「schema 不同步」，指不到真正那行类型错，所以单独挂一个 noEmit 的 project。
+   * 它不在 tsconfig.builder.json 里（那个有 rootDir: src/builder，要 emit），
+   * 也不属于 tsconfig.config.json（只挂 vitest.config.mts）。
+   *
+   * 继承 tsconfig.builder.json 是为了拿它的 paths 映射（platform.ts 一路
+   * import 到 @angular/compiler-cli 的深路径），这里只改 rootDir 和 noEmit。
+   */
+  "extends": "./tsconfig.builder.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "noEmitOnError": false
+  },
+  "include": ["script/gen-builder-schema.ts"]
+}

@@ -33,11 +33,9 @@ export const BROWSER_BUILDER_INFO = {
 };
 export const DEFAULT_ANGULAR_CONFIG = {
   outputPath: 'dist/testProject',
-  index: '',
   main: 'src/main.ts',
-  polyfills: '',
+  polyfills: [],
   tsConfig: 'src/tsconfig.app.json',
-  progress: false,
   assets: [
     {
       glob: 'project.config.json',
@@ -58,6 +56,4 @@ export const DEFAULT_ANGULAR_CONFIG = {
       inject: false,
     },
   ],
-  scripts: [],
-  aot: true,
 };

@@ -17,8 +17,8 @@ import {
   buildPlatformDefine,
   buildViteAlias,
   getBuildPlatform,
+  normalizePolyfills,
   polyfillEntryPlugin,
-  resolveLocalizeInit,
 } from '../../vite';
 import {
   generateEntryPatterns,
@@ -185,11 +185,12 @@ export async function createVitestViteConfig(options: {
     },
     plugins: [
       ...stack.preAnalogPlugins,
-      // polyfill 入口走虚拟模块，才能在同一处把 @angular/localize/init
-      // 拼在后面（与 application 链路同一套）。
+      // polyfill 入口走虚拟模块：我们那份固定装，`polyfills` 声明的条目
+      // 逐条拼在后面（与 application 链路同一套）。
       polyfillEntryPlugin(
         path.resolve(__dirname, '../../platform/template/polyfill-entry.js'),
-        resolveLocalizeInit(vitestOptions.polyfills),
+        normalizePolyfills(vitestOptions.polyfills),
+        context.workspaceRoot,
       ),
       // analog 必须排在 wxs-strip 之后：它建 Angular program 时要读
       // fileReplacements，而 wxs-strip 会就地往里 push。

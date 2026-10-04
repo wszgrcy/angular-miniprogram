@@ -39,6 +39,11 @@ export default defineConfig({
           translations: { en: 'Build' },
           items: [
             nav('入口：页面 / 组件 / tabBar', 'Entries', '/guide/entry/'),
+            nav(
+              '构建选项迁移',
+              'Builder Options Migration',
+              '/guide/migration-builder-options/',
+            ),
           ],
         },
         {

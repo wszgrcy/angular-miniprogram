@@ -16,7 +16,8 @@
     "glob",
     "ora",
     "static-injector",
-    "vite"
+    "vite",
+    "ws"
   ],
   "lib": {
     "entryFile": "./platform/index.ts"

@@ -15,10 +15,12 @@
     "prebuild": "rimraf ./dist",
     "build": "npm run build:library && npm run build:builder && npm run copy:assets && npm run build:schema && node ./script/link-self.cjs",
     "build:schema": "tsx ./script/build-cli-schema.ts",
+    "gen:schema": "tsx ./script/gen-builder-schema.ts",
+    "check:schema": "tsx ./script/gen-builder-schema.ts --check",
     "copy:assets": "cpx \"./src/builder/**/*.json\" ./dist/builder && cpx \"./src/builder/**/*.d.ts\" ./dist/builder && cpx \"./src/builder/**/*.js\" ./dist/builder && cpx ./readme.md ./dist",
     "build:library": "tsx ./script/ensure-sync.ts && tsx ./script/build-ng-package.ts",
     "build:builder": "npm run typecheck:builder && tsx ./script/vite-build.ts",
-    "typecheck": "npm run typecheck:builder && npm run typecheck:spec && npm run typecheck:config",
+    "typecheck": "npm run typecheck:builder && npm run typecheck:spec && npm run typecheck:config && npm run typecheck:script",
     "typecheck:builder": "tsc -p ./tsconfig.builder.json --noEmit",
     "typecheck:spec": "tsc -p ./tsconfig.spec.json --noEmit",
     "prepare": "husky install",
@@ -29,7 +31,8 @@
     "typedoc": "typedoc",
     "deploy": "npm run typedoc && npm run build:library && npm test && npm run coverage-badge -- init && cpx \"./deploy/doc/**/*\" ./docs && cpx \"./deploy/api-doc/**/*\" ./docs/api-doc && npm run coverage && npm run coverage-badge -- success && cpx ./deploy/doc/assets/img/badge.svg ./docs/assets/img",
     "coverage-badge": "tsx ./script/coverage-badge.ts",
-    "typecheck:config": "tsc -p ./tsconfig.config.json --noEmit"
+    "typecheck:config": "tsc -p ./tsconfig.config.json --noEmit",
+    "typecheck:script": "tsc -p ./tsconfig.script.json --noEmit"
   },
   "private": true,
   "author": "wszgrcy",

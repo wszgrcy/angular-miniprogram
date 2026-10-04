@@ -32,12 +32,27 @@
     "glob": "^7.2.0",
     "ora": "^9.4.1",
     "static-injector": "7.0.0",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "ws": "^8.22.0"
   },
   "peerDependencies": {
-    "ng-packagr": "^22.1.1",
+    "@angular-devkit/architect": "^0.2201.8",
+    "@angular-devkit/build-angular": "^22.1.8",
+    "@angular-devkit/core": "^22.1.8",
+    "@angular/build": "^22.1.8",
+    "@angular/common": "^22.1.7",
+    "@angular/compiler": "^22.1.7",
+    "@angular/compiler-cli": "^22.1.7",
     "@angular/core": "^22.1.7",
-    "@angular/common": "^22.1.7"
+    "ng-packagr": "^22.1.1",
+    "rxjs": "^7.4.0",
+    "typescript": ">=6.0 <6.1",
+    "vitest": "^4.1.11"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   },
   "exports": {
     "./vitest/runtime": {

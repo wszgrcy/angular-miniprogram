@@ -13,15 +13,20 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
-import { executeOnceShared } from '../../../test/util/shared-build';
+import {
+  BUILD_TIMEOUT_MS,
+  executeOnceShared,
+} from '../../../test/util/shared-build';
 import { PlatformType } from '../platform/platform';
 import {
   POLYFILL_ENTRY_ID,
   buildPlatformDefine,
   getBuildPlatform,
+  normalizePolyfills,
+  polyfillEntryContents,
   polyfillEntryPlugin,
-  resolveLocalizeInit,
   runViteBuilder,
+  toPolyfillSpecifier,
 } from './index';
 
 /**
@@ -30,8 +35,8 @@ import {
  * ## 为什么是构建期 polyfill，不是运行时兜底
  *
  * Angular 官方就把 `@angular/localize/init` 当 **polyfill**：
- * - `@angular/build` 看 `polyfills` 里有没有 `@angular/localize(/init)`，有就
- *   把它塞进 polyfills bundle（`application-code-bundle.js`）
+ * - `@angular/build` 把 `polyfills` 数组逐条 `import` 进一个虚拟模块
+ *   （`application-code-bundle.ts` 的 `getEsBuildCommonPolyfillsOptions`）
  * - webpack 时代看 tsconfig `types`，有就把 `@angular/localize/init` 作为
  *   `main` 的第一个 entry（`configs/common.js`）
  * - AOT 内联翻译时干脆 `alias['@angular/localize/init'] = false` 整个摘掉
@@ -40,43 +45,55 @@ import {
  * 插件对源码里直接 `import '@angular/localize/init'` 发警告。
  * 所以本项目也不在库里装 `$localize` 占位——没做 i18n 的项目不该为它付体积，
  * 更不该被要求装那个包。
+ *
+ * 本项目走第一条（与上游 browser 路径同名同义）：`polyfills` 里声明什么就
+ * import 什么，包名和本地文件都走普通解析，没有任何特判。所以 `/init` 必须
+ * 写全（`ng add @angular/localize` 写的就是全路径），下面钉了裸写法的后果。
  */
 describe('@angular/localize/init 注入', () => {
-  describe('判定（单元）', () => {
-    it('没声明就返回 undefined', () => {
-      expect(resolveLocalizeInit(undefined)).toBeUndefined();
-      expect(resolveLocalizeInit('')).toBeUndefined();
-      expect(resolveLocalizeInit(['zone.js'])).toBeUndefined();
+  describe('polyfills 条目（单元）', () => {
+    it('单个串写法归一成数组（schema 允许 string）', () => {
+      expect(normalizePolyfills('src/polyfills.ts')).toEqual([
+        'src/polyfills.ts',
+      ]);
+      expect(normalizePolyfills(undefined)).toEqual([]);
     });
 
-    for (const name of ['@angular/localize', '@angular/localize/init']) {
-      it(`${name} 认得，且给的是裸标识符`, () => {
-        expect(resolveLocalizeInit([name])).toBe('@angular/localize/init');
-      });
-    }
+    it('包名保持裸标识符，不自己解析', () => {
+      // 解析交给 Vite（exports map / conditions / alias 与应用里其余依赖同一套）；
+      // 自己 require.resolve 在 monorepo 提升、`file:` 链接下会分叉。
+      const r = toPolyfillSpecifier('@angular/localize/init', '/w');
+      expect(r).toBe('@angular/localize/init');
+      expect(path.isAbsolute(r)).toBe(false);
+      expect(r).not.toContain('node_modules');
+    });
 
-    it('单个串写法同样认（schema 允许 string）', () => {
-      expect(resolveLocalizeInit('@angular/localize')).toBe(
-        '@angular/localize/init',
+    it('本地文件拼成绝对路径', () => {
+      expect(toPolyfillSpecifier('src/polyfills.ts', '/w')).toBe(
+        path.resolve('/w', 'src/polyfills.ts'),
+      );
+      expect(toPolyfillSpecifier('./x.polyfill.js', '/w')).toBe(
+        path.resolve('/w', './x.polyfill.js'),
       );
     });
 
-    /**
-     * 给裸标识符而不是解析后的绝对路径：解析交给 Vite，和应用里其余依赖走
-     * 同一条路（exports map / conditions / alias 全一致）。自己
-     * require.resolve 出来的路径在 monorepo 提升、`file:` 链接下会分叉。
-     */
-    it('给的是裸标识符，不是解析结果', () => {
-      const r = resolveLocalizeInit(['@angular/localize'])!;
-      expect(path.isAbsolute(r)).toBe(false);
-      expect(r).not.toContain('node_modules');
-      expect(r).not.toContain('fesm');
+    it('条目逐条 import，顺序保持，我们那份在最前', () => {
+      const code = polyfillEntryContents('/abs/polyfill-entry.js', ['a', 'b'], '/w');
+      expect(code).toContain('import "a";');
+      expect(code).toContain('import "b";');
+      expect(code.indexOf('polyfill-entry.js')).toBeLessThan(code.indexOf('"a"'));
+      expect(code.indexOf('"a"')).toBeLessThan(code.indexOf('"b"'));
+    });
+
+    it('没声明就只有我们那一份', () => {
+      const code = polyfillEntryContents('/abs/polyfill-entry.js', [], '/w');
+      expect(code).toContain('__mpPolyfills');
+      expect(code.match(/import /g)).toHaveLength(1);
     });
   });
 
   /**
-   * 为什么 `@angular/localize` 要归一成 `@angular/localize/init`，
-   * 而不是「声明了什么就 import 什么」。
+   * 为什么 `/init` 必须写全，写 `@angular/localize` 不算。
    *
    * 两者不等价，实测：
    *  - `@angular/localize` 主入口只导出 `ɵ` 前缀的内部 API
@@ -86,14 +103,14 @@ describe('@angular/localize/init 注入', () => {
    *    `globalThis.$localize = $localize`。
    *
    * 而编译产物里的 i18n 常量走的是**裸 `$localize`**（define 换成
-   * `<平台>.$localize`），那个全局只有 `/init` 会挂。所以照抄声明里的
-   * `@angular/localize` 会构建成功、运行时全炸。
+   * `<平台>.$localize`），那个全局只有 `/init` 会挂。所以声明裸主入口会
+   * 构建成功、运行时全炸。
    *
-   * 上游两条路径也都是归一到 `/init`：
-   *  - `@angular/build` `application-code-bundle.js:119`
-   *  - `build-angular` `configs/common.js:81`
+   * 构建器不做归一：上游 browser 路径也不做（只有 SSR 那条
+   * `createServerPolyfillBundleOptions` 会补 `/init`），小程序不是 SSR，
+   * 就按普通 browser 语义走。
    */
-  describe('两种声明都归一到 /init', () => {
+  describe('`/init` 必须写全', () => {
     it('主入口不挂 $localize', async () => {
       delete (globalThis as Record<string, unknown>).$localize;
       await import('@angular/localize');
@@ -110,27 +127,27 @@ describe('@angular/localize/init 注入', () => {
 
   describe('入口拼装（单元）', () => {
     /** vite 的 hook 允许写成对象形式，类型上不可调用，这里收窄成函数 */
-    const loadOf = (init: string | undefined) => {
-      const p = polyfillEntryPlugin('/abs/polyfill-entry.js', init);
+    const loadOf = (polyfills: string[]) => {
+      const p = polyfillEntryPlugin('/abs/polyfill-entry.js', polyfills, '/w');
       return (p.load as (id: string) => string | null)(POLYFILL_ENTRY_ID);
     };
 
     it('声明了才多一行 import', () => {
-      expect(loadOf('/abs/init.mjs')).toContain('/abs/init.mjs');
-      expect(loadOf(undefined)).not.toContain('init.mjs');
+      expect(loadOf(['/abs/init.mjs'])).toContain('/abs/init.mjs');
+      expect(loadOf([])).not.toContain('init.mjs');
       // 自己的那份永远在
-      expect(loadOf(undefined)).toContain('/abs/polyfill-entry.js');
+      expect(loadOf([])).toContain('/abs/polyfill-entry.js');
     });
 
     it('自己的 polyfill-entry 永远在最前', () => {
-      const code = loadOf('/abs/init.mjs')!;
+      const code = loadOf(['/abs/init.mjs'])!;
       expect(code.indexOf('polyfill-entry.js')).toBeLessThan(
         code.indexOf('init.mjs'),
       );
     });
 
     it('别的 id 一概不接管', () => {
-      const resolveId = polyfillEntryPlugin('/abs/polyfill-entry.js', undefined)
+      const resolveId = polyfillEntryPlugin('/abs/polyfill-entry.js', [], '/w')
         .resolveId as (id: string) => string | null;
       expect(resolveId('/some/real.js')).toBeNull();
       expect(resolveId(POLYFILL_ENTRY_ID)).toBe(POLYFILL_ENTRY_ID);
@@ -156,7 +173,7 @@ describe('@angular/localize/init 注入', () => {
         pages: DEFAULT_ANGULAR_CONFIG.pages,
         platform: PlatformType.wx,
         sourceMap: false,
-        polyfills: ['@angular/localize'],
+        polyfills: ['@angular/localize/init'],
       });
       expect(result.result?.success).toBeTruthy();
 
@@ -199,8 +216,9 @@ describe('@angular/localize/init 注入', () => {
       expect(all).toMatch(/wx\.__window\.AgentNode\s*=/);
       // 可执行代码里不该再剩裸 `Node`（`instanceof Node` 是最典型的一处）
       expect(all).not.toMatch(/instanceof\s+(?!\w+\.)Node\b/);
-    }, 600000);
+    }, BUILD_TIMEOUT_MS);
   });
+
 });
 
 /**

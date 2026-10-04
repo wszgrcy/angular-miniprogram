@@ -17,13 +17,27 @@ import type { WxsAnalysisRef } from '../mini-program-compiler/type';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
 import { LibraryTemplateScopeService } from '../shared/library-template-scope.service';
+import type { BudgetEntry } from '../util/angular-build-compat';
 import { getSubPackages } from './app-config';
 import {
   generateEntryPatterns,
   resolveProjectRoots,
   toRollupInput,
 } from './entry-patterns';
+import {
+  type OptimizationOption,
+  type OutputHashing,
+  type SourceMapOption,
+  isExternalSpecifier,
+  mergeDefine,
+  resolveCssPreprocessorOptions,
+  resolveOptimization,
+  resolveOutputNames,
+  resolveSourcemap,
+  toAbsoluteFileReplacements,
+} from './options';
 import { platformConditionDefine } from './platform-flags';
+import { budgetsPlugin } from './plugins/budgets.plugin';
 import { miniProgramComponentTransformPlugin } from './plugins/component-transform.plugin';
 import { entryBootstrapPlugin } from './plugins/entry-bootstrap.plugin';
 import { libraryTemplatePlugin } from './plugins/library-template.plugin';
@@ -60,18 +74,16 @@ export interface ViteMiniProgramBuildOptions {
   platform: PlatformType;
   assets?: AssetPattern[];
   styles?: (string | { input: string })[];
-  sourceMap?: boolean;
+  sourceMap?: SourceMapOption;
   /**
-   * 与 angular.json `build.options.polyfills` 同名同义。
+   * 与 angular.json `build.options.polyfills` 同名同义：每条都会被 import 进
+   * polyfills 入口，包名和本地文件都收，语义跟 `@angular/build` 的 browser
+   * 路径一致（见 `polyfillEntryContents`）。
    *
-   * 目前只用来判定要不要装 `@angular/localize/init`，判定规则与
-   * `@angular/build` 一致，见 `resolveLocalizeInit`。
-   *
-   * 与 schema 一样允许单个串（`"src/polyfills.ts"` 这种写法很常见）。
+   * 与 schema 一样允许单个串（`"polyfills": "src/polyfills.ts"` 这种写法很常见）。
    */
   polyfills?: string | string[];
-  optimization?: boolean;
-  base?: string;
+  optimization?: OptimizationOption;
   /** 监听模式：对应小程序的开发方式（微信开发者工具盯着 dist 目录） */
   watch?: boolean;
   /**
@@ -101,9 +113,10 @@ export interface ViteMiniProgramBuildOptions {
     replace: string;
     with: string;
   }[];
-  /** scss / sass / less 的 includePaths 等预处理器选项 */
+  /** scss / sass 的 includePaths 与 sass 编译器选项 */
   stylePreprocessorOptions?: {
     includePaths?: string[];
+    sass?: Record<string, unknown>;
   };
   /**
    * `@Component.styles` 内联样式的语言，默认 'css'。
@@ -138,6 +151,22 @@ export interface ViteMiniProgramBuildOptions {
    * 这里显式出 cjs，不再依赖工具链兜底。
    */
   format?: 'cjs' | 'es';
+  /** 产物文件名的 hash 策略，见 `resolveOutputNames` */
+  outputHashing?: OutputHashing;
+  /** 构建前是否清空 outputPath，对应 vite 的 `build.emptyOutDir` */
+  deleteOutputPath?: boolean;
+  /** 模块解析是否还原软链接，透传 vite `resolve.preserveSymlinks` */
+  preserveSymlinks?: boolean;
+  /** 用户侧 define，与平台 define 合并（平台优先），见 `mergeDefine` */
+  define?: Record<string, string>;
+  /** 条件导出解析条件，透传 vite `resolve.conditions` */
+  conditions?: string[];
+  /** 不打包、运行时依赖外部提供的包名 */
+  externalDependencies?: string[];
+  /** 产物体积预算，判定逻辑复用 @angular/build，见 budgets.plugin */
+  budgets?: BudgetEntry[];
+  /** 产出 stats.json（各文件体积清单） */
+  statsJson?: boolean;
 }
 
 /**
@@ -200,68 +229,85 @@ export function buildPlatformDefine(
 /**
  * polyfills 入口的虚拟模块 id。
  *
- * 我们自己的 `polyfill-entry.js` 是固定要装的，`@angular/localize/init` 却
- * 不是——没做 i18n 的项目不该为它付体积，也不该被要求装那个包。所以入口
- * 不能是一个写死的文件路径，得按配置现场拼出来。
+ * 我们自己的 `polyfill-entry.js` 是固定要装的（小程序模板是纯文本内联、不过
+ * bundler，全局能力表只能走入口），用户 `polyfills` 里声明的条目跟在后面。
  */
 export const POLYFILL_ENTRY_ID = 'angular-miniprogram:polyfills';
 
 /**
- * angular.json 的 `polyfills` 里有没有声明 `@angular/localize`，有则给出
- * 该注入的模块。
+ * 条目是不是本地文件：以 `.` 开头、或带 js/ts 扩展名。
  *
- * ## 为什么两种写法都归一成 `@angular/localize/init`
- *
- * **不是偷懒，两者不等价**（实测，见 `localize-polyfill.spec.ts`）：
- *
- *  - `@angular/localize` 主入口只导出 `ɵ` 前缀的内部 API
- *    （`ɵ$localize` / `loadTranslations` / `parseTranslation` …），
- *    **一个字都不碰 globalThis**。
- *  - `@angular/localize/init` 整个模块就一句 `globalThis.$localize = $localize`。
- *
- * 而编译产物里的 i18n 常量走的是**裸 `$localize`**（`buildPlatformDefine`
- * 把它换成 `<平台>.$localize`），那个全局只有 `/init` 会挂。所以「声明里写的
- * 是什么就 import 什么」会构建成功、运行时全炸——照抄声明在这里是 bug。
- *
- * 声明 `@angular/localize` 表达的是「这个 app 要用 i18n」这个**意图**，
- * `/init` 是兑现它的**手段**。上游两条路径也都是这么归一的：
- *  - `@angular/build` `application-code-bundle.js:119`
- *  - `build-angular` `configs/common.js:81`
- *
- * ## 归一化会不会架空 app 自己的 `loadTranslations`
- *
- * 不会。`loadTranslations` 是业务侧**显式 import** 的 API，我们从不替换它；
- * 注入 `/init` 只是往 polyfills 里**多加**一个模块，没有 alias 掉主入口
- * （CLI 在 AOT 内联翻译那条路才会 `alias['@angular/localize/init'] = false`，
- * 我们不走内联）。
- *
- * 更关键的是两个入口共用同一个 `_localize-chunk.mjs`：`/init` 挂上全局的
- * 那个 `$localize` 对象，`loadTranslations` 写 `translate` / `TRANSLATIONS`
- * 就在同一个对象上，注册表只有一份。实测产物里 `$localize` 只在
- * `polyfills.js` 定义一次，业务 chunk 一律读 `wx.__window.$localize`。
- * 行为侧的钉测见 `library/platform/localize-runtime.spec.ts`。
- *
- * ## 为什么返回裸标识符而不是解析后的路径
- *
- * 交给 Vite 按它自己的 exports map / conditions / alias 解析，和应用里
- * 其余依赖走同一条路。自己 `require.resolve` 反而绕开这套，monorepo 提升、
- * `file:` 链接、条件导出这些情况就会和 Vite 的解析结果分叉。
+ * 上游 `isLocalFile`（`tools/esbuild/application-code-bundle.ts`）还有一条
+ * 「`zone.js` 及其子路径一律按包算」，那是给它自己 import zone 用的，本包
+ * 照抄不过来。
  */
-export function resolveLocalizeInit(
+export function isLocalPolyfill(entry: string): boolean {
+  return entry.startsWith('.') || /\.[cm]?[jt]sx?$/.test(entry);
+}
+
+/**
+ * angular.json 的 `polyfills` → 条目数组。就是上游 `application/options.ts:478`
+ * 那条归一（串也收），除此之外不做任何过滤：声明什么就 import 什么。
+ */
+export function normalizePolyfills(
   polyfills: string | string[] | undefined,
-): string | undefined {
-  const declared = new Set(
-    polyfills === undefined ? [] : ([] as string[]).concat(polyfills),
-  );
-  return declared.has('@angular/localize') ||
-    declared.has('@angular/localize/init')
-    ? '@angular/localize/init'
-    : undefined;
+): string[] {
+  return ([] as string[]).concat(polyfills ?? []);
+}
+
+/**
+ * 单条 `polyfills` 声明 → 能交给解析器的模块标识。
+ *
+ * 包名原样交给 Vite（exports map / conditions / alias 与应用里其余依赖同一套，
+ * 自己 require.resolve 在 monorepo 提升、`file:` 链接下会分叉）；本地文件拼成
+ * 绝对路径（上游用 esbuild 的 `build.resolve('./x')` 试探，rolldown 在配置期
+ * 没等价 API，判定口径与 `isLocalPolyfill` 一致）。
+ *
+ * 不做 `@angular/localize` → `/init` 的归一：那是上游 SSR 路径的事
+ * （`createServerPolyfillBundleOptions`），小程序不是 SSR，按 browser 语义
+ * 声明什么就 import 什么，`/init` 必须写全（`ng add @angular/localize`
+ * 写的就是全路径；裸写法的后果见 `localize-polyfill.spec.ts`）。
+ */
+export function toPolyfillSpecifier(
+  entry: string,
+  workspaceRoot: string,
+): string {
+  return isLocalPolyfill(entry) ? path.resolve(workspaceRoot, entry) : entry;
+}
+
+/**
+ * 把 angular.json 的 `polyfills` 翻成 polyfills 入口的模块内容。
+ *
+ * 结构对齐 `@angular/build` 的 `getEsBuildCommonPolyfillsOptions`：那边也是
+ * 造一个虚拟模块，内容就是每条 polyfill 一个 `import`（上游
+ * `application-code-bundle.ts:750`）。上游改了照着同步即可。
+ *
+ * 与上游只有一处结构差异：我们那份 `polyfill-entry.js` 固定在最前，所以上游
+ * 「polyfills 为空就不产出 polyfills bundle」那条早退在这里不成立。
+ */
+export function polyfillEntryContents(
+  selfEntry: string,
+  polyfills: readonly string[],
+  workspaceRoot: string,
+): string {
+  const lines = [
+    // 必须把命名空间接住再引用一次：polyfill-entry 是 CJS 产物，只往
+    // globalThis 上挂东西、不导出任何有用值，裸 `import "x"` 会被
+    // rolldown 判成无副作用整块摇掉。构建绿、产物里没有 AbortController，
+    // 跑到才炸 `wx.__window.AbortController is not a constructor`。
+    `import * as __mpPolyfills from ${JSON.stringify(selfEntry)};`,
+    `globalThis.__mpPolyfills = __mpPolyfills;`,
+  ];
+  for (const entry of polyfills) {
+    lines.push(`import ${JSON.stringify(toPolyfillSpecifier(entry, workspaceRoot))};`);
+  }
+  return lines.join('\n');
 }
 
 export function polyfillEntryPlugin(
   selfEntry: string,
-  localizeInit: string | undefined,
+  polyfills: readonly string[],
+  workspaceRoot: string,
 ): import('vite').Plugin {
   return {
     name: 'angular-miniprogram:polyfill-entry',
@@ -273,19 +319,7 @@ export function polyfillEntryPlugin(
       if (id !== POLYFILL_ENTRY_ID) {
         return null;
       }
-      const lines = [
-        // 必须把命名空间接住再引用一次：polyfill-entry 是 CJS 产物，只往
-        // globalThis 上挂东西、不导出任何有用值，裸 `import "x"` 会被
-        // rolldown 判成无副作用整块摇掉。构建绿、产物里没有 AbortController，
-        // 跑到才炸 `wx.__window.AbortController is not a constructor`。
-        // `export default ns` 同样留不住（实测），落到全局能力表上才稳。
-        `import * as __mpPolyfills from ${JSON.stringify(selfEntry)};`,
-        `globalThis.__mpPolyfills = __mpPolyfills;`,
-      ];
-      if (localizeInit) {
-        lines.push(`import ${JSON.stringify(localizeInit)};`);
-      }
-      return lines.join('\n');
+      return polyfillEntryContents(selfEntry, polyfills, workspaceRoot);
     },
   };
 }
@@ -350,8 +384,10 @@ export async function createMiniProgramViteConfig(options: {
   root?: string;
 }): Promise<InlineConfig> {
   const { viteOptions, context, buildPlatform } = options;
-  const isProduction = !!viteOptions.optimization;
-  const localizeInit = resolveLocalizeInit(viteOptions.polyfills);
+  const optimization = resolveOptimization(viteOptions.optimization);
+  const isProduction = optimization.isProduction;
+  const outputNames = resolveOutputNames(viteOptions.outputHashing);
+  const polyfills = normalizePolyfills(viteOptions.polyfills);
 
   const entryPatterns = await generateEntryPatterns({
     pages: viteOptions.pages || [],
@@ -397,6 +433,7 @@ export async function createMiniProgramViteConfig(options: {
           subpackageChunkPlugin({
             appConfig,
             sourceRoot: getSystemPath(absoluteProjectSourceRoot),
+            chunkFileNames: outputNames.chunkFileNames,
           }),
         ];
       }
@@ -427,7 +464,10 @@ export async function createMiniProgramViteConfig(options: {
     current: WxsAnalysisRef;
   } = { current: null };
   const sharedFileReplacements: Array<{ replace: string; with: string }> = [
-    ...(viteOptions.fileReplacements ?? []),
+    ...toAbsoluteFileReplacements(
+      viteOptions.fileReplacements,
+      context.workspaceRoot,
+    ),
   ];
 
   const config: InlineConfig = {
@@ -437,11 +477,14 @@ export async function createMiniProgramViteConfig(options: {
     // 'warn' 会把 vite 自己的「building / transformed / 产物清单」全吞掉，
     // 用户只看到命令一闪而过，分不清是成功还是静默失败。
     logLevel: 'info',
-    define: {
-      ...buildPlatformDefine(buildPlatform, isProduction),
+    define: mergeDefine(
+      viteOptions.define,
+      // 平台 define 在后：global / window / wx / ngDevMode 这些是运行时
+      // 能不能跑的关键，用户配同名 key 也不能把它们换掉
+      buildPlatformDefine(buildPlatform, isProduction),
       // 条件编译：__MP_WX__ 等布尔常量，死分支由 bundler DCE 移除
-      ...platformConditionDefine(viteOptions.platform),
-    },
+      platformConditionDefine(viteOptions.platform),
+    ),
     resolve: {
       alias: buildViteAlias(
         buildPlatform,
@@ -452,27 +495,19 @@ export async function createMiniProgramViteConfig(options: {
       // 默认空——不往模块解析里注入任何东西。link 接入时才需要，
       // 详见下面两处 angular.json 里的写法。
       dedupe: viteOptions.dedupe ?? [],
+      // npm link / file: 接入时关掉，否则同一个包会被当成两份不同文件
+      preserveSymlinks: viteOptions.preserveSymlinks,
+      // vite 的默认 condition 是追加而非覆盖，空数组等于不干预
+      conditions: viteOptions.conditions,
     },
-    // scss / sass 的 includePaths。不接的话项目里 `@import 'variables'`
-    // 这种写法会直接编译失败。
-    css: viteOptions.stylePreprocessorOptions?.includePaths?.length
-      ? {
-          preprocessorOptions: {
-            scss: {
-              includePaths:
-                viteOptions.stylePreprocessorOptions.includePaths.map((p) =>
-                  path.resolve(context.workspaceRoot, p),
-                ),
-            },
-            sass: {
-              includePaths:
-                viteOptions.stylePreprocessorOptions.includePaths.map((p) =>
-                  path.resolve(context.workspaceRoot, p),
-                ),
-            },
-          },
-        }
-      : {},
+    // scss / sass 的 includePaths 与 sass 编译器选项。不接 includePaths
+    // 的话项目里 `@import 'variables'` 这种写法会直接编译失败。
+    css: {
+      preprocessorOptions: resolveCssPreprocessorOptions(
+        viteOptions.stylePreprocessorOptions,
+        context.workspaceRoot,
+      ),
+    },
     plugins: [
       // 入口注册（bootstrapPage / componentRegistry / bootstrapCustomTabbar）
       // 由构建器注入，所以必须 enforce: 'pre' 抢在 vite 解析器前面认领虚拟 id
@@ -514,6 +549,9 @@ export async function createMiniProgramViteConfig(options: {
         workspaceRoot: context.workspaceRoot,
         fastCompile: false,
         experimental: { useAngularCompilationAPI: true },
+        // `@Component.styles` 内联样式的语言。不传的话 analog 一律当 css，
+        // 写 scss 嵌套的组件会静默产出一份缺样式的 wxss。
+        inlineStylesExtension: viteOptions.inlineStyleLanguage,
         // fileReplacements 是 Angular 切环境的标准机制（environment.prod.ts），
         // 不接的话「生产构建」会静默用着 dev 配置——这是会直接上线出事的坑。
         // 传我们自己的数组实例，wxs 剥离的替换项由上面的插件就地 push。
@@ -521,11 +559,23 @@ export async function createMiniProgramViteConfig(options: {
       }),
       polyfillEntryPlugin(
         path.resolve(__dirname, '../platform/template/polyfill-entry.js'),
-        localizeInit,
+        polyfills,
+        context.workspaceRoot,
       ),
       libraryTemplatePlugin({ buildPlatform, templateScope }),
       miniProgramComponentTransformPlugin(),
       ...subpackagePlugin,
+      // budgets / statsJson 都要遍历最终 bundle，合成一个插件；
+      // 两个都没配就完全不挂，连 @angular/build 都不用加载
+      ...(viteOptions.budgets?.length || viteOptions.statsJson
+        ? [
+            budgetsPlugin({
+              budgets: viteOptions.budgets,
+              statsJson: viteOptions.statsJson,
+              logger: context.logger,
+            }),
+          ]
+        : []),
       ...(viteOptions.nativeComponentsDir
         ? [
             nativeComponentsPlugin({
@@ -539,11 +589,18 @@ export async function createMiniProgramViteConfig(options: {
     ],
     build: {
       outDir: viteOptions.outputPath,
-      emptyOutDir: true,
-      sourcemap: !!viteOptions.sourceMap,
-      minify: isProduction,
+      emptyOutDir: viteOptions.deleteOutputPath !== false,
+      sourcemap: resolveSourcemap(viteOptions.sourceMap),
+      minify: optimization.minifyScripts,
+      cssMinify: optimization.minifyStyles,
       assetsInlineLimit: 0,
       rollupOptions: {
+        // `externalDependencies` 语义跟 @angular/build 一致：`@foo/bar`
+        // 连子路径一起算外部，产物里保留 require('...')
+        external: viteOptions.externalDependencies?.length
+          ? (id: string) =>
+              isExternalSpecifier(id, viteOptions.externalDependencies ?? [])
+          : undefined,
         input: {
           // 全局 polyfill 入口。必须排在 require 列表最前面，
           // 保证 AbortController 等在任何业务 chunk 之前装好。
@@ -565,8 +622,8 @@ export async function createMiniProgramViteConfig(options: {
           // 于是能产出 `pages/index/index-entry.js` 这种和 webpack 时代
           // outputFiles.logic 对齐的路径
           entryFileNames: '[name].js',
-          chunkFileNames: '[name]-[hash].js',
-          assetFileNames: '[name].[ext]',
+          chunkFileNames: outputNames.chunkFileNames,
+          assetFileNames: outputNames.assetFileNames,
           // 小程序运行时是 CommonJS，默认出 cjs。
           // 注意扩展名仍然要 .js（不是 .cjs）——小程序只认 .js。
           format: viteOptions.format ?? 'cjs',

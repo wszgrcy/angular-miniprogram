@@ -35,6 +35,11 @@ export interface SubpackageChunkPluginOptions {
   appConfig: MpAppConfig;
   /** 项目 sourceRoot 绝对路径（posix） */
   sourceRoot: string;
+  /**
+   * 主包 chunk 的文件名模板，分包在它前面拼上分包目录。
+   * 跟 `outputHashing` 归一出来的值保持一致，不传维持旧的带 hash 行为。
+   */
+  chunkFileNames?: string;
 }
 
 /**
@@ -83,6 +88,7 @@ export function subpackageChunkPlugin(
         string,
         unknown
       >;
+      const baseChunkNames = options.chunkFileNames ?? '[name]-[hash].js';
       output.chunkFileNames = (chunk: {
         moduleId?: string;
         moduleIds?: string[];
@@ -100,10 +106,10 @@ export function subpackageChunkPlugin(
         if (zones.size === 1) {
           const zone = [...zones][0];
           if (zone) {
-            return `${zone.root}/[name]-[hash].js`;
+            return `${zone.root}/${baseChunkNames}`;
           }
         }
-        return '[name]-[hash].js';
+        return baseChunkNames;
       };
       config.build = config.build ?? {};
       config.build.rollupOptions = {
