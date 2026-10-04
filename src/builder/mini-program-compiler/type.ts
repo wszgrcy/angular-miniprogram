@@ -54,9 +54,30 @@ export function splitComponentKey(key: string): {
   };
 }
 
+/**
+ * 一条**内联**样式：`@Component.styles` 数组里的一项，或模板里的 `<style>`。
+ *
+ * 存的是**未编译的原文** —— 按 `inlineStyleLanguage` 它可能是 scss / less，
+ * 得交给样式管线（`bundleInline`）编译，不能直接当 css 落盘。
+ */
+export interface InlineStyleSource {
+  /** 样式原文 */
+  text: string;
+  /**
+   * 编译产物在 `styleProcessor.styleMap` 里的 key。
+   *
+   * 必须每个组件每条样式各不相同（`styleMap` 按 key 存，同文件多组件会互相覆盖），
+   * 而它的**目录**部分又必须留在组件源文件所在目录 —— css 里的相对 `url()`
+   * 是按 `dirname(key)` 解析的。
+   */
+  key: string;
+}
+
 export interface ResolvedDataGroup {
-  /** key: `源文件#组件类名` */
+  /** key: `源文件#组件类名`，value: 样式**源文件**绝对路径 */
   style: Map<string, string[]>;
+  /** key: `源文件#组件类名`，value: 内联样式（未编译） */
+  inlineStyle: Map<string, InlineStyleSource[]>;
   /** key: `源文件#组件类名` */
   outputContent: Map<string, string>;
   /**

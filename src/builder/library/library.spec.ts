@@ -142,6 +142,8 @@ describe('test-library 制品', () => {
     expect(secComp.listeners).toEqual(['tap']);
     expect(secComp.properties).toEqual(['class']);
     expect(secComp.style).toContain('.lib-secondary-entry__text');
+    // 内联 styles 与 styleUrls 拼接，不是二选一
+    expect(secComp.style).toContain('.lib-secondary-entry__inline');
     expect(typeof secComp.content, '二级出口 content 应是 ${} 插值模板串').toBe(
       'string',
     );

@@ -106,6 +106,13 @@ export interface ViteMiniProgramBuildOptions {
     includePaths?: string[];
   };
   /**
+   * `@Component.styles` 内联样式的语言，默认 'css'。
+   *
+   * schema 早就声明了这个字段，但之前没人读：内联样式一律被当 css，
+   * 写 scss 嵌套的组件静默产出一份空 wxss。
+   */
+  inlineStyleLanguage?: string;
+  /**
    * app 引导入口（src/main.ts），现在是
    * `bootstrapApplication({ providers: [...] })`。
    *
@@ -489,6 +496,7 @@ export async function createMiniProgramViteConfig(options: {
         assets: viteOptions.assets,
         appJson: viteOptions.appJson,
         styles: viteOptions.styles,
+        inlineStyleLanguage: viteOptions.inlineStyleLanguage,
         absoluteProjectRoot,
         absoluteProjectSourceRoot,
         analysisRef: wxsAnalysisRef,

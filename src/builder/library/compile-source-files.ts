@@ -20,13 +20,20 @@ import { join } from 'node:path';
 import path from 'path';
 import { Injector } from 'static-injector';
 import ts from 'typescript';
-import { MiniProgramCompilerService } from '../mini-program-compiler';
+import {
+  InlineStyleSource,
+  MiniProgramCompilerService,
+} from '../mini-program-compiler';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
 import { AddDeclarationMetaDataService } from './add-declaration-metadata.service';
 import { OutputTemplateMetadataService } from './output-template-metadata.service';
 import { SetupComponentDataService } from './setup-component-data.service';
-import { CustomStyleSheetProcessor } from './stylesheet-processor';
+import {
+  CustomStyleSheetProcessor,
+  compileStyles,
+  inlineStyleEntries,
+} from './stylesheet-processor';
 import {
   ENTRY_FILE_TOKEN,
   ENTRY_POINT_TOKEN,
@@ -192,6 +199,29 @@ export async function compileSourceFiles(
   miniProgramCompilerService.init();
   const metaMap =
     await miniProgramCompilerService.exportComponentBuildMetaMap();
+  /**
+   * 把内联样式（`@Component.styles` / 模板 `<style>`）先编译完。
+   *
+   * 必须在这里做：`SetupComponentDataService` 挂在 `compilerHost.writeFile`
+   * 上，那是个同步回调，编不了异步的样式。编译结果按组件级的 key
+   * 进 `styleMap`，下游直接查。
+   *
+   * 不能指望 ng-packagr 自己那份：它的 `transformResource` 拿
+   * `containingFile`（组件 .ts）当 key，同文件多条内联样式会互相覆盖。
+   */
+  if (stylesheetProcessor) {
+    const styleProcessor = stylesheetProcessor as CustomStyleSheetProcessor;
+    const inline: InlineStyleSource[] = [];
+    metaMap.inlineStyle.forEach((list) => inline.push(...list));
+    await compileStyles(
+      styleProcessor,
+      inlineStyleEntries(styleProcessor, inline, inlineStyleLanguage),
+      (error, key) =>
+        log.warn(
+          `内联样式编译失败 ${key}: ${String((error as Error)?.message ?? error)}`,
+        ),
+    );
+  }
   injector = Injector.create({
     parent: injector,
     providers: [

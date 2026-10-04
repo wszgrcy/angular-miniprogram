@@ -9,6 +9,7 @@ import ts from 'typescript';
 import type { CompilerOptions } from 'typescript';
 import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
 import {
+  InlineStyleSource,
   MiniProgramCompilerService,
   splitComponentKey,
 } from '../mini-program-compiler';
@@ -118,6 +119,15 @@ export class MiniProgramApplicationAnalysisService {
       );
       styleMap.set(entryPattern.outputFiles.style, value);
     });
+    const inlineStyleMap = new Map<string, InlineStyleSource[]>();
+    metaMap.inlineStyle.forEach((value, key) => {
+      const { sourceFile, componentClassName } = splitComponentKey(key);
+      const entryPattern = this.getComponentPagePattern(
+        sourceFile,
+        componentClassName,
+      );
+      inlineStyleMap.set(entryPattern.outputFiles.style, value);
+    });
     const contentMap = new Map<string, string>();
     metaMap.outputContent.forEach((value, key) => {
       const { sourceFile, componentClassName } = splitComponentKey(key);
@@ -167,6 +177,7 @@ export class MiniProgramApplicationAnalysisService {
     wxsSourceFiles.push(...resolvedEntries.map((e) => e.resolvedSource));
 
     metaMap.style = styleMap;
+    metaMap.inlineStyle = inlineStyleMap;
     const config = new Map<
       string,
       {
@@ -233,6 +244,7 @@ export class MiniProgramApplicationAnalysisService {
     }
     return {
       style: styleMap,
+      inlineStyle: inlineStyleMap,
       outputContent: contentMap,
       wxsSources,
       wxsSourceFiles,

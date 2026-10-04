@@ -35,6 +35,7 @@ import { ComponentContext } from './parse-node';
 import {
   ComponentMetaFromLibrary,
   DirectiveMetaFromLibrary,
+  InlineStyleSource,
   MetaFromLibrary,
   ResolvedDataGroup,
   UseComponent,
@@ -106,6 +107,60 @@ function inlineTemplateSpanBase(classDeclaration: ClassDeclaration): number {
     }
   }
   return 0;
+}
+
+/** 把「可能是 undefined / null / 非数组」的 ngtsc 字段归一成字符串数组。 */
+function toStringList(raw: unknown): string[] {
+  return Array.isArray(raw)
+    ? raw.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
+/**
+ * 从装饰器里直接读出 `styles: [...]` 的字面量原文。
+ *
+ * 为什么不能只信 `analysis.inlineStyles`：库构建给 ngtsc 挂的是 ng-packagr
+ * 的资源加载器，它会先把内联样式过一遍预处理器再交给 ngtsc；而
+ * `CustomStyleSheetProcessor` 把返回内容故意置空（组件 JS 不内联样式）——
+ * 于是 ngtsc 收到的是空串，`analysis.inlineStyles` 里只剩 `['']`。
+ * 装饰器 AST 才是没被动过的那一份原文。
+ *
+ * 只认字面量：`styles: [someVar]` 这种求不出值，只能放弃（非要用请写文件）。
+ */
+function decoratorInlineStyles(classDeclaration: ClassDeclaration): string[] {
+  const list: string[] = [];
+  for (const dec of ts.getDecorators(classDeclaration) ?? []) {
+    const expr = dec.expression;
+    if (!ts.isCallExpression(expr) || expr.arguments.length !== 1) {
+      continue;
+    }
+    const arg = expr.arguments[0];
+    if (!ts.isObjectLiteralExpression(arg)) {
+      continue;
+    }
+    for (const prop of arg.properties) {
+      if (
+        !ts.isPropertyAssignment(prop) ||
+        !prop.name ||
+        prop.name.getText() !== 'styles'
+      ) {
+        continue;
+      }
+      // `.text` 是扫描器已经反转义过的值，`'a\nb'` 拿到的就是带真换行的串
+      const items = ts.isArrayLiteralExpression(prop.initializer)
+        ? prop.initializer.elements
+        : [prop.initializer];
+      for (const item of items) {
+        if (
+          ts.isStringLiteral(item) ||
+          ts.isNoSubstitutionTemplateLiteral(item)
+        ) {
+          list.push(item.text);
+        }
+      }
+    }
+  }
+  return list;
 }
 
 /** `R3TemplateDependencyKind.NgModule`，compiler 没有把这个枚举导出到运行时 */
@@ -198,6 +253,7 @@ export class MiniProgramCompilerService {
   private directiveMap = new Map<ClassDeclaration, R3DirectiveMetadata>();
   private resolvedDataGroup: ResolvedDataGroup = {
     style: new Map<string, string[]>(),
+    inlineStyle: new Map<string, InlineStyleSource[]>(),
     outputContent: new Map<string, string>(),
     wxsModules: new Map<string, WxsDeclaration[]>(),
     useComponentPath: new Map<
@@ -244,16 +300,29 @@ export class MiniProgramCompilerService {
           meta,
           `${path.normalize(fileName)}#${classDeclaration.name?.getText() ?? '?'}`,
         );
+        const componentKey = makeComponentKey(
+          path.normalize(fileName),
+          classDeclaration.name?.getText() ?? '',
+        );
         this.resolvedDataGroup.style.set(
-          makeComponentKey(
-            path.normalize(fileName),
-            classDeclaration.name?.getText() ?? '',
-          ),
+          componentKey,
           this.resolveStyleUrls(
             fileName,
             classDeclaration.name?.getText() ?? '',
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (trait as any)?.analysis?.styleUrls,
+          ),
+        );
+        this.resolvedDataGroup.inlineStyle.set(
+          componentKey,
+          this.resolveInlineStyles(
+            path.normalize(fileName),
+            classDeclaration.name?.getText() ?? '',
+            classDeclaration,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (trait as any)?.analysis?.inlineStyles,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (trait as any)?.analysis?.template?.styles,
           ),
         );
         this.componentMap.set(
@@ -566,6 +635,51 @@ export class MiniProgramCompilerService {
     return list.map((item) =>
       this.resolveStyleUrl(componentPath, String(item?.url)),
     );
+  }
+  /**
+   * 收集组件的**内联**样式。
+   *
+   * 三个源，按原文去重后合并：
+   *   1. 装饰器 AST 里的 `styles: [...]` 字面量 —— 唯一在应用构建和库构建
+   *      两边都可靠的原文（理由见 `decoratorInlineStyles`）；
+   *   2. `analysis.inlineStyles` —— ngtsc 求过值的，能接住非字面量写法；
+   *      应用构建（无预处理器）下与 1 完全重合，去重后不重复；
+   *   3. `analysis.template.styles` —— 模板里的 `<style>` 块。
+   *
+   * 这里只拿原文，**不编译** —— 样式编译器（`CustomStyleSheetProcessor`）在消费
+   * 侧，编译后的文本按 `key` 回查 `styleMap`。
+   */
+  private resolveInlineStyles(
+    componentPath: string,
+    className: string,
+    classDeclaration: ClassDeclaration,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rawInlineStyles: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rawTemplateStyles: any,
+  ): InlineStyleSource[] {
+    const texts = [
+      ...decoratorInlineStyles(classDeclaration),
+      ...toStringList(rawInlineStyles),
+      ...toStringList(rawTemplateStyles),
+    ];
+    const seen = new Set<string>();
+    const list: InlineStyleSource[] = [];
+    for (const text of texts) {
+      if (!text.trim() || seen.has(text)) {
+        continue;
+      }
+      seen.add(text);
+      list.push({
+        text,
+        // 留在组件目录里，但带上类名 + 下标，同文件多组件 / 多条样式不会互盖
+        key: path.join(
+          path.dirname(componentPath),
+          `${className}.${list.length}.inline`,
+        ),
+      });
+    }
+    return list;
   }
   getDirectiveMap() {
     return this.directiveMap;

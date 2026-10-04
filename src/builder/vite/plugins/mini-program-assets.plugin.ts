@@ -6,8 +6,16 @@ import * as path from 'path';
 import { Injector } from 'static-injector';
 import ts from 'typescript';
 import type { Plugin } from 'vite';
-import { CustomStyleSheetProcessor } from '../../library/stylesheet-processor';
-import type { WxsAnalysisRef } from '../../mini-program-compiler/type';
+import {
+  CustomStyleSheetProcessor,
+  StyleCompileEntry,
+  compileStyles,
+  inlineStyleEntries,
+} from '../../library/stylesheet-processor';
+import type {
+  InlineStyleSource,
+  WxsAnalysisRef,
+} from '../../mini-program-compiler/type';
 import { BuildPlatform } from '../../platform/platform';
 import { LibraryTemplateScopeService } from '../../shared/library-template-scope.service';
 import { MiniProgramApplicationAnalysisService } from '../../shared/mini-program-application-analysis.service';
@@ -104,6 +112,13 @@ export interface MiniProgramAssetsPluginOptions {
   /** builder 配置里的全局样式，产出 app.wxss */
   styles?: (string | { input: string })[];
   /**
+   * `@Component.styles` 内联样式的语言，默认 'css'。
+   *
+   * 内联样式存的是原文，不指定语言就只能当 css 编译；写了 scss 嵌套的
+   * 组件会静默产出一份缺样式的 wxss。
+   */
+  inlineStyleLanguage?: string;
+  /**
    * app.js 从哪个 chunk 出发做可达性分析。
    *
    * 测试链路的应用入口叫 `test.js`，
@@ -155,39 +170,6 @@ function createStyleProcessor(
 }
 
 /**
- * 逐个编译样式源文件，返回 path -> css 文本。
- * 单个文件编译失败只记警告并落空串，不中断整轮构建。
- *
- * 结果从 `styleProcessor.styleMap` 取，**不能读 `bundleFile` 的返回值**：
- * `CustomStyleSheetProcessor` 把真实 css 存进 styleMap，返回的 `contents`
- * 被它故意置空（组件 JS 不内联样式）。读返回值会拿到空串。
- */
-async function compileStyleSources(
-  options: MiniProgramAssetsPluginOptions,
-  styleProcessor: CustomStyleSheetProcessor,
-  styleSourcePaths: Set<string>,
-): Promise<Map<string, string>> {
-  const compiled = new Map<string, string>();
-  for (const stylePath of styleSourcePaths) {
-    try {
-      await styleProcessor.bundleFile(stylePath);
-      compiled.set(
-        path.normalize(stylePath),
-        styleProcessor.styleMap.get(stylePath) ?? '',
-      );
-    } catch (error) {
-      options.context.logger.warn(
-        `样式编译失败 ${stylePath}: ${String(
-          (error as Error)?.message ?? error,
-        )}`,
-      );
-      compiled.set(path.normalize(stylePath), '');
-    }
-  }
-  return compiled;
-}
-
-/**
  * wxs 落盘 + watch 登记。
  *
  * wxs 不是 ES module，没有任何 import 指向它，Vite 的模块图看不见。
@@ -209,6 +191,104 @@ export function emitWxs(
   resolved.wxsSourceFiles?.forEach((srcPath) => {
     addWatchFile(srcPath);
   });
+}
+
+/**
+ * 样式源文件路径 → 编译条目。
+ *
+ * key 统一 normalize：`styleMap` 和 `emitStyles` 两边得用同一个形状对得上。
+ */
+function fileStyleEntries(
+  styleProcessor: CustomStyleSheetProcessor,
+  paths: Iterable<string>,
+): StyleCompileEntry[] {
+  return [...paths].map((p) => {
+    const key = path.normalize(p);
+    return { key, bundle: () => styleProcessor.bundleFile(key) };
+  });
+}
+
+/**
+ * 一轮分析里需要被样式管线碰到的那部分。
+ */
+type StyleSlice = {
+  style: Map<string, string[]>;
+  inlineStyle: Map<string, InlineStyleSource[]>;
+};
+
+/**
+ * 编译本轮所有组件样式：样式源文件 + 内联样式，两份分开返回。
+ *
+ * 分开是因为 key 不同域：前者按磁盘路径，后者按合成的组件级 key。
+ * 到 `emitStyles` 那里再汇成一份 wxss。
+ */
+async function compileResolvedStyles(
+  options: MiniProgramAssetsPluginOptions,
+  ensureStyleProcessor: () => CustomStyleSheetProcessor,
+  resolved: StyleSlice,
+) {
+  const files: string[] = [];
+  resolved.style.forEach((sourceList) => files.push(...sourceList));
+  const inline: InlineStyleSource[] = [];
+  resolved.inlineStyle.forEach((sourceList) => inline.push(...sourceList));
+  // 一个样式都没有就别拉样式编译器：建一次 StylesheetProcessor 要跑
+  // browserslist + postcss 配置探测，纯脚本项目白付这笔钱。
+  if (!files.length && !inline.length) {
+    return {
+      files: new Map<string, string>(),
+      inline: new Map<string, string>(),
+    };
+  }
+  const styleProcessor = ensureStyleProcessor();
+  const warn = (label: string) => (error: unknown, key: string) =>
+    options.context.logger.warn(
+      `${label} ${key}: ${String((error as Error)?.message ?? error)}`,
+    );
+  return {
+    files: await compileStyles(
+      styleProcessor,
+      fileStyleEntries(styleProcessor, files),
+      warn('样式编译失败'),
+    ),
+    inline: await compileStyles(
+      styleProcessor,
+      inlineStyleEntries(styleProcessor, inline, options.inlineStyleLanguage),
+      warn('内联样式编译失败'),
+    ),
+  };
+}
+
+/**
+ * wxss 落盘。
+ *
+ * 一个产物样式可能同时来自样式文件和内联样式（两边都拼，不是二选一），
+ * 所以先汇到同一份列表里再写。
+ */
+function emitStyles(
+  resolved: StyleSlice,
+  compiled: { files: Map<string, string>; inline: Map<string, string> },
+  emit: (fileName: string, source: string) => void,
+) {
+  const parts = new Map<string, string[]>();
+  const append = (outPath: string, css: string) => {
+    const list = parts.get(outPath);
+    if (list) {
+      list.push(css);
+    } else {
+      parts.set(outPath, [css]);
+    }
+  };
+  resolved.style.forEach((sourceList, outPath) => {
+    for (const s of sourceList) {
+      append(outPath, compiled.files.get(path.normalize(s)) ?? '');
+    }
+  });
+  resolved.inlineStyle.forEach((sourceList, outPath) => {
+    for (const s of sourceList) {
+      append(outPath, compiled.inline.get(s.key) ?? '');
+    }
+  });
+  parts.forEach((list, outPath) => emit(outPath, list.join('\n')));
 }
 
 /**
@@ -279,16 +359,10 @@ export function miniProgramAssetsPlugin(
   };
 
   /**
-   * 编译样式源文件，返回 path -> css 文本。
-   * processor 需要跳轮复用，所以由闭包持有，具体编译在模块级函数里。
+   * 样式编译器跳轮复用，所以由闭包持有；具体编译在模块级函数里。
    */
-  const compileStyles = async (styleSourcePaths: Set<string>) => {
-    if (!styleSourcePaths.size) {
-      return new Map<string, string>();
-    }
-    styleProcessor ??= createStyleProcessor(options);
-    return compileStyleSources(options, styleProcessor, styleSourcePaths);
-  };
+  const ensureStyleProcessor = () =>
+    (styleProcessor ??= createStyleProcessor(options));
 
   return {
     name: 'mini-program:assets',
@@ -317,14 +391,11 @@ export function miniProgramAssetsPlugin(
       analysisPromise ??= runAnalysis();
       const resolved = await analysisPromise;
 
-      // 收集所有要编译的样式源文件
-      const styleSources = new Set<string>();
-      resolved.style.forEach((sourceList) => {
-        for (const s of sourceList) {
-          styleSources.add(path.normalize(s));
-        }
-      });
-      const compiledStyles = await compileStyles(styleSources);
+      const compiledStyles = await compileResolvedStyles(
+        options,
+        ensureStyleProcessor,
+        resolved,
+      );
 
       const emit = (fileName: string, source: string) => {
         // 不能用 path.normalize：Windows 上它会把 `/` 转成 `\`，
@@ -353,12 +424,7 @@ export function miniProgramAssetsPlugin(
       emitWxs(resolved, emit, (p) => this.addWatchFile(p));
 
       // 2. wxss：按组件把编译后的样式拼起来
-      resolved.style.forEach((sourceList, outPath) => {
-        const css = sourceList
-          .map((s) => compiledStyles.get(path.normalize(s)) ?? '')
-          .join('\n');
-        emit(outPath, css);
-      });
+      emitStyles(resolved, compiledStyles, emit);
 
       // 3. json：合并组件目录里已存在的配置文件
       resolved.config.forEach((value, outPath) => {
@@ -612,8 +678,16 @@ export function miniProgramAssetsPlugin(
           .map((s) => (typeof s === 'string' ? s : s.input))
           .filter((s) => fs.existsSync(path.resolve(options.workspaceRoot, s)))
           .map((s) => path.resolve(options.workspaceRoot, s));
+        const styleProcessor = ensureStyleProcessor();
         const compiledGlobal = await compileStyles(
-          new Set(globalStyleSources.map((s) => path.normalize(s))),
+          styleProcessor,
+          fileStyleEntries(styleProcessor, globalStyleSources),
+          (error, key) =>
+            options.context.logger.warn(
+              `全局样式编译失败 ${key}: ${String(
+                (error as Error)?.message ?? error,
+              )}`,
+            ),
         );
         const globalCss = globalStyleSources
           .map((s) => compiledGlobal.get(path.normalize(s)) ?? '')

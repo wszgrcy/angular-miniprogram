@@ -84,6 +84,12 @@ export class SetupComponentDataService {
       styleUrlList?.forEach((item) => {
         styleContentList.push(customStyleSheetProcessor.styleMap.get(item)!);
       });
+      // 内联样式已在 compileSourceFiles 里编译完，这里只负责收集
+      this.dataGroup.inlineStyle.get(key)?.forEach((item) => {
+        styleContentList.push(
+          customStyleSheetProcessor.styleMap.get(item.key) ?? '',
+        );
+      });
 
       patchLibraryComponentMeta(this.entryPoint, componentClassName, {
         id:
