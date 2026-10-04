@@ -9,14 +9,14 @@ import {
   clearLibraryMetaMisses,
   formatLibraryMetaSummary,
 } from '../../library/library-meta-diagnostics';
-import { resolveNative } from '../../util/asset-path';
 import { createMiniProgramTestStack } from '../../shared/mini-program-test-stack';
 import { globSpecFiles } from '../../shared/spec-discovery';
+import { resolveNative } from '../../util/asset-path';
 import {
+  POLYFILL_ENTRY_ID,
   buildPlatformDefine,
   buildViteAlias,
   getBuildPlatform,
-  POLYFILL_ENTRY_ID,
   polyfillEntryPlugin,
   resolveLocalizeInit,
 } from '../../vite';
