@@ -13,6 +13,9 @@
       "@angular/core/testing": [
         "./node_modules/@angular/core/types/testing.d.ts"
       ],
+      "@angular/localize/init": [
+        "./node_modules/@angular/localize/types/init.d.ts"
+      ],
       "@angular/build/private": [
         "./node_modules/@angular/build/src/private.d.ts"
       ],

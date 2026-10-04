@@ -1,0 +1,20 @@
+<div class="icu-page">
+  <div class="before">before</div>
+
+  <p class="select">{gender, select, male {him} female {her} other {them}}</p>
+
+  <p class="interp">{gender, select, male {him} other {{{count}} items}}</p>
+
+  <p class="plural">{count, plural, =1 {one item} other {{{count}} items}}</p>
+
+  <p class="nested">{gender, select, female {{tier, select, one {one} other {{{count}} many}}} other {x}}</p>
+
+  <p class="pipe">{gender, select, other {x{{count | number}}}}</p>
+
+  @if (show) {
+    <p class="in-if">{gender, select, male {s} other {p}}</p>
+  }
+
+  <img class="attr" i18n-alt="照片 {{count}}" alt="photo {{count}}" i18n-title="标题" title="t" />
+  <div class="after">after</div>
+</div>

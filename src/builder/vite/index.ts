@@ -13,6 +13,7 @@ import {
   clearLibraryMetaMisses,
   formatLibraryMetaSummary,
 } from '../library/library-meta-diagnostics';
+import type { WxsAnalysisRef } from '../mini-program-compiler/type';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
 import { LibraryTemplateScopeService } from '../shared/library-template-scope.service';
@@ -60,6 +61,15 @@ export interface ViteMiniProgramBuildOptions {
   assets?: AssetPattern[];
   styles?: (string | { input: string })[];
   sourceMap?: boolean;
+  /**
+   * 与 angular.json `build.options.polyfills` 同名同义。
+   *
+   * 目前只用来判定要不要装 `@angular/localize/init`，判定规则与
+   * `@angular/build` 一致，见 `resolveLocalizeInit`。
+   *
+   * 与 schema 一样允许单个串（`"src/polyfills.ts"` 这种写法很常见）。
+   */
+  polyfills?: string | string[];
   optimization?: boolean;
   base?: string;
   /** 监听模式：对应小程序的开发方式（微信开发者工具盯着 dist 目录） */
@@ -148,11 +158,121 @@ export function buildPlatformDefine(
     // 两侧必须配套，见 polyfill-entry.ts 顶部说明。
     AbortController: `${p}.AbortController`,
     AbortSignal: `${p}.AbortSignal`,
+    /**
+     * `Node` 同理，而且更彻底：小程序里根本没有 `Node`，也不需要有个
+     * 全局叫这个名字，所以**编译期直接把它换掉**，运行时压根不存在 `Node`
+     * 这个标识符（实测微信小程序全局上没有 Node）。
+     *
+     * Angular 里两类用法都要它：
+     *  - `walkIcuTree` / `applyCreateOpCodes` 读 `Node.TEXT_NODE` /
+     *    `Node.COMMENT_NODE`，**不在 ngDevMode 守卫里**，生产也要；
+     *  - `assertDomNode` 的 `node instanceof Node`，仅 ngDevMode。
+     *
+     * `instanceof` 要有真的构造器，所以只能指向运行期挂在能力表上的
+     * `AgentNode`（由 `agent-node.ts` 挂，和 AbortController 一样是
+     * 「define 重定向 + 表里得有值」两步，缺一步就 undefined）。
+     */
+    Node: `${p}.AgentNode`,
+    /**
+     * `$localize` 同理：Angular 编译产物里的 i18n 常量是裸 `$localize` 调用
+     * （`i18n_0 = $localize(...)`），小程序里没有这个全局，第一次读 consts
+     * 就 `ReferenceError`。重定向到能力表后，没装 `@angular/localize/init`
+     * 也只是 `undefined`（不会抛），装了则由它自己往上挂。
+     *
+     * 本项目自己的 ICU 求值也读这个名字，见
+     * `src/library/platform/default/icu.ts`。
+     */
+    $localize: `${p}.$localize`,
   };
   if (!isProduction) {
     define['ngDevMode'] = `${g}.__global.ngDevMode`;
   }
   return define;
+}
+
+/**
+ * polyfills 入口的虚拟模块 id。
+ *
+ * 我们自己的 `polyfill-entry.js` 是固定要装的，`@angular/localize/init` 却
+ * 不是——没做 i18n 的项目不该为它付体积，也不该被要求装那个包。所以入口
+ * 不能是一个写死的文件路径，得按配置现场拼出来。
+ */
+export const POLYFILL_ENTRY_ID = 'angular-miniprogram:polyfills';
+
+/**
+ * angular.json 的 `polyfills` 里有没有声明 `@angular/localize`，有则给出
+ * 该注入的模块。
+ *
+ * ## 为什么两种写法都归一成 `@angular/localize/init`
+ *
+ * **不是偷懒，两者不等价**（实测，见 `localize-polyfill.spec.ts`）：
+ *
+ *  - `@angular/localize` 主入口只导出 `ɵ` 前缀的内部 API
+ *    （`ɵ$localize` / `loadTranslations` / `parseTranslation` …），
+ *    **一个字都不碰 globalThis**。
+ *  - `@angular/localize/init` 整个模块就一句 `globalThis.$localize = $localize`。
+ *
+ * 而编译产物里的 i18n 常量走的是**裸 `$localize`**（`buildPlatformDefine`
+ * 把它换成 `<平台>.$localize`），那个全局只有 `/init` 会挂。所以「声明里写的
+ * 是什么就 import 什么」会构建成功、运行时全炸——照抄声明在这里是 bug。
+ *
+ * 声明 `@angular/localize` 表达的是「这个 app 要用 i18n」这个**意图**，
+ * `/init` 是兑现它的**手段**。上游两条路径也都是这么归一的：
+ *  - `@angular/build` `application-code-bundle.js:119`
+ *  - `build-angular` `configs/common.js:81`
+ *
+ * ## 归一化会不会架空 app 自己的 `loadTranslations`
+ *
+ * 不会。`loadTranslations` 是业务侧**显式 import** 的 API，我们从不替换它；
+ * 注入 `/init` 只是往 polyfills 里**多加**一个模块，没有 alias 掉主入口
+ * （CLI 在 AOT 内联翻译那条路才会 `alias['@angular/localize/init'] = false`，
+ * 我们不走内联）。
+ *
+ * 更关键的是两个入口共用同一个 `_localize-chunk.mjs`：`/init` 挂上全局的
+ * 那个 `$localize` 对象，`loadTranslations` 写 `translate` / `TRANSLATIONS`
+ * 就在同一个对象上，注册表只有一份。实测产物里 `$localize` 只在
+ * `polyfills.js` 定义一次，业务 chunk 一律读 `wx.__window.$localize`。
+ * 行为侧的钉测见 `library/platform/localize-runtime.spec.ts`。
+ *
+ * ## 为什么返回裸标识符而不是解析后的路径
+ *
+ * 交给 Vite 按它自己的 exports map / conditions / alias 解析，和应用里
+ * 其余依赖走同一条路。自己 `require.resolve` 反而绕开这套，monorepo 提升、
+ * `file:` 链接、条件导出这些情况就会和 Vite 的解析结果分叉。
+ */
+export function resolveLocalizeInit(
+  polyfills: string | string[] | undefined,
+): string | undefined {
+  const declared = new Set(
+    polyfills === undefined ? [] : ([] as string[]).concat(polyfills),
+  );
+  return declared.has('@angular/localize') ||
+    declared.has('@angular/localize/init')
+    ? '@angular/localize/init'
+    : undefined;
+}
+
+export function polyfillEntryPlugin(
+  selfEntry: string,
+  localizeInit: string | undefined,
+): import('vite').Plugin {
+  return {
+    name: 'angular-miniprogram:polyfill-entry',
+    enforce: 'pre',
+    resolveId(id) {
+      return id === POLYFILL_ENTRY_ID ? POLYFILL_ENTRY_ID : null;
+    },
+    load(id) {
+      if (id !== POLYFILL_ENTRY_ID) {
+        return null;
+      }
+      const lines = [`import ${JSON.stringify(selfEntry)};`];
+      if (localizeInit) {
+        lines.push(`import ${JSON.stringify(localizeInit)};`);
+      }
+      return lines.join('\n');
+    },
+  };
 }
 
 /**
@@ -216,6 +336,7 @@ export async function createMiniProgramViteConfig(options: {
 }): Promise<InlineConfig> {
   const { viteOptions, context, buildPlatform } = options;
   const isProduction = !!viteOptions.optimization;
+  const localizeInit = resolveLocalizeInit(viteOptions.polyfills);
 
   const entryPatterns = await generateEntryPatterns({
     pages: viteOptions.pages || [],
@@ -288,7 +409,7 @@ export async function createMiniProgramViteConfig(options: {
    */
   /** 分析层结果共享引用：assets 插件填，wxs-strip 插件读 */
   const wxsAnalysisRef: {
-    current: { wxsModules?: ReadonlyMap<string, unknown> } | null;
+    current: WxsAnalysisRef;
   } = { current: null };
   const sharedFileReplacements: Array<{ replace: string; with: string }> = [
     ...(viteOptions.fileReplacements ?? []),
@@ -382,6 +503,10 @@ export async function createMiniProgramViteConfig(options: {
         // 传我们自己的数组实例，wxs 剥离的替换项由上面的插件就地 push。
         fileReplacements: sharedFileReplacements,
       }),
+      polyfillEntryPlugin(
+        path.resolve(__dirname, '../platform/template/polyfill-entry.js'),
+        localizeInit,
+      ),
       libraryTemplatePlugin({ buildPlatform, templateScope }),
       miniProgramComponentTransformPlugin(),
       ...subpackagePlugin,
@@ -407,10 +532,9 @@ export async function createMiniProgramViteConfig(options: {
           // 全局 polyfill 入口。必须排在 require 列表最前面，
           // 保证 AbortController 等在任何业务 chunk 之前装好。
           // 模板是纯文本内联、不过 bundler，所以 polyfill 只能走入口。
-          polyfills: path.resolve(
-            __dirname,
-            '../platform/template/polyfill-entry.js',
-          ),
+          // 入口本身是个虚拟模块：我们那份固定装，`@angular/localize/init`
+          // 只在 angular.json 声明了才拼进来。
+          polyfills: POLYFILL_ENTRY_ID,
           ...toRollupInput(allEntries),
           // app 引导入口。key 固定叫 main，产物 main.js，
           // 和 webpack 时代结构一致。

@@ -215,6 +215,85 @@ function readEmbeddedLViews(container: unknown[]): unknown[] {
   return views;
 }
 
+/**
+ * `TView.data[i]` 上挂的 `TI18n`（`i18n` 属性 / ICU 的静态侧）。
+ *
+ * 形状由 `@angular/core` 的 `interfaces/i18n.ts` 定，未对外导出，只能按形状认。
+ */
+function asT18n(data: any): { ast: any[] } | null {
+  return data && typeof data === 'object' && Array.isArray(data.ast)
+    ? (data as { ast: any[] })
+    : null;
+}
+
+/** `I18nNodeKind`：TEXT / ELEMENT / PLACEHOLDER / ICU */
+const I18N_TEXT = 0;
+const I18N_ELEMENT = 1;
+const I18N_ICU = 3;
+
+/**
+ * 解 ICU 的当前分支下标。
+ *
+ * 编码是 Angular 自己的：`select` 存 `~caseIndex`（必为负），`plural` 存
+ * 原始 `caseIndex`。照抄 `getCurrentICUCaseIndex`，别自己猜——实测两种
+ * ICU 存法不同，只按 `~x` 解会让 plural 全错。
+ */
+function readCaseIndex(lView: LView, lviewIndex: number): number | null {
+  const stored = lView[lviewIndex];
+  if (stored === null || stored === undefined) {
+    return null;
+  }
+  return typeof stored === 'number' && stored < 0
+    ? ~stored
+    : (stored as number);
+}
+
+/**
+ * 把 i18n 块（含 ICU）当前渲染出来的文本拼成一个串。
+ *
+ * ## 为什么需要
+ *
+ * `ɵɵi18n` 不往自己的槽位写值：译文节点是 `applyCreateOpCodes` 建在 **expando**
+ * 下标上的，而下面的循环只走到 `bindingStartIndex`。于是 wxml 在那个位置
+ * 读到的永远是空对象。这里把散在 expando 上的节点收回来，填进槽自己的位置。
+ *
+ * ## 为什么必须按分支下标取
+ *
+ * 换分支时 Angular 只把新分支的节点建出来，**旧分支的节点仍留在 lView 里**
+ * （只是脱离了渲染树）。所以「收集所有非 null 节点」在首次渲染碰巧对，
+ * 一旦切分支就变成 `他TA` 这种拼接结果。必须只走当前分支。
+ *
+ * ## 局限
+ *
+ * 只能拼文本。分支里带标签时元素节点会被跳过、其子文本被拼平，渲染出来
+ * 丢标签——wxml 的一个 `{{value}}` 带不动结构。
+ */
+function readI18nText(lView: LView, ast: any[], parts: string[]): void {
+  for (const node of ast) {
+    if (!node || typeof node !== 'object') {
+      continue;
+    }
+    if (node.kind === I18N_ICU) {
+      const caseIndex = readCaseIndex(lView, node.currentCaseLViewIndex);
+      const activeCase =
+        caseIndex === null ? undefined : (node.cases ?? [])[caseIndex];
+      if (activeCase) {
+        readI18nText(lView, activeCase, parts);
+      }
+      continue;
+    }
+    if (node.kind === I18N_TEXT) {
+      const rendered = lView[node.index];
+      if (rendered instanceof AgentNode && rendered.type === 'text') {
+        parts.push(rendered.value ?? '');
+      }
+    } else if (node.kind === I18N_ELEMENT) {
+      // 元素本身进不了 `{{value}}`，只把它下面的文字收进来
+      readI18nText(lView, node.children ?? [], parts);
+    }
+  }
+}
+
 function lViewToWXView(
   lView: LView,
   parentNodePath: any[] = [],
@@ -294,8 +373,19 @@ function lViewToWXView(
       });
       nodeList[rel] = lContainerList;
     } else {
-      // todo
-      nodeList[rel] = {} as any;
+      /**
+       * i18n / ICU 的槽位：`lView[i]` 是 `null`，译文在 expando 上。
+       * 收回来填到本槽，wxml 那边就是一个普通 `{{nodeList[k].value}}`。
+       */
+      const t18n = asT18n(tView.data?.[index]);
+      if (t18n) {
+        const parts: string[] = [];
+        readI18nText(lView, t18n.ast, parts);
+        nodeList[rel] = { value: parts.join('') } as any;
+      } else {
+        // todo
+        nodeList[rel] = {} as any;
+      }
     }
   }
   return nodeList;

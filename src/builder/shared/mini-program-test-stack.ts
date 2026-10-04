@@ -3,6 +3,7 @@ import type { AssetPattern } from '@angular-devkit/build-angular';
 import type { Path } from '@angular-devkit/core';
 import * as path from 'path';
 import type { Plugin } from 'vite';
+import type { WxsAnalysisRef } from '../mini-program-compiler/type';
 import type { BuildPlatform, PlatformType } from '../platform/platform';
 import { miniProgramComponentTransformPlugin } from '../vite/plugins/component-transform.plugin';
 import { entryBootstrapPlugin } from '../vite/plugins/entry-bootstrap.plugin';
@@ -70,7 +71,7 @@ export function createMiniProgramTestStack(
   options: MiniProgramTestStackOptions,
 ): MiniProgramTestStack {
   const wxsAnalysisRef: {
-    current: { wxsModules?: ReadonlyMap<string, unknown> } | null;
+    current: WxsAnalysisRef;
   } = { current: null };
   const fileReplacements: Array<{ replace: string; with: string }> = [];
   const templateScope = new LibraryTemplateScopeService();

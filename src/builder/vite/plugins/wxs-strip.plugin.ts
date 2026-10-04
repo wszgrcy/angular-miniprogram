@@ -1,23 +1,30 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Plugin } from 'vite';
-import { splitComponentKey } from '../../mini-program-compiler/type';
+import {
+  type WxsAnalysisRef,
+  splitComponentKey,
+} from '../../mini-program-compiler/type';
 import { lookupStrippedByContent } from '../../wxs/wxs-angular-strip';
 import { rewriteComponentForWxs } from '../../wxs/wxs-component-rewrite';
 
 /**
- * 把「剥离 wxs 后的组件」喂给 Angular。
+ * 把「改写后的组件」喂给 Angular。
+ *
+ * 触发条件有两个清单：带 wxs 的组件（表达式被改成了枝叶数组）与带 ICU 的组件
+ * （整段 `{x, plural, ...}` 被替成了普通插值）。两者产出的都是「Angular 可见
+ * 模板」，走的是同一条 fileReplacements 通道，所以共用一套生成逻辑。
  *
  * Angular 编译发生在 analog 插件里，而 `fileReplacements` 必须在它建
  * program **之前**就位（`initialize()` 之后就改不动了）。所以本插件
  * 必须 `enforce: 'pre'`，抢在 analog 的 buildStart 前面把替换项 push
  * 进那个**共享数组**里。
  *
- * 组件清单来自分析层（`analysisRef.current.wxsModules`），本插件不扫盘：
- * 分析层第一步就已经把所有组件、它们的模板和 wxs 声明都解析完了，
+ * 组件清单来自分析层（`analysisRef.current`），本插件不扫盘：
+ * 分析层第一步就已经把所有组件、它们的模板和改写结果都解析完了，
  * 再走一遍全盘纯属重复劳动，还得自己处理 node_modules / dist 这些排除项。
  *
- * 只处理含 wxs 的组件，其余组件不进替换表，零影响。
+ * 只处理被改写过的组件，其余组件不进替换表，零影响。
  */
 export interface WxsStripPluginOptions {
   workspaceRoot: string;
@@ -27,7 +34,7 @@ export interface WxsStripPluginOptions {
   fileReplacements: Array<{ replace: string; with: string }>;
   /** 分析层结果，由 mini-program:assets 在它的 buildStart 里填 */
   analysisRef: {
-    current: { wxsModules?: ReadonlyMap<string, unknown> } | null;
+    current: WxsAnalysisRef;
   };
   watch: boolean;
 }
@@ -80,8 +87,11 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
   const redirect = new Map<string, string>();
 
   const rebuild = (): void => {
-    const wxsModules = options.analysisRef.current?.wxsModules;
-    if (!wxsModules?.size) {
+    /** 被改写过的组件 key */
+    const touched = new Set<string>([
+      ...(options.analysisRef.current?.wxsModules?.keys() ?? []),
+    ]);
+    if (!touched.size) {
       options.fileReplacements.length = 0;
       options.fileReplacements.push(...userReplacements);
       return;
@@ -93,7 +103,7 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
      */
     const components = [
       ...new Set(
-        [...wxsModules.keys()].map((key) =>
+        [...touched].map((key) =>
           toPosix(path.resolve(splitComponentKey(key).sourceFile)),
         ),
       ),

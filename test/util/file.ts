@@ -16,6 +16,7 @@ export const ALL_PAGE_NAME_LIST = [
   `life-time-page-use-component`,
   `library-meta-demo`,
   `control-flow`,
+  `icu`,
 ];
 export const ALL_COMPONENT_NAME_LIST = [
   `component1`,

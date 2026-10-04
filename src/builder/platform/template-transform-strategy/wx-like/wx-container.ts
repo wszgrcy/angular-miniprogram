@@ -291,6 +291,22 @@ export class WxContainer {
       .forEach(([key, value]) => {
         attributeMap.set(key, value);
       });
+    /**
+     * 静态 `i18n-<attr>` 的属性必须从字面量改成绑定。
+     *
+     * 译文只有运行时知道（`$localize` 查表），wxml 里内联源文案就等于
+     * **永远翻不了**——不是翻错，是根本不翻。Angular 在建元素时把它
+     * `setAttribute` 到 `attribute` 上，所以这里改读那个通道。
+     *
+     * 值含插值的不在列：那条走 `ɵɵi18nAttributes` + `setProperty`，
+     * 下面的 `inputs` 循环已经把绑定指到 `property` 了。
+     */
+    for (const name of node.i18nAttrs ?? []) {
+      if (attributeMap.has(name)) {
+        attributeMap.delete(name);
+        propertyMap.set(name, `nodeList[${index}].attribute.${name}`);
+      }
+    }
     node.inputs
       .filter(
         (property) =>

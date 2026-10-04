@@ -18,7 +18,8 @@ import {
   MpModalResult,
   MpNavigateBackOptions,
   MpNavigateOptions,
- MpToastOptions } from './types';
+  MpToastOptions,
+} from './types';
 
 // ---------------------------------------------------------------- 导航栏
 
@@ -437,7 +438,6 @@ export interface MpBeacon {
   power?: number;
 }
 
-
 export interface MpSetClipboardDataOptions extends MpCallbackOptions {
   data: string;
   showToast?: boolean;
@@ -838,8 +838,9 @@ export interface MpApiParamMap {
 }
 
 /** 按名字查参数类型，未收录的保持宽松 */
-export type MpParamOf<N extends MpApiNameInput> =
-  N extends keyof MpApiParamMap ? MpApiParamMap[N] : MpCallbackOptions;
+export type MpParamOf<N extends MpApiNameInput> = N extends keyof MpApiParamMap
+  ? MpApiParamMap[N]
+  : MpCallbackOptions;
 
 export interface MpApiResultMap {
   // 交互

@@ -187,6 +187,26 @@ function checkTagCorrespondence(
           .flatMap((v) => v.entries.filter((e) => e.index === idx))
           .filter((e) => !isTextInstruction(e.instruction) && e.tag);
         if (entries.length === 0) {
+          /**
+           * 该槽在 Angular 侧**存**但没有标签（text / TI18n / i18nAttributes）。
+           *
+           * 这里不能 `continue`：wxml 既然在 `nodeList[idx]` 上写了个元素，
+           * Angular 就必须在同一槽上建元素。没标签就是「两边下标对不上」，
+           * 而不是「无法判定」——跳过就等于把位移放过去。
+           *
+           * 实测：`i18nAttributes` 多占一格时，wxml 把后续元素放在 16、
+           * Angular 的 16 是那个 TI18n，旧写法在此静默跳过，全套测试全绿。
+           */
+          const occupying = covering.flatMap((v) =>
+            v.entries.filter((e) => e.index === idx),
+          );
+          if (occupying.length) {
+            compared++;
+            violations.push(
+              `${cmp} 块 ${b.name} 下标 ${idx}: wxml=<${wtag}> 但 Angular 该槽是 ` +
+                `"${occupying.map((e) => e.instruction).join('/')}"，不是元素`,
+            );
+          }
           continue;
         }
         const expected = mapAngularTagToWxml(entries[0].tag as string);

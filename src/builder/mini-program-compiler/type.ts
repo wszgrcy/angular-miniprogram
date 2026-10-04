@@ -78,3 +78,12 @@ export interface ResolvedDataGroup {
   >;
   otherMetaCollectionGroup: Record<string, MetaCollection>;
 }
+
+/**
+ * wxs-strip 插件与分析层共享的那份引用。
+ *
+ * 清单就是「哪些组件的模板被改写过、必须换一份给 Angular」。
+ */
+export type WxsAnalysisRef = {
+  wxsModules?: ReadonlyMap<string, unknown>;
+} | null;

@@ -239,6 +239,10 @@ export class MiniProgramCompilerService {
       const componentSourceFile = path.normalize(
         classDeclaration.getSourceFile().fileName,
       );
+      const componentKey = makeComponentKey(
+        componentSourceFile,
+        classDeclaration.name?.getText() ?? '',
+      );
       const template = meta.template as ComponentTemplateMeta | undefined;
       const { declarations } = await rewriteWxsTemplates(
         template?.nodes ?? [],
@@ -248,8 +252,9 @@ export class MiniProgramCompilerService {
       /**
        * 就地产出「给 Angular 编译的那份模板」。
        *
-       * 必须紧跟在改写后面：此时 AST 已带枝叶数组，一次走树同时喂给 wxml 和
-       * Angular 两侧，不存在第二个真相源。只按内容登记（`file.fileName` 为 null）。
+       * 必须紧跟在 wxs 改写后面：此时 AST 已带枝叶数组，一次走树同时喂给
+       * wxml 和 Angular 两侧，不存在第二个真相源。
+       * 只按内容登记（`file.fileName` 为 null）。
        */
       if (declarations.length && typeof template?.content === 'string') {
         recordStrippedTemplate(
@@ -262,13 +267,7 @@ export class MiniProgramCompilerService {
         );
       }
       if (declarations.length) {
-        wxsModules.set(
-          makeComponentKey(
-            componentSourceFile,
-            classDeclaration.name?.getText() ?? '',
-          ),
-          declarations,
-        );
+        wxsModules.set(componentKey, declarations);
       }
     }
 
@@ -458,6 +457,13 @@ export class MiniProgramCompilerService {
             // 事件下推在 walk 阶段发生，而事件不改写（没 plan 可挂），
             // 所以识别集合要从改写阶段带到 walk 阶段
             ctx.declaredWxsModules = getDeclaredWxs(sourceFile);
+            /**
+             * 给分析侧留一份解析用的原文，用来数 `i18n-*` 属性占的声明槽。
+             * 必须是 Angular **解析用的那一份**：元素的 `sourceSpan` 是相对它算的。
+             */
+            ctx.templateText = (
+              componentMeta.template as ComponentTemplateMeta | undefined
+            )?.content;
             return ctx;
           },
         },

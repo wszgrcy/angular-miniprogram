@@ -34,6 +34,20 @@ export class ComponentContext {
    */
   declaredWxsModules: DeclaredWxsModules = new Set<string>();
 
+  /**
+   * Angular 解析本模板时用的那份原文（`componentMeta.template.template`）。
+   *
+   * 只为 `i18n-*` 属性而存在：i18n pass 会在我们拿到 AST 之前就把
+   * `i18n-alt="照片 {{x}}"` 消费掉，把 `alt` 变成一个普通绑定，分析侧
+   * 从此无法区分「带 i18n 的插值属性」与「普通插值属性」（实测两者 AST
+   * 逐字相同）。而 `ɵɵi18nAttributes` 是要占声明槽的，猜不到就整体错位。
+   *
+   * 元素自己的 `sourceSpan` 就是这串文本里的偏移，所以能精确切出开始标签
+   * 再看它上面有没有 `i18n-`。挂在 context 上跟 `declaredWxsModules` 同理：
+   * 递归建子模板时自动传下去。
+   */
+  templateText?: string;
+
   constructor(private directiveMatcher: SelectorMatcher | undefined) {}
   matchDirective(node: t.Element): MatchedMeta[] {
     if (!this.directiveMatcher) {

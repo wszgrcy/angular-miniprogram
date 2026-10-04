@@ -56,6 +56,13 @@ export interface MPElementData {
   class: string;
   style: string;
   property: Record<string, any>;
+  /**
+   * `setAttribute` 那侧的静态属性，剔掉 class / style（已由上面两个字段承载）。
+   *
+   * 只为静态 `i18n-<attr>` 存在：那条属性的译文由 Angular 建元素时
+   * setAttribute 写进来，wxml 得能从数据里读到它。
+   */
+  attribute: Record<string, any>;
 }
 
 export interface MPTextData {

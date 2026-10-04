@@ -56,8 +56,17 @@ const NODE_SLOT_INSTRUCTIONS = new Set([
   'conditionalBranchCreate',
   'repeaterCreate',
   'switchCreate',
-  // i18n 块占一个 TI18n 节点槽——这正是原架构漏掉的那一类
+  /**
+   * i18n 块占一个 TI18n 节点槽——这正是原架构漏掉的那一类。
+   *
+   * 实际 emit 出来的是 `ɵɵi18n(index, msgIdx)`（文本 / ICU）与
+   * `ɵɵi18nAttributes(index, exprCount, ...)`（属性）；`i18nStart` 是
+   * `@if` 内部模板那条路。`i18nExp` / `i18nApply` / `i18nEnd` 不带
+   * index，不占槽。
+   */
+  'i18n',
   'i18nStart',
+  'i18nAttributes',
 ]);
 
 export interface ManifestEntry {

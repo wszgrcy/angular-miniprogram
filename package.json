@@ -88,6 +88,7 @@
   },
   "dependencies": {
     "@angular/common": "22.1.7",
+    "@angular/localize": "22.1.7",
     "abortcontroller-polyfill": "^1.7.8",
     "clsx": "^2.1.1",
     "cyia-code-util": "^1.8.0",

@@ -19,10 +19,7 @@ export class MpEventChannel {
   private listeners = new Map<string, ChannelListener[]>();
   private emitCache: { eventName: string; args: any[] }[] = [];
 
-  constructor(
-    id?: number,
-    events?: Record<string, (...args: any[]) => void>,
-  ) {
+  constructor(id?: number, events?: Record<string, (...args: any[]) => void>) {
     this.id = id;
     if (events) {
       Object.keys(events).forEach((name) => this.on(name, events[name]));
@@ -76,9 +73,7 @@ export class MpEventChannel {
     if (!matched.length) {
       return;
     }
-    this.emitCache = this.emitCache.filter(
-      (c) => c.eventName !== eventName,
-    );
+    this.emitCache = this.emitCache.filter((c) => c.eventName !== eventName);
     matched.forEach((c) => this.emit(c.eventName, ...c.args));
   }
 }

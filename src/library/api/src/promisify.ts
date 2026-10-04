@@ -54,10 +54,11 @@ export interface MpTask {
 }
 
 /** 按名字查结果类型，未收录的保持宽松 */
-export type MpResultOf<N extends MpApiNameInput> = N extends keyof MpApiResultMap
-  ? MpApiResultMap[N]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  : any;
+export type MpResultOf<N extends MpApiNameInput> =
+  N extends keyof MpApiResultMap
+    ? MpApiResultMap[N]
+    : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      any;
 
 /**
  * `invoke(name)` 的返回类型：按名字把 task / 同步 / Promise 三分，

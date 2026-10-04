@@ -36,6 +36,17 @@ export interface NgElementMeta extends NgNodeMeta {
   staticStyle: string;
   inputs: string[];
   outputs: string[];
+  /**
+   * 带 `i18n-<attr>` 且**值为静态**的属性名。
+   *
+   * 这类属性的译文由 Angular 在建元素时 `setAttribute` 写进 `attribute`，
+   * wxml 若照旧内联源文案就永远翻不了，所以必须改成读
+   * `nodeList[i].attribute.<name>` 的绑定。
+   *
+   * 值含插的那种不在这里——那条走 `ɵɵi18nAttributes` + `setProperty`，
+   * 绑定本来就指着 `property`。
+   */
+  i18nAttrs: string[];
   singleClosedTag: boolean;
   /**
    * `[innerHTML]` 富文本承载。

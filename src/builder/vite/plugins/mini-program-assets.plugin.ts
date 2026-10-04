@@ -7,6 +7,7 @@ import { Injector } from 'static-injector';
 import ts from 'typescript';
 import type { Plugin } from 'vite';
 import { CustomStyleSheetProcessor } from '../../library/stylesheet-processor';
+import type { WxsAnalysisRef } from '../../mini-program-compiler/type';
 import { BuildPlatform } from '../../platform/platform';
 import { LibraryTemplateScopeService } from '../../shared/library-template-scope.service';
 import { MiniProgramApplicationAnalysisService } from '../../shared/mini-program-application-analysis.service';
@@ -121,7 +122,7 @@ export interface MiniProgramAssetsPluginOptions {
    * 是先 assets 后 strip，strip 要在那之前拿到。
    */
   analysisRef?: {
-    current: { wxsModules?: ReadonlyMap<string, unknown> } | null;
+    current: WxsAnalysisRef;
   };
 }
 

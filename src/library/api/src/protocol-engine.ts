@@ -33,7 +33,11 @@ export interface MpFieldDescriptor {
   value: any;
 }
 
-export type MpFieldOption = string | false | MpFieldTransform | MpFieldDescriptor;
+export type MpFieldOption =
+  | string
+  | false
+  | MpFieldTransform
+  | MpFieldDescriptor;
 
 export type MpFieldMap = Record<string, MpFieldOption>;
 
@@ -45,7 +49,9 @@ export type MpMapFn = (
 
 function isPlainObject(value: unknown): value is Record<string, any> {
   return (
-    !!value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype
+    !!value &&
+    typeof value === 'object' &&
+    Object.getPrototypeOf(value) === Object.prototype
   );
 }
 

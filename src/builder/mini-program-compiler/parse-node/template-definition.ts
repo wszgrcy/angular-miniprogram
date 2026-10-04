@@ -81,6 +81,46 @@ import { MatchedComponent, MatchedDirective } from './type';
  * 方法顺序刻意照抄 Angular，升级时可以直接 diff 出「Angular 新增了哪种
  * 节点」，避免漏掉。
  */
+/**
+ * 元素开始标签上的 `i18n-<attr>`，连同它是否带插值。
+ *
+ * ## 为什么只能从原文看
+ *
+ * i18n pass 在分析侧拿到 AST 之前就把 `i18n-alt="照片 {{x}}"` 消费了：属性名
+ * 消失，`alt` 变成一个普通插值绑定。实测「带 i18n 的插值属性」与「普通插值
+ * 属性」的 AST 逐字相同，AST 里没有任何残留标记。而 emit 侧的行为两者不同
+ * （见下），猜不到就是整体错位且不报错。
+ *
+ * 元素的 `startSourceSpan` 是解析原文里的偏移，切出开始标签直接看最准。
+ *
+ * ## dynamic 决定两件完全不同的事
+ *
+ * - **dynamic（值含 `{{`）**：发 `ɵɵi18nAttributes`，**多占一个声明槽**；
+ *   译文经 `setProperty` 落在 `property` 上，wxml 的绑定已经指着它。
+ * - **静态**：不发那条指令、不占槽；译文在建元素时 `setAttribute`，落在
+ *   `attribute` 上。wxml 若照旧内联源文案，就永远翻不了——所以必须改成绑定。
+ */
+function i18nAttributesOf(
+  element: t.Element,
+  templateText?: string,
+): { name: string; dynamic: boolean }[] {
+  if (!templateText || !element.startSourceSpan) {
+    return [];
+  }
+  const span = element.startSourceSpan as unknown as {
+    start: { offset: number };
+    end: { offset: number };
+  };
+  const tag = templateText.slice(span.start.offset, span.end.offset);
+  const attr = /i18n-([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  const out: { name: string; dynamic: boolean }[] = [];
+  for (let m = attr.exec(tag); m; m = attr.exec(tag)) {
+    const value = m[2] ?? m[3] ?? '';
+    out.push({ name: m[1], dynamic: value.includes('{{') });
+  }
+  return out;
+}
+
 export class TemplateDefinition implements TmplAstRecursiveVisitor {
   private parentNode: ParsedNgElement | ParsedNgTemplate | undefined;
   list: ParsedNode<NgNodeMeta>[] = [];
@@ -129,6 +169,22 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    */
   visitElement(element: t.Element) {
     const nodeIndex = this.declIndex++;
+    /**
+     * 带插值的 `i18n-<attr>` 会让 emit 侧多出一条 `ɵɵi18nAttributes(i+1, n)`，
+     * **紧跟在本元素后面**再占一个声明槽（实测：`domElementStart(15,"img",15)`
+     * → `i18nAttributes(16, 6)` → 下一个元素从 17 起）。
+     *
+     * 一个元素只占一个，不管带几个 i18n 属性（exprCount 变大，槽不变）。
+     * 纯静态的 `i18n-title="标题"` 不发这条指令（译文被烘进 consts attrs，
+     * 建元素时直接 setAttribute），所以不能数。
+     */
+    const i18nAttrs = i18nAttributesOf(
+      element,
+      this.componentContext?.templateText,
+    );
+    if (i18nAttrs.some((item) => item.dynamic)) {
+      this.declIndex++;
+    }
     let componentMeta: MatchedComponent | undefined;
     let directiveMeta: MatchedDirective | undefined;
     const result = this.componentContext.matchDirective(element);
@@ -155,6 +211,8 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       nodeIndex,
       directiveMeta,
       this.componentContext?.declaredWxsModules,
+      // 静态那半要改成绑定（译文在 `attribute` 上），见 `NgElementMeta.i18nAttrs`
+      i18nAttrs.filter((item) => !item.dynamic).map((item) => item.name),
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
@@ -660,11 +718,67 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    * （`Element, Icu`），留空等于**静默丢掉整段内容**，
    * 且后续所有节点槽位错位。
    */
+  /**
+   * ICU 消息（复数 / 性别选择）。
+   *
+   * ```html
+   * {count, plural, =1 {one item} other {{{count}} items}}
+   * ```
+   *
+   * Angular 把它编成 `ɵɵi18n(i, msgIdx)` —— **一个声明槽**，分支文本节点之后
+   * 由 `ɵɵi18nApply` 建在 expando 下标上。所以这里按一个文本节点记账即可，
+   * 与 `{{a}}` 的 `ɵɵtext` 逐字相同。
+   *
+   * 文案本身不在这里管：序列化层会从 lView 的 expando 上把当前分支的节点收回来
+   * （`component-template-hook.factory.ts` 的 `readI18nText`）。
+   */
   visitIcu(icu: t.Icu) {
-    throw new Error(
-      '暂不支持 ICU 消息语法（{x, plural, ...} / {x, select, ...}），' +
-        '请改用组件内的普通条件渲染',
+    const nodeIndex = this.declIndex++;
+    /**
+     * ICU 由 Angular 原生的 `ɵɵi18n` 渲染，只占**一个**声明槽，与 `{{a}}`
+     * 的 `ɵɵtext` 记账逐字相同，所以这里就当一个文本节点记。
+     *
+     * wxml 这边只需要一个文本槽（`{{nodeList[i].value}}`）；真正的文案由序列化层
+     * 从 lView 的 expando 上收回来，见 `component-template-hook.factory.ts`
+     * 的 `readI18nText`。
+     */
+    const instance = new ParsedNgBoundText(
+      icu as unknown as t.BoundText,
+      this.parentNode,
+      nodeIndex,
     );
+    /**
+     * ICU 自带表达式里的管道各占一个声明槽。
+     *
+     * ```html
+     * {g, select, other {x{{count | number}}}}   ← emit 侧多出 ɵɵpipe(i, "number")
+     * ```
+     *
+     * 判断变量在 `vars`，分支里的插值在 `placeholders`，两边都得走：
+     * 漏一个就是 wxml 下标整体前移一位。
+     */
+    // `placeholders` 不在 `t.Icu` 的公开类型里，只能按形状取
+    const asVariables = (value: unknown): unknown[] =>
+      Array.isArray(value) ? value : Object.values((value ?? {}) as object);
+    const expressions: { visit(v: unknown): void }[] = [];
+    for (const variable of [
+      ...asVariables(icu.vars),
+      ...asVariables(
+        (icu as unknown as { placeholders?: unknown }).placeholders,
+      ),
+    ]) {
+      const value = (variable as { value?: { visit(v: unknown): void } })
+        ?.value;
+      if (value) {
+        expressions.push(value);
+      }
+    }
+    expressions.forEach((expression) => expression.visit(this.astVisitor));
+    if (this.parentNode) {
+      this.parentNode.appendNgNodeChild(instance);
+    } else {
+      this.list.push(instance);
+    }
   }
 
   run() {

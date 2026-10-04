@@ -27,7 +27,7 @@
             "outputPath": "dist/app",
             "index": "",
             "main": "src/main.ts",
-            "polyfills": "",
+            "polyfills": ["@angular/localize"],
             "tsConfig": "src/tsconfig.app.json",
             "assets": [
               {

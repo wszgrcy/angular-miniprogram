@@ -5,6 +5,17 @@ import type {
 import clsx from 'clsx';
 
 export class AgentNode {
+  /**
+   * `Node` 的 nodeType 常量。
+   *
+   * `walkIcuTree` 的 `switch (node.nodeType)` 与 `applyCreateOpCodes` 的
+   * `Node.COMMENT_NODE` 都不在 `ngDevMode` 守卫里，缺了直接 `ReferenceError`。
+   * 下面把全局 `Node` 直接指到本类，所以常量得挂在这里。
+   */
+  static readonly ELEMENT_NODE = 1;
+  static readonly TEXT_NODE = 3;
+  static readonly COMMENT_NODE = 8;
+
   selector!: unknown;
   name!: string;
   parent!: AgentNode | undefined;
@@ -54,7 +65,7 @@ export class AgentNode {
   /** `suffix -> 完整 setData key` 缓存，避免每次变更重复拼串 */
   __keyCache: Record<string, string> = {};
 
-  constructor(public type: 'element' | 'comment' | 'text') { }
+  constructor(public type: 'element' | 'comment' | 'text') {}
   appendChild(child: AgentNode) {
     const lastChildIndex = this.children.length - 1;
     this.children.push(child);
@@ -75,13 +86,26 @@ export class AgentNode {
     }
     parent.appendChild(this);
   }
-  insertBefore(newChild: AgentNode, refChild: AgentNode) {
+  insertBefore(newChild: AgentNode, refChild?: AgentNode | null) {
+    /**
+     * `refChild` 为空就是追加 —— DOM 的既定语义（`Node.insertBefore(x, null)`
+     * 等价于 `appendChild(x)`），不是异常。
+     *
+     * Angular 的 i18n 插入路径就依赖这一点：`ɵɵi18nStart` 传给
+     * `nativeInsertBefore` 的 `insertInFrontOf`，在父节点不是
+     * `ElementContainer` 时恒为 `null`。
+     */
+    if (refChild == null) {
+      this.appendChild(newChild);
+      return;
+    }
     const refIndex = this.children.findIndex((item) => item === refChild);
     if (refIndex === -1) {
       // eslint-disable-next-line @typescript-eslint/no-base-to-string
       throw new Error('未找到引用子节点' + refChild);
     }
 
+    newChild.parent = this;
     if (refIndex === 0) {
       newChild.nextSibling = refChild;
     } else {
@@ -138,7 +162,33 @@ export class AgentNode {
         class: this.classString(),
         style: this.styleString(),
         property: { ...this.property },
+        // class / style 已由上面两个字段汇总（还含 addClass / 动态 style），
+        // 原样再塞一份纯属浪费 setData 体积
+        attribute: Object.fromEntries(
+          Object.entries(this.attribute).filter(
+            ([key]) => key !== 'class' && key !== 'style',
+          ),
+        ),
       };
     }
   }
 }
+
+/**
+ * 把 `AgentNode` 挂上全局能力表，供编译期重定义后的 `Node` 指过来。
+ *
+ * ## 为什么是「挂表 + define」而不是 `globalThis.Node = AgentNode`
+ *
+ * 小程序里没有 `Node`，也不需要有个全局叫这个名字。`buildPlatformDefine`
+ * 已经把 `Node` 这个标识符在编译期换成 `<平台>.AgentNode`（见
+ * `builder/vite/index.ts`），运行时压根不存在 `Node`，所以这里只需要把
+ * `AgentNode` 放进能力表即可——不去占一个本不存在的浏览器全局名。
+ *
+ * 和 `AbortController` 是同一套两步：define 负责把裸引用指过去，表里
+ * 必须得有值，缺一步就是 undefined。
+ *
+ * 这里的 `globalThis` 会被 define 换成同一个能力表，所以两边天然对齐。
+ * 没跑过 define 的环境（vitest 直连库源码）里这句只是往真 globalThis 上
+ * 挂个属性，`Node` 由测试环境自己接上，见 `test-util/init-env.ts`。
+ */
+(globalThis as Record<string, unknown>).AgentNode = AgentNode;

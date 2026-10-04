@@ -50,11 +50,10 @@ export function blockWith(
   reason?: any,
 ): OperatorFunction<MpInvokeContext, never> {
   return () =>
-    throwError(
-      () =>
-        reason instanceof Error
-          ? reason
-          : new MpBlockedError(String(reason ?? 'blocked')),
+    throwError(() =>
+      reason instanceof Error
+        ? reason
+        : new MpBlockedError(String(reason ?? 'blocked')),
     );
 }
 

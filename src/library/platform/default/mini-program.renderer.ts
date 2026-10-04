@@ -168,7 +168,7 @@ export class MiniProgramRenderer implements Renderer2 {
   }
   setValue(node: AgentNode, value: string) {
     node.value = value;
-    this.emit(node, 'value', value);
+    this.emit(node, 'value', node.value);
   }
   listen(
     target: AgentNode,

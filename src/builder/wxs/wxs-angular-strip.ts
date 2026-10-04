@@ -112,8 +112,15 @@ export function stripWxsFromAst(
   nodes: any[],
   source: string,
   fileName: string,
+  /**
+   * 同批要一起应用的外部编辑（目前只有 ICU）。
+   *
+   * 必须同批：两边算的都是**原始文件坐标**，分两轮应用的话第二轮的偏移
+   * 已经被第一轮改过了，会切错位置。
+   */
+  extraEdits: Edit[] = [],
 ): string {
-  const edits: Edit[] = [];
+  const edits: Edit[] = [...extraEdits];
   /**
    * 宿主上已经写过的承载位 key。
    *

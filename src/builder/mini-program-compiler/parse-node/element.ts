@@ -48,6 +48,8 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
      * 没注入时退回按组件源文件反查。
      */
     private declaredWxs?: DeclaredWxsModules,
+    /** 静态 `i18n-<attr>` 的属性名，见 `NgElementMeta.i18nAttrs` */
+    private i18nAttrs: string[] = [],
   ) {}
   private analysis() {
     this.getTagName();
@@ -199,6 +201,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       // 这里只是不再为它们产出 wxml，后续节点的下标不受影响。
       children: this.richText ? [] : this.children.map((c) => c.getNodeMeta()),
       inputs: this.inputs,
+      i18nAttrs: this.i18nAttrs,
       outputs: this.outputs,
       attributes: this.attributeObject,
       staticClass: this.staticClass,

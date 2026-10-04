@@ -177,18 +177,95 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
     ).run();
   }
 
-  it('ICU 复数消息抛错（实测该节点会真实产出，留空即静默丢弃）', () => {
-    expect(() => run('<p>{count, plural, =1 {one} other {many}}</p>')).toThrow(
-      /ICU/,
+  /**
+   * ICU 走 Angular 原生 `ɵɵi18n`，与 `{{a}}` 的 `ɵɵtext` 一样只占一个声明槽，
+   * 所以记账必须与等价插值逐字相同 —— 这是 wxml 下标不错位的前提。
+   */
+  for (const [name, html] of [
+    ['plural', '<p>{count, plural, =1 {one} other {many}}</p>'],
+    ['select', '<p>{gender, select, male {他} other {TA}}</p>'],
+  ] as const) {
+    it(`ICU（${name}）按一个文本槽记账，与等价插值一致`, () => {
+      const icu = JSON.stringify(run(html).map((n) => n.getNodeMeta()));
+      const plain = JSON.stringify(
+        run('<p>{{ a }}</p>').map((n) => n.getNodeMeta()),
+      );
+      expect(icu).toBe(plain);
+    });
+  }
+
+  /**
+   * ICU 分支里的插值带管道时，emit 侧会多出 `ɵɵpipe(i, "number")`，
+   * 占一个声明槽。漏数就是 wxml 下标整体前移一位——实测踩过，
+   * 表现是后续所有节点错位一格且零报错。
+   */
+  it('ICU 分支里的管道各占一个声明槽', () => {
+    // 把所有节点（含 children）的下标拍平取最大，即「最后一个槽」
+    const lastIndex = (html: string) => {
+      const seen: number[] = [];
+      const walk = (meta: any) => {
+        if (typeof meta?.index === 'number') {
+          seen.push(meta.index);
+        }
+        (meta?.children ?? []).forEach(walk);
+      };
+      run(html).forEach((n) => walk(n.getNodeMeta() as any));
+      return Math.max(...seen);
+    };
+    const without = lastIndex(
+      '<p>{g, select, other {x{{c}}}}</p><b>{{ y }}</b>',
+    );
+    const withPipe = lastIndex(
+      '<p>{g, select, other {x{{c | number}}}}</p><b>{{ y }}</b>',
+    );
+    expect(withPipe, '分支里多一个管道，后面的节点必须整体后移一格').toBe(
+      without + 1,
     );
   });
 
-  it('ICU select 消息同样抛错', () =>
-    expect(() => run('<p>{gender, select, male {他} other {TA}}</p>')).toThrow(
-      /ICU/,
-    ));
+  /**
+   * `ɵɵi18nAttributes` 占一个独立声明槽，但 i18n pass 在我们拿到 AST 前
+   * 就把 `i18n-*` 消费干净了，AST 里没有任何残留（实测带 i18n 的插值属性
+   * 与普通插值属性逐字相同）。所以只能从模板原文数，这里把规则钉住：
+   * **值含插值的 `i18n-<attr>` → 该元素后多一格**，静态的不算。
+   */
+  describe('i18n-* 属性占的声明槽', () => {
+    const lastIndex = (html: string) => {
+      const seen: number[] = [];
+      const walk = (meta: any) => {
+        if (typeof meta?.index === 'number') {
+          seen.push(meta.index);
+        }
+        (meta?.children ?? []).forEach(walk);
+      };
+      const ctx = new ComponentContext(undefined);
+      ctx.templateText = html;
+      new TemplateDefinition(parseTemplate(html, 'p.html').nodes, ctx)
+        .run()
+        .forEach((n) => walk(n.getNodeMeta() as any));
+      return Math.max(...seen);
+    };
 
-  it('ng-content 带 fallback 内容抛错（小程序 slot 无对应能力）', () => {
+    for (const [name, attr, expectShift] of [
+      ['无 i18n', '', false],
+      ['静态 i18n 值', 'i18n-title="标题"', false],
+      ['插值 i18n 值', 'i18n-alt="照片 {{n}}"', true],
+      ['插值 i18n + 静态 i18n', 'i18n-alt="照片 {{n}}" i18n-title="题"', true],
+      [
+        '两个插值 i18n（仍只多一格）',
+        'i18n-alt="照 {{n}}" i18n-title="题 {{n}}"',
+        true,
+      ],
+    ] as const) {
+      it(`${name} → ${expectShift ? '多占一格' : '不多占'}`, () => {
+        const withAttr = lastIndex(`<img ${attr} alt="a" /><b>{{ y }}</b>`);
+        const without = lastIndex('<img alt="a" /><b>{{ y }}</b>');
+        expect(withAttr - without).toBe(expectShift ? 1 : 0);
+      });
+    }
+  });
+
+  it('ng-content 带 fallback 内容抛错（小程序 slot 无无能）', () => {
     expect(() => run('<ng-content>fallback</ng-content>')).toThrow(/fallback/);
   });
 
