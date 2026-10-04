@@ -266,7 +266,15 @@ export function polyfillEntryPlugin(
       if (id !== POLYFILL_ENTRY_ID) {
         return null;
       }
-      const lines = [`import ${JSON.stringify(selfEntry)};`];
+      const lines = [
+        // 必须把命名空间接住再引用一次：polyfill-entry 是 CJS 产物，只往
+        // globalThis 上挂东西、不导出任何有用值，裸 `import "x"` 会被
+        // rolldown 判成无副作用整块摇掉。构建绿、产物里没有 AbortController，
+        // 跑到才炸 `wx.__window.AbortController is not a constructor`。
+        // `export default ns` 同样留不住（实测），落到全局能力表上才稳。
+        `import * as __mpPolyfills from ${JSON.stringify(selfEntry)};`,
+        `globalThis.__mpPolyfills = __mpPolyfills;`,
+      ];
       if (localizeInit) {
         lines.push(`import ${JSON.stringify(localizeInit)};`);
       }

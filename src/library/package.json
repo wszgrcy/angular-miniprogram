@@ -21,16 +21,18 @@
   },
   "homepage": "https://github.com/wszgrcy/angular-miniprogram#readme",
   "dependencies": {
-    "cyia-code-util": "1.8.0",
-    "static-injector": "7.0.0",
     "@analogjs/vite-plugin-angular": "^2.7.2",
     "abortcontroller-polyfill": "^1.7.8",
+    "birpc": "^4.2.0",
+    "clsx": "^2.1.1",
+    "cyia-code-util": "1.8.0",
     "es-toolkit": "^1.52.0",
+    "flatted": "^3.4.4",
     "fs-extra": "11.2.0",
     "glob": "^7.2.0",
     "ora": "^9.4.1",
-    "vite": "^8.3.0",
-    "clsx": "^2.1.1"
+    "static-injector": "7.0.0",
+    "vite": "^8.3.0"
   },
   "peerDependencies": {
     "ng-packagr": "^22.1.1",

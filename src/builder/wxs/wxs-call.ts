@@ -23,9 +23,9 @@ import type { AST } from '@angular/compiler';
  * 之所以走「声明集合 + 结构判定」而不是类型系统：编译器不在 Angular
  * 编译管线内部，拿不到符号解析结果，只能吃 AST。
  *
- * 节点判别用 `constructor.name` 而非 `instanceof`：
- * `@angular/compiler` 是 ESM，本仓库通过 `load_esm.ts` 动态加载，
- * 静态值导入会与它抢同一模块导致 ERR_REQUIRE_ESM_RACE_CONDITION。
+ * 节点判别用 `constructor.name` 而非 `instanceof`：手上那批 AST 节点是调用方
+ * 构造好传进来的，不保证跟本地 import 的是同一份 `@angular/compiler` 实例，
+ * 按名字判不依赖“同一份类对象”这个前提。
  */
 
 /** 已声明的 wxs 模块名集合，识别的唯一依据 */

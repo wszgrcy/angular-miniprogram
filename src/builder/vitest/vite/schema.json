@@ -74,6 +74,20 @@
       "type": "string",
       "description": "小程序内回连宿主的地址，默认 127.0.0.1（微信模拟器解不了 localhost）。真机调试改成开发机局域网 IP。"
     },
+    "polyfills": {
+      "description": "语义与 application builder 的同名选项一致。声明 `@angular/localize`（或 `@angular/localize/init`）会让测试构建注入 `@angular/localize/init`，这是运行时 i18n 唯一的开关：不注入时 `$localize` 是 core 的恒等实现，ICU 分支不解析，i18n spec 会直接看到 `{VAR_SELECT, select, ...}` 原文。",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
     "sourceMap": {
       "type": "boolean",
       "description": "Output source maps.",

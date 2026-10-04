@@ -1,8 +1,8 @@
+import { CssSelector, SelectorMatcher } from '@angular/compiler';
 import type {
   R3ComponentMetadata,
   R3DirectiveMetadata,
   R3TemplateDependency,
-  SelectorMatcher,
 } from '@angular/compiler';
 import type { NgtscProgram } from '@angular/compiler-cli';
 import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
@@ -22,7 +22,6 @@ import {
 } from '../library/library-meta-schema';
 import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
-import { angularCompilerPromise } from '../util';
 import {
   recordStrippedTemplate,
   stripWxsFromAst,
@@ -228,8 +227,6 @@ export class MiniProgramCompilerService {
   }
 
   async exportComponentBuildMetaMap() {
-    const { SelectorMatcher, CssSelector } = await angularCompilerPromise;
-
     // wxs 改写必须赶在任何模板 walk 之前跑完。
     // walk 阶段读到的表达式和最终 emit 用的必须是同一份，
     // 否则下标和 wxml 会对不上。

@@ -37,8 +37,20 @@
       "description": "The full path for the main entry point to the app, relative to the current workspace."
     },
     "polyfills": {
-      "type": "string",
-      "description": "The full path for the polyfills file, relative to the current workspace."
+      "description": "Polyfills to be included in the build.",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of polyfills to include, in order. Declaring `@angular/localize` (or `/init`) makes the builder inject `@angular/localize/init`, which is what turns runtime i18n on."
+        },
+        {
+          "type": "string",
+          "description": "A single polyfills file, relative to the current workspace."
+        }
+      ]
     },
     "tsConfig": {
       "type": "string",

@@ -9,13 +9,16 @@ import {
   clearLibraryMetaMisses,
   formatLibraryMetaSummary,
 } from '../../library/library-meta-diagnostics';
-import { writeDerivedTsConfig } from '../../shared/derived-tsconfig';
+import { resolveNative } from '../../util/asset-path';
 import { createMiniProgramTestStack } from '../../shared/mini-program-test-stack';
 import { globSpecFiles } from '../../shared/spec-discovery';
 import {
   buildPlatformDefine,
   buildViteAlias,
   getBuildPlatform,
+  POLYFILL_ENTRY_ID,
+  polyfillEntryPlugin,
+  resolveLocalizeInit,
 } from '../../vite';
 import {
   generateEntryPatterns,
@@ -52,6 +55,13 @@ export interface VitestViteBuilderOptions {
   port?: number;
   clientHost?: string;
   dedupe?: string[];
+  /**
+   * 语义与 application builder 的同名选项一致：声明 `@angular/localize`
+   * （或 `/init`）才会注入 `@angular/localize/init`。不注入的话
+   * `$localize` 就是 core 的恒等实现，ICU 分支不会被解析，
+   * i18n 相关的 spec 会看到 `{VAR_SELECT, select, ...}` 原文。
+   */
+  polyfills?: string | string[];
 }
 
 /**
@@ -121,19 +131,15 @@ export async function createVitestViteConfig(options: {
       : (angularPluginModule as { default: unknown }).default
   ) as (opts: unknown) => import('vite').Plugin[];
 
-  // 把 typeRoots 钉到 workspace 的 node_modules/@types，
-  // 否则临时 host 目录下找不到需要的 @types
-  const derivedTs = writeDerivedTsConfig({
-    baseTsConfig: vitestOptions.tsConfig,
-    workspaceRoot: context.workspaceRoot,
-  });
-
   const stack = createMiniProgramTestStack({
     platform: vitestOptions.platform,
     buildPlatform,
     workspaceRoot: context.workspaceRoot,
     context,
-    tsConfig: derivedTs.path,
+    // devkit 在 Windows 下给的是 /C:/... 这种 posix 化绝对路径，先归一。
+    // 类型库不在这里动手：`types` 由工程自己的 tsconfig 声明（或 spec
+    // 旁边放个 d.ts），构建器不替用户找类型。
+    tsConfig: resolveNative(context.workspaceRoot, vitestOptions.tsConfig),
     pages: vitestOptions.pages || [],
     assets: vitestOptions.assets,
     styles: vitestOptions.styles,
@@ -179,6 +185,12 @@ export async function createVitestViteConfig(options: {
     },
     plugins: [
       ...stack.preAnalogPlugins,
+      // polyfill 入口走虚拟模块，才能在同一处把 @angular/localize/init
+      // 拼在后面（与 application 链路同一套）。
+      polyfillEntryPlugin(
+        path.resolve(__dirname, '../../platform/template/polyfill-entry.js'),
+        resolveLocalizeInit(vitestOptions.polyfills),
+      ),
       // analog 必须排在 wxs-strip 之后：它建 Angular program 时要读
       // fileReplacements，而 wxs-strip 会就地往里 push。
       ...angular(stack.angularOptions),
@@ -197,10 +209,7 @@ export async function createVitestViteConfig(options: {
         input: {
           // 全局 polyfill 入口，必须排最前，保证 AbortController 等
           // 在任何业务 chunk 之前装好（与 application 链路一致）。
-          polyfills: path.resolve(
-            __dirname,
-            '../../platform/template/polyfill-entry.js',
-          ),
+          polyfills: POLYFILL_ENTRY_ID,
           ...toRollupInput([
             ...entryPatterns.pageList,
             ...entryPatterns.componentList,

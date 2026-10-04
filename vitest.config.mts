@@ -173,34 +173,6 @@ const BUILDER_PROJECT: TestProjectInlineConfiguration = {
      * `dist/`，让它白付那 4s 构建没道理。
      */
     globalSetup: ['./test/global-setup.ts'],
-    /**
-     * 把 `src/builder/util/load_esm.ts` 交给 **Node 原生加载**，不走 vitest 的模块运行器。
-     *
-     * 那个文件用 `new Function('modulePath', 'return import(modulePath)')` 加载
-     * `@angular/compiler` / `@angular/compiler-cli`。这是 Angular 官方自己的写法
-     * （`@angular/build/src/utils/load-esm.js`、core schematics 里的
-     * `schematics/utils/load_esm.ts` 都是同一套），目的是挡 tsc 把 `import()`
-     * 无条件降级成 `require()`。纯 Node 下它完全正常，线上 builder 就这么跑。
-     *
-     * 坏在测试链路：vitest 把第一方源码也丢进
-     * `vm.runInThisContext(code, { filename, lineOffset, columnOffset })`
-     * （见 `vitest/dist/module-evaluator.js`），**不传 `importModuleDynamically`**，
-     * 于是 vm 里抛 `ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING`。
-     *
-     * 试过但**不行**的路子，别再走：
-     *   不传那个 vm 选项，flag 改变不了。
-     * - `pool: 'vmForks'` / `'vmThreads'`：它们确实接了 importModuleDynamically，
-     *   但 builder spec 要开真实临时目录、起子进程，换池风险大于收益。
-     *
-     * `server.deps.external` 的官方语义就是 "pass the package to native Node"，
-     * Node 24 自带 TS 类型剥离，.ts 也能直接加载。
-     * 结果：源码不动、不改源码文本、跑的是真实代码路径。
-     *
-     * `globalSetup` 也跑在本 project 的 runner 里（`Project._initializeGlobalSetup()`），
-     * 而 `test/global-setup.ts` 要 import 真的 builder，绕不开 `load_esm.ts`，
-     * 所以这条必须跟 `globalSetup` 待在同一层。
-     */
-    server: { deps: { external: [/util[\/]load_esm[.]ts$/] } },
     isolate: false,
     sequence: { concurrent: false, sequencer: OrderedSequencer, groupOrder: 2 },
   },

@@ -13,7 +13,6 @@ import {
   splitComponentKey,
 } from '../mini-program-compiler';
 import { BuildPlatform } from '../platform/platform';
-import { angularCompilerCliPromise } from '../util/load_esm';
 import { planSharedWxsEmit } from '../wxs/wxs-declare';
 import { parseWxsSource } from '../wxs/wxs-source';
 import { detectEntryComponent } from './entry-component';
@@ -323,7 +322,9 @@ export class MiniProgramApplicationAnalysisService {
     return host;
   }
   private async initTscProgram() {
-    const { readConfiguration, NgtscProgram } = await angularCompilerCliPromise;
+    const { readConfiguration, NgtscProgram } = await import(
+      '@angular/compiler-cli'
+    );
     const config = readConfiguration(this.tsConfig, undefined);
     const host = this.initHost(config);
     this.ngTscProgram = new NgtscProgram(

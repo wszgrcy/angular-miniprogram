@@ -7,12 +7,16 @@
     "static-injector",
     "@analogjs/vite-plugin-angular",
     "abortcontroller-polyfill",
+    "birpc",
+    "clsx",
+    "cyia-code-util",
     "es-toolkit",
+    "flatted",
     "fs-extra",
     "glob",
     "ora",
-    "vite",
-    "clsx"
+    "static-injector",
+    "vite"
   ],
   "lib": {
     "entryFile": "./platform/index.ts"

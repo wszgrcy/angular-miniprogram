@@ -1,5 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { angularCompilerPromise } from '../util/load_esm';
+import {
+  ASTWithSource,
+  BindingType,
+  BoundElementProperty,
+  LiteralArray,
+} from '@angular/compiler';
 import { DeclaredWxsModules, containsWxsRoot } from './wxs-call';
 import {
   WxsDeclaration,
@@ -265,8 +270,6 @@ export async function rewriteWxsTemplates(
   declarations: WxsDeclaration[];
   declared: DeclaredWxsModules;
 }> {
-  const { LiteralArray, ASTWithSource, BoundElementProperty, BindingType } =
-    await angularCompilerPromise;
   const declarations = extractWxsDeclarations(nodes);
   assertNoDuplicateModule(declarations);
   const declared = new Set(declarations.map((d) => d.module));
