@@ -13,6 +13,7 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
+import { memoize } from '../../../test/util/memoize';
 import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
@@ -116,56 +117,112 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       .map((l: { message?: string }) => String(l.message))
       .join(' ~~ ');
 
+  /**
+   * 「default export 注入 + 自定义 tabBar」与「不配组件范围 / 不招 tsconfig 外入口」
+   * 是同一次构建的两个侧面：前者看注入与 tabBar 落盘，后者看 widgets 被收进来、
+   * spec 入口被挡在外面，互不干扰。
+   */
+  const load = memoize(async () => {
+    await setupFixture();
+    await writeTabbar();
+    await write(
+      'src/app.config.json',
+      JSON.stringify({
+        pages: builtPages,
+        tabBar: {
+          custom: true,
+          list: [{ pagePath: builtPages[0], text: '首页' }],
+        },
+      }),
+    );
+    // 组件不在任何约定目录里，只能靠「整个 sourceRoot」的组件 glob 收到
+    await write(
+      'src/widgets/widget/widget.component.ts',
+      [
+        "import { Component } from '@angular/core';",
+        '@Component({',
+        '  standalone: true,',
+        "  selector: 'app-widget',",
+        "  template: '<view></view>',",
+        '})',
+        'export class WidgetComponent {}',
+        '',
+      ].join('\n'),
+    );
+    await write(
+      'src/widgets/widget/widget.entry.ts',
+      "export { WidgetComponent as default } from './widget.component';\n",
+    );
+    // 入口必须进 tsconfig 才算这个 app 的编译单元
+    await write(
+      'src/tsconfig.app.json',
+      JSON.stringify({
+        extends: '../tsconfig.base.json',
+        compilerOptions: {
+          outDir: '../out-tsc/app',
+          types: [],
+          skipLibCheck: true,
+          target: 'ES2022',
+        },
+        files: ['main.ts'],
+        include: [
+          '**/*.d.ts',
+          'pages/**/*.entry.ts',
+          'components/**/*.entry.ts',
+          'custom-tab-bar/**/*.entry.ts',
+          'widgets/**/*.entry.ts',
+        ],
+      }),
+    );
+
+    const result = await build('dist/vite-entry-bootstrap', {
+      appJson: 'src/app.config.json',
+    });
+    if (!result.result?.success) {
+      console.log('ENTRY_ERR>>>' + errorText(result).slice(0, 4000));
+    }
+    expect(result.result?.success).toBeTruthy();
+
+    const base = result.result!.baseOutputPath as string;
+    const names = fs.readdirSync(base, { recursive: true }).map(String);
+    const files = new Map(
+      names
+        .filter((n) => fs.statSync(path.join(base, n)).isFile())
+        .map((n) => [n, fs.readFileSync(path.join(base, n), 'utf8')]),
+    );
+    return { names, files };
+  });
+
   describe('vite: 入口注册自动注入', () => {
     it('default export 入口被注入对应注册函数，tabBar 落 custom-tab-bar/index', async () => {
-      await setupFixture();
-      await writeTabbar();
-      await write(
-        'src/app.config.json',
-        JSON.stringify({
-          pages: builtPages,
-          tabBar: {
-            custom: true,
-            list: [{ pagePath: builtPages[0], text: '首页' }],
-          },
-        }),
-      );
-
-      const result = await build('dist/vite-entry-bootstrap', {
-        appJson: 'src/app.config.json',
-      });
-      if (!result.result?.success) {
-        console.log('ENTRY_ERR>>>' + errorText(result).slice(0, 4000));
-      }
-      expect(result.result?.success).toBeTruthy();
+      const { names, files } = await load();
 
       // 页面入口：注入 bootstrapPage
-      const page = await readOutput(
-        'dist/vite-entry-bootstrap/pages/base-tap/base-tap-entry.js',
+      expect(files.get('pages/base-tap/base-tap-entry.js')).toContain(
+        'bootstrapPage',
       );
-      expect(page).toContain('bootstrapPage');
 
       // 组件入口：注入 componentRegistry
-      const component = await readOutput(
-        'dist/vite-entry-bootstrap/components/component1/component1-entry.js',
+      expect(files.get('components/component1/component1-entry.js')).toContain(
+        'componentRegistry',
       );
-      expect(component).toContain('componentRegistry');
 
       // 自定义 tabBar：产物路径固定，注入 bootstrapCustomTabbar
-      const base = result.result!.baseOutputPath as string;
-      expect(exists(base, 'custom-tab-bar/index.js')).toBe(true);
-      const tabbar = await readOutput(
-        'dist/vite-entry-bootstrap/custom-tab-bar/index.js',
+      expect(names).toContain('custom-tab-bar/index.js');
+      expect(files.get('custom-tab-bar/index.js')).toContain(
+        'bootstrapCustomTabbar',
       );
-      expect(tabbar).toContain('bootstrapCustomTabbar');
       // tabBar 组件的 json 必须带 component: true
-      const tabbarJson = JSON.parse(
-        await readOutput('dist/vite-entry-bootstrap/custom-tab-bar/index.json'),
-      ) as { component?: boolean };
-      expect(tabbarJson.component).toBe(true);
+      expect(
+        (
+          JSON.parse(files.get('custom-tab-bar/index.json')!) as {
+            component?: boolean;
+          }
+        ).component,
+      ).toBe(true);
 
       // app.js 不能 require 入口类 chunk：那等于在 app 上下文调 Page()/Component()
-      const appJs = await readOutput('dist/vite-entry-bootstrap/app.js');
+      const appJs = files.get('app.js')!;
       expect(appJs).not.toContain('custom-tab-bar');
       expect(appJs).not.toContain('pages/base-tap');
     }, 300000);
@@ -215,73 +272,21 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     }, 300000);
 
     it('不配任何组件范围：其余入口全按组件处理，且不招 tsconfig 外的无关入口', async () => {
-      await setupFixture();
-      // 组件不在任何约定目录里，只能靠「整个 sourceRoot」的组件 glob 收到
-      await write(
-        'src/widgets/widget/widget.component.ts',
-        [
-          "import { Component } from '@angular/core';",
-          '@Component({',
-          '  standalone: true,',
-          "  selector: 'app-widget',",
-          "  template: '<view></view>',",
-          '})',
-          'export class WidgetComponent {}',
-          '',
-        ].join('\n'),
-      );
-      await write(
-        'src/widgets/widget/widget.entry.ts',
-        "export { WidgetComponent as default } from './widget.component';\n",
-      );
-      // 入口必须进 tsconfig 才算这个 app 的编译单元
-      await write(
-        'src/tsconfig.app.json',
-        JSON.stringify({
-          extends: '../tsconfig.base.json',
-          compilerOptions: {
-            outDir: '../out-tsc/app',
-            types: [],
-            skipLibCheck: true,
-            target: 'ES2022',
-          },
-          files: ['main.ts'],
-          include: [
-            '**/*.d.ts',
-            'pages/**/*.entry.ts',
-            'components/**/*.entry.ts',
-            'custom-tab-bar/**/*.entry.ts',
-            'widgets/**/*.entry.ts',
-          ],
-        }),
-      );
-
-      const result = await build('dist/vite-entry-no-components');
-      if (!result.result?.success) {
-        console.log('NOCONF_ERR>>>' + errorText(result).slice(0, 4000));
-      }
-      expect(result.result?.success).toBeTruthy();
-      const base = result.result!.baseOutputPath as string;
+      const { names, files } = await load();
 
       // 产物路径按 sourceRoot 镜像：src/widgets/... → widgets/...
-      expect(exists(base, 'widgets/widget/widget-entry.js')).toBe(true);
-      const widget = await readOutput(
-        'dist/vite-entry-no-components/widgets/widget/widget-entry.js',
+      expect(names).toContain('widgets/widget/widget-entry.js');
+      expect(files.get('widgets/widget/widget-entry.js')).toContain(
+        'componentRegistry',
       );
-      expect(widget).toContain('componentRegistry');
 
       // 常规组件目录照旧产出（镜像路径与源目录同名）
-      expect(exists(base, 'components/component1/component1-entry.js')).toBe(
-        true,
-      );
+      expect(names).toContain('components/component1/component1-entry.js');
 
       // sourceRoot 下还躺着测试工程的 spec / spec-component 入口，
       // 它们不在 tsconfig.app.json 的编译单元里，必须被过滤掉
-      const emitted = fs
-        .readdirSync(base, { recursive: true })
-        .map((f) => String(f));
-      expect(emitted.filter((f) => f.startsWith('spec'))).toEqual([]);
-      expect(emitted.filter((f) => f.startsWith('spec-component'))).toEqual([]);
+      expect(names.filter((f) => f.startsWith('spec'))).toEqual([]);
+      expect(names.filter((f) => f.startsWith('spec-component'))).toEqual([]);
     }, 300000);
 
     it('入口没有 default export → 构建失败且错误可读', async () => {

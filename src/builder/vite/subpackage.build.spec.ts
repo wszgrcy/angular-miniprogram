@@ -11,6 +11,7 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
+import { memoize } from '../../../test/util/memoize';
 import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
@@ -87,12 +88,13 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
   const builtMainPages = ALL_PAGE_NAME_LIST.map((n) => `pages/${n}/${n}-entry`);
 
-  /** 写一个最小页面（组件 + 入口），`imports` / `body` 用来插共享依赖 */
+  /** 写一个最小页面（组件 + 入口），`imports` / `body` 用来插共享依赖，`template` 用来留内容标记 */
   const writePage = async (
     baseDir: string,
     name: string,
     imports: string[],
     body: string[],
+    template = `<view>${name}</view>`,
   ) => {
     const cls =
       name
@@ -110,7 +112,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
         '  standalone: true,',
         '  imports: [CommonModule],',
         `  selector: 'app-${name}',`,
-        `  template: '<view>${name}</view>',`,
+        `  template: '${template}',`,
         '})',
         `export class ${cls} {`,
         ...body,
@@ -184,14 +186,56 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       );
     }, 300000);
 
-    it('subpackages 选项：app.json 不写分包，构建器自己派生出来', async () => {
-      await setupBase();
-      await createSubPackagePage('sub-page');
-      await createSubPackagePage('sub-b');
+    /**
+     * 「subpackages 选项派生 app.json」与「共享模块只产一份」是同一次构建的两个
+     * 侧面：前者看 app.json 怎么写，后者看 chunk 落在主包还是分包，互不干扰。
+     *
+     * 两个页面的 template 带上 `subpackage <name>` 标记，让「产物内容确实是这个
+     * 页面」那条断言在合过的构建上依旧成立。
+     */
+    const loadDerived = memoize(async () => {
+      const { root, myTestProjectHost } = await setupBase();
+      await write(
+        'src/packageA/shared/a-shared.ts',
+        `export const A_SHARED = 'A_SHARED_MARKER_7f3';\n`,
+      );
+      await write(
+        'src/shared/main-shared.ts',
+        `export const MAIN_SHARED = 'MAIN_SHARED_MARKER_9c1';\n`,
+      );
+      // 分包内两个页面共用一个模块
+      await writePage(
+        'src/packageA/pages',
+        'sub-page',
+        ["import { A_SHARED } from '../../shared/a-shared';"],
+        ['  value = A_SHARED;'],
+        '<view>subpackage sub-page</view>',
+      );
+      await writePage(
+        'src/packageA/pages',
+        'sub-b',
+        ["import { A_SHARED } from '../../shared/a-shared';"],
+        ['  value = A_SHARED;'],
+        '<view>subpackage sub-b</view>',
+      );
+      // 主包页 + 分包页共用一个模块
+      await writePage(
+        'src/packageA/pages',
+        'sub-c',
+        ["import { MAIN_SHARED } from '../../../shared/main-shared';"],
+        ['  value = MAIN_SHARED;'],
+      );
+      await writePage(
+        'src/pages',
+        'probe-main',
+        ["import { MAIN_SHARED } from '../../shared/main-shared';"],
+        ['  value = MAIN_SHARED;'],
+      );
 
+      const outDir = 'dist/vite-subpkg-auto';
       harness.useTarget('build', {
         tsConfig: 'src/tsconfig.app.json',
-        outputPath: 'dist/vite-subpkg-auto',
+        outputPath: outDir,
         main: DEFAULT_ANGULAR_CONFIG.main,
         pages: DEFAULT_ANGULAR_CONFIG.pages,
         subpackages: [
@@ -214,94 +258,6 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       }
       expect(result.result?.success).toBeTruthy();
 
-      const appJson = JSON.parse(
-        await readOutput('dist/vite-subpkg-auto/app.json'),
-      ) as {
-        pages: string[];
-        subpackages: Array<{ root: string; pages: string[] }>;
-      };
-      expect(appJson.subpackages).toEqual([
-        {
-          root: 'packageA',
-          pages: ['pages/sub-b/sub-b-entry', 'pages/sub-page/sub-page-entry'],
-        },
-      ]);
-      // 分包页没被当成主包页
-      expect(appJson.pages).not.toContain(
-        'packageA/pages/sub-page/sub-page-entry',
-      );
-      expect(
-        await readOutput(
-          'dist/vite-subpkg-auto/packageA/pages/sub-page/sub-page-entry.js',
-        ),
-      ).toContain('subpackage sub-page');
-    }, 300000);
-
-    it('共享模块只产一份：分包内共用的归进分包，跨主包/分包的留主包', async () => {
-      const { root, myTestProjectHost } = await setupBase();
-      await write(
-        'src/packageA/shared/a-shared.ts',
-        `export const A_SHARED = 'A_SHARED_MARKER_7f3';\n`,
-      );
-      await write(
-        'src/shared/main-shared.ts',
-        `export const MAIN_SHARED = 'MAIN_SHARED_MARKER_9c1';\n`,
-      );
-      // 分包内两个页面共用一个模块
-      await writePage(
-        'src/packageA/pages',
-        'sub-page',
-        ["import { A_SHARED } from '../../shared/a-shared';"],
-        ['  value = A_SHARED;'],
-      );
-      await writePage(
-        'src/packageA/pages',
-        'sub-b',
-        ["import { A_SHARED } from '../../shared/a-shared';"],
-        ['  value = A_SHARED;'],
-      );
-      // 主包页 + 分包页共用一个模块
-      await writePage(
-        'src/packageA/pages',
-        'sub-c',
-        ["import { MAIN_SHARED } from '../../../shared/main-shared';"],
-        ['  value = MAIN_SHARED;'],
-      );
-      await writePage(
-        'src/pages',
-        'probe-main',
-        ["import { MAIN_SHARED } from '../../shared/main-shared';"],
-        ['  value = MAIN_SHARED;'],
-      );
-
-      harness.useTarget('build', {
-        tsConfig: 'src/tsconfig.app.json',
-        outputPath: 'dist/vite-subpkg-shared',
-        main: DEFAULT_ANGULAR_CONFIG.main,
-        pages: DEFAULT_ANGULAR_CONFIG.pages,
-        subpackages: [
-          {
-            glob: '**/*.entry.ts',
-            input: './src/packageA',
-            output: 'packageA',
-          },
-        ],
-        assets: DEFAULT_ANGULAR_CONFIG.assets,
-        platform: PlatformType.wx,
-        sourceMap: false,
-      } as never);
-      const result = await harness.executeOnce();
-      if (!result.result?.success) {
-        const errLogs = (result.logs || [])
-          .filter((l: { level: string }) => l.level === 'error')
-          .map((l: { message?: string }) => String(l.message));
-        console.log(
-          'SUBPKG_SHARED_ERR>>>' + errLogs.join(' ~~ ').slice(0, 4000),
-        );
-      }
-      expect(result.result?.success).toBeTruthy();
-
-      const outDir = 'dist/vite-subpkg-shared';
       const files = (
         await myTestProjectHost.getFileList(join(root, outDir))
       ).map(String);
@@ -315,6 +271,39 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       for (const f of files.filter((f) => f.endsWith('.js'))) {
         js.set(relOf(f), await readOutput(`${outDir}/${relOf(f)}`));
       }
+
+      return {
+        appJson: JSON.parse(await readOutput(`${outDir}/app.json`)) as {
+          pages: string[];
+          subpackages: Array<{ root: string; pages: string[] }>;
+        },
+        js,
+      };
+    });
+
+    it('subpackages 选项：app.json 不写分包，构建器自己派生出来', async () => {
+      const { appJson, js } = await loadDerived();
+      expect(appJson.subpackages).toEqual([
+        {
+          root: 'packageA',
+          pages: [
+            'pages/sub-b/sub-b-entry',
+            'pages/sub-c/sub-c-entry',
+            'pages/sub-page/sub-page-entry',
+          ],
+        },
+      ]);
+      // 分包页没被当成主包页
+      expect(appJson.pages).not.toContain(
+        'packageA/pages/sub-page/sub-page-entry',
+      );
+      expect(js.get('packageA/pages/sub-page/sub-page-entry.js')).toContain(
+        'subpackage sub-page',
+      );
+    }, 300000);
+
+    it('共享模块只产一份：分包内共用的归进分包，跨主包/分包的留主包', async () => {
+      const { js } = await loadDerived();
       const hits = (marker: string) =>
         [...js].filter(([, text]) => text.includes(marker)).map(([p]) => p);
 

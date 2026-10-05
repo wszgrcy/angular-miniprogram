@@ -11,6 +11,7 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
+import { memoize } from '../../../test/util/memoize';
 import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
@@ -66,38 +67,48 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       .toPromise();
   };
 
+  /**
+   * `$schema` 剥离与 appJson 生成是同一次构建的两个侧面：一个只要求产物里没这个键，
+   * 一个只看 pages/window/tabBar，互不干扰。合一次构建，断言一个字不动。
+   */
+  const loadAppJson = memoize(async () => {
+    await setupFixture();
+    await writeAppConfig({
+      $schema:
+        './node_modules/angular-miniprogram/builder/schemas/app-config.schema.json',
+      pages: builtPages,
+      window: { navigationBarTitleText: 'compiled' },
+      tabBar: {
+        list: [{ pagePath: builtPages[0], text: '首页' }],
+      },
+    });
+
+    harness.useTarget('build', {
+      tsConfig: 'src/tsconfig.app.json',
+      outputPath: 'dist/vite-app-json',
+      pages: DEFAULT_ANGULAR_CONFIG.pages,
+      assets: assetsWithoutAppJson,
+      appJson: 'src/app.config.json',
+      platform: PlatformType.wx,
+      sourceMap: false,
+    } as never);
+    const result = await harness.executeOnce();
+    if (!result.result?.success) {
+      const errLogs = (result.logs || [])
+        .filter((l: { level: string }) => l.level === 'error')
+        .map((l: { message?: string }) => String(l.message));
+      console.log('APPJSON_ERR>>>' + errLogs.join(' ~~ ').slice(0, 4000));
+    }
+    expect(result.result?.success).toBeTruthy();
+
+    return JSON.parse(
+      await readOutput('dist/vite-app-json/app.json'),
+    ) as Record<string, unknown>;
+  });
+
   describe('vite: app.json 编译生成', () => {
     it('appJson 配置产出 app.json，内容含校验过的 pages/tabBar', async () => {
-      await setupFixture();
-      await writeAppConfig({
-        pages: builtPages,
-        window: { navigationBarTitleText: 'compiled' },
-        tabBar: {
-          list: [{ pagePath: builtPages[0], text: '首页' }],
-        },
-      });
-
-      harness.useTarget('build', {
-        tsConfig: 'src/tsconfig.app.json',
-        outputPath: 'dist/vite-app-json',
-        pages: DEFAULT_ANGULAR_CONFIG.pages,
-        assets: assetsWithoutAppJson,
-        appJson: 'src/app.config.json',
-        platform: PlatformType.wx,
-        sourceMap: false,
-      } as never);
-      const result = await harness.executeOnce();
-      if (!result.result?.success) {
-        const errLogs = (result.logs || [])
-          .filter((l: { level: string }) => l.level === 'error')
-          .map((l: { message?: string }) => String(l.message));
-        console.log('APPJSON_ERR>>>' + errLogs.join(' ~~ ').slice(0, 4000));
-      }
-      expect(result.result?.success).toBeTruthy();
-
-      const appJson = JSON.parse(
-        await readOutput('dist/vite-app-json/app.json'),
-      ) as {
+      const appJson = (await loadAppJson()) as {
         pages: string[];
         window: { navigationBarTitleText: string };
         tabBar: { list: Array<{ pagePath: string }> };
@@ -155,30 +166,9 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     }, 300000);
 
     it('$schema 只给编辑器用，不会跟着进产物', async () => {
-      await setupFixture();
-      await writeAppConfig({
-        $schema:
-          './node_modules/angular-miniprogram/builder/schemas/app-config.schema.json',
-        pages: [builtPages[0]],
-      });
-
-      harness.useTarget('build', {
-        tsConfig: 'src/tsconfig.app.json',
-        outputPath: 'dist/vite-app-json-schema',
-        pages: DEFAULT_ANGULAR_CONFIG.pages,
-        assets: assetsWithoutAppJson,
-        appJson: 'src/app.config.json',
-        platform: PlatformType.wx,
-        sourceMap: false,
-      } as never);
-      const result = await harness.executeOnce();
-      expect(result.result?.success).toBeTruthy();
-
-      const appJson = JSON.parse(
-        await readOutput('dist/vite-app-json-schema/app.json'),
-      ) as Record<string, unknown>;
+      const appJson = await loadAppJson();
       expect('$schema' in appJson).toBe(false);
-      expect(appJson.pages).toContain(builtPages[0]);
+      expect(appJson.pages as string[]).toContain(builtPages[0]);
     }, 300000);
 
     it('静态 app.json 里 tabBar 指向不存在的页面 → 警告不拦构建', async () => {

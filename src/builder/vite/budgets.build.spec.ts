@@ -11,6 +11,7 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
+import { memoize } from '../../../test/util/memoize';
 import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
@@ -70,14 +71,25 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
   const logsOf = (result: { logs?: readonly { message?: string }[] }) =>
     (result.logs || []).map((l) => String(l.message)).join(' ~~ ');
 
-  it('statsJson 产出 stats.json（带各文件体积）', async () => {
+  const load = memoize(async () => {
     await setupFixture();
-    const result = await build('dist/vite-stats-json', { statsJson: true });
-    expect(result.result?.success).toBeTruthy();
+    const result = await build('dist/vite-stats-warn', {
+      statsJson: true,
+      budgets: [{ type: 'any', maximumWarning: '1kb' }],
+    });
+    return {
+      success: result.result?.success,
+      logs: logsOf(result),
+      stats: JSON.parse(
+        await readOutput('dist/vite-stats-warn/stats.json'),
+      ) as { assets: { name: string; size: number }[] },
+    };
+  });
 
-    const stats = JSON.parse(
-      await readOutput('dist/vite-stats-json/stats.json'),
-    ) as { assets: { name: string; size: number }[] };
+  it('statsJson 产出 stats.json（带各文件体积）', async () => {
+    const { success, stats } = await load();
+    expect(success).toBeTruthy();
+
     expect(stats.assets.some((a) => a.name.endsWith('-entry.js'))).toBe(true);
     // 无样式的组件会产出空 .wxss，size 允许为 0，但必须是数字
     expect(
@@ -98,11 +110,8 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
   }, 300000);
 
   it('只配 maximumWarning → 构建成功但告警', async () => {
-    await setupFixture();
-    const result = await build('dist/vite-budget-warn', {
-      budgets: [{ type: 'any', maximumWarning: '1kb' }],
-    });
-    expect(result.result?.success).toBeTruthy();
-    expect(logsOf(result)).toContain('exceeded maximum budget');
+    const { success, logs } = await load();
+    expect(success).toBeTruthy();
+    expect(logs).toContain('exceeded maximum budget');
   }, 300000);
 });

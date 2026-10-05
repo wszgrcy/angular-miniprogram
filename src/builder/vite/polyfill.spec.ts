@@ -89,6 +89,8 @@ describe('AbortController polyfill 接入', () => {
         pages: DEFAULT_ANGULAR_CONFIG.pages,
         platform: PlatformType.wx,
         sourceMap: false,
+        // 与 localize-polyfill.build 用完全相同的输入，两边共用一份构建产物
+        polyfills: ['@angular/localize/init'],
       });
       if (!result.result?.success) {
         const errLogs = (result.logs || [])

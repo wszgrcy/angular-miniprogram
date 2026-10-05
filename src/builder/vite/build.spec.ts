@@ -1,3 +1,4 @@
+import type { TestProjectHost } from '@angular-devkit/architect/testing';
 import { join, normalize, virtualFs } from '@angular-devkit/core';
 import * as fs from 'fs-extra';
 import * as path from 'path';
@@ -13,6 +14,7 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
+import { memoize } from '../../../test/util/memoize';
 import { executeOnceShared } from '../../../test/util/shared-build';
 import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
@@ -24,37 +26,71 @@ import { runViteBuilder } from './index';
  * JS 侧的编译与注入是对的。
  */
 
-/** 构建一次，多个用例复用同一份产物（产物内容先读进内存，sandbox 随用例销毁） */
-function memoize<T>(fn: () => Promise<T>) {
-  let promise: Promise<T> | undefined;
-  return () => (promise = promise ?? fn());
+/** 两个 describe 块共用的 harness 形状（sandbox 内容必须一致才能复用构建） */
+interface BuildHarness {
+  host: TestProjectHost;
+  writeFile(path: string, content: string): Promise<void>;
+}
+
+/** 标准 fixture：整理目录 + 补入口。 */
+async function setupBase(harness: BuildHarness) {
+  const root = harness.host.root();
+  const myTestProjectHost = new MyTestProjectHost(harness.host);
+  const list = await myTestProjectHost.getFileList(
+    normalize(join(root, 'src', '__pages')),
+  );
+  list.push(
+    ...(await myTestProjectHost.getFileList(
+      normalize(join(root, 'src', '__components')),
+    )),
+  );
+  await myTestProjectHost.importPathRename(list);
+  await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
+  await myTestProjectHost.moveDir(
+    ALL_COMPONENT_NAME_LIST,
+    '__components',
+    'components',
+  );
+  await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
+}
+
+/**
+ * 写一个真的 import environment 的 page entry。
+ * 值要绑到组件属性上，否则会被 tree-shake 掉。
+ */
+async function writeEnvProbe(harness: BuildHarness) {
+  await harness.writeFile(
+    'src/pages/env-probe/env-probe.entry.ts',
+    `import { Component } from '@angular/core';
+import { environment } from '../../environments/environment';
+
+@Component({
+  selector: 'app-env-probe',
+  standalone: true,
+  template: '<view>{{ isProd }}</view>',
+})
+export class EnvProbeComponent {
+  isProd = environment.production;
+}
+
+export default EnvProbeComponent;
+`,
+  );
 }
 
 describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('vite: 构建链路', () => {
     /**
-     * 两条用例看的是同一次构建的不同侧面（JS 侧注入 / 资产产出），
-     * 构建参数完全一致，所以合成一次构建。
+     * 三条用例看的是同一次构建的不同侧面（JS 侧注入 / 资产产出 / fileReplacements
+     * 的对照组），构建参数与 fixture 完全一致，所以合成一次构建。
+     *
+     * 这里也写上 env-probe entry：它对本组断言无影响，但能让下面「不替换时保持 dev
+     * 值」的对照组命中同一份缓存——对照组与本次构建的差别只在 fileReplacements 参数。
      */
     const load = memoize(async () => {
       const root = harness.host.root();
-      const myTestProjectHost = new MyTestProjectHost(harness.host);
-      const list = await myTestProjectHost.getFileList(
-        normalize(join(root, 'src', '__pages')),
-      );
-      list.push(
-        ...(await myTestProjectHost.getFileList(
-          normalize(join(root, 'src', '__components')),
-        )),
-      );
-      await myTestProjectHost.importPathRename(list);
-      await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
-      await myTestProjectHost.moveDir(
-        ALL_COMPONENT_NAME_LIST,
-        '__components',
-        'components',
-      );
-      await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
+      await setupBase(harness);
+      await writeEnvProbe(harness);
 
       const result = await executeOnceShared(harness, 'build', {
         tsConfig: 'src/tsconfig.app.json',
@@ -73,7 +109,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       }
       expect(result.result?.success).toBeTruthy();
 
-      const files = await myTestProjectHost.getFileList(
+      const files = await new MyTestProjectHost(harness.host).getFileList(
         join(root, 'dist/vite-app'),
       );
       const read = async (p: string) =>
@@ -143,52 +179,13 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
 describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('vite: fileReplacements 端到端', () => {
     /**
-     * 造一个 page entry 真的 import environment，然后替换它，
-     * 最后去 dist 里看替换有没有生效。
-     *
      * 之前说「验不了」是错的——environment 不在 bundle 里只是因为
      * 现有 fixture 没有 page import 它，那是 fixture 的属性，
      * 不是 builder 的限制。自己写一个 entry 就能造出条件。
      */
     const setup = async () => {
-      const root = harness.host.root();
-      const myTestProjectHost = new MyTestProjectHost(harness.host);
-      const list = await myTestProjectHost.getFileList(
-        normalize(join(root, 'src', '__pages')),
-      );
-      list.push(
-        ...(await myTestProjectHost.getFileList(
-          normalize(join(root, 'src', '__components')),
-        )),
-      );
-      await myTestProjectHost.importPathRename(list);
-      await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
-      await myTestProjectHost.moveDir(
-        ALL_COMPONENT_NAME_LIST,
-        '__components',
-        'components',
-      );
-      await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
-
-      // 关键：写一个真的 import environment 的 page entry。
-      // 值要绑到组件属性上，否则会被 tree-shake 掉。
-      await harness.writeFile(
-        'src/pages/env-probe/env-probe.entry.ts',
-        `import { Component } from '@angular/core';
-import { environment } from '../../environments/environment';
-
-@Component({
-  selector: 'app-env-probe',
-  standalone: true,
-  template: '<view>{{ isProd }}</view>',
-})
-export class EnvProbeComponent {
-  isProd = environment.production;
-}
-
-export default EnvProbeComponent;
-`,
-      );
+      await setupBase(harness);
+      await writeEnvProbe(harness);
     };
 
     const readAllJs = (base: string) =>

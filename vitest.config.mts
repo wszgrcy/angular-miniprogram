@@ -1,3 +1,4 @@
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JavaScriptTransformer } from '@angular/build/private';
@@ -100,6 +101,29 @@ class OrderedSequencer extends BaseSequencer {
 }
 
 /**
+ * builder 的并发上限。
+ *
+ * 一次小程序构建 ≈ 2s，实测每个 fork 的构建要吃 ~1.2 个核（rolldown + esbuild
+ * 各自起线程/子进程）。核数开满反而更慢：16 核上 1 worker 98s、8 worker 34s、
+ * 16 worker 又回到 39s（互相抢核 + 抢同一块盘的 I/O）。所以按核数的一半取，
+ * 再封顶 8。
+ *
+ * 另一个天花板是内存：一个 fork 峰值 ~1GB（Angular 编译产物 + rolldown 图），
+ * 拿总内存除 1.5GB 卡一道，小机器上自动退到少并发甚至串行，而不是被 OOM 杀掉
+ * 后只拿到一句 worker exited。
+ *
+ * `MP_TEST_MAX_WORKERS` 覆盖它，`MP_TEST_MAX_WORKERS=1` 就是原来的串行，
+ * 排查「是不是并发串台」时拿它做对照。
+ */
+const BUILDER_MAX_WORKERS =
+  Number(process.env.MP_TEST_MAX_WORKERS) ||
+  Math.min(
+    8,
+    Math.max(1, Math.floor(os.availableParallelism() / 2)),
+    Math.max(1, Math.floor(os.totalmem() / (1.5 * 1024 * 1024 * 1024))),
+  );
+
+/**
  * 两类测试用 vitest 官方 `test.projects` 彻底分开，互不干扰。
  *
  * ### `library` —— Angular 运行时
@@ -108,8 +132,9 @@ class OrderedSequencer extends BaseSequencer {
  *
  * ### `builder` —— 构建链路
  * 真的跑一遍小程序构建：architect 的 `TestProjectHost` 会在仓库里开真实
- * 临时目录写文件，并发会互相踩；产物又来自 `dist/`，彼此有读写依赖。
- * 所以必须：单进程串行 + 隔离关掉 + 分钟级超时 + 固定执行顺序。
+ * 临时目录写文件，产物又来自 `dist/`。sandbox 名字构造唯一、模板目录只读，
+ * 所以可以多 fork；但模块级注册表要求单文件粒度串行，所以
+ * `sequence.concurrent: false` + 分钟级超时 + 固定执行顺序。
  *
  * 两边共用的是根配置：`resolve.alias`（包自引用）与 `setupFiles` 里的小程序全局。
  * linker plugin 和 `server.deps.inline` **只给 library**，见下面注释。
@@ -147,30 +172,36 @@ const BUILDER_PROJECT: TestProjectInlineConfiguration = {
     testTimeout: 60_000,
     hookTimeout: 60_000,
     /**
-     * 执行模型：**串行**（`maxWorkers: 1`）。
+     * 执行模型：**多 fork，每个 fork 内部串行**。
      *
-     * sandbox 本身是隔离的：`TestProjectHost.initialize()` 每次用
-     * `claimUniqueSandboxRoot()` 以 `mkdir` 原子地占一个独立目录
-     * （`test/test-project-host-hello-world-app-<pid>-<序号>/`）。
+     * 时间几乎全花在构建上（四十次真构建 ≈ 78s，占整个 project 的八成；
+     * 重复输入已经被 `shared-build` 去重掉了），而构建是 CPU 密集的，
+     * 所以提速靠把 fork 铺开，不靠改用例。
      *
-     * 钉成串行是因为 spec 之间存在**跨文件的进程级依赖**：`@angular/core` 被
-     * vitest 外部化，一个 worker 里只有一份，而 Ivy 的 `TView` 状态（指令匹配 /
-     * `TNode.localNames` 等）是跨文件累加的。实测洗牌顺序下会随机碎
-     * `template-name-coverage.spec.ts`，**强制 `maxWorkers: 1` 加洗牌同样会碎**
-     * —— 即这是文件顺序依赖，不是并发竞态；`isolate: true` 也挡不住。
-     * 默认顺序（`OrderedSequencer`）下全绿，所以先钉串行。
+     * ## 并发为什么安全
      *
-     * `MP_TEST_MAX_WORKERS=N` 可以开并发，但上面那个顺序依赖没修之前不要这么跑。
+     * | 共享的东西 | 为什么不互踩 |
+     * | ---------- | ------------ |
+     * | sandbox 目录 | `claimUniqueSandboxRoot()` 用 `mkdir` 原子占坑，名字带 pid + 进程内序号，跨进程不可能重名 |
+     * | `test/.shared-build` | `publish()` 先写 tmp 再 `rename`，读侧要么看不见、要么看见完整一份；目录每轮由 `globalSetup` 抹掉 |
+     * | `test/hello-world-app`（模板） | 只读。唯一的写者是 `globalSetup`（库产物 + `node_modules/test-library`），跑在 worker 起跑之前 |
+     * | 仓库 `dist/` | 只读（`npm run build:library` 的产物） |
+     * | 模块级注册表（`manifest-registry`、`library-meta-store`） | `sequence.concurrent: false` 保证一个 worker 同一时刻只跑一个文件，跨文件也各自 reset |
+     * | 临时工作区 | 走 `fs.mkdtemp(os.tmpdir())` 的 spec（mp-config / options / library-meta-store）天然隔离 |
      *
-     * `isolate: false` + `sequence.concurrent: false`：同一个 worker 里 spec
-     * 共用模块图，`manifest-registry` 这类模块级注册表才不会串台。
+     * 以前钉串行是因为「洗牌顺序下随机碎 `template-name-coverage.spec.ts`」，
+     * 那是 Ivy `TView` 跨文件累加导致的**文件顺序依赖**，不是并发竞态。
+     * 现在 `--sequence.shuffle --maxWorkers=1` 已经稳定全绿，这条依赖不成立了。
+     *
+     * `isolate: false` 是构建去重的前提，不是可选项：`shared-build` 的记忆化表
+     * 挂在模块实例上，一 isolate 就每个文件一张新表，跨文件复用当场失效。
      */
     pool: 'forks',
-    maxWorkers: Number(process.env.MP_TEST_MAX_WORKERS) || 1,
+    maxWorkers: BUILDER_MAX_WORKERS,
     /**
      * worker 起跑前把 `test-library` 夹具构建出来，spec 之间不再有先后依赖
      * （见 `test/global-setup.ts`）。只给本 project：library 不碰磁盘也不碰
-     * `dist/`，让它白付那 4s 构建没道理。
+     * `dist/`，让它白付那 2s 构建没道理。
      */
     globalSetup: ['./test/global-setup.ts'],
     isolate: false,

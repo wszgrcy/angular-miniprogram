@@ -22,15 +22,17 @@ export const BUILD_TIMEOUT_MS = 60_000;
  * zoneless 看有没有 zone.js、control-flow 看 wxml 模板名、polyfill 看
  * require 顺序……于是同一件事被重复构建了七八遍。
  *
- * 这里按「构建输入」做进程内记忆化：命中就把上一次的产物目录拷进当前
- * sandbox，不再跑构建。
+ * 这里按「构建输入」做记忆化：命中就把上一次的产物目录拷进当前
+ * sandbox，不再跑构建。两层：进程内一张表，加上 `test/.shared-build` 下的
+ * 磁盘目录 —— 后者是给多 fork 用的：同一个输入被分到两个 worker 时，
+ * 后到的那个只拷贝，不再重构建。
  *
- * ## 为什么只在进程内，不落盘跨进程复用
+ * ## 缓存为什么只活在一轮 `npm test` 里
  *
- * 缓存键覆盖不了「构建器自己的源码变了」。一旦落盘，改了 `src/builder/**`
+ * 缓存键覆盖不了「构建器自己的源码变了」。一旦跳轮，改了 `src/builder/**`
  * 之后命中的还是旧产物 —— 构建没跑、断言全绿，是典型的假绿灯。
- * 进程内缓存没这个问题：一次 `npm test` 里构建器代码是固定的，
- * 输入相同 ⇒ 产物必然相同。
+ * `globalSetup` 每轮开头把 `test/.shared-build` 整个抹掉，缓存的生命周期
+ * 就刚好等于一次运行：期间构建器代码固定，输入相同 ⇒ 产物必然相同。
  *
  * ## 键里为什么不含 outputPath
  *
@@ -107,9 +109,13 @@ export async function executeOnceShared<T extends object>(
     return harness.executeOnce();
   }
   const key = stableKey(root, opts);
+  const dir = path.join(CACHE_ROOT, key);
 
-  const cached = cache.get(key);
-  if (cached && fs.existsSync(cached)) {
+  // 进程内表先走；miss 了再看磁盘 —— 同一个输入被分到另一个 worker 时，
+  // 那边已经（或正在）构建，拿现成的比重新跑一遍便宜。
+  const cached = cache.get(key) ?? (fs.existsSync(dir) ? dir : undefined);
+  if (cached) {
+    cache.set(key, cached);
     fs.rmSync(dest, { recursive: true, force: true });
     fs.mkdirSync(dest, { recursive: true });
     fs.cpSync(cached, dest, { recursive: true });
@@ -124,8 +130,8 @@ export async function executeOnceShared<T extends object>(
   const executed = await harness.executeOnce();
 
   if (executed.result?.success && fs.existsSync(dest)) {
-    publish(path.join(CACHE_ROOT, key), dest);
-    cache.set(key, path.join(CACHE_ROOT, key));
+    publish(dir, dest);
+    cache.set(key, dir);
   }
   return executed;
 }

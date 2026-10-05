@@ -11,6 +11,7 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
+import { memoize } from '../../../test/util/memoize';
 import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
@@ -73,30 +74,80 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       ...extra,
     } as never);
 
+  /**
+   * 有用户文件的一族：默认值打底 / 静态优先于 projectConfig 选项 / private 原样拷，
+   * 三条都是同一次构建的不同侧面，互不干扰。
+   *
+   * 静态那份的 appid 与 jsonc 里的不一样，所以「产物里是静态那份的 appid」这一个
+   * 断言同时钉住了「用户文件盖默认值」和「静态盖选项」两条优先级。
+   */
+  const privateConfig = { compileHotReLoad: true, miniprogramRoot: 'x/' };
+  const loadWithUserFile = memoize(async () => {
+    await setupFixture();
+    await write(
+      'src/project.config.json',
+      JSON.stringify({ appid: 'wx-custom-appid', setting: { es6: true } }),
+    );
+    await write(
+      'src/project.config.jsonc',
+      JSON.stringify({ appid: 'from-option', projectname: 'demo' }),
+    );
+    await write(
+      'src/project.private.config.json',
+      JSON.stringify(privateConfig),
+    );
+    build('dist/vite-project-merge', {
+      assets: [
+        ...(DEFAULT_ANGULAR_CONFIG.assets as Array<{ glob: string }>),
+        { glob: 'project.private.config.json', input: './src', output: './' },
+      ],
+      projectConfig: 'src/project.config.jsonc',
+    });
+    const result = await harness.executeOnce();
+    if (!result.result?.success) {
+      const errLogs = (result.logs || [])
+        .filter((l: { level: string }) => l.level === 'error')
+        .map((l: { message?: string }) => String(l.message));
+      console.log('PROJECT_ERR>>>' + errLogs.join(' ~~ ').slice(0, 4000));
+    }
+    expect(result.result?.success).toBeTruthy();
+
+    return {
+      project: JSON.parse(
+        await readOutput('dist/vite-project-merge/project.config.json'),
+      ) as Record<string, unknown>,
+      privateText: await readOutput(
+        'dist/vite-project-merge/project.private.config.json',
+      ),
+    };
+  });
+
+  /**
+   * 没用户文件的一族：appid 缺省值与 deriveCondition。deriveCondition 只是往产物里
+   * 多写一个 condition，不影响 appid / compileType；而「不开关时不生成 condition」
+   * 由 mp-config.spec 在单元层面钉住。
+   */
+  const loadWithoutUserFile = memoize(async () => {
+    await setupFixture();
+    build('dist/vite-project-default', {
+      assets: assetsWithout('project.config.json'),
+      deriveCondition: true,
+    });
+    const result = await harness.executeOnce();
+    expect(result.result?.success).toBeTruthy();
+
+    return JSON.parse(
+      await readOutput('dist/vite-project-default/project.config.json'),
+    ) as {
+      appid: string;
+      compileType: string;
+      condition: { miniprogram: { list: Array<{ pathName: string }> } };
+    };
+  });
+
   describe('vite: project 配置', () => {
     it('内置默认值打底，用户文件里有的按文件', async () => {
-      await setupFixture();
-      await write(
-        'src/project.config.json',
-        JSON.stringify({ appid: 'wx-custom-appid', setting: { es6: true } }),
-      );
-      build('dist/vite-project-merge');
-      const result = await harness.executeOnce();
-      if (!result.result?.success) {
-        const errLogs = (result.logs || [])
-          .filter((l: { level: string }) => l.level === 'error')
-          .map((l: { message?: string }) => String(l.message));
-        console.log('PROJECT_ERR>>>' + errLogs.join(' ~~ ').slice(0, 4000));
-      }
-      expect(result.result?.success).toBeTruthy();
-
-      const project = JSON.parse(
-        await readOutput('dist/vite-project-merge/project.config.json'),
-      ) as {
-        appid: string;
-        setting: Record<string, unknown>;
-        compileType: string;
-      };
+      const { project } = await loadWithUserFile();
       expect(project.appid).toBe('wx-custom-appid');
       expect(project.setting).toEqual({ es6: true });
       // 用户没写的字段由默认值补上
@@ -104,34 +155,13 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     }, 300000);
 
     it('没有用户文件时也能出一个可打开的 project 配置（appid 缺省值）', async () => {
-      await setupFixture();
-      build('dist/vite-project-default', {
-        assets: assetsWithout('project.config.json'),
-      });
-      const result = await harness.executeOnce();
-      expect(result.result?.success).toBeTruthy();
-
-      const project = JSON.parse(
-        await readOutput('dist/vite-project-default/project.config.json'),
-      ) as { appid: string; compileType: string };
+      const project = await loadWithoutUserFile();
       expect(project.appid).toBe('touristappid');
       expect(project.compileType).toBe('miniprogram');
     }, 300000);
 
     it('deriveCondition 打开后按页面生成调试启动项', async () => {
-      await setupFixture();
-      build('dist/vite-project-condition', {
-        assets: assetsWithout('project.config.json'),
-        deriveCondition: true,
-      });
-      const result = await harness.executeOnce();
-      expect(result.result?.success).toBeTruthy();
-
-      const project = JSON.parse(
-        await readOutput('dist/vite-project-condition/project.config.json'),
-      ) as {
-        condition: { miniprogram: { list: Array<{ pathName: string }> } };
-      };
+      const project = await loadWithoutUserFile();
       expect(project.condition.miniprogram.list.length).toBe(
         ALL_PAGE_NAME_LIST.length,
       );
@@ -141,47 +171,15 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     }, 300000);
 
     it('project.private.config.json 原样拷贝，不参与合并', async () => {
-      await setupFixture();
-      const privateConfig = { compileHotReLoad: true, miniprogramRoot: 'x/' };
-      await write(
-        'src/project.private.config.json',
-        JSON.stringify(privateConfig),
-      );
-      build('dist/vite-project-private', {
-        assets: [
-          ...(DEFAULT_ANGULAR_CONFIG.assets as Array<{ glob: string }>),
-          { glob: 'project.private.config.json', input: './src', output: './' },
-        ],
-      });
-      const result = await harness.executeOnce();
-      expect(result.result?.success).toBeTruthy();
-
-      const text = await readOutput(
-        'dist/vite-project-private/project.private.config.json',
-      );
-      expect(JSON.parse(text)).toEqual(privateConfig);
+      const { privateText } = await loadWithUserFile();
+      expect(JSON.parse(privateText)).toEqual(privateConfig);
     }, 300000);
 
     it('projectConfig 选项与静态文件合并，静态优先', async () => {
-      await setupFixture();
-      await write(
-        'src/project.config.json',
-        JSON.stringify({ appid: 'from-static' }),
-      );
-      await write(
-        'src/project.config.jsonc',
-        JSON.stringify({ appid: 'from-option', projectname: 'demo' }),
-      );
-      build('dist/vite-project-option', {
-        projectConfig: 'src/project.config.jsonc',
-      });
-      const result = await harness.executeOnce();
-      expect(result.result?.success).toBeTruthy();
-
-      const project = JSON.parse(
-        await readOutput('dist/vite-project-option/project.config.json'),
-      ) as { appid: string; projectname: string };
-      expect(project.appid).toBe('from-static');
+      const { project } = await loadWithUserFile();
+      // jsonc 里写的是 from-option，产物里是静态那份的值 => 静态优先
+      expect(project.appid).toBe('wx-custom-appid');
+      // 静态里没写的字段从选项补进来
       expect(project.projectname).toBe('demo');
     }, 300000);
   });
