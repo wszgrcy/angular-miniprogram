@@ -40,6 +40,11 @@ export default defineConfig({
           items: [
             nav('入口：页面 / 组件 / tabBar', 'Entries', '/guide/entry/'),
             nav(
+              '原生配置：mpComponentOptions',
+              'Native Component Options',
+              '/guide/mp-component-options/',
+            ),
+            nav(
               '配置文件：app.json / project 配置',
               'Config Files',
               '/guide/mp-config/',

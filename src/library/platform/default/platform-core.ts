@@ -11,6 +11,9 @@ import type {
   MiniProgramComponentInstance,
   MiniProgramComponentOptions,
   MiniProgramPageOptions,
+  MpComponentConfig,
+  MpComponentOptions,
+  MpPageOptions,
   NodePath,
 } from 'angular-miniprogram/platform/type';
 import { AgentNode } from './agent-node';
@@ -240,14 +243,7 @@ export class MiniProgramCoreFactory {
           }
           await action.bind(this)();
         };
-      const config: WechatMiniprogram.Component.Options<
-        {},
-        {},
-        {},
-        [],
-        {},
-        true
-      > = {
+      const config: MpComponentConfig<true> = {
         ...options,
         data: { hasLoad: false },
         options: { ...options?.options, multipleSlots: true },
@@ -396,9 +392,7 @@ export class MiniProgramCoreFactory {
       },
     );
   };
-  protected addNgComponentLinkLogic(
-    config: WechatMiniprogram.Component.Options<{}, {}, {}, []>,
-  ) {
+  protected addNgComponentLinkLogic(config: MpComponentConfig) {
     config.lifetimes = config.lifetimes || {};
     const oldCreate = config.lifetimes.created;
     config.lifetimes.created = function (this: MiniProgramComponentInstance) {
@@ -452,7 +446,7 @@ export class MiniProgramCoreFactory {
   }
   public componentRegistry = (component: Type<unknown>) => {
     const options = this.getComponentOptions(component) || {};
-    let config: WechatMiniprogram.Component.Options<{}, {}, {}, []> = {
+    let config: MpComponentConfig = {
       ...options,
       data: { hasLoad: false },
       options: { ...options?.options, multipleSlots: true },
@@ -494,19 +488,12 @@ export class MiniProgramCoreFactory {
   };
 
   protected getPageOptions(component: Type<unknown> & MiniProgramPageOptions) {
-    return component.mpPageOptions as WechatMiniprogram.Page.Options<{}, {}>;
+    return component.mpPageOptions as MpPageOptions;
   }
   protected getComponentOptions<T extends boolean = false>(
-    component: Type<unknown> & MiniProgramComponentOptions,
+    component: Type<unknown> & MiniProgramComponentOptions<T>,
   ) {
-    return component.mpComponentOptions as WechatMiniprogram.Component.Options<
-      {},
-      {},
-      {},
-      [],
-      {},
-      T
-    >;
+    return component.mpComponentOptions as MpComponentOptions<T>;
   }
 }
 

@@ -29,7 +29,8 @@ chunk，在那儿调用毫无意义。
 
 页面组件声明了 `static mpComponentOptions` 时，`bootstrapPage` 默认按
 `useComponent: true` 处理（那份配置只在 `Component()` 分支生效），
-所以「组件即页面」不需要额外声明。
+所以「组件即页面」不需要额外声明。那份配置单里哪些段生效见
+[原生配置](../mp-component-options/)。
 
 ## 2. 入口类型来自配置
 
