@@ -330,7 +330,24 @@ function lViewToWXView(
   for (let index = LVIEW.HEADER_OFFSET; index < end; index++) {
     const rel = index - LVIEW.HEADER_OFFSET;
     const item = lView[index];
-    if (item instanceof AgentNode) {
+    /**
+     * `#x` 的**影子槽**：`saveResolvedLocalsInData` 把 local ref 的值写进
+     * `lView[tNode.index + 1]`，那个槽里是**同一个 AgentNode**。
+     *
+     * 它不对应任何 wxml 元素（编译期 `prepareRefsArray` 同样为它占一个空槽
+     * 并跳过），所以两件事都不能做：
+     *
+     * - **不能重新打前缀**——后打的影子会把真前缀盖掉，于是节点自报的位置
+     *   比渲染位置大 1：可查询 class 与路径式 setData 一起落到没人读的那个
+     *   槽上，`find()` 永远查不到。
+     * - **不能写 nodeList**——写进去就是把同一个节点的视图数据原样复制一份，
+     *   白占 setData 体积，还会让 diff 多比一份。
+     *
+     * 判据就一句：影子槽与它自己的元素槽**是同一个对象**，且紧贴在后面
+     * （`localIndex = tNode.index + 1`）。不依赖 `tView.data` 的形状。
+     */
+    const isRefShadow = item instanceof AgentNode && item === lView[index - 1];
+    if (item instanceof AgentNode && !isRefShadow) {
       // 顺手打路径前缀：这次遍历本来就要经过每个节点
       item.__pathPrefix = `${dataPrefix}[${rel}]`;
       if (mpRef) {
