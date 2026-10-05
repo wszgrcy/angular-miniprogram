@@ -1,5 +1,4 @@
 import type { BuilderContext } from '@angular-devkit/architect';
-import type { AssetPattern } from '@angular-devkit/build-angular';
 import type { Path } from '@angular-devkit/core';
 import * as fs from 'fs';
 import { CssUrl } from 'ng-packagr/src/lib/styles/stylesheet-processor';
@@ -30,8 +29,10 @@ import {
 import type { PagePattern } from '../../shared/type';
 import { toPosixPath } from '../../util/asset-path';
 import { transformMiniProgramStyle } from '../../util/mini-program-style';
-import { MpAppConfig, generateAppJson, validateAppConfig } from '../app-config';
-import { collectAssets } from '../copy-assets';
+import type { CopiedAsset } from '../copy-assets';
+import { mergeConfig } from '../merge-config';
+import type { MpConfigBundle } from '../mp-config';
+import { checkReferencedFiles } from '../mp-config';
 
 /**
  * 一个纯 node fs 的 ts.System。
@@ -74,6 +75,26 @@ export function createNodeTsSystem(
 }
 
 /**
+ * 读一份已有的 json 配置（页面 / 组件目录里用户自己写的那份）。
+ *
+ * 读不到就当空对象，构建器算出来的字段就是全部输出；不是对象直接报错，
+ * 静默丢掉用户内容比报错难查得多。
+ */
+function readJsonObject(
+  file: string | undefined,
+): Record<string, unknown> {
+  if (!file || !fs.existsSync(file)) {
+    return {};
+  }
+  const text = fs.readFileSync(file, 'utf8');
+  const parsed = JSON.parse(text) as unknown;
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`${file} 必须是一个 JSON 对象`);
+  }
+  return parsed as Record<string, unknown>;
+}
+
+/**
  * 顶替 webpack.Compiler。
  *
  * MiniProgramApplicationAnalysisService 实际只读两处：
@@ -104,13 +125,15 @@ export interface MiniProgramAssetsPluginOptions {
   watch?: boolean;
   /** 与 library-template 插件共享同一个实例，否则 scope 注册信息对不上 */
   templateScope?: LibraryTemplateScopeService;
-  /** builder 配置里的 assets，app.json / project.config.json 从这里来 */
-  assets?: AssetPattern[];
+  /** builder 配置里的 assets 展开结果（app.json / project.config.json 从这里来） */
+  assets?: CopiedAsset[];
   /**
-   * 结构化 app 配置源文件（相对 workspaceRoot）。
-   * 配置后由构建器编译生成 app.json，与 assets 里的静态 app.json 互斥。
+   * 解析好的配置文件（静态那份 + 结构化那份 + 构建器补的，已合并完）。
+   *
+   * 解析在 vite 配置组装前就做了，分包插件要用同一份结果；不传则配置文件
+   * 只能原样拷贝。
    */
-  appJson?: string;
+  mpConfigs?: MpConfigBundle;
   /** builder 配置里的全局样式，产出 app.wxss */
   styles?: (string | { input: string })[];
   /**
@@ -454,23 +477,20 @@ export function miniProgramAssetsPlugin(
       // 2. wxss：按组件把编译后的样式拼起来，再过一遍小程序兼容处理
       emitStyles(resolved, compiledStyles, emit, warnStyleOf);
 
-      // 3. json：合并组件目录里已存在的配置文件
+      // 3. json：用户已有的那份打底，构建器算出来的只补没写过的
       resolved.config.forEach((value, outPath) => {
-        let config: Record<string, unknown> = {};
-        if (value.existConfig && fs.existsSync(value.existConfig)) {
-          config = JSON.parse(fs.readFileSync(value.existConfig, 'utf8'));
-        }
-        config.component ??= value.component;
-        config.usingComponents = {
-          ...(config.usingComponents as Record<string, string> | undefined),
-          ...value.usingComponents.reduce(
-            (pre, cur) => {
-              pre[cur.selector] = cur.path;
-              return pre;
-            },
-            {} as Record<string, string>,
-          ),
-        };
+        const existing = readJsonObject(value.existConfig);
+        const usingComponents = value.usingComponents.reduce(
+          (pre, cur) => {
+            pre[cur.selector] = cur.path;
+            return pre;
+          },
+          {} as Record<string, string>,
+        );
+        const config = mergeConfig(existing, {
+          component: value.component,
+          usingComponents,
+        });
         emit(outPath, JSON.stringify(config));
       });
 
@@ -513,75 +533,44 @@ export function miniProgramAssetsPlugin(
         emit(key, content);
       }
 
-      // 8. builder 配置里的 assets（project.config.json 等）
-      if (
-        options.assets?.length &&
-        options.absoluteProjectRoot &&
-        options.absoluteProjectSourceRoot
-      ) {
-        const copied = await collectAssets(options.assets, {
-          workspaceRoot: options.workspaceRoot,
-          absoluteProjectRoot: options.absoluteProjectRoot,
-          absoluteProjectSourceRoot: options.absoluteProjectSourceRoot,
-        });
-        const appJsonName = `app${options.buildPlatform.fileExtname.config}`;
-        const hasStaticAppJson = copied.some(
-          (item) => toPosixPath(item.outputRelPath) === appJsonName,
-        );
-        if (options.appJson && hasStaticAppJson) {
-          this.error(
-            `appJson 配置与 assets 中的 ${appJsonName} 冲突：` +
-              `app 配置只能有一个来源，请删除 assets 里的 ${appJsonName} 或改用 appJson`,
-          );
+      // 8. builder 配置里的 assets。被合并流程接管的配置文件不能在这里拷，
+      //    否则会把合并结果盖回用户原文。
+      const consumed = options.mpConfigs?.consumedAssets ?? new Set<string>();
+      const emittedPaths = new Set<string>();
+      for (const item of options.assets ?? []) {
+        if (consumed.has(item.sourcePath)) {
+          continue;
         }
-        for (const item of copied) {
-          emit(item.outputRelPath, fs.readFileSync(item.sourcePath, 'utf8'));
-        }
+        const text = fs.readFileSync(item.sourcePath, 'utf8');
+        emit(item.outputRelPath, text);
+        emittedPaths.add(toPosixPath(item.outputRelPath));
       }
 
-      // 8.5 app.json 编译生成（#1）：结构化配置 + 编译期校验。
-      // 之前 app.json 是静态拷贝，页面不存在 / tabBar 野路径等错误
-      // 全部延后到开发者工具才能发现，这里前置拦截。
-      if (options.appJson) {
-        const appJsonName = `app${options.buildPlatform.fileExtname.config}`;
-        const appJsonPath = path.resolve(
-          options.workspaceRoot,
-          options.appJson,
+      // 8.5 配置文件输出：没有任何可合并内容时逐字节用用户那份原文
+      if (options.mpConfigs) {
+        for (const resolvedConfig of [
+          options.mpConfigs.app,
+          options.mpConfigs.project,
+        ]) {
+          const text =
+            resolvedConfig.verbatimText ??
+            `${JSON.stringify(resolvedConfig.config, null, 2)}\n`;
+          emit(resolvedConfig.filename, text);
+          emittedPaths.add(resolvedConfig.filename);
+        }
+        const missing = checkReferencedFiles(
+          options.mpConfigs.app.config,
+          emittedPaths,
         );
-        if (!fs.existsSync(appJsonPath)) {
-          this.error(`appJson 配置文件不存在: ${options.appJson}`);
+        if (missing.length) {
+          const message = `app 配置引用了产物里不存在的文件:\n  - ${missing.join('\n  - ')}`;
+          // 静态那份 app.json 是用户从别的项目搬过来的，漏拷一个文件不该停整个构建
+          if (options.mpConfigs.app.level === 'error') {
+            this.error(message);
+          } else {
+            this.warn(message);
+          }
         }
-        let appConfig: MpAppConfig;
-        try {
-          appConfig = JSON.parse(
-            fs.readFileSync(appJsonPath, 'utf8'),
-          ) as MpAppConfig;
-        } catch (e) {
-          this.error(
-            `appJson 配置 JSON 解析失败 ${options.appJson}: ${String(
-              (e as Error)?.message ?? e,
-            )}`,
-          );
-        }
-        const builtPagePaths = options.entryPatterns
-          .filter((p) => p.type === 'page')
-          .map((p) => toPosixPath(p.outputFiles.path));
-        const builtTabbarPaths = options.entryPatterns
-          .filter((p) => p.type === 'tabbar')
-          .map((p) => toPosixPath(p.outputFiles.path));
-        const errors = validateAppConfig(
-          appConfig,
-          builtPagePaths,
-          builtTabbarPaths,
-          options.buildPlatform.customTabbar,
-        );
-        if (errors.length) {
-          this.error(
-            `app 配置校验失败（${options.appJson}）:\n  - ` +
-              errors.join('\n  - '),
-          );
-        }
-        emit(appJsonName, generateAppJson(appConfig));
       }
 
       // 9. app.js：小程序没有模块系统，靠 app.js 里一串 require 把启动

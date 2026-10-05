@@ -1,9 +1,22 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { BuildPlatform } from '../platform';
+import { baiduProjectDefaults } from '../mp-project-defaults';
+import { BuildPlatform, type MpPlatformConfig } from '../platform';
 
 export class BdZnBuildPlatform extends BuildPlatform {
   packageName = 'bd';
+  mpConfig: MpPlatformConfig = {
+    projectFilename: 'project.swan.json',
+    subPackageKey: 'subPackages',
+    projectDefaults: baiduProjectDefaults,
+    capabilities: {
+      subpackages: true,
+      independentSubpackages: true,
+      darkmode: true,
+      customTabbar: false,
+    },
+  };
+
   globalObject = 'swan';
   globalVariablePrefix = 'swan.__window';
   fileExtname = {

@@ -39,6 +39,7 @@ chunk，在那儿调用毫无意义。
 | 入口来源 | 入口类型 | 构建器注入 |
 | --- | --- | --- |
 | `pages` | 页面 | `bootstrapPage(C)` |
+| `subpackages` | 页面（产物落分包目录，`output` 就是分包 root） | `bootstrapPage(C)` |
 | `customTabbar`（或产物落在平台的 tabBar 目录） | 自定义 tabBar | `bootstrapCustomTabbar(C)` |
 | 其余入口 | 组件 | `componentRegistry(C)` |
 
@@ -85,5 +86,7 @@ sourceRoot 镜像（`src/components/foo/foo.entry.ts` → `components/foo/foo-en
 入口文件名里的 `.entry` 会让位给平台写死的产物文件名 `index`：
 `index.entry.ts` → `custom-tab-bar/index.js`（支付宝则是 `customize-tab-bar/index.js`）。
 
-`app.json` 里开了开关却没产出对应组件，构建期直接报错，
-不会留到开发者工具里表现为「底部一片空白且不报错」。
+`app.json` 里的开关字段（`tabBar.custom` / `tabBar.customize`）由构建器按平台自动补：
+产出了自定义 tabBar 组件就打开对应开关，不需要你写。
+开关写着 `true` 但没产出组件也不报错——开关可能是你从另一份配置里合进来的，
+真正的错是 `tabBar.list` 里的 `pagePath` 指向不存在的页面，那条照旧拦。

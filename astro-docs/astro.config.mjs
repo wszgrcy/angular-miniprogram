@@ -40,6 +40,11 @@ export default defineConfig({
           items: [
             nav('入口：页面 / 组件 / tabBar', 'Entries', '/guide/entry/'),
             nav(
+              '配置文件：app.json / project 配置',
+              'Config Files',
+              '/guide/mp-config/',
+            ),
+            nav(
               '构建选项迁移',
               'Builder Options Migration',
               '/guide/migration-builder-options/',

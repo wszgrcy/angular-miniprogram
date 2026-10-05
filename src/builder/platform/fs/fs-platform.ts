@@ -1,6 +1,7 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { BuildPlatform } from '../platform';
+import { ttStyleProjectDefaults } from '../mp-project-defaults';
+import { BuildPlatform, type MpPlatformConfig } from '../platform';
 /**
  * 飞书小程序适配。
  *
@@ -10,6 +11,13 @@ import { BuildPlatform } from '../platform';
  */
 export class FsBuildPlatform extends BuildPlatform {
   packageName = 'fs';
+  mpConfig: MpPlatformConfig = {
+    projectFilename: 'project.config.json',
+    subPackageKey: 'subpackages',
+    projectDefaults: ttStyleProjectDefaults,
+    capabilities: { subpackages: true, customTabbar: false },
+  };
+
   globalObject = 'tt';
   globalVariablePrefix = 'tt.__window';
   fileExtname = {

@@ -14,7 +14,7 @@ import {
   type MpEntryType,
   isCustomTabbarOutput,
 } from '../shared/entry-component';
-import type { PagePattern } from '../shared/type';
+import type { MpSubPackagePattern, PagePattern } from '../shared/type';
 import { normalizeAssetPatternsSafe, toPosixPath } from '../util/asset-path';
 import { mpEntryVirtualId } from './plugins/entry-bootstrap.plugin';
 
@@ -173,6 +173,8 @@ export async function generateModuleInfo(
 
 export interface EntryPatternResult {
   pageList: PagePattern[];
+  /** 分包页面入口（身份仍是页面，只是产物落在分包目录） */
+  subPackageList: PagePattern[];
   componentList: PagePattern[];
   tabbarList: PagePattern[];
 }
@@ -257,6 +259,8 @@ export function tsConfigFileNames(tsconfigPath: string): Set<string> {
 
 export async function generateEntryPatterns(options: {
   pages: AssetPattern[];
+  /** 分包入口：pattern 的 output 就是分包 root */
+  subpackages?: MpSubPackagePattern[];
   customTabbar?: AssetPattern[];
   workspaceRoot: string;
   context: BuilderContext;
@@ -277,6 +281,23 @@ export async function generateEntryPatterns(options: {
     roots,
     options.buildPlatform,
   );
+  // 分包入口身份就是页面，只是产物落在分包目录；root 由 pattern 的 output 决定
+  const subPackageList = await generateModuleInfo(
+    options.subpackages || [],
+    'page',
+    roots,
+    options.buildPlatform,
+  );
+  if (
+    subPackageList.length &&
+    options.buildPlatform.mpConfig?.capabilities?.subpackages === false
+  ) {
+    throw new Error(
+      `${options.buildPlatform.packageName} 平台不支持分包，` +
+        `但 subpackages 配了 ${subPackageList.length} 个入口：` +
+        '请删掉 subpackages 配置，或把这些入口改回 pages',
+    );
+  }
   const tabbarDir = options.buildPlatform.customTabbar?.dir;
   const tabbarList = await generateModuleInfo(
     options.customTabbar?.length
@@ -302,10 +323,12 @@ export async function generateEntryPatterns(options: {
         '\n请删掉 customTabbar 配置，或把入口改成普通组件入口',
     );
   }
-  // 组件 glob 是「整个 sourceRoot」，pages / tabBar 已经认领的入口必须剔掉，
+  // 组件 glob 是「整个 sourceRoot」，pages / 分包页 / tabBar 已经认领的入口必须剔掉，
   // 否则同一个文件会被两个 pattern 各产一份产物
   const claimed = new Set(
-    [...pageList, ...tabbarList].map((item) => path.normalize(item.src)),
+    [...pageList, ...subPackageList, ...tabbarList].map((item) =>
+      path.normalize(item.src),
+    ),
   );
   const program = tsConfigFileNames(
     path.resolve(options.workspaceRoot, options.tsConfig),
@@ -325,7 +348,7 @@ export async function generateEntryPatterns(options: {
       (!program.size || program.has(path.normalize(item.src))),
   );
 
-  return { pageList, componentList, tabbarList };
+  return { pageList, subPackageList, componentList, tabbarList };
 }
 
 /**

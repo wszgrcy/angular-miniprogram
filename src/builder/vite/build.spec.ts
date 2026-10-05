@@ -127,8 +127,13 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const [, someWxml] = wxml[0];
       expect(someWxml.trim().length).toBeGreaterThan(0);
 
-      // json 应该是合法 JSON 且带 usingComponents
-      const someJson = JSON.parse(json[0][1]);
+      // 页面 / 组件的 json 应该合法且带 usingComponents（app.json 是另一类文件，不比它）
+      const pageJson = json.filter(([p]) => {
+        const base = p.split(/[\\/]/).pop();
+        return base !== 'app.json' && base !== 'project.config.json';
+      });
+      expect(pageJson.length).toBeGreaterThan(0);
+      const someJson = JSON.parse(pageJson[0][1]);
       expect(someJson).toBeTruthy();
       expect(typeof someJson.usingComponents).toBe('object');
     }, 300000);

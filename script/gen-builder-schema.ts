@@ -193,6 +193,35 @@ const LOCAL: Record<string, unknown> = {
     default: [],
     items: { $ref: '#/definitions/assetPattern' },
   },
+  subpackages: {
+    type: 'array',
+    description:
+      '分包入口：写法与 pages 一样，output 就是分包 root（约定 root 同时是源码目录' +
+      '与产物目录）。配了就不用在 app 配置里写 subpackages：root 取 output，' +
+      '分包页由扫出来的入口算；自己写了同一个 root 就以自己那份为准',
+    items: {
+      type: 'object',
+      properties: {
+        glob: { type: 'string', description: '匹配入口文件的 glob' },
+        input: { type: 'string', description: '源目录' },
+        output: {
+          type: 'string',
+          description: '分包 root（同时是产物目录）',
+        },
+        ignore: {
+          description: 'An array of globs to ignore.',
+          type: 'array',
+          items: { type: 'string' },
+        },
+        independent: {
+          type: 'boolean',
+          description: '独立分包：不依赖主包即可运行',
+        },
+      },
+      required: ['glob', 'input', 'output'],
+      additionalProperties: false,
+    },
+  },
   customTabbar: {
     type: 'array',
     description:
@@ -209,8 +238,30 @@ const LOCAL: Record<string, unknown> = {
   appJson: {
     type: 'string',
     description:
-      '结构化 app 配置源文件（相对 workspaceRoot）。配置后由构建器编译生成 ' +
-      'app.json（含页面/tabBar/分包校验），与 assets 中的静态 app.json 互斥。',
+      '结构化 app 配置源文件（相对 workspaceRoot）。与 assets 里的静态 app.json ' +
+      '不是二选一：静态那份是底稿，本文件只写要补的字段，已写过的 key 不动，' +
+      'pages 追加。环境不同就换这个文件，平台不同用文件里的 _platform 段。',
+  },
+  projectConfig: {
+    type: 'string',
+    description:
+      '结构化 project 配置源文件（相对 workspaceRoot），只影响 project 配置文件。' +
+      '与 appJson 各管一个输出文件，字段不互通；没写的字段由内置默认值打底。',
+  },
+  appJsonValidate: {
+    type: 'string',
+    enum: ['error', 'warn', 'off'],
+    default: 'error',
+    description:
+      'app 配置校验严格度。只作用于 appJson 通道；只有静态 app.json 的工程固定 warn' +
+      '（那是从别的项目搬过来的，合规与否不由我们负责）。off 用于先绕过校验把工程跑起来。',
+  },
+  deriveCondition: {
+    type: 'boolean',
+    default: false,
+    description:
+      '自动生成 project 配置的调试启动项（condition），开发者工具的「编译模式」' +
+      '会列出全部页面。只是方便一下，需要精确控制启动参数仍在 projectConfig 里写。',
   },
   nativeComponentsDir: {
     type: 'string',
@@ -283,11 +334,11 @@ function pickUpstream(
         `上游删字段了，请同步本脚本的 INHERIT / OVERRIDE 表。`,
     );
   }
-  const overlap = Object.keys(override).filter((key) =>
-    inherit.includes(key),
-  );
+  const overlap = Object.keys(override).filter((key) => inherit.includes(key));
   if (overlap.length) {
-    throw new Error(`字段同时出现在 INHERIT 和 OVERRIDE：${overlap.join(', ')}`);
+    throw new Error(
+      `字段同时出现在 INHERIT 和 OVERRIDE：${overlap.join(', ')}`,
+    );
   }
 
   const properties: Record<string, unknown> = {};
@@ -310,7 +361,9 @@ interface Generated {
 }
 
 function buildApplicationSchema(): Generated {
-  const { schema: upstream, version } = readUpstream(APPLICATION_SCHEMA_SUBPATH);
+  const { schema: upstream, version } = readUpstream(
+    APPLICATION_SCHEMA_SUBPATH,
+  );
   return {
     version,
     schema: {

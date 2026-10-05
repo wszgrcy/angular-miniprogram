@@ -78,10 +78,16 @@ describe('@angular/localize/init 注入', () => {
     });
 
     it('条目逐条 import，顺序保持，我们那份在最前', () => {
-      const code = polyfillEntryContents('/abs/polyfill-entry.js', ['a', 'b'], '/w');
+      const code = polyfillEntryContents(
+        '/abs/polyfill-entry.js',
+        ['a', 'b'],
+        '/w',
+      );
       expect(code).toContain('import "a";');
       expect(code).toContain('import "b";');
-      expect(code.indexOf('polyfill-entry.js')).toBeLessThan(code.indexOf('"a"'));
+      expect(code.indexOf('polyfill-entry.js')).toBeLessThan(
+        code.indexOf('"a"'),
+      );
       expect(code.indexOf('"a"')).toBeLessThan(code.indexOf('"b"'));
     });
 
@@ -155,70 +161,79 @@ describe('@angular/localize/init 注入', () => {
   });
 
   describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
-    it('声明后 polyfills.js 里真的带上了 $localize', async () => {
-      const root = harness.host.root();
-      const h = new MyTestProjectHost(harness.host);
-      const list = await h.getFileList(normalize(join(root, 'src', '__pages')));
-      list.push(
-        ...(await h.getFileList(normalize(join(root, 'src', '__components')))),
-      );
-      await h.importPathRename(list);
-      await h.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
-      await h.moveDir(ALL_COMPONENT_NAME_LIST, '__components', 'components');
-      await h.addPageEntry(ALL_PAGE_NAME_LIST);
+    it(
+      '声明后 polyfills.js 里真的带上了 $localize',
+      async () => {
+        const root = harness.host.root();
+        const h = new MyTestProjectHost(harness.host);
+        const list = await h.getFileList(
+          normalize(join(root, 'src', '__pages')),
+        );
+        list.push(
+          ...(await h.getFileList(
+            normalize(join(root, 'src', '__components')),
+          )),
+        );
+        await h.importPathRename(list);
+        await h.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
+        await h.moveDir(ALL_COMPONENT_NAME_LIST, '__components', 'components');
+        await h.addPageEntry(ALL_PAGE_NAME_LIST);
 
-      const result = await executeOnceShared(harness, 'build', {
-        tsConfig: 'src/tsconfig.app.json',
-        outputPath: 'dist/vite-localize',
-        pages: DEFAULT_ANGULAR_CONFIG.pages,
-        platform: PlatformType.wx,
-        sourceMap: false,
-        polyfills: ['@angular/localize/init'],
-      });
-      expect(result.result?.success).toBeTruthy();
+        const result = await executeOnceShared(harness, 'build', {
+          tsConfig: 'src/tsconfig.app.json',
+          outputPath: 'dist/vite-localize',
+          pages: DEFAULT_ANGULAR_CONFIG.pages,
+          platform: PlatformType.wx,
+          sourceMap: false,
+          polyfills: ['@angular/localize/init'],
+        });
+        expect(result.result?.success).toBeTruthy();
 
-      const names = (await h.getFileList(join(root, 'dist/vite-localize'))).map(
-        String,
-      );
-      const p = names.find((n) => n.endsWith('polyfills.js'));
-      expect(p).toBeTruthy();
-      const code = virtualFs.fileBufferToString(
-        await harness.host.read(normalize(p!)).toPromise(),
-      );
-      /**
-       * init 的全部内容就是往全局上挂 `$localize`；define 已把 `globalThis`
-       * 换成 `wx.__window`，所以两边必须同时出现。
-       */
-      expect(code).toContain('AbortController');
-      expect(code).toMatch(/\$localize/);
-      expect(code).toContain('wx.__window');
+        const names = (
+          await h.getFileList(join(root, 'dist/vite-localize'))
+        ).map(String);
+        const p = names.find((n) => n.endsWith('polyfills.js'));
+        expect(p).toBeTruthy();
+        const code = virtualFs.fileBufferToString(
+          await harness.host.read(normalize(p!)).toPromise(),
+        );
+        /**
+         * init 的全部内容就是往全局上挂 `$localize`；define 已把 `globalThis`
+         * 换成 `wx.__window`，所以两边必须同时出现。
+         */
+        expect(code).toContain('AbortController');
+        expect(code).toMatch(/\$localize/);
+        expect(code).toContain('wx.__window');
 
-      /**
-       * `Node` 的 define 是否真的作用进了 @angular/core。
-       *
-       * `walkIcuTree` 的 `case Node.TEXT_NODE` 不在 ngDevMode 守卫里，
-       * 生产也要，所以这条必须落实；`assertDomNode` 的 `instanceof Node`
-       * 同理（仅 ngDevMode）。
-       */
-      const all = (
-        await Promise.all(
-          names
-            .filter((n) => n.endsWith('.js'))
-            .map((n) => harness.host.read(normalize(String(n))).toPromise()),
+        /**
+         * `Node` 的 define 是否真的作用进了 @angular/core。
+         *
+         * `walkIcuTree` 的 `case Node.TEXT_NODE` 不在 ngDevMode 守卫里，
+         * 生产也要，所以这条必须落实；`assertDomNode` 的 `instanceof Node`
+         * 同理（仅 ngDevMode）。
+         */
+        const all = (
+          await Promise.all(
+            names
+              .filter((n) => n.endsWith('.js'))
+              .map((n) => harness.host.read(normalize(String(n))).toPromise()),
+          )
         )
-      )
-        .map(virtualFs.fileBufferToString)
-        .join('\n');
-      // 换成了表上的 AgentNode
-      expect(all).toMatch(/wx\.__window\.AgentNode\.(TEXT_NODE|COMMENT_NODE)/);
-      // 而且表上真的有：agent-node.ts 的 `globalThis.AgentNode = AgentNode`
-      // 被 define 改写后的形态
-      expect(all).toMatch(/wx\.__window\.AgentNode\s*=/);
-      // 可执行代码里不该再剩裸 `Node`（`instanceof Node` 是最典型的一处）
-      expect(all).not.toMatch(/instanceof\s+(?!\w+\.)Node\b/);
-    }, BUILD_TIMEOUT_MS);
+          .map(virtualFs.fileBufferToString)
+          .join('\n');
+        // 换成了表上的 AgentNode
+        expect(all).toMatch(
+          /wx\.__window\.AgentNode\.(TEXT_NODE|COMMENT_NODE)/,
+        );
+        // 而且表上真的有：agent-node.ts 的 `globalThis.AgentNode = AgentNode`
+        // 被 define 改写后的形态
+        expect(all).toMatch(/wx\.__window\.AgentNode\s*=/);
+        // 可执行代码里不该再剩裸 `Node`（`instanceof Node` 是最典型的一处）
+        expect(all).not.toMatch(/instanceof\s+(?!\w+\.)Node\b/);
+      },
+      BUILD_TIMEOUT_MS,
+    );
   });
-
 });
 
 /**

@@ -1,10 +1,28 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { BuildPlatform, type CustomTabbarSpec } from '../platform';
+import { wxStyleProjectDefaults } from '../mp-project-defaults';
+import {
+  BuildPlatform,
+  type CustomTabbarSpec,
+  type MpPlatformConfig,
+} from '../platform';
 
 export class WxBuildPlatform extends BuildPlatform {
   packageName = 'wx';
   customTabbar: CustomTabbarSpec = { dir: 'custom-tab-bar', flag: 'custom' };
+
+  mpConfig: MpPlatformConfig = {
+    projectFilename: 'project.config.json',
+    subPackageKey: 'subpackages',
+    projectDefaults: wxStyleProjectDefaults,
+    capabilities: {
+      subpackages: true,
+      independentSubpackages: true,
+      workers: true,
+      darkmode: true,
+      customTabbar: true,
+    },
+  };
 
   globalObject = 'wx';
   globalVariablePrefix = 'wx.__window';

@@ -80,9 +80,9 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     ) as { assets: { name: string; size: number }[] };
     expect(stats.assets.some((a) => a.name.endsWith('-entry.js'))).toBe(true);
     // 无样式的组件会产出空 .wxss，size 允许为 0，但必须是数字
-    expect(stats.assets.every((a) => Number.isFinite(a.size) && a.size >= 0)).toBe(
-      true,
-    );
+    expect(
+      stats.assets.every((a) => Number.isFinite(a.size) && a.size >= 0),
+    ).toBe(true);
     expect(stats.assets.reduce((sum, a) => sum + a.size, 0)).toBeGreaterThan(0);
     // stats.json 不参与自己的体积核算
     expect(stats.assets.some((a) => a.name === 'stats.json')).toBe(false);

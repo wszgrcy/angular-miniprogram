@@ -9,7 +9,6 @@ import {
 
 describe('app-config: 校验', () => {
   const builtPages = ['pages/index/index', 'pages/about/about'];
-  const WX_TABBAR = { dir: 'custom-tab-bar', flag: 'custom' } as const;
 
   it('合法配置通过校验', () => {
     const config: MpAppConfig = {
@@ -131,13 +130,15 @@ describe('app-config: 校验', () => {
       {
         pages: ['pages/index/index'],
         tabBar: { list: [{ text: 'x' }] },
-      },
+      } as unknown as MpAppConfig,
       builtPages,
     );
     expect(errors.some((e) => e.includes('缺少 pagePath'))).toBe(true);
   });
 
-  it('tabBar.custom 为真但没产出 custom-tab-bar/index 报错', () => {
+  // 开关与「本次有没有产出」的组合在 derive 阶段处理（见 mp-config.spec.ts），
+  // 校验层不再管这个开关：用户写了什么就输出什么
+  it('tabBar.custom 为真但没产出 custom-tab-bar/index 也不报错', () => {
     const errors = validateAppConfig(
       {
         pages: ['pages/index/index'],
@@ -147,12 +148,8 @@ describe('app-config: 校验', () => {
         },
       },
       builtPages,
-      [],
-      WX_TABBAR,
     );
-    expect(
-      errors.some((e) => e.includes('没有产出 custom-tab-bar/index')),
-    ).toBe(true);
+    expect(errors).toEqual([]);
   });
 
   it('tabBar.custom 为真且已产出 tabBar 入口时不报错', () => {
@@ -164,16 +161,13 @@ describe('app-config: 校验', () => {
           list: [{ pagePath: 'pages/index/index', text: 'x' }],
         },
       },
-      builtPages,
-      ['custom-tab-bar/index'],
-      WX_TABBAR,
+      [...builtPages, 'custom-tab-bar/index'],
     );
     expect(errors).toEqual([]);
   });
 
-  // 支付宝的目录名和开关字段都和微信系不同，校验必须跟着平台走
-  it('支付宝看 tabBar.customize 和 customize-tab-bar/index', () => {
-    const zfb = { dir: 'customize-tab-bar', flag: 'customize' } as const;
+  // 支付宝的开关字段名不同，但校验层不看字段名，只看 pages
+  it('支付宝的 tabBar.customize 同样不参与校验', () => {
     const config: MpAppConfig = {
       pages: ['pages/index/index'],
       tabBar: {
@@ -181,33 +175,14 @@ describe('app-config: 校验', () => {
         list: [{ pagePath: 'pages/index/index', text: 'x' }],
       },
     };
-    expect(validateAppConfig(config, builtPages, [], zfb)).toEqual([
-      expect.stringContaining('没有产出 customize-tab-bar/index'),
-    ]);
-    expect(
-      validateAppConfig(config, builtPages, ['customize-tab-bar/index'], zfb),
-    ).toEqual([]);
+    expect(validateAppConfig(config, builtPages)).toEqual([]);
     // 微信的 custom 在支付宝上不算数
     expect(
       validateAppConfig(
         { ...config, tabBar: { custom: true, list: [] } },
         builtPages,
-        [],
-        zfb,
       ),
     ).toEqual([]);
-  });
-
-  it('平台不支持自定义 tabBar 时不校验这一项', () => {
-    const errors = validateAppConfig(
-      {
-        pages: ['pages/index/index'],
-        tabBar: { custom: true, list: [{ pagePath: 'pages/index/index' }] },
-      },
-      builtPages,
-      [],
-    );
-    expect(errors).toEqual([]);
   });
 
   it('preloadRule 指向不存在页面报错', () => {

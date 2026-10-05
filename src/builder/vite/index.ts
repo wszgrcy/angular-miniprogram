@@ -2,7 +2,6 @@ import type { BuilderContext, BuilderOutput } from '@angular-devkit/architect';
 import { createBuilder } from '@angular-devkit/architect';
 import type { AssetPattern } from '@angular-devkit/build-angular';
 import { getSystemPath } from '@angular-devkit/core';
-import * as fs from 'fs';
 import * as path from 'path';
 import { Observable } from 'rxjs';
 import { Injector } from 'static-injector';
@@ -17,13 +16,21 @@ import type { WxsAnalysisRef } from '../mini-program-compiler/type';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
 import { LibraryTemplateScopeService } from '../shared/library-template-scope.service';
+import type { MpSubPackagePattern } from '../shared/type';
 import type { BudgetEntry } from '../util/angular-build-compat';
-import { getSubPackages } from './app-config';
+import { toPosixPath } from '../util/asset-path';
+import { type MpAppConfig, getSubPackages } from './app-config';
 import {
   generateEntryPatterns,
   resolveProjectRoots,
   toRollupInput,
 } from './entry-patterns';
+import type { MpConfigValidateLevel } from './mp-config';
+import {
+  groupSubPackages,
+  prepareMpConfigs,
+  reportMpConfigDiagnostics,
+} from './mp-config';
 import {
   type OptimizationOption,
   type OutputHashing,
@@ -44,10 +51,7 @@ import { libraryTemplatePlugin } from './plugins/library-template.plugin';
 import { miniProgramAssetsPlugin } from './plugins/mini-program-assets.plugin';
 import { nativeComponentsPlugin } from './plugins/native-components.plugin';
 import { platformFileResolvePlugin } from './plugins/platform-file-resolve.plugin';
-import {
-  readAppConfig,
-  subpackageChunkPlugin,
-} from './plugins/subpackage-chunk.plugin';
+import { subpackageChunkPlugin } from './plugins/subpackage-chunk.plugin';
 import { wxsStripPlugin } from './plugins/wxs-strip.plugin';
 import { tsConfigPathsToAliases } from './tsconfig-paths';
 import {
@@ -61,6 +65,17 @@ export interface ViteMiniProgramBuildOptions {
   tsConfig: string;
   outputPath: string;
   pages: AssetPattern[];
+  /**
+   * 分包入口：写法与 `pages` 一样，`output` 就是分包 root。
+   *
+   * 配了就不用在 app 配置里写 `subpackages`：root 取 `output`，分包页由扫出来的
+   * 入口算，`independent: true` 标独立分包。自己在 app 配置里写了同一个 root
+   * 就以自己那份为准，构建器只补漏写的子字段。
+   *
+   * 约定 root 同时是源码目录与产物目录（`src/packageA` → `packageA`），
+   * 分包专属 chunk 靠它归位。
+   */
+  subpackages?: MpSubPackagePattern[];
   /**
    * 自定义 tabBar 入口的**源文件位置**。
    *
@@ -96,10 +111,33 @@ export interface ViteMiniProgramBuildOptions {
   dedupe?: string[];
   /**
    * 结构化 app 配置源文件（相对 workspaceRoot，如 src/app.config.json）。
-   * 配置后由构建器编译生成 app.json（含页面/tabBar/分包校验），
-   * 与 assets 里的静态 app.json 互斥。不配则维持旧行为。
+   *
+   * 与 assets 里的静态 app.json **不是二选一**：静态那份是底稿，这个文件只写
+   * 要补的字段，已经写过的 key 一律不动，`pages` 是追加。环境不同就换这个文件
+   * （configurations 里改 `appJson`），平台不同用文件里的 `_platform` 段。
    */
   appJson?: string;
+  /**
+   * 结构化 project 配置源文件（相对 workspaceRoot）。
+   *
+   * 与 `appJson` 各管一个输出文件，字段不互通：两个文件的字段名有重叠风险，
+   * 混在一份里写错了不报错只是「改了没效果」。
+   */
+  projectConfig?: string;
+  /**
+   * app 配置校验严格度，默认 `error`。
+   *
+   * 只作用于 `appJson` 通道；只有静态 app.json 的工程固定 `warn`（那是从别的
+   * 项目搬过来的，合规与否我们控制不了）。`off` 用于先绕过校验把工程跑起来。
+   */
+  appJsonValidate?: MpConfigValidateLevel;
+  /**
+   * 自动生成 project 配置的调试启动项（`condition`）。默认关，只是方便一下。
+   *
+   * 开了之后开发者工具的「编译模式」会列出全部页面；需要精确控制启动参数
+   * 还是自己在 `projectConfig` 里写。
+   */
+  deriveCondition?: boolean;
   /**
    * 原生小程序自定义组件目录（相对 workspaceRoot，如 wxcomponents）。
    * 配置后整个目录拷进产物，模板里命中原生标签自动注入 usingComponents。
@@ -299,7 +337,9 @@ export function polyfillEntryContents(
     `globalThis.__mpPolyfills = __mpPolyfills;`,
   ];
   for (const entry of polyfills) {
-    lines.push(`import ${JSON.stringify(toPolyfillSpecifier(entry, workspaceRoot))};`);
+    lines.push(
+      `import ${JSON.stringify(toPolyfillSpecifier(entry, workspaceRoot))};`,
+    );
   }
   return lines.join('\n');
 }
@@ -391,6 +431,7 @@ export async function createMiniProgramViteConfig(options: {
 
   const entryPatterns = await generateEntryPatterns({
     pages: viteOptions.pages || [],
+    subpackages: viteOptions.subpackages,
     customTabbar: viteOptions.customTabbar,
     workspaceRoot: context.workspaceRoot,
     context,
@@ -399,12 +440,17 @@ export async function createMiniProgramViteConfig(options: {
   });
   const allEntries = [
     ...entryPatterns.pageList,
+    ...entryPatterns.subPackageList,
     ...entryPatterns.componentList,
     ...entryPatterns.tabbarList,
   ];
   context.logger.info(
     `[小程序构建] 平台 ${viteOptions.platform}，` +
-      `页面 ${entryPatterns.pageList.length} 个、` +
+      `页面 ${entryPatterns.pageList.length} 个` +
+      (entryPatterns.subPackageList.length
+        ? `（另分包内 ${entryPatterns.subPackageList.length} 个）`
+        : '') +
+      `、` +
       `组件 ${entryPatterns.componentList.length} 个、` +
       `自定义 tabBar ${entryPatterns.tabbarList.length} 个，` +
       `输出 ${viteOptions.outputPath}` +
@@ -419,25 +465,53 @@ export async function createMiniProgramViteConfig(options: {
   // 前者读后者注册的 useComponents / templateList
   const templateScope = new LibraryTemplateScopeService();
 
-  // 分包：从 appJson 解析分包配置，有分包时才挂分包插件
+  // 配置文件：静态那份 + 结构化那份 + 构建器补的，在这里算一次，之后所有消费方
+  // 读同一份结果。分包插件以前自己现读 appJson 文件，静态 app.json 里写的分包
+  // 它完全看不见，于是「写了分包但没拆」只能靠猜。
+  const builtPagePaths = [
+    ...entryPatterns.pageList,
+    ...entryPatterns.subPackageList,
+  ].map((p) => toPosixPath(p.outputFiles.path));
+  const builtTabbarPaths = entryPatterns.tabbarList.map((p) =>
+    toPosixPath(p.outputFiles.path),
+  );
+  // 分包声明不用手写：pattern 的 output 就是 root，pages 从扫出来的入口算。
+  // 用户自己在 app 配置里写了同一个 root 就以他那份为准。
+  const derivedSubPackages = groupSubPackages(
+    entryPatterns.subPackageList.map((p) => ({
+      path: toPosixPath(p.outputFiles.path),
+      root: p.output,
+      independent: p.independent,
+    })),
+  );
+  const mpConfigs = await prepareMpConfigs({
+    workspaceRoot: context.workspaceRoot,
+    platform: buildPlatform,
+    platformType: viteOptions.platform,
+    assetPatterns: viteOptions.assets,
+    absoluteProjectRoot,
+    absoluteProjectSourceRoot,
+    appJson: viteOptions.appJson,
+    projectConfig: viteOptions.projectConfig,
+    appJsonValidate: viteOptions.appJsonValidate,
+    deriveCondition: viteOptions.deriveCondition,
+    derivedSubPackages,
+    builtPagePaths,
+    builtTabbarPaths,
+  });
+  reportMpConfigDiagnostics(mpConfigs, context.logger);
+
+  // 分包：有分包才挂分包插件
   let subpackagePlugin: import('vite').Plugin[] = [];
-  if (viteOptions.appJson) {
-    const appConfigPath = path.resolve(
-      context.workspaceRoot,
-      viteOptions.appJson,
-    );
-    if (fs.existsSync(appConfigPath)) {
-      const appConfig = readAppConfig(appConfigPath);
-      if (getSubPackages(appConfig).length) {
-        subpackagePlugin = [
-          subpackageChunkPlugin({
-            appConfig,
-            sourceRoot: getSystemPath(absoluteProjectSourceRoot),
-            chunkFileNames: outputNames.chunkFileNames,
-          }),
-        ];
-      }
-    }
+  const appConfig = mpConfigs.app.config as MpAppConfig;
+  if (getSubPackages(appConfig).length) {
+    subpackagePlugin = [
+      subpackageChunkPlugin({
+        appConfig,
+        sourceRoot: getSystemPath(absoluteProjectSourceRoot),
+        chunkFileNames: outputNames.chunkFileNames,
+      }),
+    ];
   }
 
   // 该包是 ESM，esModuleInterop 下命名空间的 default 就是工厂函数；
@@ -528,8 +602,8 @@ export async function createMiniProgramViteConfig(options: {
         context,
         watch: !!viteOptions.watch,
         templateScope,
-        assets: viteOptions.assets,
-        appJson: viteOptions.appJson,
+        assets: mpConfigs.assets,
+        mpConfigs,
         styles: viteOptions.styles,
         inlineStyleLanguage: viteOptions.inlineStyleLanguage,
         absoluteProjectRoot,
@@ -678,6 +752,21 @@ function formatBuildError(error: unknown): string {
   return parts.join('\n');
 }
 
+/**
+ * 结构化配置选项指向的文件，watch 要显式盯上。
+ *
+ * 静态那份（assets 里的 app.json）通常在 sourceRoot 下，目录监听已经盖到；
+ * 这两个选项可以指到 sourceRoot 外面，不显式加进来就是「改了没反应」。
+ */
+export function mpConfigWatchFiles(
+  options: ViteMiniProgramBuildOptions,
+  workspaceRoot: string,
+): string[] {
+  return [options.appJson, options.projectConfig]
+    .filter((p): p is string => !!p)
+    .map((p) => path.resolve(workspaceRoot, p));
+}
+
 export function runViteBuilder(
   options: ViteMiniProgramBuildOptions,
   context: BuilderContext,
@@ -741,6 +830,7 @@ export function runViteBuilder(
         // 不用 Vite 原生 watch，因为 Rolldown watch 不支持动态加 input。
         const entryPatterns = await generateEntryPatterns({
           pages: options.pages || [],
+          subpackages: options.subpackages,
           customTabbar: options.customTabbar,
           workspaceRoot: context.workspaceRoot,
           context,
@@ -793,10 +883,12 @@ export function runViteBuilder(
             sourceRoot: getSystemPath(absoluteProjectSourceRoot),
             entrySrcPaths: [
               ...entryPatterns.pageList,
+              ...entryPatterns.subPackageList,
               ...entryPatterns.componentList,
               ...entryPatterns.tabbarList,
             ].map((p) => p.src),
           }),
+          files: mpConfigWatchFiles(options, context.workspaceRoot),
           factory,
           onChange: () => void rebuild(),
         });

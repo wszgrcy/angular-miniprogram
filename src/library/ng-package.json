@@ -17,7 +17,8 @@
     "ora",
     "static-injector",
     "vite",
-    "ws"
+    "ws",
+    "valibot"
   ],
   "lib": {
     "entryFile": "./platform/index.ts"

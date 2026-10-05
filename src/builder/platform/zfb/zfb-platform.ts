@@ -1,6 +1,15 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { BuildPlatform, type CustomTabbarSpec } from '../platform';
+import {
+  alipayNormalizeAppJson,
+  alipayNormalizeProjectJson,
+} from '../mp-config-normalize';
+import { alipayProjectDefaults } from '../mp-project-defaults';
+import {
+  BuildPlatform,
+  type CustomTabbarSpec,
+  type MpPlatformConfig,
+} from '../platform';
 
 export class ZfbBuildPlatform extends BuildPlatform {
   packageName = 'zfb';
@@ -8,6 +17,22 @@ export class ZfbBuildPlatform extends BuildPlatform {
   customTabbar: CustomTabbarSpec = {
     dir: 'customize-tab-bar',
     flag: 'customize',
+  };
+
+  mpConfig: MpPlatformConfig = {
+    projectFilename: 'mini.project.json',
+    projectOverrides: ['project.my.json'],
+    subPackageKey: 'subPackages',
+    projectDefaults: alipayProjectDefaults,
+    capabilities: {
+      subpackages: true,
+      independentSubpackages: true,
+      workers: true,
+      darkmode: true,
+      customTabbar: true,
+    },
+    normalizeAppJson: alipayNormalizeAppJson,
+    normalizeProjectJson: alipayNormalizeProjectJson,
   };
 
   globalObject = 'my';

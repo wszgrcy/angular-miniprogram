@@ -5,6 +5,8 @@ import * as path from 'path';
 import type { Plugin } from 'vite';
 import type { WxsAnalysisRef } from '../mini-program-compiler/type';
 import type { BuildPlatform, PlatformType } from '../platform/platform';
+import type { CopiedAsset } from '../vite/copy-assets';
+import type { MpConfigBundle } from '../vite/mp-config';
 import { miniProgramComponentTransformPlugin } from '../vite/plugins/component-transform.plugin';
 import { entryBootstrapPlugin } from '../vite/plugins/entry-bootstrap.plugin';
 import { libraryTemplatePlugin } from '../vite/plugins/library-template.plugin';
@@ -21,6 +23,9 @@ export interface MiniProgramTestStackOptions {
   tsConfig: string;
   pages: AssetPattern[];
   assets?: AssetPattern[];
+  /** assets 展开结果 + 解析好的配置文件，与 application 链路同一套 */
+  copiedAssets?: CopiedAsset[];
+  mpConfigs?: MpConfigBundle;
   styles?: (string | { input: string })[];
   watch: boolean;
   /** 引导入口的 chunk 名 */
@@ -29,6 +34,7 @@ export interface MiniProgramTestStackOptions {
   absoluteProjectSourceRoot: Path;
   entryPatterns: {
     pageList: unknown[];
+    subPackageList?: unknown[];
     componentList: unknown[];
     tabbarList?: unknown[];
   };
@@ -77,6 +83,7 @@ export function createMiniProgramTestStack(
   const templateScope = new LibraryTemplateScopeService();
   const allEntries = [
     ...options.entryPatterns.pageList,
+    ...(options.entryPatterns.subPackageList ?? []),
     ...options.entryPatterns.componentList,
     ...(options.entryPatterns.tabbarList ?? []),
   ] as never;
@@ -103,7 +110,8 @@ export function createMiniProgramTestStack(
         context: options.context,
         watch: options.watch,
         templateScope,
-        assets: options.assets,
+        assets: options.copiedAssets,
+        mpConfigs: options.mpConfigs,
         styles: options.styles,
         absoluteProjectRoot: options.absoluteProjectRoot,
         absoluteProjectSourceRoot: options.absoluteProjectSourceRoot,

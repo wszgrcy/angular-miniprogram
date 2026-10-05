@@ -2894,3 +2894,77 @@ ignore 列表并进 config 的 `ignores`。
   （`{errMsg: ...}`），原样 reject 是刻意的，行内 disable。
 - `ban-types` 在 v8 拆成 `no-empty-object-type` / `no-unsafe-function-type`，
   沿用原来 `ban-types: off` 的取舍一并关掉。
+
+## 配置文件合并（app.json / project 配置）
+
+用户写的配置文件与构建器生成的内容**是合并关系**，不是二选一。规则一句话：
+**写过的键一个字不动，没写的键才补**；唯一例外是 `pages`——用户的在前，
+构建器扫出来的追加在后面，按路径去重。
+
+代码分四层，各层职责不许串：
+
+| 文件 | 职责 |
+| --- | --- |
+| `vite/merge-config.ts` | 纯合并函数，不认识平台也不认识文件 |
+| `vite/config-schema.ts` | valibot 形状 + 形状校验 + `_platform` 检查 |
+| `vite/mp-config.ts` | 来源解析、合并顺序、派生条目、诊断汇总 |
+| `platform/platform.ts` 的 `mpConfig` | 平台事实（文件名、分包键、默认值、能力、改写） |
+
+几条必须守住的：
+
+- **合并函数不得改入参**。app 配置对象被分包插件、assets 插件、校验共用，
+  就地改一处会污染另一处。`mergeConfig` / `mergeDerived` / `unifySubPackageKey`
+  一律返回新对象，`merge-config.spec.ts` 里有「不改入参」的断言，别删。
+- **builder 里不写 `if (platform === 'zfb')`**。平台差异全部走 `mpConfig` 声明：
+  `projectFilename` / `subPackageKey` / `projectDefaults` / `capabilities` /
+  `normalizeAppJson` / `normalizeProjectJson`。环境差异走 angular.json 的 `configurations`。
+- **构建器不发明字段**，也不替用户填平台默认的 `window` / `style`。
+  唯一的例外是 project 配置的内置默认值（`compileType` 等「没有就打不开」的字段），
+  以及 `appid` 缺省 `touristappid`。
+- **校验对合并结果跑，不对源文件跑**。结构化选项通道按 `appJsonValidate`
+  （默认 error），只写静态 `app.json` 的通道固定 warn——那条通道读得到内容读不到意图，
+  拦太狠会卡死正常项目。
+- `_platform` / `$schema` 只存在于源文件，产物里必须没有（`stripInternalKeys`，
+  名单就是 `INTERNAL_KEYS`）；`_platform` 写了不存在的平台名是错误，不是忽略。
+
+### 派生条目
+
+`MP_CONFIG_SPECS[*].derive` 是一个有序表，每项 `{patch, deep?}`，在默认值之后按序补空。
+app 的顺序是 `subpackages` → `pages` → `customTabbarFlag`，不能换：
+`pages` 派生要**排除落在分包 root 下的入口**（那些是分包页，混进主包会被
+语义校验判成「分包页面与主包 pages 冲突」），所以分包声明得先到位；
+`condition` 在 project 那边，拿到的已是 app 的成品。
+
+`deep: true` 只给了 `customTabbarFlag`（要往用户已写的 `tabBar` 里塞 `custom`）
+和 `subpackages`（用户只写了 `root` 时要往里填 `pages`）——
+新条目默认用浅合并，别顺手都开 deep。
+
+追加型 key（`APPEND_KEYS`）目前两个：`pages` 按 `path` 认，`subpackages` 按 `root` 认。
+标识已存在的条目：非 deep 一个字不动，deep 只补它漏写的子字段。
+
+### 形状与 JSON Schema
+
+形状定义在 `config-schema.ts`，全部 `looseObject`：没列出的字段既不报错也不丢
+（平台字段一直在加）。同一份形状既用于构建期校验，也用 `@valibot/to-json-schema`
+生成 `src/builder/schemas/*.schema.json`（编辑器补全用）。那个目录会被
+`copy:assets` 整体拷进发布包，用户装完就能在 `node_modules/angular-miniprogram/builder/schemas/`
+里指给编辑器。**改了形状必须跑 `npm run gen:config-schema`**，
+`npm run check:schema` 会比对生成物，不一致直接失败。
+
+valibot 因此成了 builder 的运行时依赖，必须同时出现在
+`src/library/package.json` 的 `dependencies` 和 `ng-package.json` 的
+`allowedNonPeerDependencies` 里（见前面「builder 的运行时依赖」一节）。
+
+### 测试
+
+- 单元（快，先跑这些）：`merge-config.spec.ts`、`mp-config.spec.ts`、`app-config.spec.ts`
+- 集成（真跑 vite build）：`app-config.build.spec.ts`、`project-config.build.spec.ts`、
+  `subpackage.build.spec.ts`
+
+两个已知坑：
+
+- 现在**没有 assets 也会产出 `app.json`**（内容由扫出来的 pages 派生），
+  产物目录里 `app.json` 排序在页面 json 之前，`build.spec.ts` 里那种
+  「取第一个 json」的断言要先把 app.json / project.config.json 滤掉。
+- 集成测试里往 `pages` 追加一个不存在的页面路径会被语义校验拦下来
+  （「声明了但本次构建没有产出入口」），这是对的，别为了过测试放宽校验。

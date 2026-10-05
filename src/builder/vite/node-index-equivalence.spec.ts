@@ -375,51 +375,55 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
      * 但这一条已经能抓住「wxml 引用了 Angular 根本没分配的节点下标」
      * 这类错位——正是原架构最危险的失败模式。
      */
-    it('wxml 引用的每个下标都必须是 Angular 认定的真实节点下标', async () => {
-      const a = await loadArtifacts();
+    it(
+      'wxml 引用的每个下标都必须是 Angular 认定的真实节点下标',
+      async () => {
+        const a = await loadArtifacts();
 
-      const angularUniverse = new Set<number>();
-      for (const x of a.manifests) {
-        x.manifest.indices.forEach((i) => angularUniverse.add(i));
-      }
-      expect(
-        angularUniverse.size,
-        '没从任何 JS 里提取到节点下标，提取器可能失效',
-      ).toBeGreaterThan(0);
+        const angularUniverse = new Set<number>();
+        for (const x of a.manifests) {
+          x.manifest.indices.forEach((i) => angularUniverse.add(i));
+        }
+        expect(
+          angularUniverse.size,
+          '没从任何 JS 里提取到节点下标，提取器可能失效',
+        ).toBeGreaterThan(0);
 
-      const violations: string[] = [];
-      for (const w of a.wxmls) {
-        for (const idx of wxmlReferencedIndices(w.wxml)) {
-          if (!angularUniverse.has(idx)) {
-            violations.push(
-              `${w.rel}: 引用 nodeList[${idx}]，Angular 编译产物里无此节点下标`,
-            );
+        const violations: string[] = [];
+        for (const w of a.wxmls) {
+          for (const idx of wxmlReferencedIndices(w.wxml)) {
+            if (!angularUniverse.has(idx)) {
+              violations.push(
+                `${w.rel}: 引用 nodeList[${idx}]，Angular 编译产物里无此节点下标`,
+              );
+            }
           }
         }
-      }
 
-      /**
-       * 已知提取缺口清单。
-       *
-       * default-structural-directive 大量使用 ngIf/ngFor，其模板经
-       * Angular pipeline 改造后，部分节点下标当前提取器抓不到
-       * （hoisted 模板函数 / 嵌套嵌入式视图的引用形式）。
-       *
-       * 这是**提取器的局限**，不是已证实的渲染错位。
-       *
-       * 用「子集」断言而非直接忽略：清单只能缩小，不能扩大。
-       * 新增一个验证不了的 wxml 就会失败——防止缺口悄悄增长。
-       */
-      const KNOWN_EXTRACTION_GAPS = new Set<string>([]);
+        /**
+         * 已知提取缺口清单。
+         *
+         * default-structural-directive 大量使用 ngIf/ngFor，其模板经
+         * Angular pipeline 改造后，部分节点下标当前提取器抓不到
+         * （hoisted 模板函数 / 嵌套嵌入式视图的引用形式）。
+         *
+         * 这是**提取器的局限**，不是已证实的渲染错位。
+         *
+         * 用「子集」断言而非直接忽略：清单只能缩小，不能扩大。
+         * 新增一个验证不了的 wxml 就会失败——防止缺口悄悄增长。
+         */
+        const KNOWN_EXTRACTION_GAPS = new Set<string>([]);
 
-      const newGaps = [
-        ...new Set(violations.map((v) => v.split(':')[0])),
-      ].filter((f) => !KNOWN_EXTRACTION_GAPS.has(f));
+        const newGaps = [
+          ...new Set(violations.map((v) => v.split(':')[0])),
+        ].filter((f) => !KNOWN_EXTRACTION_GAPS.has(f));
 
-      expect({ newlyUnverifiableWxml: newGaps }).toEqual({
-        newlyUnverifiableWxml: [],
-      });
-    }, BUILD_TIMEOUT_MS);
+        expect({ newlyUnverifiableWxml: newGaps }).toEqual({
+          newlyUnverifiableWxml: [],
+        });
+      },
+      BUILD_TIMEOUT_MS,
+    );
 
     /**
      * 反向对照：证明这套断言**真的能抓到错位**，不是只会通过的摆设。
@@ -429,34 +433,40 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
      *
      * 没有这条，前面两条测试可能只是因为环境里恰好没有越界引用而假通过。
      */
-    it('反向对照：人为制造下标错位时，校验必须失败', async () => {
-      const a = await loadArtifacts();
-      const real = a.wxmls.find((w) => wxmlReferencedIndices(w.wxml).size > 0);
-      expect(real, '找不到带 nodeList 引用的 wxml').toBeDefined();
+    it(
+      '反向对照：人为制造下标错位时，校验必须失败',
+      async () => {
+        const a = await loadArtifacts();
+        const real = a.wxmls.find(
+          (w) => wxmlReferencedIndices(w.wxml).size > 0,
+        );
+        expect(real, '找不到带 nodeList 引用的 wxml').toBeDefined();
 
-      // 整体 +1000，模拟「运行时多占槽导致整体错位」
-      const shifted = real!.wxml.replace(
-        /nodeList\[(\d+)\]/g,
-        (_m, n) => `nodeList[${Number(n) + 1000}]`,
-      );
-      const shiftedIdx = wxmlReferencedIndices(shifted);
-      expect(shiftedIdx.size).toBeGreaterThan(0);
+        // 整体 +1000，模拟「运行时多占槽导致整体错位」
+        const shifted = real!.wxml.replace(
+          /nodeList\[(\d+)\]/g,
+          (_m, n) => `nodeList[${Number(n) + 1000}]`,
+        );
+        const shiftedIdx = wxmlReferencedIndices(shifted);
+        expect(shiftedIdx.size).toBeGreaterThan(0);
 
-      const universe = new Set<number>();
-      a.manifests.forEach((x) =>
-        x.manifest.indices.forEach((i) => universe.add(i)),
-      );
+        const universe = new Set<number>();
+        a.manifests.forEach((x) =>
+          x.manifest.indices.forEach((i) => universe.add(i)),
+        );
 
-      const orphans = [...shiftedIdx].filter((i) => !universe.has(i));
+        const orphans = [...shiftedIdx].filter((i) => !universe.has(i));
 
-      expect(
-        orphans.length,
-        `人为把 wxml 下标整体 +1000 后，所有引用都应识别为错位。` +
-          `识别出 ${orphans.length}/${shiftedIdx.size} 个——` +
-          `若为 0 说明这套校验抓不住错位，是假测试`,
-      ).toBe(shiftedIdx.size);
-      expect(orphans.length).toBeGreaterThan(0);
-    }, BUILD_TIMEOUT_MS);
+        expect(
+          orphans.length,
+          `人为把 wxml 下标整体 +1000 后，所有引用都应识别为错位。` +
+            `识别出 ${orphans.length}/${shiftedIdx.size} 个——` +
+            `若为 0 说明这套校验抓不住错位，是假测试`,
+        ).toBe(shiftedIdx.size);
+        expect(orphans.length).toBeGreaterThan(0);
+      },
+      BUILD_TIMEOUT_MS,
+    );
   });
 });
 
@@ -477,143 +487,157 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       return { manifests: a.manifests, records: a.records };
     }
 
-    it('注册表应记录到组件（否则本测试空跑）', async () => {
-      const c = await load();
-      expect(c.records.length).toBeGreaterThan(5);
-    }, BUILD_TIMEOUT_MS);
+    it(
+      '注册表应记录到组件（否则本测试空跑）',
+      async () => {
+        const c = await load();
+        expect(c.records.length).toBeGreaterThan(5);
+      },
+      BUILD_TIMEOUT_MS,
+    );
 
-    it('每个组件的 wxml 下标，必须落在该组件自己的 Angular 节点下标集合内', async () => {
-      const c = await load();
-      const violations: string[] = [];
-      const noManifest: string[] = [];
+    it(
+      '每个组件的 wxml 下标，必须落在该组件自己的 Angular 节点下标集合内',
+      async () => {
+        const c = await load();
+        const violations: string[] = [];
+        const noManifest: string[] = [];
 
-      for (const rec of c.records) {
-        const referenced = wxmlReferencedIndices(rec.wxml);
-        if (referenced.size === 0) {
-          continue;
-        }
-        // 按组件类名找它自己的 manifest（名字来自 componentKey，权威）
-        const mine = c.manifests.filter(
-          (x) => x.manifest.componentName === rec.componentName,
-        );
-        if (mine.length === 0) {
-          noManifest.push(`${rec.componentName} (${rec.componentKey})`);
-          continue;
-        }
-        const own = new Set<number>();
-        mine.forEach((x) => x.manifest.indices.forEach((i) => own.add(i)));
-        for (const idx of referenced) {
-          if (!own.has(idx)) {
-            violations.push(
-              `${rec.componentName}: wxml 引用 nodeList[${idx}]，` +
-                `但该组件自身指令流里没有此下标（自身下标集=[${[...own]
-                  .sort((a, b) => a - b)
-                  .join(',')}]）`,
-            );
+        for (const rec of c.records) {
+          const referenced = wxmlReferencedIndices(rec.wxml);
+          if (referenced.size === 0) {
+            continue;
+          }
+          // 按组件类名找它自己的 manifest（名字来自 componentKey，权威）
+          const mine = c.manifests.filter(
+            (x) => x.manifest.componentName === rec.componentName,
+          );
+          if (mine.length === 0) {
+            noManifest.push(`${rec.componentName} (${rec.componentKey})`);
+            continue;
+          }
+          const own = new Set<number>();
+          mine.forEach((x) => x.manifest.indices.forEach((i) => own.add(i)));
+          for (const idx of referenced) {
+            if (!own.has(idx)) {
+              violations.push(
+                `${rec.componentName}: wxml 引用 nodeList[${idx}]，` +
+                  `但该组件自身指令流里没有此下标（自身下标集=[${[...own]
+                    .sort((a, b) => a - b)
+                    .join(',')}]）`,
+              );
+            }
           }
         }
-      }
 
-      // 「找不到自己的 manifest」也必须上报：无法验证 ≠ 验证通过
-      expect({ componentsWithoutOwnManifest: noManifest }).toEqual({
-        componentsWithoutOwnManifest: [],
-      });
+        // 「找不到自己的 manifest」也必须上报：无法验证 ≠ 验证通过
+        expect({ componentsWithoutOwnManifest: noManifest }).toEqual({
+          componentsWithoutOwnManifest: [],
+        });
 
-      /**
-       * ⚠️ 已知无法精确验证的组件清单——**待查的真错位候选**。
-       *
-       * 现象值得警惕：BaseTagComponent 的 wxml 引用奇数下标
-       * (1,3,5,...)，而其自身指令流的节点槽是偶数 (0,2,4,...)，
-       * 呈系统性错开一位，不像随机提取失败。
-       *
-       * 两种可能，尚未定论：
-       *   (a) 提取器只抓到了部分模板（hoisted 模板函数 / 嵌入式视图
-       *       的独立函数体没走全），导致清单不完整；
-       *   (b) 真的存在 off-by-one——wxml 引用的下标并非该组件自身的
-       *       节点槽，而是靠「并集里恰好存在」蒙混过关。
-       *
-       * 现有「全输出并集」测试之所以通过，正是因为奇数下标在**别的**
-       * 组件模板里存在。也就是说并集校验掩盖了这个问题。
-       *
-       * 用子集断言固化：清单只能缩小，新增即失败。
-       * 查清一个就从这里删一个，直到清空。
-       */
-      /**
-       * 已修复：原先列了 8 个组件，实为提取器漏了 `ɵɵdom*` 系列指令
-       * （本 fork 的 patched 指令名），导致元素节点全丢、误报 off-by-one。
-       * 补上后 8 → 4。那 4 个不是渲染错位，是我提取不全。
-       *
-       * 剩下 4 个的共同点：重度使用控制流 / 结构型指令。
-       * Angular 把 @if/@for/@ngIf 的分支编译成**独立的顶层模板函数**
-       * （ɵɵtemplate(2, X_Conditional_1_Template, decls, vars, ...)），
-       * 不在主模板函数体内，所以 extractNodeManifest 只收到根视图节点，
-       * 而 wxml 引用了分支视图的下标。
-       *
-       * 下一步：让 extractNodeManifest 顺着 ɵɵtemplate 的第二个参数
-       * 找到那些独立模板函数并一并遍历（每个视图有各自从 0 开始的下标
-       * 空间，需要按视图分组，不能混在一起比）。
-       */
-      /**
-       * 已知缺口：只剩 ControlFlowComponent。
-       *
-       * 这是**本测试口径本身**的局限，不是产物错误：
-       * 「按组件精确」把组件的所有 wxml 下标拍成一个并集去比，
-       * 但 ControlFlowComponent 的 wxml 里含大量具名块
-       * (ifBlock_3 / forBlock_11 / Case_18 ...)，那些下标属于
-       * **各自子视图**的 0 基空间，混进组件级并集必然串。
-       *
-       * 更精确的「按视图分块」测试已 **零缺口** 覆盖同一批组件，
-       * 所以这里保留一个组件名不代表未验证。
-       */
-      /**
-       * 已知缺口：ControlFlowComponent —— **本测试口径的缺陷**，非产物错误。
-       *
-       * 「按组件精确」把组件所有 wxml 下标拍成一个并集，去比该组件
-       * 所有视图下标的并集。但 Angular 的下标是**每视图各自 0 基**
-       * （allocateSlots: "not unique between views"），ControlFlowComponent
-       * 有 13 个视图，并集后只有 0/1 这类小数字，而根区引用到 19，
-       * 必然串。
-       *
-       * 更强的「按视图分块」测试已对同一批组件 **零缺口** 覆盖，
-       * 本项实为被其取代的弱断言。保留只为不丢历史信号。
-       */
-      const KNOWN_PRECISION_GAPS = new Set(['ControlFlowComponent']);
+        /**
+         * ⚠️ 已知无法精确验证的组件清单——**待查的真错位候选**。
+         *
+         * 现象值得警惕：BaseTagComponent 的 wxml 引用奇数下标
+         * (1,3,5,...)，而其自身指令流的节点槽是偶数 (0,2,4,...)，
+         * 呈系统性错开一位，不像随机提取失败。
+         *
+         * 两种可能，尚未定论：
+         *   (a) 提取器只抓到了部分模板（hoisted 模板函数 / 嵌入式视图
+         *       的独立函数体没走全），导致清单不完整；
+         *   (b) 真的存在 off-by-one——wxml 引用的下标并非该组件自身的
+         *       节点槽，而是靠「并集里恰好存在」蒙混过关。
+         *
+         * 现有「全输出并集」测试之所以通过，正是因为奇数下标在**别的**
+         * 组件模板里存在。也就是说并集校验掩盖了这个问题。
+         *
+         * 用子集断言固化：清单只能缩小，新增即失败。
+         * 查清一个就从这里删一个，直到清空。
+         */
+        /**
+         * 已修复：原先列了 8 个组件，实为提取器漏了 `ɵɵdom*` 系列指令
+         * （本 fork 的 patched 指令名），导致元素节点全丢、误报 off-by-one。
+         * 补上后 8 → 4。那 4 个不是渲染错位，是我提取不全。
+         *
+         * 剩下 4 个的共同点：重度使用控制流 / 结构型指令。
+         * Angular 把 @if/@for/@ngIf 的分支编译成**独立的顶层模板函数**
+         * （ɵɵtemplate(2, X_Conditional_1_Template, decls, vars, ...)），
+         * 不在主模板函数体内，所以 extractNodeManifest 只收到根视图节点，
+         * 而 wxml 引用了分支视图的下标。
+         *
+         * 下一步：让 extractNodeManifest 顺着 ɵɵtemplate 的第二个参数
+         * 找到那些独立模板函数并一并遍历（每个视图有各自从 0 开始的下标
+         * 空间，需要按视图分组，不能混在一起比）。
+         */
+        /**
+         * 已知缺口：只剩 ControlFlowComponent。
+         *
+         * 这是**本测试口径本身**的局限，不是产物错误：
+         * 「按组件精确」把组件的所有 wxml 下标拍成一个并集去比，
+         * 但 ControlFlowComponent 的 wxml 里含大量具名块
+         * (ifBlock_3 / forBlock_11 / Case_18 ...)，那些下标属于
+         * **各自子视图**的 0 基空间，混进组件级并集必然串。
+         *
+         * 更精确的「按视图分块」测试已 **零缺口** 覆盖同一批组件，
+         * 所以这里保留一个组件名不代表未验证。
+         */
+        /**
+         * 已知缺口：ControlFlowComponent —— **本测试口径的缺陷**，非产物错误。
+         *
+         * 「按组件精确」把组件所有 wxml 下标拍成一个并集，去比该组件
+         * 所有视图下标的并集。但 Angular 的下标是**每视图各自 0 基**
+         * （allocateSlots: "not unique between views"），ControlFlowComponent
+         * 有 13 个视图，并集后只有 0/1 这类小数字，而根区引用到 19，
+         * 必然串。
+         *
+         * 更强的「按视图分块」测试已对同一批组件 **零缺口** 覆盖，
+         * 本项实为被其取代的弱断言。保留只为不丢历史信号。
+         */
+        const KNOWN_PRECISION_GAPS = new Set(['ControlFlowComponent']);
 
-      const newViolations = [
-        ...new Set(violations.map((v) => v.split(':')[0].trim())),
-      ].filter((c) => !KNOWN_PRECISION_GAPS.has(c));
+        const newViolations = [
+          ...new Set(violations.map((v) => v.split(':')[0].trim())),
+        ].filter((c) => !KNOWN_PRECISION_GAPS.has(c));
 
-      expect({ newlyFailingComponents: newViolations }).toEqual({
-        newlyFailingComponents: [],
-      });
-    }, BUILD_TIMEOUT_MS);
+        expect({ newlyFailingComponents: newViolations }).toEqual({
+          newlyFailingComponents: [],
+        });
+      },
+      BUILD_TIMEOUT_MS,
+    );
 
-    it('反向对照：篡改某组件 wxml 下标后，精确校验必须失败', async () => {
-      const c = await load();
-      const rec = c.records.find((r) => wxmlReferencedIndices(r.wxml).size > 0);
-      expect(rec, '注册表里没有带 nodeList 引用的组件').toBeDefined();
+    it(
+      '反向对照：篡改某组件 wxml 下标后，精确校验必须失败',
+      async () => {
+        const c = await load();
+        const rec = c.records.find(
+          (r) => wxmlReferencedIndices(r.wxml).size > 0,
+        );
+        expect(rec, '注册表里没有带 nodeList 引用的组件').toBeDefined();
 
-      const mine = c.manifests.filter(
-        (x) => x.manifest.componentName === rec!.componentName,
-      );
-      const own = new Set<number>();
-      mine.forEach((x) => x.manifest.indices.forEach((i) => own.add(i)));
+        const mine = c.manifests.filter(
+          (x) => x.manifest.componentName === rec!.componentName,
+        );
+        const own = new Set<number>();
+        mine.forEach((x) => x.manifest.indices.forEach((i) => own.add(i)));
 
-      const tampered = wxmlReferencedIndices(
-        rec!.wxml.replace(
-          /nodeList\[(\d+)\]/g,
-          (_m, n) => `nodeList[${Number(n) + 7777}]`,
-        ),
-      );
-      expect(tampered.size).toBeGreaterThan(0);
+        const tampered = wxmlReferencedIndices(
+          rec!.wxml.replace(
+            /nodeList\[(\d+)\]/g,
+            (_m, n) => `nodeList[${Number(n) + 7777}]`,
+          ),
+        );
+        expect(tampered.size).toBeGreaterThan(0);
 
-      const orphans = [...tampered].filter((i) => !own.has(i));
-      expect(
-        orphans.length,
-        `篡改后应全部识别为错位。识别 ${orphans.length}/${tampered.size}。` +
-          `为 0 说明精确校验抓不住问题`,
-      ).toBe(tampered.size);
-    }, BUILD_TIMEOUT_MS);
+        const orphans = [...tampered].filter((i) => !own.has(i));
+        expect(
+          orphans.length,
+          `篡改后应全部识别为错位。识别 ${orphans.length}/${tampered.size}。` +
+            `为 0 说明精确校验抓不住问题`,
+        ).toBe(tampered.size);
+      },
+      BUILD_TIMEOUT_MS,
+    );
   });
 });
 
@@ -664,126 +688,138 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       };
     }
 
-    it('视图树应拆出多个视图（控制流组件）', async () => {
-      const c = await load();
-      const cf = c.trees.find(
-        (t) => t.componentName === 'ControlFlowComponent',
-      );
-      expect(cf, '没找到 ControlFlowComponent 的视图树').toBeDefined();
-      // @if x4 + @for x3 + @switch 等，应远多于 1 个视图
-      expect(cf!.views.length).toBeGreaterThan(3);
-    }, BUILD_TIMEOUT_MS);
+    it(
+      '视图树应拆出多个视图（控制流组件）',
+      async () => {
+        const c = await load();
+        const cf = c.trees.find(
+          (t) => t.componentName === 'ControlFlowComponent',
+        );
+        expect(cf, '没找到 ControlFlowComponent 的视图树').toBeDefined();
+        // @if x4 + @for x3 + @switch 等，应远多于 1 个视图
+        expect(cf!.views.length).toBeGreaterThan(3);
+      },
+      BUILD_TIMEOUT_MS,
+    );
 
-    it('每个 wxml 模板块的下标，必须被某个视图的下标空间覆盖', async () => {
-      const c = await load();
-      const violations: string[] = [];
+    it(
+      '每个 wxml 模板块的下标，必须被某个视图的下标空间覆盖',
+      async () => {
+        const c = await load();
+        const violations: string[] = [];
 
-      for (const [cmp, blocks] of c.blocksByComponent) {
-        const tree = c.trees.find((t) => t.componentName === cmp);
-        if (!tree) {
-          continue; // 已由「按组件精确」那条上报
-        }
-        for (const b of blocks) {
-          if (b.indices.size === 0) {
-            continue;
+        for (const [cmp, blocks] of c.blocksByComponent) {
+          const tree = c.trees.find((t) => t.componentName === cmp);
+          if (!tree) {
+            continue; // 已由「按组件精确」那条上报
           }
-          const covering = tree.views.filter((v) =>
-            [...b.indices].every((i) => v.indices.has(i)),
-          );
-          if (covering.length === 0) {
-            violations.push(
-              `${cmp} 模板块 ${b.name}: 下标 [${[...b.indices]
-                .sort((x, y) => x - y)
-                .join(',')}] 没有任何视图覆盖` +
-                `（各视图下标集: ${tree.views
-                  .map(
-                    (v) =>
-                      `${v.viewName}=[${[...v.indices].sort((x, y) => x - y).join(',')}]`,
-                  )
-                  .join(' | ')}）`,
+          for (const b of blocks) {
+            if (b.indices.size === 0) {
+              continue;
+            }
+            const covering = tree.views.filter((v) =>
+              [...b.indices].every((i) => v.indices.has(i)),
             );
+            if (covering.length === 0) {
+              violations.push(
+                `${cmp} 模板块 ${b.name}: 下标 [${[...b.indices]
+                  .sort((x, y) => x - y)
+                  .join(',')}] 没有任何视图覆盖` +
+                  `（各视图下标集: ${tree.views
+                    .map(
+                      (v) =>
+                        `${v.viewName}=[${[...v.indices].sort((x, y) => x - y).join(',')}]`,
+                    )
+                    .join(' | ')}）`,
+              );
+            }
           }
         }
-      }
 
-      /**
-       * 已知缺口：只剩 __root__ 块，具名模板块已全部通过。
-       *
-       * 视图分组本身是有效的——ControlFlowComponent 拆出 8 个视图，
-       * ifBlock / forBlock 等具名块的下标全部被对应视图覆盖。
-       *
-       * 剩 __root__ 块未过，两种成因待查：
-       *   (a) splitWxmlBlocks 对根区的切分粗糙（<import> / 嵌套
-       *       <template> / <block wx:if> 混在一起，可能把不属于根视图
-       *       的下标算进来了）
-       *   (b) 根视图里仍有未计入的节点槽指令
-       *       例：NgContentComponent 根视图提取到 {0,1,2,4,5,6}，
-       *       缺 3——需要确认 index 3 处是什么指令
-       *
-       * 子集断言：只能缩小，新增即失败。
-       */
-      /**
-       * 已知缺口：只剩 ControlFlowComponent 的 __root__ 块。
-       *
-       * 演进：4 → 1
-       *   - 补 ɵɵdom* 系列指令：修掉一批误报
-       *   - 展开链式 codegen（unwrapCallChain，注意 TS 用 .expression
-       *     不是 ESTree 的 .callee）：NgContent / CustomStructural /
-       *     DefaultStructural 全部通过
-       *
-       * 剩 ControlFlowComponent：根视图提取到
-       *   [0,1,2,3,4,5,6,7,9,10,13,16,17,18,19,20]
-       * 而 __root__ 块引用了 11,12,14,15（forBlock_11 / forEmpty_12 /
-       * forBlock_14 等模板的注册槽）。
-       *
-       * 成因是 (a)：splitWxmlBlocks 用 `wxml.replace(具名模板正则, '')`
-       * 求根区，但 `<template is="...">` 调用标签、嵌套具名模板等
-       * 残留在根区里，把不属于根视图的下标算了进来。
-       *
-       * 下一步：把 splitWxmlBlocks 改成能区分
-       *   - 具名模板**定义** <template name="x">
-       *   - 模板**调用** <template is="x" data="...">
-       * 根区只取 hasLoad 那个 <block> 内、排除所有具名定义后的内容，
-       * 且调用标签引用的下标应映射到对应注册槽而非当作根视图下标。
-       */
-      const KNOWN_ROOT_BLOCK_GAPS = new Set<string>([]);
+        /**
+         * 已知缺口：只剩 __root__ 块，具名模板块已全部通过。
+         *
+         * 视图分组本身是有效的——ControlFlowComponent 拆出 8 个视图，
+         * ifBlock / forBlock 等具名块的下标全部被对应视图覆盖。
+         *
+         * 剩 __root__ 块未过，两种成因待查：
+         *   (a) splitWxmlBlocks 对根区的切分粗糙（<import> / 嵌套
+         *       <template> / <block wx:if> 混在一起，可能把不属于根视图
+         *       的下标算进来了）
+         *   (b) 根视图里仍有未计入的节点槽指令
+         *       例：NgContentComponent 根视图提取到 {0,1,2,4,5,6}，
+         *       缺 3——需要确认 index 3 处是什么指令
+         *
+         * 子集断言：只能缩小，新增即失败。
+         */
+        /**
+         * 已知缺口：只剩 ControlFlowComponent 的 __root__ 块。
+         *
+         * 演进：4 → 1
+         *   - 补 ɵɵdom* 系列指令：修掉一批误报
+         *   - 展开链式 codegen（unwrapCallChain，注意 TS 用 .expression
+         *     不是 ESTree 的 .callee）：NgContent / CustomStructural /
+         *     DefaultStructural 全部通过
+         *
+         * 剩 ControlFlowComponent：根视图提取到
+         *   [0,1,2,3,4,5,6,7,9,10,13,16,17,18,19,20]
+         * 而 __root__ 块引用了 11,12,14,15（forBlock_11 / forEmpty_12 /
+         * forBlock_14 等模板的注册槽）。
+         *
+         * 成因是 (a)：splitWxmlBlocks 用 `wxml.replace(具名模板正则, '')`
+         * 求根区，但 `<template is="...">` 调用标签、嵌套具名模板等
+         * 残留在根区里，把不属于根视图的下标算了进来。
+         *
+         * 下一步：把 splitWxmlBlocks 改成能区分
+         *   - 具名模板**定义** <template name="x">
+         *   - 模板**调用** <template is="x" data="...">
+         * 根区只取 hasLoad 那个 <block> 内、排除所有具名定义后的内容，
+         * 且调用标签引用的下标应映射到对应注册槽而非当作根视图下标。
+         */
+        const KNOWN_ROOT_BLOCK_GAPS = new Set<string>([]);
 
-      const newGaps = [
-        ...new Set(violations.map((v) => v.split(' 模板块')[0].trim())),
-      ].filter((c) => !KNOWN_ROOT_BLOCK_GAPS.has(c));
+        const newGaps = [
+          ...new Set(violations.map((v) => v.split(' 模板块')[0].trim())),
+        ].filter((c) => !KNOWN_ROOT_BLOCK_GAPS.has(c));
 
-      expect({ newlyUncoveredComponents: newGaps }).toEqual({
-        newlyUncoveredComponents: [],
-      });
-    }, BUILD_TIMEOUT_MS);
+        expect({ newlyUncoveredComponents: newGaps }).toEqual({
+          newlyUncoveredComponents: [],
+        });
+      },
+      BUILD_TIMEOUT_MS,
+    );
 
-    it('具名模板块（ifBlock / forBlock 等）必须全部被覆盖', async () => {
-      const c = await load();
-      const violations: string[] = [];
+    it(
+      '具名模板块（ifBlock / forBlock 等）必须全部被覆盖',
+      async () => {
+        const c = await load();
+        const violations: string[] = [];
 
-      for (const [cmp, blocks] of c.blocksByComponent) {
-        const tree = c.trees.find((t) => t.componentName === cmp);
-        if (!tree) {
-          continue;
-        }
-        for (const b of blocks) {
-          if (b.name === '__root__' || b.indices.size === 0) {
+        for (const [cmp, blocks] of c.blocksByComponent) {
+          const tree = c.trees.find((t) => t.componentName === cmp);
+          if (!tree) {
             continue;
           }
-          const covering = tree.views.filter((v) =>
-            [...b.indices].every((i) => v.indices.has(i)),
-          );
-          if (covering.length === 0) {
-            violations.push(`${cmp}/${b.name}`);
+          for (const b of blocks) {
+            if (b.name === '__root__' || b.indices.size === 0) {
+              continue;
+            }
+            const covering = tree.views.filter((v) =>
+              [...b.indices].every((i) => v.indices.has(i)),
+            );
+            if (covering.length === 0) {
+              violations.push(`${cmp}/${b.name}`);
+            }
           }
         }
-      }
 
-      // 这条没有豁免清单：具名块必须 100% 覆盖
-      expect({ uncoveredNamedBlocks: violations }).toEqual({
-        uncoveredNamedBlocks: [],
-      });
-    }, BUILD_TIMEOUT_MS);
+        // 这条没有豁免清单：具名块必须 100% 覆盖
+        expect({ uncoveredNamedBlocks: violations }).toEqual({
+          uncoveredNamedBlocks: [],
+        });
+      },
+      BUILD_TIMEOUT_MS,
+    );
 
     it('运行时 nodeList 长度（=decls）必须严格大于 wxml 根块引用的最大下标', async () => {
       /**
@@ -950,30 +986,34 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       ).toBeGreaterThan(0);
     });
 
-    it('反向对照：篡改某个模板块下标后，必须识别为不覆盖', async () => {
-      const c = await load();
-      // 找一个有多视图的组件
-      const entry = [...c.blocksByComponent.entries()].find(([cmp]) => {
-        const t = c.trees.find((x) => x.componentName === cmp);
-        return t && t.views.length > 1;
-      });
-      expect(entry, '找不到多视图组件').toBeDefined();
+    it(
+      '反向对照：篡改某个模板块下标后，必须识别为不覆盖',
+      async () => {
+        const c = await load();
+        // 找一个有多视图的组件
+        const entry = [...c.blocksByComponent.entries()].find(([cmp]) => {
+          const t = c.trees.find((x) => x.componentName === cmp);
+          return t && t.views.length > 1;
+        });
+        expect(entry, '找不到多视图组件').toBeDefined();
 
-      const [cmp, blocks] = entry!;
-      const tree = c.trees.find((x) => x.componentName === cmp)!;
-      const block = blocks.find((b) => b.indices.size > 0);
-      expect(block, '该组件没有带下标的模板块').toBeDefined();
+        const [cmp, blocks] = entry!;
+        const tree = c.trees.find((x) => x.componentName === cmp)!;
+        const block = blocks.find((b) => b.indices.size > 0);
+        expect(block, '该组件没有带下标的模板块').toBeDefined();
 
-      const tampered = new Set([...block!.indices].map((i) => i + 5555));
-      const covering = tree.views.filter((v) =>
-        [...tampered].every((i) => v.indices.has(i)),
-      );
+        const tampered = new Set([...block!.indices].map((i) => i + 5555));
+        const covering = tree.views.filter((v) =>
+          [...tampered].every((i) => v.indices.has(i)),
+        );
 
-      expect(
-        covering.length,
-        `篡改 ${cmp}/${block!.name} 下标 +5555 后不应有任何视图覆盖，` +
-          `实际覆盖 ${covering.length} 个（>0 说明校验抓不住）`,
-      ).toBe(0);
-    }, BUILD_TIMEOUT_MS);
+        expect(
+          covering.length,
+          `篡改 ${cmp}/${block!.name} 下标 +5555 后不应有任何视图覆盖，` +
+            `实际覆盖 ${covering.length} 个（>0 说明校验抓不住）`,
+        ).toBe(0);
+      },
+      BUILD_TIMEOUT_MS,
+    );
   });
 });

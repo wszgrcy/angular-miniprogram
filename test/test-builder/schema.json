@@ -12,6 +12,44 @@
         "$ref": "#/definitions/assetPattern"
       }
     },
+    "subpackages": {
+      "type": "array",
+      "description": "分包入口：写法与 pages 一样，output 就是分包 root（约定 root 同时是源码目录与产物目录）。配了就不用在 app 配置里写 subpackages：root 取 output，分包页由扫出来的入口算；自己写了同一个 root 就以自己那份为准",
+      "items": {
+        "type": "object",
+        "properties": {
+          "glob": {
+            "type": "string",
+            "description": "匹配入口文件的 glob"
+          },
+          "input": {
+            "type": "string",
+            "description": "源目录"
+          },
+          "output": {
+            "type": "string",
+            "description": "分包 root（同时是产物目录）"
+          },
+          "ignore": {
+            "description": "An array of globs to ignore.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "independent": {
+            "type": "boolean",
+            "description": "独立分包：不依赖主包即可运行"
+          }
+        },
+        "required": [
+          "glob",
+          "input",
+          "output"
+        ],
+        "additionalProperties": false
+      }
+    },
     "components": {
       "type": "array",
       "description": "组件配置",
@@ -426,11 +464,30 @@
     },
     "appJson": {
       "type": "string",
-      "description": "结构化 app 配置源文件（相对 workspaceRoot）。配置后由构建器编译生成 app.json（含页面/tabBar/分包校验），与 assets 中的静态 app.json 互斥。"
+      "description": "结构化 app 配置源文件（相对 workspaceRoot）。与 assets 里的静态 app.json 不是二选一：静态那份是底稿，本文件只写要补的字段，已写过的 key 不动，pages 追加。"
     },
     "nativeComponentsDir": {
       "type": "string",
       "description": "原生小程序自定义组件目录（相对 workspaceRoot，如 wxcomponents）。配置后整个目录拷进产物，模板命中原生标签自动注入 usingComponents。"
+    },
+    "projectConfig": {
+      "type": "string",
+      "description": "结构化 project 配置源文件（相对 workspaceRoot），只影响 project 配置文件；没写的字段由内置默认值打底。"
+    },
+    "appJsonValidate": {
+      "type": "string",
+      "enum": [
+        "error",
+        "warn",
+        "off"
+      ],
+      "default": "error",
+      "description": "app 配置校验严格度，默认 error；只有静态 app.json 的工程固定 warn。"
+    },
+    "deriveCondition": {
+      "type": "boolean",
+      "default": false,
+      "description": "自动生成 project 配置的调试启动项（condition）。"
     }
   },
   "additionalProperties": false,

@@ -79,7 +79,9 @@ describe('resolveOutputNames', () => {
       assetFileNames: '[name]-[hash].[ext]',
     });
     expect(resolveOutputNames('bundles').chunkFileNames).toContain('[hash]');
-    expect(resolveOutputNames('bundles').assetFileNames).not.toContain('[hash]');
+    expect(resolveOutputNames('bundles').assetFileNames).not.toContain(
+      '[hash]',
+    );
     expect(resolveOutputNames('media').chunkFileNames).not.toContain('[hash]');
     expect(resolveOutputNames('media').assetFileNames).toContain('[hash]');
   });
@@ -113,9 +115,9 @@ describe('mergeDefine', () => {
 describe('resolveCssPreprocessorOptions', () => {
   it('什么都没配返回空对象，不干预 vite 默认', () => {
     expect(resolveCssPreprocessorOptions(undefined, '/w')).toEqual({});
-    expect(
-      resolveCssPreprocessorOptions({ includePaths: [] }, '/w'),
-    ).toEqual({});
+    expect(resolveCssPreprocessorOptions({ includePaths: [] }, '/w')).toEqual(
+      {},
+    );
   });
 
   it('includePaths 相对 workspaceRoot 绝对化，scss / sass 两份都给', () => {

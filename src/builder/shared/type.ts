@@ -1,6 +1,16 @@
 import type { AssetPattern } from '@angular-devkit/build-angular';
 import type { MpEntryType } from './entry-component';
 
+/**
+ * `subpackages` 的一项：入口范围 + 这个分包是不是独立分包。
+ *
+ * `output` 就是分包 root（约定：root 同时是源码目录与产物目录）。
+ */
+export type MpSubPackagePattern = Exclude<AssetPattern, string> & {
+  /** 独立分包：不依赖主包即可运行 */
+  independent?: boolean;
+};
+
 export interface PagePattern extends Exclude<AssetPattern, string> {
   /** 入口名 */
   entryName: string;
@@ -22,6 +32,8 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
   };
   /** 入口类型，决定构建器注入哪个注册函数 */
   type: MpEntryType;
+  /** 分包 pattern 上声明的「独立分包」，只有 subpackages 来源的入口有 */
+  independent?: boolean;
 }
 
 /**

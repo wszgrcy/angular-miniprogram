@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import type { Plugin } from 'vite';
 import { MpAppConfig, resolveSubPackages } from '../app-config';
@@ -180,9 +179,4 @@ export function subpackageChunkPlugin(
       }
     },
   };
-}
-
-/** 从 appJson 文件路径读取并解析配置（供 vite/index.ts 复用） */
-export function readAppConfig(appJsonPath: string): MpAppConfig {
-  return JSON.parse(fs.readFileSync(appJsonPath, 'utf8')) as MpAppConfig;
 }

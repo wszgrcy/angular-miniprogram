@@ -11,7 +11,8 @@ import {
 } from '../../library/library-meta-diagnostics';
 import { createMiniProgramTestStack } from '../../shared/mini-program-test-stack';
 import { globSpecFiles } from '../../shared/spec-discovery';
-import { resolveNative } from '../../util/asset-path';
+import type { MpSubPackagePattern } from '../../shared/type';
+import { resolveNative, toPosixPath } from '../../util/asset-path';
 import {
   POLYFILL_ENTRY_ID,
   buildPlatformDefine,
@@ -25,6 +26,12 @@ import {
   resolveProjectRoots,
   toRollupInput,
 } from '../../vite/entry-patterns';
+import type { MpConfigValidateLevel } from '../../vite/mp-config';
+import {
+  groupSubPackages,
+  prepareMpConfigs,
+  reportMpConfigDiagnostics,
+} from '../../vite/mp-config';
 import { platformConditionDefine } from '../../vite/platform-flags';
 import { specModulesPlugin } from '../../vite/plugins/spec-modules.plugin';
 import {
@@ -42,6 +49,8 @@ export interface VitestViteBuilderOptions {
   tsConfig: string;
   outputPath?: string;
   pages?: AssetPattern[];
+  /** 分包入口，语义与 application builder 的同名字段一致 */
+  subpackages?: MpSubPackagePattern[];
   /** 自定义 tabBar 入口，语义与 application builder 的同名字段一致 */
   customTabbar?: AssetPattern[];
   platform: import('../../platform/platform').PlatformType;
@@ -62,6 +71,14 @@ export interface VitestViteBuilderOptions {
    * i18n 相关的 spec 会看到 `{VAR_SELECT, select, ...}` 原文。
    */
   polyfills?: string | string[];
+  /**
+   * 与 application builder 同名同义：测试产物也是一个完整小程序工程，
+   * 两条链路读同一份配置必须得到同一个 app.json。
+   */
+  appJson?: string;
+  projectConfig?: string;
+  appJsonValidate?: MpConfigValidateLevel;
+  deriveCondition?: boolean;
 }
 
 /**
@@ -93,6 +110,7 @@ export async function createVitestViteConfig(options: {
 
   const entryPatterns = await generateEntryPatterns({
     pages: vitestOptions.pages || [],
+    subpackages: vitestOptions.subpackages,
     customTabbar: vitestOptions.customTabbar,
     workspaceRoot: context.workspaceRoot,
     context,
@@ -131,6 +149,36 @@ export async function createVitestViteConfig(options: {
       : (angularPluginModule as { default: unknown }).default
   ) as (opts: unknown) => import('vite').Plugin[];
 
+  // 配置文件：与 application 链路同一套解析（静态 app.json + appJson 选项 +
+  // 构建器补的），测试产物也是一个完整小程序工程，两条链路不能各算一份
+  const mpConfigs = await prepareMpConfigs({
+    workspaceRoot: context.workspaceRoot,
+    platform: buildPlatform,
+    platformType: vitestOptions.platform,
+    assetPatterns: vitestOptions.assets,
+    absoluteProjectRoot,
+    absoluteProjectSourceRoot,
+    appJson: vitestOptions.appJson,
+    projectConfig: vitestOptions.projectConfig,
+    appJsonValidate: vitestOptions.appJsonValidate,
+    deriveCondition: vitestOptions.deriveCondition,
+    derivedSubPackages: groupSubPackages(
+      entryPatterns.subPackageList.map((p) => ({
+        path: toPosixPath(p.outputFiles.path),
+        root: p.output,
+        independent: p.independent,
+      })),
+    ),
+    builtPagePaths: [
+      ...entryPatterns.pageList,
+      ...entryPatterns.subPackageList,
+    ].map((p) => toPosixPath(p.outputFiles.path)),
+    builtTabbarPaths: entryPatterns.tabbarList.map((p) =>
+      toPosixPath(p.outputFiles.path),
+    ),
+  });
+  reportMpConfigDiagnostics(mpConfigs, context.logger);
+
   const stack = createMiniProgramTestStack({
     platform: vitestOptions.platform,
     buildPlatform,
@@ -142,6 +190,8 @@ export async function createVitestViteConfig(options: {
     tsConfig: resolveNative(context.workspaceRoot, vitestOptions.tsConfig),
     pages: vitestOptions.pages || [],
     assets: vitestOptions.assets,
+    copiedAssets: mpConfigs.assets,
+    mpConfigs,
     styles: vitestOptions.styles,
     watch: !!vitestOptions.watch,
     bootstrapChunk: 'test.js',
