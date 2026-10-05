@@ -24,6 +24,12 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   staticClass = '';
   /** 模板上写死的 style，下推时参与合并 */
   staticStyle = '';
+  /**
+   * 开始标签上带了 `#xxx`（模板引用变量）。
+   *
+   * 只有这种节点需要可查询 class，详见 `NgElementMeta.hasRef`。
+   */
+  hasRef = false;
   kind = NgNodeKind.Element;
   inputs: string[] = [];
   outputs: string[] = [];
@@ -60,6 +66,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   ) {}
   private analysis() {
     this.getTagName();
+    this.hasRef = (this.node.references?.length ?? 0) > 0;
     // 静态 class / style 单独捕获：它们不进 attributeObject（会被
     // 当成普通属性重复输出），但 class/style 下推时需要它们参与
     // 合并——否则 `class="a" [class]="wxs.f()"` 会把静态类抹掉。
@@ -213,6 +220,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       attributes: this.attributeObject,
       staticClass: this.staticClass,
       staticStyle: this.staticStyle,
+      hasRef: this.hasRef,
       singleClosedTag: this.richText ? false : this.singleClosedTag,
       richText: this.richText,
       componentMeta: this.componentMeta,

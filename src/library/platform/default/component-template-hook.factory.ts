@@ -294,6 +294,30 @@ function readI18nText(lView: LView, ast: any[], parts: string[]): void {
   }
 }
 
+/**
+ * 算出本节点的可查询 class，非可查询节点返回空串。
+ *
+ * 「可查询」的判据是 `TNode.localNames` 非空，即模板上写了 `#xxx`。
+ * 编译期（`ParsedNgElement.hasRef`）用的是同一个条件的模板 AST 侧，
+ * 两边同进同退：wxml 只在带 `#` 的元素上拼 `nodeList[i].refClass`，
+ * 数据侧也只在那种节点上发这个字段。
+ *
+ * ⚠️ `localNames` 是 `[name, index]` 扁平对，`<div #x>` 存的是
+ * `['x', -1]`（`-1` = 就是这个元素自己，由 `saveResolvedLocalsInData`
+ * 运行时现取）。这里**只取「有没有」**，绝不读 `localNames[i + 1]`：
+ * 那个下标对 `#x="dir"` 指的是指令实例槽，不是元素下标。
+ */
+function refClassOf(tNode: unknown, pathPrefix: string): string {
+  const localNames = (tNode as { localNames?: string[] } | undefined)
+    ?.localNames;
+  if (!localNames?.length) {
+    return '';
+  }
+  // pathPrefix 形如 `nodeList[4][1].nodeList[0]`，里面只有下标是数字
+  const nums = pathPrefix.match(/\d+/g);
+  return nums ? `__ar-${nums.join('-')}` : '';
+}
+
 function lViewToWXView(
   lView: LView,
   parentNodePath: any[] = [],
@@ -312,6 +336,10 @@ function lViewToWXView(
       if (mpRef) {
         item.__mpRef = mpRef;
       }
+      item.__refClass =
+        item.type === 'element'
+          ? refClassOf(tView.data?.[index], item.__pathPrefix)
+          : '';
       nodeList[rel] = item.toView();
     } else if (item && item[1] === true) {
       const lContainerList: MPView[] = [];

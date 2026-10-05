@@ -34,6 +34,14 @@ export interface NgElementMeta extends NgNodeMeta {
    */
   staticClass: string;
   staticStyle: string;
+  /**
+   * 开始标签上带了 `#xxx`（模板引用变量）。
+   *
+   * 只有这种节点会被 `AgentNode.find()` 查询得到，所以 wxml 只在它们
+   * 身上拼 `nodeList[i].refClass`。运行时侧的同一条件在
+   * `component-template-hook.factory.ts` 的 `refClassOf()`。
+   */
+  hasRef: boolean;
   inputs: string[];
   outputs: string[];
   /**

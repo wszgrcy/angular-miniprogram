@@ -55,6 +55,16 @@ export interface MPView {
 }
 export interface MPElementData {
   class: string;
+  /**
+   * 可查询 class，仅模板上带 `#` 的元素才有。
+   *
+   * 取值是 `__pathPrefix` 的下标序列（`nodeList[4][1].nodeList[0]` →
+   * `__ar-4-1-0`），由 `AgentNode.find()` 拿去 `select('.__ar-4-1-0')`。
+   *
+   * 与 `class` 分开存：`class` 是用户语义的 class（`addClass` 增量通道发的
+   * 就是它），框架的查询标识不该混进去。
+   */
+  refClass?: string;
   style: string;
   property: Record<string, any>;
   /**

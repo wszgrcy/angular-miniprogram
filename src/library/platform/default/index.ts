@@ -1,4 +1,5 @@
 export * from './platform-core';
+export * from './agent-node';
 export * from './token';
 export * from './mini-program.renderer';
 export * from './mini-program.renderer.factory';

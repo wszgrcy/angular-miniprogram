@@ -279,6 +279,22 @@ export class WxContainer {
       propertyMap.set('class', `nodeList[${index}].class`);
     }
 
+    /**
+     * 可查询 class。
+     *
+     * 只给带 `#` 的元素拼，没 `#` 的元素 wxml 里根本不出现这个表达式，
+     * 数据侧也不会发这个字段（两边同进同退，见 `refClassOf()`）。
+     *
+     * 拼在末尾、单独一个 `|| ''` 兜底：万一某条路径上数据没送到，
+     * 丢的只是一个查询能力，不会把 `undefined` 拼成一个假 class。
+     */
+    if (node.hasRef) {
+      propertyMap.set(
+        'class',
+        `(${propertyMap.get('class')}) + ' ' + (nodeList[${index}].refClass || '')`,
+      );
+    }
+
     const stylePlan = node.wxsStyle ?? wxsProps['style'];
     if (stylePlan) {
       useWxsPlanModules(stylePlan, (m) => this.useWxsModule(m));

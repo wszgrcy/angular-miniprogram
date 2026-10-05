@@ -1,8 +1,14 @@
+/// <reference types="miniprogram-api-typings"/>
 import type {
   MPElementData,
   MPTextData,
 } from 'angular-miniprogram/platform/type';
 import clsx from 'clsx';
+
+/** `find()` 需要的最小宿主能力，page 实例与自定义组件实例都满足 */
+interface QueryHost {
+  createSelectorQuery(): WechatMiniprogram.SelectorQuery;
+}
 
 export class AgentNode {
   /**
@@ -64,6 +70,21 @@ export class AgentNode {
   __mpRef: unknown = null;
   /** `suffix -> 完整 setData key` 缓存，避免每次变更重复拼串 */
   __keyCache: Record<string, string> = {};
+
+  /**
+   * 可查询 class，空串表示「本节点不可查询」。
+   *
+   * 由 `lViewToWXView` 在序列化时打上，且**只给模板上带 `#` 的节点**——
+   * 没 `#` 的节点没有查询需求，多发一份纯属浪费 setData 体积。
+   *
+   * 取值是 `__pathPrefix` 的下标序列：`nodeList[4][1].nodeList[0]` →
+   * `__ar-4-1-0`。用全路径而不是视图内局部下标，是因为内嵌模板被
+   * `<template is>` 内联进**同一棵** shadow tree，局部下标会内外撞车；
+   * 全路径顺带让 `@for` 的多实例天然不撞（视图序号就在路径里）。
+   *
+   * 它和所标注的节点出自同一次遍历、同一次 setData，所以不可能对不上。
+   */
+  __refClass = '';
 
   constructor(public type: 'element' | 'comment' | 'text') {}
   appendChild(child: AgentNode) {
@@ -154,12 +175,38 @@ export class AgentNode {
     return [attr, dynamic].filter((part) => !!part).join(';');
   }
 
+  /**
+   * 以本节点为起点开一条小程序节点查询，语义对齐原生 `select`。
+   *
+   * 返回的就是原生 `NodesRef`，后面 `.boundingClientRect()` / `.exec()`
+   * 怎么拼由调用方决定。作用域自动落在**渲染本节点的那个 MP 实例**上
+   * （子组件的 host 元素属于父模板，所以那时是父实例）。
+   *
+   * 返回 `null` 的情况：
+   * - 模板上没写 `#`（编译期就没发这个 class）
+   * - 还没序列化过，或 lView 还没 link 上 MP 实例（子组件的 link 是异步的）
+   * - text / comment 节点（wxml 里是裸插值或注释锚点，没有可选中元素）
+   *
+   * class 会随结构变更而变（`ng-for` 插一个，后面节点整体位移），
+   * 所以**每次都要现调 `find()`**，不要把 class 字符串存下来复用。
+   */
+  find(): WechatMiniprogram.NodesRef | null {
+    if (!this.__refClass || !this.__mpRef) {
+      return null;
+    }
+    return (this.__mpRef as QueryHost)
+      .createSelectorQuery()
+      .select(`.${this.__refClass}`);
+  }
+
   toView(): MPTextData | MPElementData {
     if (this.type === 'text') {
       return { value: this.value };
     } else {
       return {
         class: this.classString(),
+        // 没 `#` 的节点连这个 key 都不发，wxml 那侧读不到就渲染成空
+        ...(this.__refClass ? { refClass: this.__refClass } : null),
         style: this.styleString(),
         property: { ...this.property },
         // class / style 已由上面两个字段汇总（还含 addClass / 动态 style），

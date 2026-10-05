@@ -8,6 +8,7 @@ export * from './platform-miniprogram';
 export {
   propertyChange,
   ComponentFinderService,
+  AgentNode,
 } from 'angular-miniprogram/platform/wx';
 /** @internal */
 export const bootstrapPage = MiniProgramCore.bootstrapPage;
