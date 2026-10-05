@@ -1,11 +1,10 @@
 import * as path from 'path';
+import { toPosix as posix } from '../util/path';
 import { rewriteComponentForWxs } from './wxs-component-rewrite';
 
 const FILE = path.resolve('/proj/src/pages/wxs/wxs.component.ts');
 const CACHED = path.resolve('/proj/.ng-cache/src/pages/wxs/wxs.component.ts');
-const TPL = path
-  .resolve('/proj/src/pages/wxs/wxs.component.html')
-  .replace(/\\/g, '/');
+const TPL = posix(path.resolve('/proj/src/pages/wxs/wxs.component.html'));
 
 function rewrite(
   source: string,
@@ -13,11 +12,6 @@ function rewrite(
 ) {
   return rewriteComponentForWxs(source, FILE, CACHED, (p) => templates.get(p));
 }
-
-function posix(p: string): string {
-  return p.replace(/\\/g, '/');
-}
-
 describe('rewriteComponentForWxs：生成给 Angular 编译的组件文件', () => {
   it('没有命中 wxs 模板时返回 null，不生成', () => {
     const src = `
@@ -44,9 +38,7 @@ describe('rewriteComponentForWxs：生成给 Angular 编译的组件文件', () 
   });
 
   it('一个文件多个组件，逐个命中', () => {
-    const TPL2 = path
-      .resolve('/proj/src/pages/wxs/second.html')
-      .replace(/\\/g, '/');
+    const TPL2 = posix(path.resolve('/proj/src/pages/wxs/second.html'));
     const src = `
       import { Component } from '@angular/core';
       @Component({ selector: 'a', templateUrl: './wxs.component.html' })
@@ -139,11 +131,11 @@ describe('rewriteComponentForWxs：生成给 Angular 编译的组件文件', () 
       export class A {}
     `;
     const r = rewrite(src)!;
-    const dir = path.dirname(FILE).replace(/\\/g, '/');
+    const dir = posix(path.dirname(FILE));
     expect(r.code).toContain(`from '@angular/core'`);
     expect(r.code).toContain(`from ${JSON.stringify(`${dir}/svc`)}`);
     expect(r.code).toContain(
-      `from ${JSON.stringify(path.resolve(path.dirname(FILE), '../up').replace(/\\/g, '/'))}`,
+      `from ${JSON.stringify(posix(path.resolve(path.dirname(FILE), '../up')))}`,
     );
     expect(r.code).toContain(
       `export { Re } from ${JSON.stringify(`${dir}/re`)}`,

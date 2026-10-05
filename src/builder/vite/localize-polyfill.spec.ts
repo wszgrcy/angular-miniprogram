@@ -138,8 +138,16 @@ describe('@angular/localize/init 注入', () => {
       return (p.load as (id: string) => string | null)(POLYFILL_ENTRY_ID);
     };
 
+    /**
+     * 声明的是绝对路径，`toPolyfillSpecifier` 会 `path.resolve(workspaceRoot, x)`
+     * 再过一道 `JSON.stringify`。Windows 上 `/abs/init.mjs` 会落到当前盘
+     * （`C:\abs\init.mjs`）且反斜杠被转义成 `\\`，所以期望值按同一套规则算，
+     * 不能写死 posix 字面量。Linux 上两者等价。
+     */
+    const imported = (p: string) => JSON.stringify(path.resolve('/w', p));
+
     it('声明了才多一行 import', () => {
-      expect(loadOf(['/abs/init.mjs'])).toContain('/abs/init.mjs');
+      expect(loadOf(['/abs/init.mjs'])).toContain(imported('/abs/init.mjs'));
       expect(loadOf([])).not.toContain('init.mjs');
       // 自己的那份永远在
       expect(loadOf([])).toContain('/abs/polyfill-entry.js');

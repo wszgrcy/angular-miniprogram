@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 import fs from 'fs-extra';
 import * as path from 'path';
+import { relativePosix } from '../util/path';
 import {
   LIBRARY_META_FILE_NAME,
   LIBRARY_META_GENERATOR,
@@ -71,9 +72,7 @@ export function registerLibraryMetaEntry(
 }
 
 function toRelativePosix(absPath: string, root: string): string {
-  return normalizeMetaKey(
-    path.relative(root, absPath).split(path.sep).join('/'),
-  );
+  return normalizeMetaKey(relativePosix(root, absPath));
 }
 
 /**

@@ -10,6 +10,7 @@
  * 到这一步已经是一份内容，没必要按来源分别校验。
  */
 
+import { isPathIn } from '../util/path';
 import type {
   MpAppConfig,
   MpPreloadRuleEntry,
@@ -237,7 +238,5 @@ export function findSubPackageByPath(
   subPackages: ResolvedSubPackage[],
   posixPath: string,
 ): ResolvedSubPackage | undefined {
-  return subPackages.find(
-    (sp) => posixPath === sp.root || posixPath.startsWith(`${sp.root}/`),
-  );
+  return subPackages.find((sp) => isPathIn(sp.root, posixPath));
 }

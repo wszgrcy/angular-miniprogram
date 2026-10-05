@@ -2,10 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Plugin } from 'vite';
 import type { PlatformFileExtname } from '../../platform/type';
-
-function toPosix(p: string): string {
-  return p.replace(/\\/g, '/');
-}
+import { toPosix } from '../../util/path';
 
 export interface NativeComponentMeta {
   /** wxml 里的标签名 */

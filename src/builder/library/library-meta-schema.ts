@@ -28,6 +28,8 @@
  */
 
 /** sidecar 文件名，写在库根（`dist/`）下。 */
+import { toModuleSpecifier } from '../util/path';
+
 export const LIBRARY_META_FILE_NAME = 'mp-library-meta.json';
 
 /**
@@ -147,7 +149,7 @@ export function isLibraryMetaFile(value: unknown): value is LibraryMetaFile {
 
 /** 把路径统一成 key 形态：正斜杠、去掉前导 `./`。 */
 export function normalizeMetaKey(p: string): string {
-  return p.replace(/\\/g, '/').replace(/^\.\//, '');
+  return toModuleSpecifier(p);
 }
 
 /** 取记录里的 listeners / properties，缺字段一律当空数组，绝不返回 undefined。 */

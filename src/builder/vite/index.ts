@@ -18,7 +18,7 @@ import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config
 import { LibraryTemplateScopeService } from '../shared/library-template-scope.service';
 import type { MpSubPackagePattern } from '../shared/type';
 import type { BudgetEntry } from '../util/angular-build-compat';
-import { toPosixPath } from '../util/asset-path';
+import { toPosixPath } from '../util/path';
 import { type MpAppConfig, getSubPackages } from './app-config';
 import {
   generateEntryPatterns,

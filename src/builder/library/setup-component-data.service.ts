@@ -1,5 +1,4 @@
 import { join, normalize, resolve, strings } from '@angular-devkit/core';
-import * as path from 'path';
 import { inject } from 'static-injector';
 import { detectComponentNames } from '../component-template-inject/change-component';
 import { ResolvedDataGroup, makeComponentKey } from '../mini-program-compiler';
@@ -61,10 +60,7 @@ export class SetupComponentDataService {
       : '';
 
     for (const componentClassName of componentNames) {
-      const key = makeComponentKey(
-        path.normalize(originFileName),
-        componentClassName,
-      );
+      const key = makeComponentKey(originFileName, componentClassName);
       const useComponentPath = this.dataGroup.useComponentPath.get(key);
       const content = this.dataGroup.outputContent.get(key);
       // 这个组件没参与本次模板编译（例如没有模板），跳过，

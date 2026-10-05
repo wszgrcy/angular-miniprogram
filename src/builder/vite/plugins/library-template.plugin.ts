@@ -19,8 +19,8 @@ import type {
   ExtraTemplateData as ScopeExtraTemplateData,
 } from '../../shared/library-template-scope.service';
 import { libraryTemplateScopeName, stripModuleQuery } from '../../util';
-import { toPosixPath } from '../../util/asset-path';
 import { transformMiniProgramStyle } from '../../util/mini-program-style';
+import { toPosixPath } from '../../util/path';
 
 /**
  * 产物路径归一：正斜杠 + 剥前导 `/`。

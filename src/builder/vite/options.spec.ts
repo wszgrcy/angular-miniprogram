@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { toPosix } from '../util/path';
 import {
   isExternalSpecifier,
   mergeDefine,
@@ -163,7 +164,7 @@ describe('toAbsoluteFileReplacements', () => {
       ],
       workspace,
     );
-    expect(first).toEqual({ replace: src, with: prod });
+    expect(first).toEqual({ replace: toPosix(src), with: toPosix(prod) });
 
     const [legacy] = toAbsoluteFileReplacements(
       [
@@ -174,7 +175,24 @@ describe('toAbsoluteFileReplacements', () => {
       ],
       workspace,
     );
-    expect(legacy).toEqual({ replace: src, with: prod });
+    expect(legacy).toEqual({ replace: toPosix(src), with: toPosix(prod) });
+  });
+
+  /**
+   * 钉住「输出必须是 posix 绝对路径」这条契约。
+   *
+   * Windows 上 `path.join` 会交回 `C:\a\src\environment.ts`，而 analog 的
+   * `replaceFiles` 拿 `resolvedId.endsWith(replace)` 跟 vite 的
+   * `C:/a/src/environment.ts` 比 —— 带反斜杠就永不命中，替换静默失效。
+   */
+  it('输出不含反斜杠（Windows）', () => {
+    const [first] = toAbsoluteFileReplacements(
+      [{ replace: 'src/environment.ts', with: 'src/environment.prod.ts' }],
+      workspace,
+    );
+    expect(first.replace).not.toContain('\\');
+    expect(first.with).not.toContain('\\');
+    expect(path.isAbsolute(first.replace)).toBe(true);
   });
 
   it('路径写错当场报错，而不是静默不生效', () => {

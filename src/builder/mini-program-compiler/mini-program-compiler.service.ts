@@ -22,6 +22,7 @@ import {
 } from '../library/library-meta-schema';
 import { BuildPlatform } from '../platform/platform';
 import { COMPONENT_META } from '../token/component.token';
+import { pathKey, toNativePath } from '../util/path';
 import {
   recordStrippedTemplate,
   stripWxsFromAst,
@@ -298,10 +299,10 @@ export class MiniProgramCompilerService {
         };
         assertTemplateParsed(
           meta,
-          `${path.normalize(fileName)}#${classDeclaration.name?.getText() ?? '?'}`,
+          makeComponentKey(fileName, classDeclaration.name?.getText() ?? '?'),
         );
         const componentKey = makeComponentKey(
-          path.normalize(fileName),
+          fileName,
           classDeclaration.name?.getText() ?? '',
         );
         this.resolvedDataGroup.style.set(
@@ -316,7 +317,7 @@ export class MiniProgramCompilerService {
         this.resolvedDataGroup.inlineStyle.set(
           componentKey,
           this.resolveInlineStyles(
-            path.normalize(fileName),
+            fileName,
             classDeclaration.name?.getText() ?? '',
             classDeclaration,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -353,7 +354,7 @@ export class MiniProgramCompilerService {
     // 同时把每个组件用到的模块记下来，驱动后续 .wxs 产物落盘。
     const wxsModules = new Map<string, WxsDeclaration[]>();
     for (const [classDeclaration, meta] of this.componentMap) {
-      const componentSourceFile = path.normalize(
+      const componentSourceFile = pathKey(
         classDeclaration.getSourceFile().fileName,
       );
       const componentKey = makeComponentKey(
@@ -394,9 +395,7 @@ export class MiniProgramCompilerService {
     }
 
     for (const [classDeclaration, meta] of this.componentMap) {
-      const fileName = path.normalize(
-        classDeclaration.getSourceFile().fileName,
-      );
+      const fileName = pathKey(classDeclaration.getSourceFile().fileName);
       let directiveMatcher: SelectorMatcher | undefined;
       const declarations = this.resolveTemplateDeclarations(
         classDeclaration,
@@ -595,7 +594,9 @@ export class MiniProgramCompilerService {
     return instance.compile();
   }
   private resolveStyleUrl(componentPath: string, styleUrl: string) {
-    return path.normalize(path.resolve(path.dirname(componentPath), styleUrl));
+    // 这里要的是**可用**路径（结果直接给 fs.existsSync / ng-packagr），
+    // 所以是 toNativePath 而不是 pathKey。
+    return toNativePath(path.resolve(path.dirname(componentPath), styleUrl));
   }
   /**
    * 把 `@Component.styleUrls` 解析成绝对路径，逐个验文件在不在。

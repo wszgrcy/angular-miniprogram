@@ -19,7 +19,7 @@ import {
   PlatformType,
   findUnsupportedCapabilities,
 } from '../platform/platform';
-import { toPosixPath } from '../util/asset-path';
+import { isPathIn, stripPathPrefix, toPosixPath } from '../util/path';
 import {
   type MpAppConfig,
   type MpSubPackagePage,
@@ -138,9 +138,7 @@ export function groupSubPackages(entries: MpSubPackageEntry[]): MpSubPackage[] {
       continue;
     }
     const full = toPosixPath(entry.path);
-    const page = full.startsWith(`${root}/`)
-      ? full.slice(root.length + 1)
-      : full;
+    const page = stripPathPrefix(root, full) ?? full;
     const current = byRoot.get(root);
     if (current) {
       (current.pages ??= []).push(page);

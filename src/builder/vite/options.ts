@@ -4,6 +4,7 @@ import {
   normalizeOptimizationOptions,
   normalizeSourceMapOptions,
 } from '../util/angular-build-compat';
+import { toPosix } from '../util/path';
 
 /**
  * 把 angular.json 里「一个选项多种写法」的字段归一成 builder 内部好用的形状。
@@ -66,9 +67,7 @@ export function resolveOptimization(
 export function resolveSourcemap(
   sourceMap: SourceMapOption | undefined,
 ): boolean | 'hidden' {
-  const normalized = normalizeSourceMapOptions(
-    (sourceMap ?? false) as never,
-  );
+  const normalized = normalizeSourceMapOptions((sourceMap ?? false) as never);
   if (normalized.hidden) {
     return 'hidden';
   }
@@ -145,7 +144,10 @@ export function resolveCssPreprocessorOptions(
   if (!includePaths && !sass) {
     return {};
   }
-  const perLanguage = { ...(sass ?? {}), ...(includePaths ? { includePaths } : {}) };
+  const perLanguage = {
+    ...(sass ?? {}),
+    ...(includePaths ? { includePaths } : {}),
+  };
   return { scss: perLanguage, sass: perLanguage };
 }
 
@@ -155,6 +157,18 @@ export function resolveCssPreprocessorOptions(
  * 交给 @angular-devkit 的实现：它同时认 `replace/with` 和老的
  * `src/replaceWith` 两种写法，并且会校验两边文件都存在 —— 路径写错时
  * 当场报错，比让替换静默不生效好查。
+ *
+ * 拿到结果后再把两侧统一成 posix 绝对路径（`C:/a/b.ts`），因为下游两个
+ * 消费方比的都是 posix 形态的文件名：
+ *
+ *  - analog 的 `replaceFiles` 插件用 `resolvedId.endsWith(replace)` 匹配，
+ *    而 vite 解析出的 id 在 Windows 上是 `C:/a/b.ts`；devkit 只做了
+ *    `path.join(workspaceRoot, x)`，Windows 上得到 `C:\a\b.ts`，`endsWith`
+ *    永不命中——**替换静默失效**，生产构建拿着 dev 的 environment 上线。
+ *  - 同一个数组里 wxs-strip push 进来的替换项已经是 `toPosix()` 过的，
+ *    两边必须同一个口径，否则同一批数据两种形状。
+ *
+ * Linux/macOS 上 `toPosix` 是恒等变换，行为不变。
  */
 export function toAbsoluteFileReplacements(
   fileReplacements:
@@ -165,5 +179,11 @@ export function toAbsoluteFileReplacements(
   if (!fileReplacements?.length) {
     return [];
   }
-  return normalizeFileReplacementList(fileReplacements as never, workspaceRoot);
+  return normalizeFileReplacementList(
+    fileReplacements as never,
+    workspaceRoot,
+  ).map((item) => ({
+    replace: toPosix(path.resolve(item.replace)),
+    with: toPosix(path.resolve(item.with)),
+  }));
 }

@@ -14,6 +14,7 @@ import {
   splitComponentKey,
 } from '../mini-program-compiler';
 import { BuildPlatform } from '../platform/platform';
+import { isSamePath, pathKey, toNativePath } from '../util/path';
 import { planSharedWxsEmit } from '../wxs/wxs-declare';
 import { parseWxsSource } from '../wxs/wxs-source';
 import { detectEntryComponent } from './entry-component';
@@ -148,9 +149,13 @@ export class MiniProgramApplicationAnalysisService {
       [];
     metaMap.wxsModules?.forEach((decls, key) => {
       const { sourceFile } = splitComponentKey(key);
+      // key 里的 sourceFile 是 pathKey 形态（身份令牌，Windows 上是 `/C/a/b.ts`），
+      // 要拿去拼真实路径必须先 toNativePath，否则 path.resolve 会把它当成
+      // 「C 盘下的 \C\a\b.ts」。
+      const componentFile = toNativePath(sourceFile);
       for (const decl of decls) {
         // src 相对**组件源文件**解析，所以共享脚本写 ../common/format.wxs 即可
-        const srcPath = path.resolve(path.dirname(sourceFile), decl.src);
+        const srcPath = path.resolve(path.dirname(componentFile), decl.src);
         if (!fs.existsSync(srcPath)) {
           throw new Error(
             `wxs 模块 "${decl.module}" 声明的 src="${decl.src}" 解析后不存在：${srcPath}`,
@@ -369,12 +374,12 @@ export class MiniProgramApplicationAnalysisService {
 
     while (findList.length) {
       const module = findList.shift();
-      const moduleList = this.dependencyUseModule.get(path.normalize(module!));
+      const moduleList = this.dependencyUseModule.get(pathKey(module!));
       if (moduleList && moduleList.length) {
         findList.push(...moduleList);
       } else {
-        maybeEntryPath = this.pagePatternList.find(
-          (item) => path.normalize(item.src) === path.normalize(module!),
+        maybeEntryPath = this.pagePatternList.find((item) =>
+          isSamePath(item.src, module!),
         );
         if (maybeEntryPath) {
           const sourceFile = this.tsProgram.getSourceFile(maybeEntryPath.src);
@@ -399,8 +404,7 @@ export class MiniProgramApplicationAnalysisService {
             node &&
             !ts.isImportSpecifier(node) &&
             !ts.isExportSpecifier(node) &&
-            path.normalize(node.getSourceFile().fileName) ===
-              path.normalize(maybeEntryPath.src)
+            isSamePath(node.getSourceFile().fileName, maybeEntryPath.src)
           ) {
             const declaredName = ts.isClassDeclaration(node)
               ? node.name?.getText()
@@ -448,9 +452,9 @@ export class MiniProgramApplicationAnalysisService {
           const importComponentPath =
             path.resolve(
               path.dirname(maybeEntryPath.src),
-              path.normalize(relativeImportComponentPath),
+              relativeImportComponentPath,
             ) + '.ts';
-          if (importComponentPath === path.normalize(fileName)) {
+          if (isSamePath(importComponentPath, fileName)) {
             break;
           }
 
@@ -484,14 +488,10 @@ export class MiniProgramApplicationAnalysisService {
     if (!module) {
       throw new Error(`模块未被解析,文件名${filePath},模块名${moduleName}`);
     }
-    const useList =
-      this.dependencyUseModule.get(path.normalize(module.resolvedFileName)) ||
-      [];
+    const depKey = pathKey(module.resolvedFileName);
+    const useList = this.dependencyUseModule.get(depKey) || [];
     useList.push(filePath);
-    this.dependencyUseModule.set(
-      path.normalize(module.resolvedFileName),
-      useList,
-    );
+    this.dependencyUseModule.set(depKey, useList);
   }
   private augmentResolveModuleNames(
     host: ts.CompilerHost,

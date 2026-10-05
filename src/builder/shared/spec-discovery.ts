@@ -1,5 +1,6 @@
 import * as glob from 'glob';
 import * as path from 'path';
+import { toPosix } from '../util/path';
 
 function globAsync(pattern: string, options: glob.IOptions) {
   return new Promise<string[]>((resolvePromise, reject) =>
@@ -38,7 +39,7 @@ export async function globSpecFiles(options: {
     });
     for (const f of files) {
       const abs = path.resolve(options.cwd, f);
-      const rel = f.replace(/\.ts$/, '').split(path.sep).join('/');
+      const rel = toPosix(f.replace(/\.ts$/, ''));
       found.set(abs, { abs, rel });
     }
   }

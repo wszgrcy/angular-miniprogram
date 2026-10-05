@@ -1,5 +1,6 @@
 import * as path from 'path';
 import ts from 'typescript';
+import { toPosix } from '../util/path';
 
 /**
  * 生成「给 Angular 编译的那份组件文件」。
@@ -48,10 +49,6 @@ const TEMPLATE_URL = 'templateUrl';
 const TEMPLATE = 'template';
 const STYLE_URL = 'styleUrl';
 const STYLE_URLS = 'styleUrls';
-
-function toPosixPath(p: string): string {
-  return p.replace(/\\/g, '/');
-}
 
 function stringLiteralValue(node: ts.Node | undefined): string | undefined {
   if (
@@ -142,8 +139,8 @@ export function rewriteComponentForWxs(
       return;
     }
     resources.push({
-      from: toPosixPath(path.resolve(dir, url)),
-      to: toPosixPath(path.resolve(cachedDir, url)),
+      from: toPosix(path.resolve(dir, url)),
+      to: toPosix(path.resolve(cachedDir, url)),
     });
   };
 
@@ -158,7 +155,7 @@ export function rewriteComponentForWxs(
           // 在这里报错会为了一个无关组件卡住整个构建。
           continue;
         }
-        const abs = toPosixPath(path.resolve(dir, url));
+        const abs = toPosix(path.resolve(dir, url));
         const stripped = strippedForFile(abs);
         if (stripped === undefined) {
           /**
@@ -237,7 +234,7 @@ export function rewriteComponentForWxs(
     edits.push({
       start: node.getStart(sf),
       end: node.getEnd(),
-      text: JSON.stringify(toPosixPath(path.resolve(dir, v))),
+      text: JSON.stringify(toPosix(path.resolve(dir, v))),
     });
   };
 

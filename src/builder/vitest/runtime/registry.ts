@@ -7,6 +7,8 @@
  * 因为表里的 key 是构建期给的相对短名（`spec/foo/bar.spec.ts`），
  * 而宿主给的是 `<repo>/test/.../foo/bar.spec.ts`。
  */
+import { toModuleSpecifier } from '../../util/path';
+
 export interface TestModuleRegistry {
   load(filepath: string): unknown;
   /** 反查：包内 key，用于日志与错误信息 */
@@ -15,8 +17,12 @@ export interface TestModuleRegistry {
 
 export type TestModuleMap = Readonly<Record<string, () => unknown>>;
 
+/**
+ * 宿主给的绝对路径与表里的相对短名只能按后缀比，两边先过同一个
+ * `toModuleSpecifier`（posix + 去前导 `./`）再比。
+ */
 function normalize(value: string): string {
-  return value.replace(/\\/g, '/').replace(/^\.\//, '');
+  return toModuleSpecifier(value);
 }
 
 export function createTestModuleRegistry(

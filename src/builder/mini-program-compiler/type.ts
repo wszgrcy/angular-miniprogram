@@ -1,3 +1,4 @@
+import { pathKey } from '../util/path';
 import type { WxsDeclaration } from '../wxs/wxs-declare';
 import { MetaCollection } from './meta-collection';
 
@@ -33,11 +34,26 @@ export interface UseComponent {
  */
 export const COMPONENT_KEY_SEPARATOR = '#';
 
+/**
+ * 三个 map 的 key 统一用 `源文件路径#组件类名` 的复合格式。
+ *
+ * 以前只按源文件路径做 key，同文件多组件时后编译的会把先编译的覆盖掉：
+ * 实测两个组件共用一个源文件时，先那个组件的模板直接丢失（A=0 个 wxml），
+ * 且所有引用该文件的 entry 都渲染成最后那个组件的模板。
+ *
+ * 用 `#` 分隔是因为 POSIX / Windows 路径里都不会出现这个字符。
+ *
+ * **源文件段在这里统一过 `pathKey`**：这个 key 跨好几个模块生产与消费
+ * （compiler 写、setup-component-data / wxs-strip 读），以前各处自己
+ * `path.normalize` 一下，只要有一处忘了或换了形态（TS 给 `C:/a`、
+ * `path.normalize` 给 `C:\a`）就整批查不中，而且只是查不中、不报错。
+ * 归一收在这一个函数里，调用方直接传原始 fileName。
+ */
 export function makeComponentKey(
   sourceFile: string,
   componentClassName: string,
 ): string {
-  return `${sourceFile}${COMPONENT_KEY_SEPARATOR}${componentClassName}`;
+  return `${pathKey(sourceFile)}${COMPONENT_KEY_SEPARATOR}${componentClassName}`;
 }
 
 export function splitComponentKey(key: string): {

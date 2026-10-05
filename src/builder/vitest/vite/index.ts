@@ -12,7 +12,7 @@ import {
 import { createMiniProgramTestStack } from '../../shared/mini-program-test-stack';
 import { globSpecFiles } from '../../shared/spec-discovery';
 import type { MpSubPackagePattern } from '../../shared/type';
-import { resolveNative, toPosixPath } from '../../util/asset-path';
+import { resolveNative, toPosixPath } from '../../util/path';
 import {
   POLYFILL_ENTRY_ID,
   buildPlatformDefine,

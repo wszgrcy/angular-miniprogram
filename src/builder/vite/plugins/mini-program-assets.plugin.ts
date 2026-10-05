@@ -27,8 +27,8 @@ import {
   TS_SYSTEM,
 } from '../../shared/token';
 import type { PagePattern } from '../../shared/type';
-import { toPosixPath } from '../../util/asset-path';
 import { transformMiniProgramStyle } from '../../util/mini-program-style';
+import { isPathIn, toNativePath, toPosixPath } from '../../util/path';
 import type { CopiedAsset } from '../copy-assets';
 import { mergeConfig } from '../merge-config';
 import type { MpConfigBundle } from '../mp-config';
@@ -80,9 +80,7 @@ export function createNodeTsSystem(
  * 读不到就当空对象，构建器算出来的字段就是全部输出；不是对象直接报错，
  * 静默丢掉用户内容比报错难查得多。
  */
-function readJsonObject(
-  file: string | undefined,
-): Record<string, unknown> {
+function readJsonObject(file: string | undefined): Record<string, unknown> {
   if (!file || !fs.existsSync(file)) {
     return {};
   }
@@ -243,7 +241,10 @@ function fileStyleEntries(
   paths: Iterable<string>,
 ): StyleCompileEntry[] {
   return [...paths].map((p) => {
-    const key = path.normalize(p);
+    // 这里要的是**可用**路径（key 同时当 bundleFile 的入参，ng-packagr 拿它读盘），
+    // 所以用 toNativePath 而不是 pathKey：后者是身份令牌（`/C/a/b`），
+    // 交给 fs 在 Windows 上直接读不到。
+    const key = toNativePath(p);
     return { key, bundle: () => styleProcessor.bundleFile(key) };
   });
 }
@@ -324,7 +325,7 @@ function emitStyles(
   };
   resolved.style.forEach((sourceList, outPath) => {
     for (const s of sourceList) {
-      append(outPath, compiled.files.get(path.normalize(s)) ?? '');
+      append(outPath, compiled.files.get(toNativePath(s)) ?? '');
     }
   });
   resolved.inlineStyle.forEach((sourceList, outPath) => {
@@ -362,7 +363,7 @@ function isEntryChunk(
     posix.startsWith('pages/') ||
     posix.startsWith('components/') ||
     posix.startsWith('library/') ||
-    (!!tabbarDir && posix.startsWith(`${tabbarDir}/`))
+    (!!tabbarDir && isPathIn(tabbarDir, posix))
   );
 }
 
@@ -708,7 +709,7 @@ export function miniProgramAssetsPlugin(
         );
         const globalCss = transformMiniProgramStyle(
           globalStyleSources
-            .map((s) => compiledGlobal.get(path.normalize(s)) ?? '')
+            .map((s) => compiledGlobal.get(toNativePath(s)) ?? '')
             .join('\n'),
           {
             warn: (message) =>

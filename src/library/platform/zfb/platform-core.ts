@@ -93,10 +93,20 @@ class MiniProgramCoreFactory extends BaseFactory {
   }
 }
 export const MiniProgramCore = new MiniProgramCoreFactory();
-export {
-  PAGE_TOKEN,
-  MiniProgramRenderer,
-  MiniProgramRendererFactory,
-  ComponentFinderService,
-  propertyChange,
-} from 'angular-miniprogram/platform/default';
+
+/**
+ * 平台包必须能被当成 `platform/wx` 的**替身**：构建时 `platformReplacementAlias()`
+ * 把 `angular-miniprogram/platform/wx` 整个换成 `angular-miniprogram/platform/<平台>`，
+ * 换完之后主包那句 `export { AgentNode, ... } from 'angular-miniprogram/platform/wx'`
+ * 就得由这里来兑现。
+ *
+ * 所以这里必须 `export *`，不能手写名单。之前这里是一份手抄的
+ * `{ PAGE_TOKEN, MiniProgramRenderer, MiniProgramRendererFactory,
+ * ComponentFinderService, propertyChange }`，`default` 新增 `AgentNode`
+ * （viewchild query）时没同步，zfb/bd/qq 三家构建当场
+ * `[MISSING_EXPORT] "AgentNode" is not exported by ...platform-zfb.mjs`。
+ *
+ * 本地那份 `MiniProgramCore` 会盖掉 star 导出里的同名项（ES 规范：显式导出优先于
+ * `export *`），这正是我们要的——平台替换要换的就是它。
+ */
+export * from 'angular-miniprogram/platform/default';

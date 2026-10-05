@@ -1,17 +1,14 @@
 import * as path from 'path';
 import type { Plugin } from 'vite';
+import { pathKey } from '../../util/path';
 import { MpAppConfig, resolveSubPackages } from '../app-config';
 import { unwrapEntryVirtualId } from './entry-bootstrap.plugin';
 
 /** 只处理这些扩展名的源文件归属判定 */
 const SOURCE_EXT = /\.(t|j)sx?$/;
 
-function toPosix(p: string): string {
-  return p.replace(/\\/g, '/');
-}
-
 /**
- * 归属判定专用的路径归一化：posix 分隔符 + 小写盘符。
+ * 归属判定用 `pathKey`（posix 分隔符 + 小写盘符），全仓同一把尺。
  *
  * Windows 下 `sourceRoot` 走 `getSystemPath()` 拿到的是 `C:\...`（大写盘符），
  * 而 bundler 回传的 moduleIds 盘符大小写并不保证一致（取决于解析入口是谁给的）。
@@ -20,14 +17,10 @@ function toPosix(p: string): string {
  *  - `chunkFileNames` 不再把分包 chunk 归进分包目录（分包代码全落主包，白拆）；
  *  - 跨分包 / 独立分包校验全部漏报（该拦的拦不住）。
  *
- * Windows 文件系统本身大小写不敏感，所以统一小写盘符不会引入误判；
- * posix 下路径不带盘符，这个 replace 是 no-op，不影响大小写敏感的 Linux。
+ * 见 `98a3f96`：本文件以前自带一份 toPosix + normalizeId、各修各的那一处，
+ * 现在归到 util/path。
  */
-function normalizeId(p: string): string {
-  return toPosix(p).replace(/^([A-Za-z]):/, (_m, drive: string) =>
-    drive.toLowerCase(),
-  );
-}
+const normalizeId = pathKey;
 
 export interface SubpackageChunkPluginOptions {
   /** 已解析的 app 配置（含 subpackages） */
@@ -60,7 +53,7 @@ export function subpackageChunkPlugin(
   options: SubpackageChunkPluginOptions,
 ): Plugin {
   const subPackages = resolveSubPackages(options.appConfig);
-  const sourceRoot = toPosix(options.sourceRoot);
+  const sourceRoot = pathKey(options.sourceRoot);
   // 分包源码绝对目录，按长度降序，保证最深匹配优先
   const subSrcDirs = subPackages
     .map((sp) => ({

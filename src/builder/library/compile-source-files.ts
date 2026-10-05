@@ -17,7 +17,6 @@ import {
 } from 'ng-packagr/src/lib/ts/cache-compiler-host';
 import * as log from 'ng-packagr/src/lib/utils/log';
 import { join } from 'node:path';
-import path from 'path';
 import { Injector } from 'static-injector';
 import ts from 'typescript';
 import {
@@ -26,6 +25,7 @@ import {
 } from '../mini-program-compiler';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
+import { isSamePath } from '../util/path';
 import { AddDeclarationMetaDataService } from './add-declaration-metadata.service';
 import { OutputTemplateMetadataService } from './output-template-metadata.service';
 import { SetupComponentDataService } from './setup-component-data.service';
@@ -345,8 +345,10 @@ export async function compileSourceFiles(
         const sourceFile = sourceFiles && sourceFiles[0];
         if (sourceFile) {
           if (
-            normalize(entryFileName) ===
-            normalize(sourceFile.fileName.replace(/\.ts$/, '.js'))
+            isSamePath(
+              entryFileName,
+              sourceFile.fileName.replace(/\.ts$/, '.js'),
+            )
           ) {
             injector.get(OutputTemplateMetadataService).run(fileName, data);
           }
@@ -354,7 +356,7 @@ export async function compileSourceFiles(
             .get(SetupComponentDataService)
             .run(
               data,
-              path.normalize(sourceFile.fileName),
+              sourceFile.fileName,
               stylesheetProcessor! as CustomStyleSheetProcessor,
             );
         }

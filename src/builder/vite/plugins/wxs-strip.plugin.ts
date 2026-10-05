@@ -5,6 +5,7 @@ import {
   type WxsAnalysisRef,
   splitComponentKey,
 } from '../../mini-program-compiler/type';
+import { pathKey, toAbsolutePosix, toPosix } from '../../util/path';
 import { lookupStrippedByContent } from '../../wxs/wxs-angular-strip';
 import { rewriteComponentForWxs } from '../../wxs/wxs-component-rewrite';
 
@@ -37,10 +38,6 @@ export interface WxsStripPluginOptions {
     current: WxsAnalysisRef;
   };
   watch: boolean;
-}
-
-function toPosix(p: string): string {
-  return p.replace(/\\/g, '/');
 }
 
 function readFileOrNull(file: string): string | null {
@@ -91,7 +88,15 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
    * 给 resolveId 认「已经被别的插件改到 cache 上」的解析结果用，
    * 理由见 resolveId 里的注释。
    */
-  const redirectedTargets = new Set<string>();
+  /**
+   * `pathKey(cache 绝对路径)` -> `toPosix(cache 绝对路径)`。
+   *
+   * 给 resolveId 认「已经被别的插件改到 cache 上」的解析结果用，理由见 resolveId 里的注释。
+   * 查表用 pathKey（盘符大小写不敏感），但**返回的是我们自己拼的那份
+   * `toPosix(cached)`**：返回归一后的 key 会让同一个文件以两种盘符大小写
+   * 进入模块图，被当成两个模块。
+   */
+  const redirectedTargets = new Map<string, string>();
 
   const rebuild = (): void => {
     /** 被改写过的组件 key */
@@ -109,11 +114,15 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
      * fileReplacements 是文件级的，整档只能换一次。
      */
     const components = [
-      ...new Set(
-        [...touched].map((key) =>
-          toPosix(path.resolve(splitComponentKey(key).sourceFile)),
-        ),
-      ),
+      ...new Map(
+        [...touched].map((key) => {
+          // key 里的 sourceFile 是 pathKey 形态（身份令牌），要变回可用路径
+          // 必须走 toAbsolutePosix，不能 path.resolve —— 后者在 Windows 上会
+          // 把 `/C/a/b.ts` 当成「C 盘下的 \C\a\b.ts」。
+          const file = toAbsolutePosix(splitComponentKey(key).sourceFile);
+          return [pathKey(file), file] as const;
+        }),
+      ).values(),
     ];
 
     const ours: Array<{ replace: string; with: string }> = [];
@@ -145,8 +154,11 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
       }
       writeIfChanged(cached, rewritten.code);
       ours.push({ replace: component, with: toPosix(cached) });
-      redirect.set(component, toPosix(cached));
-      redirectedTargets.add(toPosix(cached));
+      // redirect 是我们自己的查表，用 pathKey；上面 push 给 analog 的
+      // replace/with 用 toPosix——那边是第三方插件拿 endsWith 去和 vite 的
+      // id 比，跟着我们降盘符反而对不上。
+      redirect.set(pathKey(component), toPosix(cached));
+      redirectedTargets.set(pathKey(cached), toPosix(cached));
     }
 
     options.fileReplacements.length = 0;
@@ -179,7 +191,7 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
       if (!resolved) {
         return null;
       }
-      const resolvedId = toPosix(path.resolve(resolved.id));
+      const resolvedId = pathKey(resolved.id);
       const hit = redirect.get(resolvedId);
       if (hit) {
         return hit;
@@ -199,7 +211,7 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
        *      Angular 那份没剥离 wxs 的模板被编进 js（wxml 却还是对的）。
        * 所以只要解析结果落在我们的 cache 上，就得由我们把它认下来。
        */
-      return redirectedTargets.has(resolvedId) ? resolvedId : null;
+      return redirectedTargets.get(resolvedId) ?? null;
     },
 
     async buildStart() {

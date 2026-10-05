@@ -13,6 +13,7 @@ import {
 } from '../../../test/util/file';
 import { memoize } from '../../../test/util/memoize';
 import { PlatformType } from '../platform/platform';
+import { toPosix } from '../util/path';
 import { runViteBuilder } from './index';
 
 /**
@@ -263,7 +264,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       ).map(String);
       const cut = `/${outDir}/`;
       const relOf = (f: string) => {
-        const p = f.replace(/\\/g, '/');
+        const p = toPosix(f);
         const at = p.lastIndexOf(cut);
         return at === -1 ? p : p.slice(at + cut.length);
       };

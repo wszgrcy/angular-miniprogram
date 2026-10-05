@@ -1,4 +1,4 @@
-import * as path from 'path';
+import { pathKey, toNativePath } from '../util/path';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -116,29 +116,33 @@ export function planSharedWxsEmit(
   sharedDir: string,
   extname: string,
 ): { outPath: string; module: string; source: string }[] {
-  const moduleToSource = new Map<string, string>();
+  const moduleToSource = new Map<string, { source: string; norm: string }>();
   const plan: { outPath: string; module: string; source: string }[] = [];
   const emitted = new Set<string>();
 
   for (const e of entries) {
-    const norm = path.normalize(e.resolvedSource);
+    // 两份分开：`source` 要给 fs 读盘（可用路径），`norm` 只用来判
+    // 「同名不同源」（身份令牌）。归一后的形态开头多一个斜杠，
+    // 直接拿去 open 在 Windows 上会变成 `C:\C\...`。
+    const source = toNativePath(e.resolvedSource);
+    const norm = pathKey(source);
     const prev = moduleToSource.get(e.module);
-    if (prev !== undefined && prev !== norm) {
+    if (prev !== undefined && prev.norm !== norm) {
       throw new Error(
         `wxs 模块名 "${e.module}" 指向了两个不同的源文件：\n` +
-          `  ${prev}\n  ${norm}\n` +
+          `  ${prev.source}\n  ${source}\n` +
           `集中落盘会撞同一个产物 ${sharedDir}/${e.module}${extname}，` +
           `必须让模块名与源文件一一对应。`,
       );
     }
-    moduleToSource.set(e.module, norm);
+    moduleToSource.set(e.module, { source, norm });
 
     const outPath = `${sharedDir}/${e.module}${extname}`;
     if (emitted.has(outPath)) {
       continue;
     }
     emitted.add(outPath);
-    plan.push({ outPath, module: e.module, source: norm });
+    plan.push({ outPath, module: e.module, source });
   }
   return plan;
 }

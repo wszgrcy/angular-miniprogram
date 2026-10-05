@@ -15,7 +15,12 @@ import {
   isCustomTabbarOutput,
 } from '../shared/entry-component';
 import type { MpSubPackagePattern, PagePattern } from '../shared/type';
-import { normalizeAssetPatternsSafe, toPosixPath } from '../util/asset-path';
+import {
+  normalizeAssetPatternsSafe,
+  pathKey,
+  relativePosix,
+  toPosixPath,
+} from '../util/path';
 import { mpEntryVirtualId } from './plugins/entry-bootstrap.plugin';
 
 function globAsync(pattern: string, options: glob.IOptions) {
@@ -184,10 +189,7 @@ function relativeSourceRoot(
   workspaceRoot: string,
   absoluteProjectSourceRoot: Path,
 ): string {
-  return path
-    .relative(workspaceRoot, getSystemPath(absoluteProjectSourceRoot))
-    .split(path.sep)
-    .join('/');
+  return relativePosix(workspaceRoot, getSystemPath(absoluteProjectSourceRoot));
 }
 
 /**
@@ -254,7 +256,7 @@ export function tsConfigFileNames(tsconfigPath: string): Set<string> {
     {},
     host,
   );
-  return new Set((parsed?.fileNames ?? []).map((f) => path.normalize(f)));
+  return new Set((parsed?.fileNames ?? []).map((f) => pathKey(f)));
 }
 
 export async function generateEntryPatterns(options: {
@@ -327,7 +329,7 @@ export async function generateEntryPatterns(options: {
   // 否则同一个文件会被两个 pattern 各产一份产物
   const claimed = new Set(
     [...pageList, ...subPackageList, ...tabbarList].map((item) =>
-      path.normalize(item.src),
+      pathKey(item.src),
     ),
   );
   const program = tsConfigFileNames(
@@ -342,10 +344,10 @@ export async function generateEntryPatterns(options: {
     )
   ).filter(
     (item) =>
-      !claimed.has(path.normalize(item.src)) &&
+      !claimed.has(pathKey(item.src)) &&
       // tsconfig 一个文件都没编（空工程、或路径写错）时不过滤，
       // 免得把「tsconfig 配错了」伪装成「没有组件」
-      (!program.size || program.has(path.normalize(item.src))),
+      (!program.size || program.has(pathKey(item.src))),
   );
 
   return { pageList, subPackageList, componentList, tabbarList };

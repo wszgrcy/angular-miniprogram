@@ -184,7 +184,14 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     expect(result.result?.success).toBeTruthy();
 
     const base = result.result!.baseOutputPath as string;
-    const names = fs.readdirSync(base, { recursive: true }).map(String);
+    /**
+     * `readdirSync(..., { recursive: true })` 在 Windows 上交回的是
+     * `pages\base-tap\base-tap-entry.js`，而下面全按 `a/b/c` 查表，
+     * 不归一就会「构建绿了但文件一个也找不到」。Linux/macOS 上是恒等变换。
+     */
+    const names = fs
+      .readdirSync(base, { recursive: true })
+      .map((n) => String(n).split(path.win32.sep).join(path.posix.sep));
     const files = new Map(
       names
         .filter((n) => fs.statSync(path.join(base, n)).isFile())

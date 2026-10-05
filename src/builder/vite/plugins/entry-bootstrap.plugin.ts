@@ -6,6 +6,7 @@ import {
   detectEntryComponentFromSource,
 } from '../../shared/entry-component';
 import type { PagePattern } from '../../shared/type';
+import { toPosix } from '../../util/path';
 
 /**
  * 虚拟入口模块前缀（`\0` 是 rollup 的虚拟模块约定）。
@@ -18,13 +19,11 @@ const MP_ENTRY_VIRTUAL = '\0mp-entry:';
 /**
  * 文件路径 → 模块说明符。
  *
- * 只翻分隔符，**不能**走 toPosixPath：它还会剥前导 `/`，而这里的绝对路径
- * 一旦少了开头的 `/`，生成出来的 `import 'workspace/x/y.ts'` 就被当成裸
- * 模块名，解析不到。
+ * 用 `toPosix`（只翻分隔符），**不能**走 `toPosixPath`：它还会剥前导 `/`，
+ * 而这里的绝对路径一旦少了开头的 `/`，生成出来的 `import 'workspace/x/y.ts'`
+ * 就被当成裸模块名，解析不到。
  */
-function toModulePath(p: string): string {
-  return p.replace(/\\/g, '/');
-}
+const toModulePath = toPosix;
 
 /** 入口源文件 → 虚拟入口模块 id */
 export function mpEntryVirtualId(src: string): string {

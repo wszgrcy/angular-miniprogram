@@ -3,7 +3,7 @@ import { type Path, normalize } from '@angular-devkit/core';
 import * as fs from 'fs';
 import * as glob from 'glob';
 import * as path from 'path';
-import { normalizeAssetPatternsSafe } from '../util/asset-path';
+import { normalizeAssetPatternsSafe, toPosix } from '../util/path';
 
 function globAsync(pattern: string, options: glob.IOptions) {
   return new Promise<string[]>((resolvePromise, reject) =>
@@ -61,10 +61,7 @@ export async function collectAssets(
       }
       // glob 匹配到目录时（如 `assets/**` 里的目录项）跳过
       result.push({
-        outputRelPath: path
-          .join(pattern.output, file)
-          .split(path.sep)
-          .join('/'),
+        outputRelPath: toPosix(path.join(pattern.output, file)),
         sourcePath,
       });
     }

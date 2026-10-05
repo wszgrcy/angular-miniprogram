@@ -35,6 +35,7 @@ import {
   LibraryMetaFile,
 } from './library/library-meta-schema';
 import { PlatformType } from './platform/platform';
+import { toPosix } from './util/path';
 import { runViteBuilder as runBuilder } from './vite';
 
 const angularConfig = {
@@ -229,9 +230,12 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         fs.readFileSync(path.join(distRoot, 'forms', 'package.json'), 'utf8'),
       );
       expect(
-        path
-          .relative(distRoot, path.resolve(distRoot, 'forms', formsPkg.typings))
-          .replace(/\\/g, '/'),
+        toPosix(
+          path.relative(
+            distRoot,
+            path.resolve(distRoot, 'forms', formsPkg.typings),
+          ),
+        ),
       ).toBe('types/angular-miniprogram-forms.d.ts');
     });
 

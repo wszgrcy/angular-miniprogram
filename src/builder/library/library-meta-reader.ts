@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 import fs from 'fs-extra';
 import * as path from 'path';
+import { isSamePath, toPosix } from '../util/path';
 import {
   LIBRARY_META_FILE_NAME,
   LIBRARY_META_SCHEMA_VERSION,
@@ -244,15 +245,11 @@ export function readLibraryMetaForModule(fromFile: string):
     return undefined;
   }
   const entries = Object.values(file.entries);
-  const abs = normalizeMetaKey(
-    path.resolve(fromFile).split(path.sep).join('/'),
-  );
+  const abs = normalizeMetaKey(toPosix(path.resolve(fromFile)));
   const entry = entries.find(
     (it) =>
       !!it.fesm &&
-      normalizeMetaKey(
-        path.resolve(pkgRoot, it.fesm).split(path.sep).join('/'),
-      ) === abs,
+      isSamePath(path.resolve(pkgRoot, it.fesm), path.resolve(fromFile)),
   );
   return { pkgRoot, entries, entry };
 }

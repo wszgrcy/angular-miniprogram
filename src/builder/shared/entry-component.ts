@@ -1,4 +1,5 @@
 import * as ts from 'typescript';
+import { isPathIn } from '../util/path';
 
 /**
  * 入口文件里「这个入口绑定哪个组件类」的唯一标记：**default export**。
@@ -39,8 +40,7 @@ export function isCustomTabbarOutput(
   if (!tabbarDir) {
     return false;
   }
-  const posix = outputPath.replace(/\\/g, '/');
-  return posix === tabbarDir || posix.startsWith(`${tabbarDir}/`);
+  return isPathIn(tabbarDir, outputPath);
 }
 
 /**
