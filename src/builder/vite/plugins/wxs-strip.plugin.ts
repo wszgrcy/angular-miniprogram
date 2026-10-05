@@ -85,6 +85,13 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
   const userReplacements = [...options.fileReplacements];
   /** 原组件绝对路径 -> cache 绝对路径，供 resolveId 查表 */
   const redirect = new Map<string, string>();
+  /**
+   * redirect 的值集合（cache 绝对路径）。
+   *
+   * 给 resolveId 认「已经被别的插件改到 cache 上」的解析结果用，
+   * 理由见 resolveId 里的注释。
+   */
+  const redirectedTargets = new Set<string>();
 
   const rebuild = (): void => {
     /** 被改写过的组件 key */
@@ -111,6 +118,7 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
 
     const ours: Array<{ replace: string; with: string }> = [];
     redirect.clear();
+    redirectedTargets.clear();
     for (const component of components) {
       const source = readFileOrNull(component);
       if (source === null) {
@@ -138,6 +146,7 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
       writeIfChanged(cached, rewritten.code);
       ours.push({ replace: component, with: toPosix(cached) });
       redirect.set(component, toPosix(cached));
+      redirectedTargets.add(toPosix(cached));
     }
 
     options.fileReplacements.length = 0;
@@ -170,7 +179,27 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
       if (!resolved) {
         return null;
       }
-      return redirect.get(toPosix(path.resolve(resolved.id))) ?? null;
+      const resolvedId = toPosix(path.resolve(resolved.id));
+      const hit = redirect.get(resolvedId);
+      if (hit) {
+        return hit;
+      }
+      /**
+       * 解析结果已经是我们的 cache 文件 —— 照单收下，别再返回 null。
+       *
+       * 坑在 analog 的 `rollup-plugin-replace-files`：它也是 `enforce: 'pre'`，
+       * 而且只要 `fileReplacements` 在**建插件列表时**非空就会注册（生产构建
+       * 有 environment.prod.ts 替换，所以正好非空；dev 没有，于是躲过去了）。
+       * 两条链会互相把对方绕进去：
+       *   1. 我们 this.resolve（跳过自己）→ replaceFiles 命中替换表，返回 cache；
+       *      我们拿 cache 去查 redirect（钥匙是**原路径**）→ 落空 → 返回 null。
+       *   2. 轮到 replaceFiles：它 this.resolve（跳过自己）→ 又回到我们，我们返回
+       *      cache；它拿 cache 去 `endsWith(原路径)` → 落空 → 也返回 null。
+       *   3. 两个 pre 插件都返回 null，vite 退回默认解析 = **原文件**，于是
+       *      Angular 那份没剥离 wxs 的模板被编进 js（wxml 却还是对的）。
+       * 所以只要解析结果落在我们的 cache 上，就得由我们把它认下来。
+       */
+      return redirectedTargets.has(resolvedId) ? resolvedId : null;
     },
 
     async buildStart() {
