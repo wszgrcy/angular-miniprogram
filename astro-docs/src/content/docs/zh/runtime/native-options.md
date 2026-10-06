@@ -23,7 +23,9 @@ export class FooComponent {
 }
 ```
 
-页面用 `static mpPageOptions`。
+页面用 `static mpPageOptions`，见下文。
+
+钩子跟 Angular 生命周期的相对顺序见 [生命周期](../lifecycle/)。
 
 ## 1. 生效范围
 
@@ -56,29 +58,26 @@ static mpComponentOptions: MpComponentOptions = {
 
 ## 2. 为什么那几段写了没用
 
-**没有生产者。** 组件的 wxml 是 HTML 转换出来的，只读框架自己的数据
-（`nodeList` / `hasLoad` / `property.*`），不会有任何一行去引用你声明的字段。
-Angular 的 `@Input` 也不走小程序 `properties`——值在 Angular 内部传，
-下发靠构建器注入的 `propertyChange`。
+组件的 wxml 是 HTML 转换出来的，只读框架自己的数据（`nodeList` / `hasLoad` /
+`property.*`），不会有任何一行去引用你声明的字段。Angular 的 `@Input` 也不走小程序
+`properties`——值在 Angular 内部传，下发靠构建器注入的 `propertyChange`。
 
-**也没有外部入口。** 小程序组件被父模板创建时，靠 `nodePath` / `nodeIndex`
-两个 property 回连到 Angular 那一侧，这两个名字是框架的。脱离 Angular 页面
-就没人传 `nodePath`，`hasLoad` 恒为 `false`，
-`<block wx:if="{{hasLoad}}">` 渲染出一个空盒子——所以 Angular 产出的组件
-不能被原生页面当普通小程序组件引用，「让原生父级给我传属性」这条路本身不成立。
+`properties` 那一格同时是 Angular 实例与小程序实例的**回连通道**，`nodePath` /
+`nodeIndex` 两个 property 是框架的。自己声明同名 property 会把回连撞断，表现为整块
+空白且不报错，所以这几段干脆不收，而不是收了但不生效。
 
-**框架也不替你合并。** 那几段在拼配置单时是整体赋值，写进去的内容不会出现在
-`Component()` 里。既然本来就没有生产者，合并它们只会多开一个坑：你自己声明一个
-叫 `nodePath` 的 property 就能把回连撞断，换来整块空白且不报错。
-所以契约直接不收——比「收了但不生效」诚实。
+推论：Angular 产出的组件**不能被原生页面当普通小程序组件引用**。脱离 Angular 页面就
+没人传 `nodePath`，`hasLoad` 恒为 `false`，`<block wx:if="{{hasLoad}}">` 渲染出一个
+空盒子。
 
 ## 3. 页面：`mpPageOptions`
 
 `onLoad` / `onShow` / `onHide` / `onReady` / `onUnload` / 下拉刷新 / 触底 /
-分享这些全部保留，框架包在你的那份周围：除 `onLoad`（在 Angular 实例起来之后
-才调你的）以外，都是你的先跑。`data` 同样被框架占用。
+分享这些全部保留，只剔 `data`。顺序上的差异见 [生命周期](../lifecycle/)。
 
 ```ts
+import { MpPageOptions } from 'angular-miniprogram/platform/type';
+
 export class FooPage {
   static mpPageOptions: MpPageOptions = {
     onShareAppMessage() {

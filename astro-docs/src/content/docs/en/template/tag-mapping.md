@@ -6,4 +6,4 @@ title: "Tag Mapping"
 The English documentation is not written yet. The Chinese version is the source of truth.
 :::
 
-See the [Chinese documentation](../../zh/template/tag-mapping/) for now.
+See the [Chinese documentation](../../../zh/template/tag-mapping/) for now.

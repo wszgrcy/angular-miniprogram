@@ -30,8 +30,7 @@
     "docs:dev": "npm --prefix ./astro-docs run dev",
     "docs:build": "npm --prefix ./astro-docs run build",
     "typedoc": "typedoc",
-    "deploy": "npm run typedoc && npm run build:library && npm test && npm run coverage-badge -- init && cpx \"./deploy/doc/**/*\" ./docs && cpx \"./deploy/api-doc/**/*\" ./docs/api-doc && npm run coverage && npm run coverage-badge -- success && cpx ./deploy/doc/assets/img/badge.svg ./docs/assets/img",
-    "coverage-badge": "tsx ./script/coverage-badge.ts",
+    "deploy": "npm run docs:build && npm run typedoc",
     "typecheck:config": "tsc -p ./tsconfig.config.json --noEmit",
     "typecheck:script": "tsc -p ./tsconfig.script.json --noEmit"
   },

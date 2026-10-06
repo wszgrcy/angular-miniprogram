@@ -2,5 +2,6 @@
 
 <p align="center">尽可能使用 Angular 已有生态,降低跨平台时所需成本</p>
 
-- 文档 [https://wszgrcy.github.io/angular-miniprogram/](https://wszgrcy.github.io/angular-miniprogram/)
-- document [https://wszgrcy.github.io/angular-miniprogram/en-US/](https://wszgrcy.github.io/angular-miniprogram/en-US/)
+- 文档 [https://wszgrcy.github.io/angular-miniprogram/zh/](https://wszgrcy.github.io/angular-miniprogram/zh/)
+- document [https://wszgrcy.github.io/angular-miniprogram/en/](https://wszgrcy.github.io/angular-miniprogram/en/)
+- 示例项目 [angular-miniprogram-template](https://github.com/wszgrcy/angular-miniprogram-template)

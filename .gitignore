@@ -7,7 +7,6 @@ __test-app
 coverage-builder
 .temp-git
 docs
-deploy/api-doc
 
 # 构建 / 探测产物（Vite 输出的小程序包，可随时重新生成）
 __q

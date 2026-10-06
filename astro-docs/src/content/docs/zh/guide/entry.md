@@ -30,7 +30,7 @@ chunk，在那儿调用毫无意义。
 页面组件声明了 `static mpComponentOptions` 时，`bootstrapPage` 默认按
 `useComponent: true` 处理（那份配置只在 `Component()` 分支生效），
 所以「组件即页面」不需要额外声明。那份配置单里哪些段生效见
-[原生配置](../mp-component-options/)。
+[原生配置](../../runtime/native-options/)。
 
 ## 2. 入口类型来自配置
 
@@ -78,9 +78,23 @@ src/pages/home/card/card.component.ts
 ```
 
 不需要 `*.entry.ts`，不需要 `export default`，父级的 `usingComponents` 由构建器算。
-一个文件里放多个组件时，产物名自动带上类名以免撞车。
+一个文件里放多个组件时，产物名自动带上类名以免撞车：
+
+```text
+src/pages/home/projection/projection.components.ts   # 四个组件
+  →  pages/home/projection/projection.components-ProjChildComponent.{js,wxml,json,wxss}
+  →  pages/home/projection/projection.components-ProjDefaultComponent.…
+```
 
 已经被入口认领的组件（页面自己的组件、写了 `*.entry.ts` 的组件）不会被重复产出。
+**认领是按文件算的**：入口用 `export { X as default } from './y'` 指向 `y.ts`，
+整个 `y.ts` 就算被认领，同文件里其余组件不会再自动产出，构建会报
+
+```
+没有找到组件[YComponent]的产物路径：…/y.component.ts
+```
+
+把额外的组件放同目录的另一个文件就行。
 
 ## 4. 自定义 tabBar
 

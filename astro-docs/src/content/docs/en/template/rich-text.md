@@ -6,4 +6,4 @@ title: "Rich Text innerHTML"
 The English documentation is not written yet. The Chinese version is the source of truth.
 :::
 
-See the [Chinese documentation](../../zh/template/rich-text/) for now.
+See the [Chinese documentation](../../../zh/template/rich-text/) for now.

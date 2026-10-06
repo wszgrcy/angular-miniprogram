@@ -15,7 +15,6 @@ const ignores = [
   'test/**',
   'script/**',
   'astro-docs/**',
-  'deploy/**',
   'docs/**',
   '**/fixture/**',
   '**/*.d.ts',
