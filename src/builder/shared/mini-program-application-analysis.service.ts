@@ -211,7 +211,10 @@ export class MiniProgramApplicationAnalysisService {
           selector: item.selector,
           path: resolve(
             normalize('/'),
-            normalize(this.getComponentPagePattern(item.path).outputFiles.path),
+            normalize(
+              this.getComponentPagePattern(item.path, item.className)
+                .outputFiles.path,
+            ),
           ),
           className: item.className,
         })),
@@ -242,7 +245,10 @@ export class MiniProgramApplicationAnalysisService {
         element.localPath.forEach((item) => {
           item.path = resolve(
             normalize('/'),
-            normalize(this.getComponentPagePattern(item.path).outputFiles.path),
+            normalize(
+              this.getComponentPagePattern(item.path, item.className)
+                .outputFiles.path,
+            ),
           );
         });
       }
@@ -370,104 +376,115 @@ export class MiniProgramApplicationAnalysisService {
     componentClassName?: string,
   ) {
     const findList = [fileName];
-    let maybeEntryPath: PagePattern | undefined;
+    const visited = new Set<string>();
 
     while (findList.length) {
-      const module = findList.shift();
-      const moduleList = this.dependencyUseModule.get(pathKey(module!));
-      if (moduleList && moduleList.length) {
-        findList.push(...moduleList);
-      } else {
-        maybeEntryPath = this.pagePatternList.find((item) =>
-          isSamePath(item.src, module!),
-        );
-        if (maybeEntryPath) {
-          const sourceFile = this.tsProgram.getSourceFile(maybeEntryPath.src);
-          if (!sourceFile) {
-            throw new Error(
-              `${maybeEntryPath.src} 不在 ${this.tsConfig} 的编译范围内，` +
-                `入口文件必须被 tsconfig 的 files / include 覆盖`,
-            );
-          }
-          const importComponent = this.getEntryComponentExpression(sourceFile);
-          const symbol = this.typeChecker.getSymbolAtLocation(importComponent);
-          const node = symbol?.getDeclarations()?.[0];
-
-          // `export default InlineComponent` 这种组件就在 entry 文件里、
-          // 不是 import 进来的，根本没有 ImportDeclaration，
-          // 不能再往下走 parent 链（会 undefined.parent 崩）。
-          // 组件声明文件就是 entry 本身，直接命中。
-          // 注意 re-export（export { X as default } from './y'）的声明节点也在
-          // entry 文件里，但它是别名不是声明，必须排除，否则同文件多组件时
-          // 会错把别人的 entry 认成自己的。
-          if (
-            node &&
-            !ts.isImportSpecifier(node) &&
-            !ts.isExportSpecifier(node) &&
-            isSamePath(node.getSourceFile().fileName, maybeEntryPath.src)
-          ) {
-            const declaredName = ts.isClassDeclaration(node)
-              ? node.name?.getText()
-              : undefined;
-            if (
-              !componentClassName ||
-              !declaredName ||
-              declaredName === componentClassName
-            ) {
-              return maybeEntryPath;
-            }
-            maybeEntryPath = undefined;
-            continue;
-          }
-
-          // 同文件多组件时，光比对文件路径分不出到底是哪个组件：
-          // 两个 entry 各自 import 同一个文件的不同组件时，必须连类名一起对上，
-          // 否则先那个组件会被解析到别人的 entry 上，模板就串了。
-          const resolvedComponentName =
-            this.resolveImportedComponentName(symbol);
-          if (
-            componentClassName &&
-            resolvedComponentName &&
-            resolvedComponentName !== componentClassName
-          ) {
-            maybeEntryPath = undefined;
-            continue;
-          }
-          const moduleSpecifier =
-            // 优先从引用点往上找：`export { X as default } from './y'` 的
-            // symbol 声明可能已经跳到 './y' 里的类声明上，从那里往上就找不到
-            // 模块说明符了
-            this.findModuleSpecifier(importComponent) ??
-            this.findModuleSpecifier(node);
-          if (!moduleSpecifier) {
-            // 解析不到 import / re-export（组件不是外部模块引进来的），
-            // 这个候选 entry 不匹配，继续找下一个而不是直接崩
-            maybeEntryPath = undefined;
-            continue;
-          }
-          const relativeImportComponentPath = moduleSpecifier
-            .getText()
-            .slice(1, -1);
-
-          const importComponentPath =
-            path.resolve(
-              path.dirname(maybeEntryPath.src),
-              relativeImportComponentPath,
-            ) + '.ts';
-          if (isSamePath(importComponentPath, fileName)) {
-            break;
-          }
-
-          maybeEntryPath = undefined;
-        }
+      const module = findList.shift()!;
+      const key = pathKey(module);
+      // 互相 import 的组件会让反向依赖图带环，不去重就走不完
+      if (visited.has(key)) {
+        continue;
       }
+      visited.add(key);
+
+      const entry = this.pagePatternList.find(
+        (item) =>
+          isSamePath(item.src, module) &&
+          this.entryBindsComponent(item, fileName, componentClassName),
+      );
+      if (entry) {
+        return entry;
+      }
+      // 这个模块自己不是（或不是这个组件的）入口，再往引用它的人走
+      findList.push(...(this.dependencyUseModule.get(key) ?? []));
     }
-    if (!maybeEntryPath) {
-      throw new Error(
-        `没有找到组件[${componentClassName ?? fileName}]对应的入口点`,
+    throw new Error(
+      `没有找到组件[${componentClassName ?? '?'}]的产物路径：${fileName}\n` +
+        `它既不是任何入口 export default 绑定的组件，也不在 tsconfig 的编译范围里`,
+    );
+  }
+
+  /**
+   * 这个入口是不是「把 fileName 里的 componentClassName 当组件注册」。
+   *
+   * 两种入口两套认法：
+   *
+   *  - **自动组件**（构建器造的，src 就是组件文件本身）：文件对上再比类名。
+   *  - **声明式入口**：读 entry 的 `export default` 看它绑的是谁。
+   *
+   * 声明式那条必须比类名：同文件多组件时，两个 entry 各自 import 同一文件的
+   * 不同组件，光比对文件路径分不出到底是哪个，先那个组件会被解析到别人的
+   * entry 上，模板就串了。
+   */
+  private entryBindsComponent(
+    entry: PagePattern,
+    fileName: string,
+    componentClassName?: string,
+  ): boolean {
+    if (entry.componentClassName) {
+      return (
+        isSamePath(entry.src, fileName) &&
+        (!componentClassName || entry.componentClassName === componentClassName)
       );
     }
-    return maybeEntryPath;
+    const sourceFile = this.tsProgram.getSourceFile(entry.src);
+    if (!sourceFile) {
+      throw new Error(
+        `${entry.src} 不在 ${this.tsConfig} 的编译范围内，` +
+          `入口文件必须被 tsconfig 的 files / include 覆盖`,
+      );
+    }
+    const importComponent = this.getEntryComponentExpression(sourceFile);
+    const symbol = this.typeChecker.getSymbolAtLocation(importComponent);
+    const node = symbol?.getDeclarations()?.[0];
+
+    // `export default InlineComponent` 这种组件就在 entry 文件里、
+    // 不是 import 进来的，根本没有 ImportDeclaration，
+    // 不能再往下走 parent 链（会 undefined.parent 崩）。
+    // 组件声明文件就是 entry 本身，直接命中。
+    // 注意 re-export（export { X as default } from './y'）的声明节点也在
+    // entry 文件里，但它是别名不是声明，必须排除，否则同文件多组件时
+    // 会错把别人的 entry 认成自己的。
+    if (
+      node &&
+      !ts.isImportSpecifier(node) &&
+      !ts.isExportSpecifier(node) &&
+      isSamePath(node.getSourceFile().fileName, entry.src)
+    ) {
+      const declaredName = ts.isClassDeclaration(node)
+        ? node.name?.getText()
+        : undefined;
+      return (
+        !componentClassName ||
+        !declaredName ||
+        declaredName === componentClassName
+      );
+    }
+
+    const resolvedComponentName = this.resolveImportedComponentName(symbol);
+    if (
+      componentClassName &&
+      resolvedComponentName &&
+      resolvedComponentName !== componentClassName
+    ) {
+      return false;
+    }
+    const moduleSpecifier =
+      // 优先从引用点往上找：`export { X as default } from './y'` 的
+      // symbol 声明可能已经跳到 './y' 里的类声明上，从那里往上就找不到
+      // 模块说明符了
+      this.findModuleSpecifier(importComponent) ??
+      this.findModuleSpecifier(node);
+    if (!moduleSpecifier) {
+      // 解析不到 import / re-export（组件不是外部模块引进来的），这个候选不算
+      return false;
+    }
+    const relativeImportComponentPath = moduleSpecifier.getText().slice(1, -1);
+
+    const importComponentPath =
+      path.resolve(path.dirname(entry.src), relativeImportComponentPath) +
+      '.ts';
+    return isSamePath(importComponentPath, fileName);
   }
 
   private addCleanDependency(host: ts.CompilerHost) {

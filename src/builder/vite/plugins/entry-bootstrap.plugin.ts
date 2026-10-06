@@ -17,6 +17,15 @@ import { toPosix } from '../../util/path';
 const MP_ENTRY_VIRTUAL = '\0mp-entry:';
 
 /**
+ * 自动组件在虚拟 id 里拼类名的分隔符。
+ *
+ * 同一个源文件可以贡献多个 `@Component`，而 id 必须一个产物一个：共用
+ * `src` 会让两个入口在 rollup 里塌成一个模块，第二个产物只剩一句 require，
+ * 组件注册直接丢。`#` 在 Windows 文件名里非法，拿它切分不会和路径本身撞。
+ */
+const MP_ENTRY_CLASS_SEP = '#mp-component:';
+
+/**
  * 文件路径 → 模块说明符。
  *
  * 用 `toPosix`（只翻分隔符），**不能**走 `toPosixPath`：它还会剥前导 `/`，
@@ -25,21 +34,29 @@ const MP_ENTRY_VIRTUAL = '\0mp-entry:';
  */
 const toModulePath = toPosix;
 
-/** 入口源文件 → 虚拟入口模块 id */
-export function mpEntryVirtualId(src: string): string {
-  return `${MP_ENTRY_VIRTUAL}${toModulePath(path.resolve(src))}`;
+/** 入口源文件（+ 自动组件的类名）→ 虚拟入口模块 id */
+export function mpEntryVirtualId(
+  src: string,
+  componentClassName?: string,
+): string {
+  return `${MP_ENTRY_VIRTUAL}${toModulePath(path.resolve(src))}${
+    componentClassName ? `${MP_ENTRY_CLASS_SEP}${componentClassName}` : ''
+  }`;
 }
 
 /**
  * 虚拟入口模块 id → 它包装的入口源文件路径；非虚拟 id 原样返回。
  *
  * 任何「按源路径前缀判定归属」的逻辑（分包归属等）都得先脱壳，
- * 否则入口模块会被当成主包外的匿名模块。
+ * 否则入口模块会被当成主包外的匿名模块。自动组件拼在后面的类名也一并
+ * 脱掉：它不是路径的一部分。
  */
 export function unwrapEntryVirtualId(moduleId: string): string {
-  return moduleId.startsWith(MP_ENTRY_VIRTUAL)
+  const body = moduleId.startsWith(MP_ENTRY_VIRTUAL)
     ? moduleId.slice(MP_ENTRY_VIRTUAL.length)
     : moduleId;
+  const sep = body.indexOf(MP_ENTRY_CLASS_SEP);
+  return sep < 0 ? body : body.slice(0, sep);
 }
 
 export interface EntryBootstrapPluginOptions {
@@ -61,12 +78,19 @@ export interface EntryBootstrapPluginOptions {
  *
  * 用 default import 而不是重新解析组件类名：入口里 `export default` 写成
  * 什么形态（标识符 / re-export / 表达式）都不用管，绑上就行。
+ *
+ * 自动组件没有入口文件，也就没有 default 可认，改成按类名具名 import。
+ * 类名是分析层从 `@Component` 声明直接拿的，不存在别名问题。
  */
-function entryModuleSource(src: string, type: PagePattern['type']): string {
+function entryModuleSource(entry: PagePattern): string {
+  const modulePath = JSON.stringify(toModulePath(path.resolve(entry.src)));
+  const componentImport = entry.componentClassName
+    ? `import { ${entry.componentClassName} as __mpComponent } from ${modulePath};\n`
+    : `import __mpComponent from ${modulePath};\n`;
   return (
     `import * as amp from 'angular-miniprogram';\n` +
-    `import __mpComponent from ${JSON.stringify(toModulePath(path.resolve(src)))};\n` +
-    `amp.${MP_ENTRY_BOOTSTRAP[type]}(__mpComponent);\n`
+    componentImport +
+    `amp.${MP_ENTRY_BOOTSTRAP[entry.type]}(__mpComponent);\n`
   );
 }
 
@@ -81,7 +105,10 @@ export function entryBootstrapPlugin(
   options: EntryBootstrapPluginOptions,
 ): Plugin {
   const entries = new Map(
-    options.entries.map((item) => [mpEntryVirtualId(item.src), item]),
+    options.entries.map((item) => [
+      mpEntryVirtualId(item.src, item.componentClassName),
+      item,
+    ]),
   );
   return {
     name: 'mini-program:entry-bootstrap',
@@ -97,13 +124,16 @@ export function entryBootstrapPlugin(
         return null;
       }
       const code = fs.readFileSync(entry.src, 'utf8');
-      if (!detectEntryComponentFromSource(code, entry.src)) {
+      if (
+        !entry.componentClassName &&
+        !detectEntryComponentFromSource(code, entry.src)
+      ) {
         this.error(
           `${entry.src} 没声明入口组件：` +
             `需要 \`export default 组件类\`（或 \`export { 组件类 as default } from './x'\`）`,
         );
       }
-      return entryModuleSource(entry.src, entry.type);
+      return entryModuleSource(entry);
     },
   };
 }

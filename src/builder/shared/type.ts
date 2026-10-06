@@ -32,6 +32,14 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
   };
   /** 入口类型，决定构建器注入哪个注册函数 */
   type: MpEntryType;
+  /**
+   * 自动组件的组件类名（只有构建器自己造的那批有）。
+   *
+   * 普通入口靠 `export default` 认组件，自动组件没有入口文件、也就没有
+   * default 可认，只能按类名从源文件具名 import。同时它也是「这个 pattern
+   * 不是用户声明的入口」的标记，分析层靠它区分两种匹配规则。
+   */
+  componentClassName?: string;
   /** 分包 pattern 上声明的「独立分包」，只有 subpackages 来源的入口有 */
   independent?: boolean;
 }

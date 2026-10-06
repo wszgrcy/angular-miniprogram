@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as ts from 'typescript';
 import { isPathIn } from '../util/path';
 
@@ -98,4 +100,168 @@ export function detectEntryComponentFromSource(
       ts.ScriptKind.TS,
     ),
   );
+}
+
+/**
+ * 从 default 导出表达式往上找到携带 moduleSpecifier 的那层声明。
+ *
+ * `export { X as default } from './y'` 里表达式到声明之间隔着 NamedExports，
+ * `export default X` 则根本没有这层，所以逐层往上找而不是数固定层数。
+ */
+function findModuleBearingDeclaration(
+  expression: ts.Expression,
+): ts.ImportDeclaration | ts.ExportDeclaration | undefined {
+  let current: ts.Node | undefined = expression;
+  for (let i = 0; i < 5 && current; i++) {
+    if (ts.isImportDeclaration(current) || ts.isExportDeclaration(current)) {
+      return current;
+    }
+    current = current.parent;
+  }
+  return undefined;
+}
+
+/** 相对模块说明符解析成源文件绝对路径（构建器只认 `./x` 形式） */
+function resolveRelativeModule(fromFile: string, specifier: string): string {
+  return path.resolve(path.dirname(fromFile), specifier) + '.ts';
+}
+
+/**
+ * 解析入口的 default 导出**实际指向哪个文件的哪个类**。
+ *
+ * 纯语法解析，不建 program：入口的 default 只有三种写法（见本文件顶部注释），
+ * 全部能在不做类型检查的前提下解开。
+ *
+ * `className` 为 undefined 表示「知道文件、不知道类」（`export { default } from`
+ * 这种二道贩子写法），调用方按「整个文件都被认领」处理。
+ *
+ * 解析不出来（default 绑的是表达式、或说明符不是相对路径）返回 undefined。
+ */
+export function resolveEntryComponentBinding(
+  entrySrc: string,
+  sourceFile: ts.SourceFile,
+): { file: string; className?: string } | undefined {
+  const expression = detectEntryComponent(sourceFile);
+  if (!expression) {
+    return undefined;
+  }
+
+  const bearing = findModuleBearingDeclaration(expression);
+  if (bearing?.moduleSpecifier && ts.isStringLiteral(bearing.moduleSpecifier)) {
+    const specifier = bearing.moduleSpecifier.text;
+    if (!specifier.startsWith('.')) {
+      return undefined;
+    }
+    // `export { X as default } from './y'`：propertyName 才是 y 里的原名。
+    // `export { default } from './y'` 没有 propertyName，类名未知。
+    let className: string | undefined;
+    if (ts.isExportSpecifier(expression)) {
+      const original = expression.propertyName?.text ?? expression.name.text;
+      className = original === 'default' ? undefined : original;
+    } else if (ts.isImportSpecifier(expression)) {
+      className = expression.propertyName?.text ?? expression.name.text;
+    }
+    return { file: resolveRelativeModule(entrySrc, specifier), className };
+  }
+
+  // `export default InlineComponent`：组件就声明在本文件里
+  if (ts.isIdentifier(expression)) {
+    const name = expression.text;
+    const declared = sourceFile.statements.find(
+      (statement): statement is ts.ClassDeclaration =>
+        ts.isClassDeclaration(statement) && statement.name?.text === name,
+    );
+    if (declared) {
+      return { file: entrySrc, className: name };
+    }
+    // `import { X } from './y'; export default X;`
+    for (const statement of sourceFile.statements) {
+      if (!ts.isImportDeclaration(statement)) {
+        continue;
+      }
+      const bindings = statement.importClause?.namedBindings;
+      if (!bindings || !ts.isNamedImports(bindings)) {
+        continue;
+      }
+      for (const element of bindings.elements) {
+        if (element.name.text !== name) {
+          continue;
+        }
+        if (!ts.isStringLiteral(statement.moduleSpecifier)) {
+          return undefined;
+        }
+        const specifier = statement.moduleSpecifier.text;
+        return specifier.startsWith('.')
+          ? {
+              file: resolveRelativeModule(entrySrc, specifier),
+              className: element.propertyName?.text ?? name,
+            }
+          : undefined;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** 读盘解析入口 default 绑定；读不到或解析不出就返回 undefined */
+export function resolveEntryComponentBindingFromFile(
+  file: string,
+): { file: string; className?: string } | undefined {
+  try {
+    return resolveEntryComponentBinding(
+      file,
+      ts.createSourceFile(
+        file,
+        fs.readFileSync(file, 'utf8'),
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      ),
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/** 类上有没有 `@Component`（含 `@Component({...})` 调用形式） */
+function isComponentClass(node: ts.ClassDeclaration): boolean {
+  return (ts.getDecorators(node) ?? []).some((decorator) => {
+    const target = ts.isCallExpression(decorator.expression)
+      ? decorator.expression.expression
+      : decorator.expression;
+    return ts.isIdentifier(target) && target.text === 'Component';
+  });
+}
+
+/**
+ * 列出一个文件里所有 `@Component` 类的类名。
+ *
+ * 纯语法，不做类型检查：组件发现发生在 vite 配置之前（产物路径要进 rollup
+ * input），那会儿还没有 Angular program，只能靠 AST。
+ */
+export function findComponentClassNames(sourceFile: ts.SourceFile): string[] {
+  return sourceFile.statements
+    .filter((statement): statement is ts.ClassDeclaration =>
+      ts.isClassDeclaration(statement),
+    )
+    .filter(isComponentClass)
+    .map((node) => node.name?.text)
+    .filter((name): name is string => !!name);
+}
+
+/** 读盘并列出 `@Component` 类名；读不到或没有就返回空数组 */
+export function findComponentClassNamesFromFile(file: string): string[] {
+  try {
+    return findComponentClassNames(
+      ts.createSourceFile(
+        file,
+        fs.readFileSync(file, 'utf8'),
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+      ),
+    );
+  } catch {
+    return [];
+  }
 }

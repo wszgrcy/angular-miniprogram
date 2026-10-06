@@ -12,15 +12,19 @@ import ts from 'typescript';
 import type { BuildPlatform } from '../platform/platform';
 import {
   type MpEntryType,
+  findComponentClassNamesFromFile,
   isCustomTabbarOutput,
+  resolveEntryComponentBindingFromFile,
 } from '../shared/entry-component';
 import type { MpSubPackagePattern, PagePattern } from '../shared/type';
 import {
-  normalizeAssetPatternsSafe,
+  isPathIn,
   pathKey,
   relativePosix,
+  toNativePath,
   toPosixPath,
 } from '../util/path';
+import { normalizeAssetPatternsSafe } from './asset-patterns';
 import { mpEntryVirtualId } from './plugins/entry-bootstrap.plugin';
 
 function globAsync(pattern: string, options: glob.IOptions) {
@@ -259,6 +263,95 @@ export function tsConfigFileNames(tsconfigPath: string): Set<string> {
   return new Set((parsed?.fileNames ?? []).map((f) => pathKey(f)));
 }
 
+/**
+ * 自动组件：没有 `*.entry.ts` 的普通 `@Component`。
+ *
+ * 入口要 `export default` 的理由是「路径是对外契约」：页面路径写进 app.json、
+ * 写进 navigateTo 的 url，必须固定解析。组件没有这个约束：它只被父级 json 里
+ * 的 `usingComponents` 引用，而那个路径是构建器自己写进去的，自洽就行。
+ * 所以普通组件不需要入口文件，产物路径直接按「源目录 = 产物目录」从源文件镜像。
+ *
+ * 已经被入口认领的组件类不在这里（页面自己的组件、写了入口的组件），认领
+ * 关系见 `resolveEntryComponentBinding`。
+ *
+ * 只能做语法级发现：产物路径要进 rollup input，而那时还没有 Angular program，
+ * 等 program 建好了再发现就晚了。
+ */
+function discoverAutoComponents(options: {
+  /** tsconfig 真正编译的文件集（pathKey 形态） */
+  program: Set<string>;
+  /** 项目 sourceRoot（原生绝对路径） */
+  sourceRoot: string;
+  workspaceRoot: string;
+  /** 已经声明出来的入口，用来剔掉它们认领的组件 */
+  declared: PagePattern[];
+  buildPlatform: BuildPlatform;
+}): PagePattern[] {
+  const { buildPlatform } = options;
+
+  /** `文件#类名`，类名为 `*` 表示整个文件被认领 */
+  const claimed = new Set<string>();
+  for (const entry of options.declared) {
+    const binding = resolveEntryComponentBindingFromFile(entry.src);
+    if (binding) {
+      claimed.add(`${pathKey(binding.file)}#${binding.className ?? '*'}`);
+    }
+  }
+  const isClaimed = (file: string, className: string) =>
+    claimed.has(`${pathKey(file)}#*`) ||
+    claimed.has(`${pathKey(file)}#${className}`);
+
+  const groups = new Map<string, string[]>();
+  for (const key of options.program) {
+    const file = toNativePath(key);
+    if (
+      !file.endsWith('.ts') ||
+      // 入口文件自己走声明式那条路，spec 不进产物
+      file.endsWith('.entry.ts') ||
+      file.endsWith('.spec.ts') ||
+      !isPathIn(options.sourceRoot, file)
+    ) {
+      continue;
+    }
+    const names = findComponentClassNamesFromFile(file).filter(
+      (name) => !isClaimed(file, name),
+    );
+    if (names.length) {
+      groups.set(file, names);
+    }
+  }
+
+  const list: PagePattern[] = [];
+  for (const [file, names] of groups) {
+    const base = relativePosix(options.sourceRoot, file).replace(/\.ts$/, '');
+    for (const className of names) {
+      // 一个文件贡献多个组件时才把类名拼进产物名，单组件与源文件同名
+      const output = names.length > 1 ? `${base}-${className}` : base;
+      list.push({
+        glob: '**/*.ts',
+        input: relativePosix(options.workspaceRoot, options.sourceRoot),
+        output: '.',
+        entryName: path.basename(output),
+        fileName: relativePosix(options.sourceRoot, file),
+        src: file,
+        outputFiles: {
+          path: output,
+          logic: output + buildPlatform.fileExtname.logic,
+          style: output + buildPlatform.fileExtname.style,
+          content: output + buildPlatform.fileExtname.content,
+          config: output + buildPlatform.fileExtname.config,
+        },
+        inputFiles: {
+          config: file.replace(/\.ts$/, buildPlatform.fileExtname.config!),
+        },
+        type: 'component',
+        componentClassName: className,
+      });
+    }
+  }
+  return list;
+}
+
 export async function generateEntryPatterns(options: {
   pages: AssetPattern[];
   /** 分包入口：pattern 的 output 就是分包 root */
@@ -350,7 +443,23 @@ export async function generateEntryPatterns(options: {
       (!program.size || program.has(pathKey(item.src))),
   );
 
-  return { pageList, subPackageList, componentList, tabbarList };
+  const autoComponentList = discoverAutoComponents({
+    program,
+    sourceRoot: getSystemPath(absoluteProjectSourceRoot),
+    workspaceRoot: options.workspaceRoot,
+    declared: [...pageList, ...subPackageList, ...tabbarList, ...componentList],
+    buildPlatform: options.buildPlatform,
+  });
+
+  return {
+    pageList,
+    subPackageList,
+    // 自动组件和声明式组件入口在下游完全同构（都是 type: component 的
+    // PagePattern），并进同一个列表才能让 rollup input / watch 目录 /
+    // 分析层不用各自认两套
+    componentList: [...componentList, ...autoComponentList],
+    tabbarList,
+  };
 }
 
 /**
@@ -371,7 +480,10 @@ export function toRollupInput(
   for (const item of patternList) {
     // key 必须正斜杠：Windows 下 outputFiles.path 是 path.join 出来的
     // 反斜杠形式，会一路带进 chunk fileName 和 app.js 的 require 字面量
-    input[toPosixPath(item.outputFiles.path)] = mpEntryVirtualId(item.src);
+    input[toPosixPath(item.outputFiles.path)] = mpEntryVirtualId(
+      item.src,
+      item.componentClassName,
+    );
   }
   return input;
 }

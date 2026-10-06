@@ -153,6 +153,18 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       'src/widgets/widget/widget.entry.ts',
       "export { WidgetComponent as default } from './widget.component';\n",
     );
+    // 一个文件两个组件、都没有入口：产物必须各注册各的
+    await write(
+      'src/widgets/multi/multi.component.ts',
+      [
+        "import { Component } from '@angular/core';",
+        "@Component({ standalone: true, selector: 'app-multi-a', template: '<view>a</view>' })",
+        'export class MultiAComponent {}',
+        "@Component({ standalone: true, selector: 'app-multi-b', template: '<view>b</view>' })",
+        'export class MultiBComponent {}',
+        '',
+      ].join('\n'),
+    );
     // 入口必须进 tsconfig 才算这个 app 的编译单元
     await write(
       'src/tsconfig.app.json',
@@ -171,6 +183,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
           'components/**/*.entry.ts',
           'custom-tab-bar/**/*.entry.ts',
           'widgets/**/*.entry.ts',
+          'widgets/**/*.component.ts',
         ],
       }),
     );
@@ -294,6 +307,37 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       // 它们不在 tsconfig.app.json 的编译单元里，必须被过滤掉
       expect(names.filter((f) => f.startsWith('spec'))).toEqual([]);
       expect(names.filter((f) => f.startsWith('spec-component'))).toEqual([]);
+    }, 300000);
+
+    /**
+     * 一个文件多个组件。
+     *
+     * 小程序的组件身份是「一个路径 + 同名的 js/json/wxml/wxss」，同一目录放多个
+     * 组件合法，撞名才非法，所以同文件多组件拆成同目录下的多个产物就行。
+     *
+     * 回归点：虚拟入口模块 id 一度只按源文件编码，同文件的第二个组件会和第一个
+     * 塌进同一个 rollup 模块——前者注册了对方的类，后者只剩一句 require。
+     */
+    it('一个文件多个组件：拆成同目录多个产物，各注册各的类', async () => {
+      const { files } = await load();
+
+      const a = 'widgets/multi/multi.component-MultiAComponent';
+      const b = 'widgets/multi/multi.component-MultiBComponent';
+      expect(files.get(`${a}.js`)).toBeDefined();
+      expect(files.get(`${b}.js`)).toBeDefined();
+
+      for (const [key, name, other] of [
+        [a, 'MultiAComponent', 'MultiBComponent'],
+        [b, 'MultiBComponent', 'MultiAComponent'],
+      ] as const) {
+        const js = files.get(`${key}.js`)!;
+        expect(js).toContain(name);
+        expect(js).not.toContain(other);
+        expect(
+          (JSON.parse(files.get(`${key}.json`)!) as { component?: boolean })
+            .component,
+        ).toBe(true);
+      }
     }, 300000);
 
     it('入口没有 default export → 构建失败且错误可读', async () => {

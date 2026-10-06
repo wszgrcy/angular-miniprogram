@@ -3,7 +3,8 @@ import { type Path, normalize } from '@angular-devkit/core';
 import * as fs from 'fs';
 import * as glob from 'glob';
 import * as path from 'path';
-import { normalizeAssetPatternsSafe, toPosix } from '../util/path';
+import { toPosix } from '../util/path';
+import { normalizeAssetPatternsSafe } from './asset-patterns';
 
 function globAsync(pattern: string, options: glob.IOptions) {
   return new Promise<string[]>((resolvePromise, reject) =>
