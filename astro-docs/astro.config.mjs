@@ -28,6 +28,9 @@ export default defineConfig({
         zh: { label: '简体中文', lang: 'zh-CN' },
         en: { label: 'English', lang: 'en' },
       },
+      components: {
+        PageTitle: './src/overrides/starlight/PageTitle.astro',
+      },
       sidebar: [
         {
           label: '入门',
@@ -62,11 +65,7 @@ export default defineConfig({
               'Config Files',
               '/guide/mp-config/',
             ),
-            nav(
-              '多平台与条件编译',
-              'Platforms',
-              '/guide/platforms/',
-            ),
+            nav('多平台与条件编译', 'Platforms', '/guide/platforms/'),
             nav(
               '使用原生自定义组件',
               'Native Components',
