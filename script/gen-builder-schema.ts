@@ -287,6 +287,14 @@ const LOCAL: Record<string, unknown> = {
       '产物模块格式。小程序 JS 运行时是 CommonJS，默认 cjs；' +
       '只有在宿主侧确认支持 ESM 时才改成 es。',
   },
+  viteConfig: {
+    type: 'string',
+    description:
+      '自定义 vite 配置的钩子文件（相对 workspaceRoot）。文件默认导出一个 ' +
+      '(config, ctx) => config 的函数：config 是构建器组装完的最终 vite 配置，' +
+      '随便改，返回新对象或就地改都行；构建器不校验钩子的改动。' +
+      '.ts / .mts / .cts 由 jiti 加载，.js / .mjs / .cjs 走原生 import。',
+  },
 };
 
 function readUpstream(subpath: string): {

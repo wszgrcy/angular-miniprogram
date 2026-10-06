@@ -21,6 +21,7 @@ import {
   normalizePolyfills,
   polyfillEntryPlugin,
 } from '../../vite';
+import { applyMpViteConfig } from '../../vite/config-hook';
 import {
   generateEntryPatterns,
   resolveProjectRoots,
@@ -79,6 +80,12 @@ export interface VitestViteBuilderOptions {
   projectConfig?: string;
   appJsonValidate?: MpConfigValidateLevel;
   deriveCondition?: boolean;
+  /**
+   * 与 application builder 同名同义：自定义 vite 配置的钩子文件（相对 workspaceRoot）。
+   *
+   * 测试产物也是一个完整小程序工程，要加插件 / 加 alias 两条链路应当是同一个入口。
+   */
+  viteConfig?: string;
 }
 
 /**
@@ -200,7 +207,7 @@ export async function createVitestViteConfig(options: {
     entryPatterns,
   });
 
-  return {
+  const config: InlineConfig = {
     root: context.workspaceRoot,
     configFile: false,
     mode: 'development',
@@ -285,6 +292,16 @@ export async function createVitestViteConfig(options: {
       },
     },
   };
+
+  return applyMpViteConfig(config, {
+    viteConfig: vitestOptions.viteConfig,
+    target: 'vitest',
+    platform: vitestOptions.platform,
+    isProduction: false,
+    workspaceRoot: context.workspaceRoot,
+    tsConfig: vitestOptions.tsConfig,
+    logger: context.logger,
+  });
 }
 
 /**

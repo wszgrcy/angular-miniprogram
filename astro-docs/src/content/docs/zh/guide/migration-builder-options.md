@@ -57,7 +57,7 @@ title: "构建选项迁移"
 
 ## 3. 现在能用的选项
 
-**本包独有**：`platform` `pages` `customTabbar` `main`（上游叫 `browser`）`appJson` `nativeComponentsDir` `dedupe` `format`
+**本包独有**：`platform` `pages` `customTabbar` `main`（上游叫 `browser`）`appJson` `nativeComponentsDir` `dedupe` `format` `viteConfig`
 
 **与 `@angular/build` 同名同义**：`outputPath` `tsConfig` `assets` `styles` `polyfills` `fileReplacements` `optimization` `sourceMap` `watch` `stylePreprocessorOptions` `inlineStyleLanguage` `define` `conditions` `externalDependencies` `outputHashing` `deleteOutputPath` `preserveSymlinks` `budgets` `statsJson`
 
@@ -67,6 +67,7 @@ title: "构建选项迁移"
 - `statsJson` —— 产出 `stats.json`（每个产物的体积清单）
 - `define` —— 用户常量。与平台内置 define（`wx` / `window` / `ngDevMode` / `__MP_WX__` 等）合并，**同名时平台优先**
 - `conditions` `preserveSymlinks` `externalDependencies` `deleteOutputPath` —— 分别透传 Vite 的 `resolve.conditions` / `resolve.preserveSymlinks` / rollup `external` / `build.emptyOutDir`
+- `viteConfig` —— 上面这些选项覆盖不到时的兜底：指一个文件，默认导出 `(config, ctx) => config`，把构建器组装完的 vite 配置接出来自己改（见「自定义 vite 配置」）
 
 `library` builder 另外补上了 `poll`（透传给 ng-packagr 的 watcher，网络盘 / WSL 挂载上有用）。
 

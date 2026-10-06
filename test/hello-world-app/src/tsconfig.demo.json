@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../out-tsc/demo",
+    "types": [],
+    "skipLibCheck": true,
+    "target": "ES2022"
+  },
+  "files": ["main.ts"],
+  "include": [
+    "**/*.d.ts",
+    "pages/**/*.entry.ts",
+    "pages-demo/**/*.entry.ts",
+    "pages-demo/**/*.component.ts"
+  ]
+}
