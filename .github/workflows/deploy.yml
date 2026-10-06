@@ -4,45 +4,55 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
+
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: init
-        run: |
-          git config --global user.name "${GITHUB_ACTOR}"
-          git config --global user.email "${GITHUB_ACTOR}@gmail.com"
-      - name: pull-code
+      - name: 拉取仓库
         uses: actions/checkout@v7
-      - name: install-node
+
+      - name: 安装 Node
         uses: actions/setup-node@v7
         with:
           node-version: 24.x
           cache: 'npm'
-      - name: install-dependencies
-        run: |
-          npm ci --legacy-peer-deps
-      - name: hook-code
-        run: |
-          npm run sync
-      - name: build-docs
-        continue-on-error: true
-        run: |
-          npm run deploy
-          cp -rp docs/ ../dist
-          git branch gh-pages
-          git checkout gh-pages
-          rm -rf *
-          cp -rp ../dist/* .
-          cp ./index.html 404.html
-        env:
-          INPUT_TOKEN: ''
-      - name: tag
-        run: |
-          git status
-          git add -A
-          HUSKY=0 git commit -m 'build: 页面构建'
-          HUSKY=0 git push --force origin gh-pages
-          # git pull
+
+      - name: 安装依赖
+        run: npm ci --legacy-peer-deps
+
+      - name: 安装文档依赖
+        run: npm ci
+        working-directory: astro-docs
+
+      - name: 同步源码
+        run: npm run sync
+
+      - name: 构建文档
+        run: npm run deploy
+
+      - name: 上传制品
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

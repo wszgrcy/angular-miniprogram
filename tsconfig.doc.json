@@ -8,6 +8,7 @@
     "declaration": true,
     "target": "ES2015",
     "module": "esnext",
+    "moduleResolution": "bundler",
     "strict": true,
     "useUnknownInCatchVariables": false,
     "stripInternal": true,
