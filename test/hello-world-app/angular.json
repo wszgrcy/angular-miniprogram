@@ -21,13 +21,19 @@
                 "glob": "**/*.entry.ts",
                 "input": "./src/pages",
                 "output": "pages"
+              },
+              {
+                "glob": "**/*.entry.ts",
+                "input": "./src/pages-demo",
+                "output": "pages"
               }
             ],
             "platform": "wx",
             "outputPath": "dist/app",
             "main": "src/main.ts",
             "polyfills": ["@angular/localize/init"],
-            "tsConfig": "src/tsconfig.app.json",
+            "tsConfig": "src/tsconfig.demo.json",
+            "viteConfig": "tools/mp.vite.ts",
             "assets": [
               {
                 "glob": "project.config.json",

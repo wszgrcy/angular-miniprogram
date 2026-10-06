@@ -50,6 +50,11 @@ export default defineConfig({
               '/guide/mp-config/',
             ),
             nav(
+              '自定义 vite 配置',
+              'Custom Vite Config',
+              '/guide/custom-vite-config/',
+            ),
+            nav(
               '构建选项迁移',
               'Builder Options Migration',
               '/guide/migration-builder-options/',

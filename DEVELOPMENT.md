@@ -2968,3 +2968,58 @@ valibot 因此成了 builder 的运行时依赖，必须同时出现在
   「取第一个 json」的断言要先把 app.json / project.config.json 滤掉。
 - 集成测试里往 `pages` 追加一个不存在的页面路径会被语义校验拦下来
   （「声明了但本次构建没有产出入口」），这是对的，别为了过测试放宽校验。
+
+## 自定义 vite 配置（`viteConfig`）
+
+### 为什么只能走文件
+
+angular.json 是 JSON，装不下函数，所以「让用户改 vite 配置」没有第二种形状：
+选项给路径，文件默认导出 `(config, ctx) => config`。两个 builder
+（`application` / `vitest`）**各收各的 `viteConfig`、各指各的文件** ——
+测试链路不一定存在，把两个钩子塞一份文件里等于逼用户建一个用不到的 key。
+
+### 没有守卫，这是刻意的
+
+钩子在 `createMiniProgramViteConfig` / `createVitestViteConfig` 的**最后**执行，
+拿到的就是真正交给 vite 的那份，改完什么就用什么。不做保护项比对、不回正、
+不 warn：默认配置由构建器自己组装、本来就是对的，钩子改坏了报错会自然落在
+vite / rolldown 那一层，加一层「不许改这个」只会把用户的合法需求也挡掉。
+
+`config-hook/index.ts` 里剩下的错误处理全是防手滑：文件不存在、默认导出不是
+函数、钩子抛错、返回非对象。四条都把**文件绝对路径**写进消息，因为这几类
+错误的共同症状都是「构建失败但看不出跟自己的钩子文件有关」。
+
+### 读 TS 用 jiti，不用 vite 的 `loadConfigFromFile`
+
+`loadConfigFromFile` 对函数默认导出会先 `await fn(configEnv)` 再要求结果是
+对象（vite 把它当 vite 配置工厂），裸钩子会被它吃掉。jiti 不做任何语义解释，
+纯加载，且 `moduleCache: false` 正好是 watch 要的「每轮重新求值」，transform
+结果仍进它的 fs 缓存。
+
+- jiti 已经在树上（`vite` 自己依赖它），但**必须显式声明**：根
+  `devDependencies` + `src/library/package.json` 的 `dependencies` +
+  `ng-package.json` 的 `allowedNonPeerDependencies`。pnpm 严格解析下没声明就是
+  解析不到，vite 哪天不依赖它也会当场断。下限 `>=2`，1.x 是完全不同的 API。
+- `.js` / `.mjs` / `.cjs` 走原生 `import()`，这类工程连 jiti 都不必加载；
+  代价是必须自己带 `?t=` 破缓存，否则 watch 期间一直拿第一轮那份。
+- `createJiti(configPath, ...)` 的实例 id 用钩子文件本身：传给 `jiti.import`
+  的一直是绝对路径，实例 id 只影响相对解析与 tsconfig 自动发现。
+- `tsconfigPaths` 传工程的 `tsConfig`，钩子文件里就能用 `@app/*` 这类别名。
+- 发布面是 `angular-miniprogram/builder`：运行时是 `dist/builder/vite/config-hook/index.js`
+  （`vite-build.ts` 的 preserveModules 自动产出），类型是手写的 `types.d.ts`
+  （`copy:assets` 拷过去，同 `platform-flags.d.ts` 的路子）。实现里只用
+  `import type` 引它，编译期擦除，运行时不需要同名 `.js`。
+
+### watch
+
+`mpConfigWatchFiles` 里追加了钩子文件。只盯文件本身：jiti 关掉模块缓存后
+拿不到可靠的依赖清单，钩子里再 import 的本地文件不追踪。
+
+### 测试
+
+- `config-hook/index.spec.ts`（快，不碰 vite）：三种模块形态、ctx、返回值规则、
+  改文件下一轮是新内容（watch 的前提）、tsconfigPaths 真能解析。
+- `config-wiring.spec.ts`（中等，直接调 `create*ViteConfig` 拿 config，不 build）：
+  钉的是「两个 builder 组装完的配置确实经过了钩子」——钩子本身上面一层已经
+  验透了，这里只防「应用了但结果被丢掉」。夹具用 `test/hello-world-app`（只读），
+  钩子写临时目录用绝对路径引用，不往夹具里落脏文件。

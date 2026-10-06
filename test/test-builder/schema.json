@@ -488,6 +488,10 @@
       "type": "boolean",
       "default": false,
       "description": "自动生成 project 配置的调试启动项（condition）。"
+    },
+    "viteConfig": {
+      "type": "string",
+      "description": "自定义 vite 配置的钩子文件（相对 workspaceRoot）。"
     }
   },
   "additionalProperties": false,

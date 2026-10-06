@@ -20,6 +20,7 @@ import type { MpSubPackagePattern } from '../shared/type';
 import type { BudgetEntry } from '../util/angular-build-compat';
 import { toPosixPath } from '../util/path';
 import { type MpAppConfig, getSubPackages } from './app-config';
+import { applyMpViteConfig } from './config-hook';
 import {
   generateEntryPatterns,
   resolveProjectRoots,
@@ -201,6 +202,16 @@ export interface ViteMiniProgramBuildOptions {
   conditions?: string[];
   /** 不打包、运行时依赖外部提供的包名 */
   externalDependencies?: string[];
+  /**
+   * 自定义 vite 配置的钩子文件（相对 workspaceRoot）。
+   *
+   * 文件默认导出 `(config, ctx) => config`：`config` 是构建器组装完的最终
+   * vite 配置，随便改，返回新对象或就地改都行。构建器不校验钩子的改动 ——
+   * 默认配置是对的，钩子改坏了由钩子负责。
+   *
+   * `.ts` / `.mts` / `.cts` 由 jiti 加载，`.js` / `.mjs` / `.cjs` 走原生 import。
+   */
+  viteConfig?: string;
   /** 产物体积预算，判定逻辑复用 @angular/build，见 budgets.plugin */
   budgets?: BudgetEntry[];
   /** 产出 stats.json（各文件体积清单） */
@@ -709,7 +720,17 @@ export async function createMiniProgramViteConfig(options: {
     },
   };
 
-  return config;
+  // 钩子排在最后：它看到的必须是自己真正会交给 vite 的那份配置，
+  // 而不是某个中间态。
+  return applyMpViteConfig(config, {
+    viteConfig: viteOptions.viteConfig,
+    target: 'application',
+    platform: viteOptions.platform,
+    isProduction,
+    workspaceRoot: context.workspaceRoot,
+    tsConfig: viteOptions.tsConfig,
+    logger: context.logger,
+  });
 }
 
 export function getBuildPlatform(platform: PlatformType): BuildPlatform {
@@ -756,13 +777,13 @@ function formatBuildError(error: unknown): string {
  * 结构化配置选项指向的文件，watch 要显式盯上。
  *
  * 静态那份（assets 里的 app.json）通常在 sourceRoot 下，目录监听已经盖到；
- * 这两个选项可以指到 sourceRoot 外面，不显式加进来就是「改了没反应」。
+ * 这几个选项可以指到 sourceRoot 外面，不显式加进来就是「改了没反应」。
  */
 export function mpConfigWatchFiles(
   options: ViteMiniProgramBuildOptions,
   workspaceRoot: string,
 ): string[] {
-  return [options.appJson, options.projectConfig]
+  return [options.appJson, options.projectConfig, options.viteConfig]
     .filter((p): p is string => !!p)
     .map((p) => path.resolve(workspaceRoot, p));
 }

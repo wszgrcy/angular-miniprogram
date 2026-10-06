@@ -165,6 +165,10 @@
       "type": "boolean",
       "default": false,
       "description": "自动生成 project 配置的调试启动项（condition）。"
+    },
+    "viteConfig": {
+      "type": "string",
+      "description": "与 application builder 同名同义：自定义 vite 配置的钩子文件（相对 workspaceRoot），默认导出 (config, ctx) => config。测试产物也是一个完整小程序工程，两条链路要加插件 / 加 alias 用的是同一个入口。"
     }
   },
   "additionalProperties": false,
