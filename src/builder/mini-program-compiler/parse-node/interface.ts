@@ -126,4 +126,12 @@ export interface NgTemplateMeta extends NgNodeMeta {
 export interface NgContentMeta extends NgNodeMeta {
   kind: NgNodeKind.Content;
   name: string | undefined;
+  /**
+   * 兜底内容（`<ng-content>写点东西</ng-content>`）。
+   *
+   * Angular 把它编成投影节点**紧后面**的一个 embedded view，
+   * 于是 `<ng-content>` 带兜底时要占**两个**声明槽（投影 + 兜底容器）。
+   * 兜底视图自己的节点在那个独立视图里重新从 0 编号。
+   */
+  fallback?: NgTemplateMeta;
 }

@@ -135,11 +135,49 @@ export class WxContainer {
     }
     return this.interp(`nodeList[${node.index}].value`);
   }
+  /**
+   * 内容投影。
+   *
+   * 无兜底内容时就是一个 `<slot>`。带兜底时小程序没有原生能力，
+   * 改成「兜底容器有没有视图」二选一：Angular 只在插槽空着时
+   * 才往兜底容器里塞视图（`ɵɵprojection` 的 isEmpty 分支），
+   * 所以 `nodeList[兜底槽].length` 为真就等价于「没投影到东西」。
+   *
+   * 两个分支天然互斥，不会同时渲染，也不会同时空着。
+   *
+   * 兜底容器里**最多一份**视图（`insertFallbackContent` 每次 create
+   * pass 只塞一份），所以这里直接取 `[0]`，不走 `ngTemplateTransform`
+   * 那套 `wx:for` —— 那套是给份数运行时才知道的容器用的，
+   * 用在这儿只会多一层空转的列表渲染。
+   */
   private ngContentTransform(node: NgContentMeta): string {
-    return node.name ? `<slot name="${node.name}"></slot>` : `<slot></slot>`;
+    const slot = node.name
+      ? `<slot name="${node.name}"></slot>`
+      : `<slot></slot>`;
+    if (!node.fallback) {
+      return slot;
+    }
+    const { directivePrefix, seq } = WxContainer.globalConfig;
+    const templateName = this.defineTemplate(node.fallback);
+    return (
+      `<block ${directivePrefix}${seq}if="${this.interp(
+        `nodeList[${node.fallback.index}].length`,
+      )}">` +
+      `<template is="${templateName}" ${this.getTemplateDataStr(
+        node.fallback.index,
+        `0`,
+      )}></template>` +
+      `</block>` +
+      `<block ${directivePrefix}${seq}else>${slot}</block>`
+    );
   }
-  private ngTemplateTransform(node: NgTemplateMeta): string {
-    let content = '';
+  /**
+   * 把嵌入视图的内容编成 `<template name="…">` 定义并登记，返回模板名。
+   *
+   * 只管「定义」，不管「在哪实例化」——实例化形状由调用方决定
+   * （通用容器用 `wx:for`，投影兜底直接取 `[0]`）。
+   */
+  private defineTemplate(node: NgTemplateMeta): string {
     const defineTemplateName = node.defineTemplateName;
     const childContainer = new WxContainer(this);
     const globalTemplate = this.isGlobalTemplate(node.defineTemplateName);
@@ -166,8 +204,11 @@ export class WxContainer {
         content: `<template name="${defineTemplateName}">${childContainer.templateStr}</template>`,
       });
     }
-
-    content += `<block ${WxContainer.globalConfig.directivePrefix}${
+    return defineTemplateName;
+  }
+  private ngTemplateTransform(node: NgTemplateMeta): string {
+    const defineTemplateName = this.defineTemplate(node);
+    return `<block ${WxContainer.globalConfig.directivePrefix}${
       WxContainer.globalConfig.seq
     }for="${this.interp(`nodeList[${node.index}]`)}" ${
       WxContainer.globalConfig.directivePrefix
@@ -176,8 +217,6 @@ export class WxContainer {
         `item.__templateName||'${defineTemplateName}'`,
       )}" ${this.getTemplateDataStr(node.index, `index`)}></template>
       </block>`;
-
-    return content;
   }
   /**
    * 静态文本节点。

@@ -52,6 +52,7 @@ import type {
   Unary,
   Visitor,
 } from '@angular/compiler';
+import { TmplAstText } from '@angular/compiler';
 
 import * as t from '../../angular-internal/ast.type';
 import { ParsedNgBoundText } from './bound-text';
@@ -141,6 +142,26 @@ function i18nAttributesOf(
 function hasBareI18n(element: t.Element, templateText?: string): boolean {
   const tag = startTagOf(element, templateText);
   return tag !== undefined && /(^|\s)i18n\s*=/.test(tag);
+}
+
+/**
+ * 这堆子节点能不能算兜底内容。
+ *
+ * Angular 的判据在 `ingest.ts`：注释与**纯空白文本**都不算，只有剩下的
+ * 节点存在才建兜底视图。默认（`preserveWhitespaces: false`）下解析器
+ * 已经把空白洗掉了，但组件显式开了 `preserveWhitespaces` 时
+ * `<ng-content> </ng-content>` 仍会带一个空白 Text 进来 ——
+ * 这里多占一格，后面所有节点整体错位一位且不报错。
+ *
+ * 注释到不了 r3 AST（`parseTemplate` 就洗掉了），所以只需防空白文本。
+ */
+function hasProjectionFallback(children: t.Node[] | undefined): boolean {
+  return (
+    !!children?.length &&
+    children.some(
+      (child) => !(child instanceof TmplAstText) || !!child.value.trim().length,
+    )
+  );
 }
 
 export class TemplateDefinition implements TmplAstRecursiveVisitor {
@@ -315,25 +336,26 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   }
 
   /**
-   * `<ng-content>` 内容投影。
+   * `<ng-content>` 内容投影，含兜底内容。
    *
    * ```html
-   * <ng-content select=".header"></ng-content>   ← 支持，children 为空
-   * <ng-content>默认内容</ng-content>            ← 不支持，显式抛错
+   * <ng-content select="[slot='head']"></ng-content>  ← 一个槽
+   * <ng-content>默认内容</ng-content>                 ← 两个槽
    * ```
    *
-   * 实测：空标签和纯空白都会被 Angular 归一成 `children = []`，
-   * 只有写了 fallback 才有子节点。小程序的 `<slot>` 没有 fallback
-   * 能力，所以这里对非空 children 显式抛错 —— 静默丢掉 fallback
-   * 会让「投影不到东西」这种问题极难定位。
+   * 兜底内容在 Angular 里不是投影节点的子节点，而是**紧贴在它后面**的
+   * 一个 embedded view（`createProjectionOp` 的
+   * `numSlotsUsed: fallbackView === null ? 1 : 2`，运行时对应
+   * `ɵɵprojection(i, …, fallbackFn)` 里 `fallbackIndex = i + 1`）。
+   * 于是这里也要占两格，并另起一个 `TemplateDefinition` 走子节点 ——
+   * 兜底内容自己有一套从 0 开始的索引空间。
+   *
+   * 小程序的 `<slot>` 没有兜底能力，wxml 侧靠「兜底容器有没有视图」
+   * 二选一，见 `WxContainer.ngContentTransform`。Angular 那边
+   * `ɵɵprojection` 正是这么判的：插槽空着才 `insertFallbackContent`，
+   * 否则走 `applyProjection`，两者互斥。
    */
   visitContent(content: t.Content) {
-    if (content.children && content.children.length) {
-      throw new Error(
-        '暂不支持 <ng-content> 的 fallback 内容（小程序 slot 无对应能力），' +
-          '请把兜底逻辑放到宿主组件里处理',
-      );
-    }
     const nodeIndex = this.declIndex++;
     const instance = new ParsedNgContent(content, this.parentNode, nodeIndex);
     if (this.parentNode) {
@@ -341,6 +363,24 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     } else {
       this.list.push(instance);
     }
+    if (!hasProjectionFallback(content.children)) {
+      return;
+    }
+    const fallbackIndex = this.declIndex++;
+    const fallback = new ParsedNgTemplate(
+      null,
+      instance,
+      fallbackIndex,
+      `projectionFallback_${this.namePrefix}${fallbackIndex}`,
+    );
+    instance.fallback = fallback;
+    const fallbackView = new TemplateDefinition(
+      content.children,
+      this.componentContext,
+      `${this.namePrefix}${fallbackIndex}_`,
+    );
+    fallbackView.parentNode = fallback;
+    fallbackView.run();
   }
 
   /**

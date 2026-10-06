@@ -84,6 +84,12 @@ function rootSlots(html: string): number[] {
       if (m.kind === NgNodeKind.Element) {
         walk((m as any).children ?? []);
       }
+      const fallback = (m as any).fallback;
+      if (fallback && typeof fallback.index === 'number') {
+        // 兜底容器占**宿主**视图一格（紧贴投影节点）；兜底内容自己在
+        // 另一个视图里重新从 0 编号，所以不能 walk 它的 children。
+        seen.add(fallback.index);
+      }
     }
   };
   walk(metas);
@@ -197,6 +203,18 @@ describe('根视图下标与 Angular 槽位逐字对齐', () => {
     ],
 
     ['ng-content', `<view><ng-content /></view><s></s>`, [0, 1, 2]],
+    // 兜底内容在 Angular 里是投影节点紧后面的 embedded view
+    // （`createProjectionOp`：`numSlotsUsed: fallbackView === null ? 1 : 2`）
+    [
+      'ng-content 带兜底（多占一格）',
+      `<view><ng-content>兜底</ng-content></view><s></s>`,
+      [0, 1, 2, 3],
+    ],
+    [
+      'ng-content 带兜底（多个子节点仍只多一格）',
+      `<view><ng-content><b>1</b><i>{{ n }}</i></ng-content></view><s></s>`,
+      [0, 1, 2, 3],
+    ],
     [
       'ng-template + #ref',
       `<view><ng-template #t><text></text></ng-template></view><s></s>`,

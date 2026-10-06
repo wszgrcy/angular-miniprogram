@@ -1,9 +1,15 @@
 import type { Content } from '../../angular-internal/ast.type';
 import { NgContentMeta, NgNodeKind, NgNodeMeta, ParsedNode } from './interface';
+import type { ParsedNgTemplate } from './template';
 
 const SELECT_NAME_VALUE_REGEXP = /^\[slot=["']?([^"']*)["']?\]$/;
 export class ParsedNgContent implements ParsedNode<NgContentMeta> {
   kind = NgNodeKind.Content;
+  /**
+   * 兜底内容。Angular 把它编成投影节点**紧后面**的一个 embedded view，
+   * 只有该插槽没被投影到东西时才会创建，见 `TemplateDefinition.visitContent`。
+   */
+  fallback: ParsedNgTemplate | undefined;
 
   constructor(
     private node: Content,
@@ -28,6 +34,7 @@ export class ParsedNgContent implements ParsedNode<NgContentMeta> {
       kind: NgNodeKind.Content,
       name: value,
       index: this.index,
+      ...(this.fallback ? { fallback: this.fallback.getNodeMeta() } : null),
     };
   }
 }

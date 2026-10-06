@@ -166,8 +166,8 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
  * 属于最难排查的一类。本 fork 对 @defer / @content 已采用同一策略。
  */
 describe('TemplateDefinition: 不支持的构造显式抛错', () => {
-  function run(html: string) {
-    const r: any = parseTemplate(html, 'p.html');
+  function run(html: string, options?: { preserveWhitespaces?: boolean }) {
+    const r: any = parseTemplate(html, 'p.html', options);
     if (r.errors && r.errors.length) {
       throw new Error('模板解析失败: ' + r.errors[0].message);
     }
@@ -265,18 +265,49 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
     }
   });
 
-  it('ng-content 带 fallback 内容抛错（小程序 slot 无无能）', () => {
-    expect(() => run('<ng-content>fallback</ng-content>')).toThrow(/fallback/);
+  /**
+   * 兜底内容在 Angular 里是投影节点紧后面的一个 embedded view
+   * （`createProjectionOp` 的 `numSlotsUsed: fallbackView === null ? 1 : 2`），
+   * 所以带兜底要多占一格，且兜底内容自己在另一个视图里从 0 编号。
+   */
+  it('ng-content 带兜底内容：投影槽 + 紧贴的兜底容器槽', () => {
+    const meta: any = run('<ng-content>fallback</ng-content>')[0].getNodeMeta();
+    expect(meta.index).toBe(0);
+    expect(meta.fallback.index, '兜底容器必须紧贴投影节点').toBe(1);
+    expect(meta.fallback.defineTemplateName).toBe('projectionFallback_1');
+    // 兜底内容自成一套下标，不占宿主视图的槽
+    expect(meta.fallback.children.map((c: any) => c.index)).toEqual([0]);
   });
 
-  it('对照：ng-content 无 fallback 正常通过', () => {
-    const list = run('<ng-content select=".header"></ng-content>');
-    expect(list.length).toBe(1);
+  it('ng-content 带兜底内容：后续节点整体后移一格', () => {
+    const list = run('<ng-content>fallback</ng-content><b></b>');
+    expect(list.map((n) => n.getNodeMeta().index)).toEqual([0, 2]);
   });
 
-  it('对照：ng-content 纯空白不算 fallback（Angular 归一成空 children）', () => {
-    const list = run('<ng-content>   </ng-content>');
-    expect(list.length).toBe(1);
+  it('对照：ng-content 无兜底内容只占一格', () => {
+    const list = run('<ng-content select="[slot=header]"></ng-content><b></b>');
+    expect(list.map((n) => n.getNodeMeta().index)).toEqual([0, 1]);
+  });
+
+  it('对照：ng-content 纯空白不算兜底内容（Angular 归一成空 children）', () => {
+    const meta: any = run('<ng-content>   </ng-content>')[0].getNodeMeta();
+    expect(meta.fallback).toBeUndefined();
+  });
+
+  /**
+   * `preserveWhitespaces: true` 时解析器不洗空白，AST 里真的会剩一个
+   * 空白 Text。Angular 的兜底判据不数它，这里跟着数就多占一格。
+   */
+  it('preserveWhitespaces 下的纯空白 Text 仍不算兜底内容', () => {
+    const blank: any = run('<ng-content>   </ng-content>', {
+      preserveWhitespaces: true,
+    })[0].getNodeMeta();
+    expect(blank.fallback, '空白文本不建兜底视图').toBeUndefined();
+
+    const real: any = run('<ng-content> a </ng-content>', {
+      preserveWhitespaces: true,
+    })[0].getNodeMeta();
+    expect(real.fallback.index).toBe(1);
   });
 
   it('@defer / @content 仍按既有策略抛错', () => {
