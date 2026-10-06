@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Plugin } from 'vite';
 import type { PlatformFileExtname } from '../../platform/type';
-import { toPosix } from '../../util/path';
+import { relativePosix, toPosix } from '../../util/path';
 
 export interface NativeComponentMeta {
   /** wxml 里的标签名 */
@@ -125,11 +125,9 @@ export function nativeComponentsPlugin(
         config.usingComponents = config.usingComponents ?? {};
         for (const hit of hits) {
           // 相对路径：从该 wxml 所在目录到原生组件主文件
-          const rel = toPosix(
-            path.posix.relative(
-              path.posix.dirname(wxmlName),
-              hit.outputPathNoExt,
-            ),
+          const rel = relativePosix(
+            path.posix.dirname(wxmlName),
+            hit.outputPathNoExt,
           );
           config.usingComponents[hit.tag] = rel.startsWith('.')
             ? rel

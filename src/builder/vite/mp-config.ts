@@ -532,7 +532,7 @@ export function checkReferencedFiles(
     if (typeof value !== 'string' || !value) {
       continue;
     }
-    if (!emitted.has(path.posix.normalize(value))) {
+    if (!emitted.has(toPosixPath(value))) {
       errors.push(
         `app 配置的 ${key} 指向 ${value}，但产物里没有这个文件（检查 assets 是否把它拷进来）`,
       );

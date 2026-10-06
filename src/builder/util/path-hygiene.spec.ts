@@ -13,6 +13,15 @@ import { describe, expect, it } from 'vitest';
  * （Windows 上 `/C:/a/b`，开头多一个斜杠），只能用来比、当 key；交给 `fs` 或 `path.resolve`
  * 会被当成「C 盘下的 `\C\a\b`」，Windows 上直接 ENOENT。要变回可用路径用 `toNativePath` /
  * `toAbsolutePosix`。这条只能抓到直接嵌套的写法。
+ *
+ * 规则三：归一 / 相对计算 / 绝对判定一律走 `util/path`。node 的 `path.normalize` 与 `path.relative`
+ * 都是平台相关的，`path.posix.*` / `path.win32.*` 又只站在某一边；直接拿它们归一真实路径，等于在赌
+ * 当前平台。`util/path` 底下已经统一到 `normalize-path` / `is-relative`。
+ *
+ * 规则四：`normalize-path` / `is-relative` 只在 `util/path.ts` 里出现。换归一实现时只改一处，
+ * 才不会一半走新尺一半走旧尺。
+ *
+ * 规则三、四只管产物代码：测试里拿 node `path` 造输入、拼期望值属另一回事，不在约束范围内。
  */
 
 const BUILDER_ROOT = path.resolve(__dirname, '..');
@@ -23,7 +32,12 @@ const ALLOWED = new Set([
   path.join('util', 'path-hygiene.spec.ts'),
 ]);
 
-const FORBIDDEN: Array<{ name: string; re: RegExp }> = [
+const FORBIDDEN: Array<{
+  name: string;
+  re: RegExp;
+  /** 只查产物代码，测试里拿 node path 造输入 / 拼期望值不受限 */
+  productionOnly?: boolean;
+}> = [
   {
     name: '手写反斜杠转正斜杠',
     re: /\.replace\(\s*\/\\\\\/g\s*,\s*['"]\/['"]\s*\)/,
@@ -39,6 +53,16 @@ const FORBIDDEN: Array<{ name: string; re: RegExp }> = [
   {
     name: 'pathKey 产物直接进 fs / node path',
     re: /(?:fs\.\w+|path\.(?:resolve|dirname|join|relative|isAbsolute))\([^)]*\bpathKey\(/,
+  },
+  {
+    name: '绕过 util/path 做归一 / 相对计算 / 绝对判定',
+    re: /path\.(?:(?:posix|win32)\.)?(?:normalize|relative|isAbsolute)\s*\(/,
+    productionOnly: true,
+  },
+  {
+    name: '绕过 util/path 直接引 normalize-path / is-relative',
+    re: /from\s+['"](?:normalize-path|is-relative)['"]/,
+    productionOnly: true,
   },
 ];
 
@@ -61,12 +85,15 @@ describe('路径写法防回归', () => {
     expect(files.length).toBeGreaterThan(50);
   });
 
-  for (const { name, re } of FORBIDDEN) {
+  for (const { name, re, productionOnly } of FORBIDDEN) {
     it(`不出现「${name}」`, () => {
       const hits: string[] = [];
       for (const file of files) {
         const rel = path.relative(BUILDER_ROOT, file);
         if (ALLOWED.has(rel)) {
+          continue;
+        }
+        if (productionOnly && rel.endsWith('.spec.ts')) {
           continue;
         }
         const lines = readFileSync(file, 'utf8').split('\n');

@@ -470,7 +470,7 @@ export class MiniProgramCompilerService {
       throw new Error(
         `[mini-program-compiler] 组件 ${
           classDeclaration.name?.getText() ?? '?'
-        }（${path.normalize(
+        }（${toNativePath(
           classDeclaration.getSourceFile().fileName,
         )}）的 meta.declarations 缺失，Angular 组件分析未完成。` +
           `这通常是上游编译错误的连带结果，先把真正的报错修掉再来。`,
@@ -569,7 +569,7 @@ export class MiniProgramCompilerService {
       );
     if (missing.length) {
       throw new Error(
-        `组件 ${className}（${path.normalize(componentPath)}）的 styleUrls 指向的文件不存在：\n` +
+        `组件 ${className}（${toNativePath(componentPath)}）的 styleUrls 指向的文件不存在：\n` +
           missing.map((url) => `  - ${url}`).join('\n'),
       );
     }

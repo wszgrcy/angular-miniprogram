@@ -47,6 +47,11 @@ describe('toPosix（只翻分隔符）', () => {
     expect(toPosix('/C:/a')).toBe('/C:/a');
     expect(toPosix('C:\\a\\')).toBe('C:/a/');
   });
+
+  it('重斜杠一并归一，尾斜杠则原样留着', () => {
+    expect(toPosix('a//b\\c')).toBe('a/b/c');
+    expect(toPosix('a/b/')).toBe('a/b/');
+  });
 });
 
 describe('toNativePath（原生绝对路径）', () => {
@@ -96,6 +101,13 @@ describe('isAbsoluteish / resolveNative（devkit posix 化的 /C:/...）', () =>
     expect(isAbsoluteish('/workspace/x')).toBe(true);
     expect(isAbsoluteish('src/tsconfig.spec.json')).toBe(false);
     expect(isAbsoluteish('./src/x')).toBe(false);
+  });
+
+  it('UNC 算绝对，盘符没跟分隔符不算，裸子目录算相对', () => {
+    expect(isAbsoluteish('\\\\server\\share\\x')).toBe(true);
+    expect(isAbsoluteish('C:')).toBe(false);
+    expect(isAbsoluteish('a/b')).toBe(false);
+    expect(isAbsoluteish('')).toBe(false);
   });
 
   it('resolveNative：绝对输入不再跟 base 拼，且不会双盘符', () => {

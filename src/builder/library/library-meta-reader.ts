@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import fs from 'fs-extra';
 import * as path from 'path';
-import { isSamePath, toPosix } from '../util/path';
+import { isSamePath, relativePosix, toPosix } from '../util/path';
 import {
   LIBRARY_META_FILE_NAME,
   LIBRARY_META_SCHEMA_VERSION,
@@ -169,7 +169,7 @@ export function lookupLibraryMeta(
   }
   const sidecarPath = path.join(pkgRoot, LIBRARY_META_FILE_NAME);
   const relKey = normalizeMetaKey(
-    path.relative(pkgRoot, path.resolve(sourceFilePath)),
+    relativePosix(pkgRoot, path.resolve(sourceFilePath)),
   );
 
   let entry: LibraryMetaEntry | undefined = file.entries[relKey];

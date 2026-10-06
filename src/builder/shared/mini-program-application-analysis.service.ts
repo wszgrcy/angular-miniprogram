@@ -27,15 +27,12 @@ import {
 } from './token';
 import type { CompilerHostLike, PagePattern } from './type';
 
-/** Windows 下把路径外联成 win32 形式（带缓存）。非 win32 恒等。 */
+/** 外联给 webpack 的路径必须是当前平台的原生绝对形态（带缓存）。 */
 const externalizationCache = new Map<string, string>();
 function externalizePath(p: string): string {
-  if (process.platform !== 'win32') {
-    return p;
-  }
   let result = externalizationCache.get(p);
   if (result === undefined) {
-    result = path.win32.normalize(p);
+    result = toNativePath(p);
     externalizationCache.set(p, result);
   }
   return result;

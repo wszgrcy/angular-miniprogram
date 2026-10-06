@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Plugin } from 'vite';
 import { PlatformType } from '../../platform/platform';
+import { isAbsoluteish } from '../../util/path';
 
 /** 参与平台变体替换的扩展名 */
 const RESOLVABLE_EXTS = ['.ts', '.tsx', '.js', '.mts', '.mjs'];
@@ -26,8 +27,8 @@ export function platformFileResolvePlugin(options: {
       if (!importer || source.startsWith('\0') || source.startsWith('#')) {
         return null;
       }
-      const isRelative = source.startsWith('./') || source.startsWith('../');
-      if (!isRelative && !path.isAbsolute(source)) {
+      const dotRelative = source.startsWith('./') || source.startsWith('../');
+      if (!dotRelative && !isAbsoluteish(source)) {
         return null;
       }
       // 请求已指向平台变体（foo.wx / foo.wx.ts），放行避免循环

@@ -4,6 +4,8 @@ import {
   getSystemPath,
   normalize,
 } from '@angular-devkit/core';
+import isRelative from 'is-relative';
+import normalizePath from 'normalize-path';
 import * as path from 'path';
 
 /**
@@ -30,7 +32,13 @@ import * as path from 'path';
  * | 写进产物的模块说明符 | `toModuleSpecifier` |
  * | 真的读写盘 | `toNativePath` / `resolveNative` |
  *
- * 底下就是 `@angular-devkit/core` 的路径层，本模块只补它给不了的那几样。
+ * 底下分三层，各管一段，本模块是唯一出口：
+ *
+ *  - `normalize-path`：真实路径的分隔符归一（`toPosix` 及由它派生的那几个）。
+ *  - `is-relative`：相对 / 绝对判定（`isAbsoluteish`），认得盘符与 UNC。
+ *  - `@angular-devkit/core`：Host（virtual fs）那套路径的形态与身份，
+ *    即 `pathKey` / `toNativePath`——`/C:/x` 这种 posix 化绝对路径只有它认得。
+ *
  * Linux/macOS 上除了盘符那条，这里所有函数都是恒等变换。
  */
 
@@ -41,19 +49,20 @@ import * as path from 'path';
 /**
  * 只翻分隔符：`C:\a\b` -> `C:/a/b`。绝对性、盘符大小写、前导斜杠都不动。
  * 自己比的时候用 `pathKey`，别用它。
+ *
+ * `stripTrailing=false`：尾分隔符是不是要留由调用方决定，这里只负责分隔符本身
+ * （顺带把 `a//b` 这类重斜杠并掉）。
  */
 export function toPosix(p: string): string {
-  return p.replace(/\\/g, '/');
+  return normalizePath(p, false);
 }
 
-/** devkit posix 化的 Windows 绝对路径，如 `/C:/code/x` */
-const POSIXIFIED_WIN_ABS = /^[/\\]?([a-zA-Z]:[/\\])/;
-
 /**
- * 是不是绝对路径——含当前平台原生绝对，以及 devkit posix 化的 `/C:/x`。
+ * 是不是绝对路径——含当前平台原生绝对、Windows 盘符、UNC，
+ * 以及 devkit posix 化的 `/C:/x`（开头那个斜杠就够它判绝对了）。
  */
 export function isAbsoluteish(p: string): boolean {
-  return path.isAbsolute(p) || POSIXIFIED_WIN_ABS.test(p);
+  return !isRelative(p);
 }
 
 /**
@@ -101,9 +110,12 @@ export function toModuleSpecifier(p: string): string {
   return toPosix(p).replace(/^\.\//, '');
 }
 
-/** 相对路径 + posix。`path.relative` 在 Windows 上产出反斜杠，必须再翻一次分隔符。 */
+/**
+ * 相对路径 + posix。相对计算本身只有 `path.relative` 会做，
+ * 归一交给 `normalize-path`（Windows 上它给的是反斜杠）。
+ */
 export function relativePosix(from: string, to: string): string {
-  return toPosix(path.relative(from, to));
+  return normalizePath(path.relative(from, to));
 }
 
 /* ------------------------------------------------------------------ *

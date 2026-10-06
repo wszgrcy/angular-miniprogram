@@ -5,7 +5,12 @@ import {
   type WxsAnalysisRef,
   splitComponentKey,
 } from '../../mini-program-compiler/type';
-import { pathKey, toAbsolutePosix, toPosix } from '../../util/path';
+import {
+  pathKey,
+  relativePosix,
+  toAbsolutePosix,
+  toPosix,
+} from '../../util/path';
 import { lookupStrippedByContent } from '../../wxs/wxs-angular-strip';
 import { rewriteComponentForWxs } from '../../wxs/wxs-component-rewrite';
 
@@ -124,7 +129,7 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
       if (source === null) {
         continue;
       }
-      const rel = path.relative(options.workspaceRoot, component);
+      const rel = relativePosix(options.workspaceRoot, component);
       const cached = path.join(options.cacheDir, rel);
       const rewritten = rewriteComponentForWxs(
         source,
