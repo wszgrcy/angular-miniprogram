@@ -14,9 +14,6 @@ export default defineConfig({
   base: '/angular-miniprogram/',
   outDir: '../docs',
   deleteOutDir: true,
-  redirect: {
-    '/': '/zh/',
-  },
   integrations: [
     starlight({
       title: {
