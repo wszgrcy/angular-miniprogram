@@ -1,4 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { ContentMultiComponent } from './content-multi.component';
-
-componentRegistry(ContentMultiComponent);
+export { ContentMultiComponent as default } from './content-multi.component';

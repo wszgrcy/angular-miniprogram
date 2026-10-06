@@ -2,14 +2,12 @@ import { componentTestComplete, getComponent, openComponent } from '../util';
 import { NgContentSpecComponent } from './ng-content.component';
 describe('NgContentSpecComponent', () => {
   beforeEach(async () => {
-    await openComponent(`/spec/ng-content-spec/ng-content-spec-entry`);
+    await openComponent(`/pages/ng-content-spec/ng-content-spec-entry`);
   });
-  it('run', (done) => {
+  it('run', () => {
     let pages = getCurrentPages();
     let page = pages[0];
     let component = getComponent<NgContentSpecComponent>(page);
-    componentTestComplete(component.testFinish$$).then(() => {
-      done();
-    });
+    return componentTestComplete(component.testFinish$$);
   });
 });

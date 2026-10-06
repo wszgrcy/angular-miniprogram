@@ -51,17 +51,11 @@ export class TwoBComponent {
 `;
 
 const ENTRY_A_TS = `
-import { componentRegistry } from 'angular-miniprogram';
-import { TwoAComponent } from '../two-in-file.component';
-
-componentRegistry(TwoAComponent);
+export { TwoAComponent as default } from '../two-in-file.component';
 `;
 
 const ENTRY_B_TS = `
-import { componentRegistry } from 'angular-miniprogram';
-import { TwoBComponent } from '../two-in-file.component';
-
-componentRegistry(TwoBComponent);
+export { TwoBComponent as default } from '../two-in-file.component';
 `;
 
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
@@ -75,19 +69,19 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const root = harness.host.root();
       const myTestProjectHost = new MyTestProjectHost(harness.host);
       const list = await myTestProjectHost.getFileList(
-        normalize(join(root, 'src', '__pages'))
+        normalize(join(root, 'src', '__pages')),
       );
       list.push(
         ...(await myTestProjectHost.getFileList(
-          normalize(join(root, 'src', '__components'))
-        ))
+          normalize(join(root, 'src', '__components')),
+        )),
       );
       await myTestProjectHost.importPathRename(list);
       await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
       await myTestProjectHost.moveDir(
         ALL_COMPONENT_NAME_LIST,
         '__components',
-        'components'
+        'components',
       );
       await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
 
@@ -102,17 +96,17 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       expect(result.result?.success).toBeTruthy();
 
       const files = await myTestProjectHost.getFileList(
-        join(root, DEFAULT_ANGULAR_CONFIG.outputPath)
+        join(root, DEFAULT_ANGULAR_CONFIG.outputPath),
       );
 
       const read = async (p: string) =>
         virtualFs.fileBufferToString(
-          await harness.host.read(normalize(p)).toPromise()
+          await harness.host.read(normalize(p)).toPromise(),
         );
 
       const wxmlOf = async (name: string) => {
         const hit = files.find(
-          (f) => String(f).includes(name) && String(f).endsWith('.wxml')
+          (f) => String(f).includes(name) && String(f).endsWith('.wxml'),
         );
         expect(hit).toBeTruthy();
         return read(String(hit));

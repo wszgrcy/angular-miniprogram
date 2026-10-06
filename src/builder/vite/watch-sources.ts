@@ -17,7 +17,7 @@ export interface WatcherFactoryLike {
   watch(
     files: Iterable<string>,
     directories: Iterable<string>,
-    callback: (events: Array<{ path: string; type: WatchEventType }>) => void
+    callback: (events: Array<{ path: string; type: WatchEventType }>) => void,
   ): { close(): void };
 }
 
@@ -33,6 +33,8 @@ export interface WatcherFactoryLike {
  */
 export function watchSources(options: {
   directories: string[];
+  /** 目录之外的单个文件（如放在 sourceRoot 外的配置文件） */
+  files?: string[];
   onChange: () => void;
   /** 测试里传 harness 的 watcher；不传则用原生 fs.watch */
   factory?: WatcherFactoryLike;
@@ -63,9 +65,16 @@ export function watchSources(options: {
       return false;
     }
   });
+  const files = (options.files ?? []).filter((f) => {
+    try {
+      return fs.statSync(f).isFile();
+    } catch {
+      return false;
+    }
+  });
 
   if (options.factory) {
-    const handle = options.factory.watch([], dirs, fire);
+    const handle = options.factory.watch(files, dirs, fire);
     return {
       close: () => {
         closed = true;
@@ -79,12 +88,19 @@ export function watchSources(options: {
 
   // 原生退化路径：真实 ng build --watch 走这里
   const watchers: fs.FSWatcher[] = [];
+  for (const file of files) {
+    try {
+      watchers.push(fs.watch(file, () => fire()));
+    } catch {
+      continue;
+    }
+  }
   for (const dir of dirs) {
     try {
       watchers.push(
         fs.watch(dir, { recursive: true }, () => {
           fire();
-        })
+        }),
       );
     } catch (error) {
       // 目录不存在或平台不支持 recursive，跳过而不是整体失败

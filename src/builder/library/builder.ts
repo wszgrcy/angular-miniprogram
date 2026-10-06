@@ -23,7 +23,7 @@ import { ngPackagrFactory } from './ng-packagr-factory';
  */
 export function execute(
   options: any,
-  context: BuilderContext
+  context: BuilderContext,
 ): Observable<BuilderOutput> {
   return from(
     (async () => {
@@ -35,7 +35,7 @@ export function execute(
       }
       const packager = await ngPackagrFactory(
         resolve(root, options.project),
-        tsConfig
+        tsConfig,
       );
 
       const projectName = context.target?.project;
@@ -50,19 +50,22 @@ export function execute(
       const ngPackagrOptions = {
         cacheEnabled,
         cacheDirectory: join(cacheDirectory, 'ng-packagr'),
+        // ng-packagr 自己把它交给 chokidar 的 watchOptions.poll，
+        // 网络盘 / WSL 挂载上没轮询就看不到改动
+        poll: options.poll,
       };
 
       return { packager, ngPackagrOptions };
-    })()
+    })(),
   ).pipe(
     switchMap(({ packager, ngPackagrOptions }) =>
       options.watch
         ? packager.watch(ngPackagrOptions)
-        : packager.build(ngPackagrOptions)
+        : packager.build(ngPackagrOptions),
     ),
     mapTo({ success: true, workspaceRoot: context.workspaceRoot }),
-    catchError((err) => of({ success: false, error: err.message }))
+    catchError((err) => of({ success: false, error: err.message })),
   );
 }
 
-export default createBuilder<Record<string, string> & any>(execute);
+export default createBuilder<Record<string, string>>(execute);

@@ -6,7 +6,8 @@ import { StyleClassComponent } from '../../spec-component/style-class/style-clas
 import { fields, nodeExist } from '../util';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [StyleClassComponent],
   selector: 'app-style-class-spec',
   template: `<app-style-class #instance></app-style-class>`,
 })
@@ -15,7 +16,7 @@ export class StyleClassSpecComponent {
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
     onReady: function (
       this: WechatMiniprogram.Page.Instance<{}, {}> &
-        MiniProgramComponentInstance<StyleClassSpecComponent>
+        MiniProgramComponentInstance<StyleClassSpecComponent>,
     ) {
       this.__ngComponentInstance.componentFinderService
         .get(this.__ngComponentInstance.instance)
@@ -24,7 +25,7 @@ export class StyleClassSpecComponent {
             item: WechatMiniprogram.Page.Instance<
               WechatMiniprogram.IAnyObject,
               WechatMiniprogram.IAnyObject
-            >
+            >,
           ) => {
             let query = item.createSelectorQuery();
 
@@ -35,7 +36,7 @@ export class StyleClassSpecComponent {
             });
             expect(result).toEqual({ backgroundColor: 'rgb(255, 0, 0)' });
             this.__ngComponentInstance.testFinish$$.complete();
-          }
+          },
         );
     },
   };

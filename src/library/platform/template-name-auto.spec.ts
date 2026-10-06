@@ -12,7 +12,6 @@
  * 与 lview-to-node-list.spec（证明 lViewToWXView 读的就是这些槽）串起来，
  * 整条「声明名 → wxml template is」链路闭合。
  */
-import { CommonModule } from '@angular/common';
 import { Component, TemplateRef, ViewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
@@ -22,7 +21,7 @@ import { initMiniProgramTestEnv } from './test-util/init-env';
 @Component({
   selector: 'probe-auto',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <ng-template #autoTpl let-greeting="greeting">
       <span>{{ greeting }}</span>
@@ -49,12 +48,8 @@ describe('#5 createEmbeddedView 不传 __templateName 的自动推导来源', ()
     const fromDecl = lView[1]?.declTNode?.localNames?.[0];
 
     // 第一项为空 → 名字只能来自声明名
-    expect(fromContext)
-      .withContext('context 不应带 __templateName')
-      .toBeUndefined();
-    expect(fromDecl)
-      .withContext('声明名应自动推导为 autoTpl')
-      .toBe('autoTpl');
+    expect(fromContext, 'context 不应带 __templateName').toBeUndefined();
+    expect(fromDecl, '声明名应自动推导为 autoTpl').toBe('autoTpl');
 
     // 模拟 lViewToWXView 的取值表达式，结果必须是 autoTpl
     const resolved = fromContext || fromDecl || null;

@@ -1,10 +1,9 @@
 import { Component, Inject, OnInit } from '@angular/core';
 import { MINIPROGRAM_GLOBAL_TOKEN } from 'angular-miniprogram';
-import { CommonModule } from '@angular/common';
 
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   selector: 'app-root',
   templateUrl: './root.component.html',
   styleUrls: ['./root.component.css'],
@@ -77,6 +76,11 @@ export class RootComponent implements OnInit {
   lifeTimeUseComponent() {
     this.global.navigateTo({
       url: '/pages/life-time-page-use-component/life-time-page-use-component-entry',
+    });
+  }
+  libraryMetaDemo() {
+    this.global.navigateTo({
+      url: '/pages/library-meta-demo/library-meta-demo-entry',
     });
   }
 }

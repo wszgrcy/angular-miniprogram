@@ -43,7 +43,7 @@ export function recordGeneratedWxml(
   componentKey: string,
   componentName: string,
   sourceFile: string,
-  wxml: string
+  wxml: string,
 ): void {
   records.set(componentKey, {
     componentKey,

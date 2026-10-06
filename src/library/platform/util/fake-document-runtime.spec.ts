@@ -28,7 +28,7 @@ describe('fake-document (无 document 环境)', () => {
 
   it('前置条件：无 document 且未装补丁时，getDocument() 必须抛 NG0210', () => {
     expect(typeof g.document).toBe('undefined');
-    expect(() => ɵgetDocument()).toThrowError(/NG0210/);
+    expect(() => ɵgetDocument()).toThrow(/NG0210/);
   });
 
   it('装补丁后 getDocument() 返回占位物，不再抛', () => {

@@ -3,10 +3,10 @@
  *
  * ## 为什么需要
  *
- * `script/` 下的脚本（`package-sync.ts`、`build.ts` 等）**不在任何
+ * `script/` 下的脚本（`package-sync.ts`、`ensure-sync.ts` 等）**不在任何
  * 构建/类型检查路径里**：
  *
- *   - `npm run build` 走 `script/build.ts` / `start-build-library`，
+ *   - `npm run build` 走 `tsc -p ./tsconfig.builder.json` / `tsx ./script/build-ng-package.ts`，
  *     不会去类型检查 `package-sync.ts`
  *   - `script/tsconfig.json` 有既有 rootDir 问题，不能当门禁
  *   - `package-sync.ts` 只在 `npm run sync` 时由 ts-node 现场编译
@@ -30,9 +30,7 @@ describe('script/*.ts 语法守卫', () => {
   let files: string[];
 
   beforeAll(() => {
-    expect(fs.existsSync(SCRIPT_DIR))
-      .withContext(`找不到 ${SCRIPT_DIR}`)
-      .toBeTrue();
+    expect(fs.existsSync(SCRIPT_DIR), `找不到 ${SCRIPT_DIR}`).toBe(true);
     files = fs
       .readdirSync(SCRIPT_DIR)
       .filter((f) => f.endsWith('.ts'))
@@ -40,9 +38,10 @@ describe('script/*.ts 语法守卫', () => {
   });
 
   it('应至少扫到 package-sync.ts 等脚本', () => {
-    expect(files.length)
-      .withContext('script/ 下没扫到 .ts 文件，本守卫空跑')
-      .toBeGreaterThan(3);
+    expect(
+      files.length,
+      'script/ 下没扫到 .ts 文件，本守卫空跑',
+    ).toBeGreaterThan(3);
     expect(files).toContain('package-sync.ts');
     expect(files).toContain('ensure-sync.ts');
   });
@@ -61,7 +60,7 @@ describe('script/*.ts 语法守卫', () => {
         },
       });
       const diags = (out.diagnostics ?? []).filter(
-        (d) => d.category === ts.DiagnosticCategory.Error
+        (d) => d.category === ts.DiagnosticCategory.Error,
       );
       for (const d of diags) {
         let where = f;
@@ -69,7 +68,9 @@ describe('script/*.ts 语法守卫', () => {
           const { line } = d.file.getLineAndCharacterOfPosition(d.start);
           where = `${f}:${line + 1}`;
         }
-        failures.push(`${where}  ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
+        failures.push(
+          `${where}  ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`,
+        );
       }
     }
 
@@ -86,10 +87,11 @@ describe('script/*.ts 语法守卫', () => {
       },
     });
     const diags = (out.diagnostics ?? []).filter(
-      (d) => d.category === ts.DiagnosticCategory.Error
+      (d) => d.category === ts.DiagnosticCategory.Error,
     );
-    expect(diags.length)
-      .withContext('这段就是当初漏网的 `])  ]);`，若抓不到说明守卫无效')
-      .toBeGreaterThan(0);
+    expect(
+      diags.length,
+      '这段就是当初漏网的 `])  ]);`，若抓不到说明守卫无效',
+    ).toBeGreaterThan(0);
   });
 });

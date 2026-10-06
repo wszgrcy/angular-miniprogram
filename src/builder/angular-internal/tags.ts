@@ -6,24 +6,14 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-export enum TagContentType {
-  RAW_TEXT,
-  ESCAPABLE_RAW_TEXT,
-  PARSABLE_DATA,
-}
-
-export interface TagDefinition {
-  closedByParent: boolean;
-  implicitNamespacePrefix: string | null;
-  isVoid: boolean;
-  ignoreFirstLf: boolean;
-  canSelfClose: boolean;
-  preventNamespaceInheritance: boolean;
-
-  isClosedByChild(name: string): boolean;
-  getContentType(prefix?: string): TagContentType;
-}
-
+/**
+ * 拆 Angular 的「带命名空间元素名」（`:ns:name` 形态）。
+ *
+ * 本 fork 只用到这一个函数：模板里没有真正的命名空间元素，
+ * 但 `createCssSelector` 需要把 `:svg:circle` 这类名字拆开。
+ * 其余 Angular 原有的标签工具（isNgContainer / getNsPrefix 等）
+ * 在小程序链路上没有调用点，已删。
+ */
 export function splitNsName(elementName: string): [string | null, string] {
   if (elementName[0] != ':') {
     return [null, elementName];
@@ -33,34 +23,9 @@ export function splitNsName(elementName: string): [string | null, string] {
 
   if (colonIndex === -1) {
     throw new Error(
-      `Unsupported format "${elementName}" expecting ":namespace:name"`
+      `Unsupported format "${elementName}" expecting ":namespace:name"`,
     );
   }
 
   return [elementName.slice(1, colonIndex), elementName.slice(colonIndex + 1)];
-}
-
-// `<ng-container>` tags work the same regardless the namespace
-export function isNgContainer(tagName: string): boolean {
-  return splitNsName(tagName)[1] === 'ng-container';
-}
-
-// `<ng-content>` tags work the same regardless the namespace
-export function isNgContent(tagName: string): boolean {
-  return splitNsName(tagName)[1] === 'ng-content';
-}
-
-// `<ng-template>` tags work the same regardless the namespace
-export function isNgTemplate(tagName: string): boolean {
-  return splitNsName(tagName)[1] === 'ng-template';
-}
-
-export function getNsPrefix(fullName: string): string;
-export function getNsPrefix(fullName: null): null;
-export function getNsPrefix(fullName: string | null): string | null {
-  return fullName === null ? null : splitNsName(fullName)[0];
-}
-
-export function mergeNsAndName(prefix: string, localName: string): string {
-  return prefix ? `:${prefix}:${localName}` : localName;
 }

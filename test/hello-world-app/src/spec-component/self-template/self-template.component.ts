@@ -1,7 +1,9 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, OnInit, TemplateRef, input } from '@angular/core';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [NgTemplateOutlet],
   selector: 'app-self-template',
   templateUrl: './self-template.component.html',
 })

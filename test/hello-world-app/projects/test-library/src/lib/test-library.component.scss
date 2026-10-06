@@ -1,3 +1,8 @@
 body {
   background-color: red;
 }
+
+/* 供产物验收：这个类名会原样出现在编译出的 .wxss 里 */
+.lib-test-library__body {
+  color: #06c;
+}

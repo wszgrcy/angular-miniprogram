@@ -1,5 +1,1 @@
-import { pageStartup } from 'angular-miniprogram';
-import { HttpSpecModule } from './http.module';
-import { HttpSpecComponent } from './http.component';
-
-pageStartup(HttpSpecModule, HttpSpecComponent);
+export { HttpSpecComponent as default } from './http.component';

@@ -24,6 +24,9 @@ jobs:
       - name: lint
         run: |
           npm run lint
+      - name: check builder schema
+        run: |
+          npm run check:schema
       - name: hook-code
         run: |
           npm run sync

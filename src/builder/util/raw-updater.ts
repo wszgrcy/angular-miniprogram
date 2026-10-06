@@ -11,7 +11,10 @@ export class RawUpdater {
     return new RawUpdater(content, change).update();
   }
   originContent!: string;
-  constructor(private content: string, private changes: Change[]) {
+  constructor(
+    private content: string,
+    private changes: Change[],
+  ) {
     this.originContent = content;
   }
   update() {

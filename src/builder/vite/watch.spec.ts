@@ -16,6 +16,7 @@ import {
   ALL_PAGE_NAME_LIST,
   ALL_COMPONENT_NAME_LIST as COMP_LIST,
 } from '../../../test/util/file';
+import { memoize } from '../../../test/util/memoize';
 import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
@@ -45,19 +46,19 @@ describeBuilder(
         const root = harness.host.root();
         const myTestProjectHost = new MyTestProjectHost(harness.host);
         const list = await myTestProjectHost.getFileList(
-          normalize(join(root, 'src', '__pages'))
+          normalize(join(root, 'src', '__pages')),
         );
         list.push(
           ...(await myTestProjectHost.getFileList(
-            normalize(join(root, 'src', '__components'))
-          ))
+            normalize(join(root, 'src', '__components')),
+          )),
         );
         await myTestProjectHost.importPathRename(list);
         await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
         await myTestProjectHost.moveDir(
           COMP_LIST,
           '__components',
-          'components'
+          'components',
         );
         await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
       };
@@ -65,9 +66,18 @@ describeBuilder(
       const readOut = (base: string, rel: string) =>
         fs.readFileSync(path.join(base, rel), 'utf8');
 
-      it('watch 下改模板能重新产出 wxml', async () => {
+      /**
+       * 「改模板能重出 wxml」与「新增入口能被拉进来」是同一次 watch 会话的两个侧面。
+       *
+       * 两处改动在同一个批次里写完（writeFiles 内部是同步落盘，watcher 回调要等一个
+       * 微任务），所以只会触发一轮重建；会话从两次降到一次，构建从四轮降到两轮。
+       */
+      const session = memoize(async () => {
         await setup();
         const marker = 'VITE_WATCH_MARKER';
+        const htmlFile = 'src/pages/control-flow/control-flow.component.html';
+        let watchNewBefore = true;
+        let sourceHasMarkerBefore = true;
 
         harness.useTarget('build', angularConfig as never);
         const results: Array<{
@@ -80,57 +90,28 @@ describeBuilder(
               results.push(result as never);
               if (index === 0) {
                 const base = result.result!.baseOutputPath!;
-                const before = readOut(
-                  base,
-                  'pages/control-flow/control-flow-entry.wxml'
+                watchNewBefore = fs.existsSync(
+                  path.join(base, 'pages/watch-new/watch-new-entry.wxml'),
                 );
-                expect(before).not.toContain(marker);
-                void harness.writeFile(
-                  'src/pages/control-flow/control-flow.component.html',
-                  before + marker
-                );
-              }
-              return of(result);
-            }),
-            take(2),
-            skip(1)
-          )
-          .toPromise();
-
-        const base = results[results.length - 1].result!.baseOutputPath!;
-        expect(
-          readOut(base, 'pages/control-flow/control-flow-entry.wxml')
-        ).toContain(marker);
-      }, 180000);
-
-      it('watch 期间新增入口能被拉进来', async () => {
-        await setup();
-
-        harness.useTarget('build', angularConfig as never);
-        const results: Array<{
-          result?: { success?: boolean; baseOutputPath?: string };
-        }> = [];
-        await harness
-          .execute()
-          .pipe(
-            concatMap((result, index) => {
-              results.push(result as never);
-              if (index === 0) {
-                const base = result.result!.baseOutputPath!;
-                expect(
-                  fs.existsSync(
-                    path.join(base, 'pages/watch-new/watch-new-entry.wxml')
-                  )
-                ).toBeFalsy();
+                /**
+                 * 改的是**源模板**。
+                 *
+                 * 早先这里读的是产物 `control-flow-entry.wxml`、再把它写回
+                 * 源 `.html`。产物里带着改写后的 `[nodeList[1][index]]` 这类
+                 * 片段，当模板喂回去就是 `[...nodeList[1][index] ]` 展开语法，
+                 * 增量构建必然「Parser Error: Unexpected token ...」。
+                 */
+                const source = harness.readFile(htmlFile);
+                sourceHasMarkerBefore = source.includes(marker);
                 const appJson = JSON.parse(harness.readFile('src/app.json'));
                 appJson.pages = [
                   ...(appJson.pages || []),
                   'pages/watch-new/watch-new-entry',
                 ];
                 void harness.writeFiles({
+                  [htmlFile]: `${source}\n${marker}`,
                   'src/app.json': JSON.stringify(appJson),
                   'src/pages/watch-new/watch-new.entry.ts': `import { Component } from '@angular/core';
-import { bootstrapPage } from 'angular-miniprogram';
 
 @Component({
   selector: 'app-watch-new',
@@ -141,25 +122,63 @@ export class WatchNewComponent {
   title = 'watch-new';
 }
 
-bootstrapPage(WatchNewComponent);
+export default WatchNewComponent;
 `,
                 });
               }
               return of(result);
             }),
             take(2),
-            skip(1)
+            skip(1),
           )
           .toPromise();
 
-        const base = results[results.length - 1].result!.baseOutputPath!;
-        expect(
-          fs.existsSync(path.join(base, 'pages/watch-new/watch-new-entry.js'))
-        ).toBeTruthy();
-        expect(
-          fs.existsSync(path.join(base, 'pages/watch-new/watch-new-entry.wxml'))
-        ).toBeTruthy();
+        const last = results[results.length - 1].result;
+        const base = last!.baseOutputPath!;
+        return {
+          success: last?.success,
+          watchNewBefore,
+          sourceHasMarkerBefore,
+          controlFlowWxml: readOut(
+            base,
+            'pages/control-flow/control-flow-entry.wxml',
+          ),
+          libComp: fs.existsSync(
+            path.join(
+              base,
+              'library/test-library/lib-comp1-component/lib-comp1-component.js',
+            ),
+          ),
+          watchNewJs: fs.existsSync(
+            path.join(base, 'pages/watch-new/watch-new-entry.js'),
+          ),
+          watchNewWxml: fs.existsSync(
+            path.join(base, 'pages/watch-new/watch-new-entry.wxml'),
+          ),
+        };
+      });
+
+      it('watch 下改模板能重新产出 wxml', async () => {
+        const r = await session();
+        expect(r.sourceHasMarkerBefore).toBe(false);
+        // 先确认构建成功：少了这一步，构建失败只会变成一个莫名其妙的
+        // path.join(undefined) TypeError
+        expect(r.success).toBe(true);
+        expect(r.controlFlowWxml).toContain('VITE_WATCH_MARKER');
+
+        // watch 轮次不能只重编改动的页面：库组件产物（走 library-meta
+        // 那条旁路）也得在。以前由 builder.watch.spec.ts 守，那个文件
+        // 与本文件跑的是同一个 builder，已合到这里。
+        expect(r.libComp).toBe(true);
+      }, 180000);
+
+      it('watch 期间新增入口能被拉进来', async () => {
+        const r = await session();
+        expect(r.watchNewBefore).toBe(false);
+        expect(r.success).toBe(true);
+        expect(r.watchNewJs).toBe(true);
+        expect(r.watchNewWxml).toBe(true);
       }, 180000);
     });
-  }
+  },
 );

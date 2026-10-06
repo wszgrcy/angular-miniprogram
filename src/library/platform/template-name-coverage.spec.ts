@@ -12,7 +12,13 @@
  *   ng_if（then / else）、ng_for_of、ng_switch、ng_template_outlet
  * 外加自定义结构指令显式传值的优先级，以及反向对照。
  */
-import { CommonModule } from '@angular/common';
+import {
+  NgForOf,
+  NgIf,
+  NgSwitch,
+  NgSwitchCase,
+  NgTemplateOutlet,
+} from '@angular/common';
 import { Component, TemplateRef, ViewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
@@ -23,7 +29,7 @@ import { initMiniProgramTestEnv } from './test-util/init-env';
 @Component({
   selector: 'cov-ngif',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgIf],
   template: `
     <ng-template #thenBlock><span>ON</span></ng-template>
     <ng-template #elseBlock><span>OFF</span></ng-template>
@@ -37,7 +43,7 @@ class CovNgIfComponent {
 @Component({
   selector: 'cov-ngfor',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgForOf],
   template: `
     <ng-template #rowTpl let-i>
       <span>{{ i }}</span>
@@ -52,7 +58,7 @@ class CovNgForComponent {
 @Component({
   selector: 'cov-ngswitch',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgSwitch, NgSwitchCase, NgTemplateOutlet],
   template: `
     <div [ngSwitch]="mode">
       <ng-template #oddCase><span>odd</span></ng-template>
@@ -75,7 +81,7 @@ class CovNgSwitchComponent {
 @Component({
   selector: 'cov-outlet',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgTemplateOutlet],
   template: `
     <ng-template #alpha><span>A</span></ng-template>
     <ng-template #beta><span>B</span></ng-template>
@@ -91,7 +97,7 @@ class CovOutletComponent {
 @Component({
   selector: 'cov-outlet-static',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgTemplateOutlet],
   template: `
     <ng-template #alpha><span>A</span></ng-template>
     <div *ngTemplateOutlet="alpha"></div>
@@ -113,7 +119,7 @@ function componentLView(fixture: any): any[] {
  * 容器在 nodeList 里表现为数组，每项含 __templateName / nodeList。
  */
 function collectContainerNames(
-  nodeList: any[]
+  nodeList: any[],
 ): { slot: number; names: (string | undefined)[] }[] {
   const out: { slot: number; names: (string | undefined)[] }[] = [];
   nodeList.forEach((entry, slot) => {
@@ -121,7 +127,7 @@ function collectContainerNames(
       out.push({
         slot,
         names: entry.map((e: any) =>
-          e && '__templateName' in e ? e.__templateName : '<非对象>'
+          e && '__templateName' in e ? e.__templateName : '<非对象>',
         ),
       });
     }
@@ -144,18 +150,20 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
     const containers = collectContainerNames(ctxOf(fixture).nodeList as any[]);
     console.log('ngIf(then) 容器:', JSON.stringify(containers));
 
-    expect(containers.length)
-      .withContext('没找到容器，说明 ngIf 没建出嵌入视图')
-      .toBeGreaterThan(0);
+    expect(
+      containers.length,
+      '没找到容器，说明 ngIf 没建出嵌入视图',
+    ).toBeGreaterThan(0);
     // 每个容器项都应有 __templateName 字段，且**不得为 `undefined`**。
     // 微信 `setData` 对路径式 key 上的 `undefined` 直接拒掉整个调用，
     // 无名时用 `null`（wxml 的 `item.__templateName||'X'` 仍走兼底）。
     containers.forEach((c) =>
       c.names.forEach((n) =>
-        expect(n === null || typeof n === 'string')
-          .withContext(`slot${c.slot} 不得为 undefined`)
-          .toBeTrue()
-      )
+        expect(
+          n === null || typeof n === 'string',
+          `slot${c.slot} 不得为 undefined`,
+        ).toBe(true),
+      ),
     );
   });
 
@@ -177,7 +185,7 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
     console.log('ngFor 容器:', JSON.stringify(containers));
 
     const total = containers.reduce((acc, c) => acc + c.names.length, 0);
-    expect(total).withContext('ngFor 3 项应产生 3 个嵌入视图项').toBe(3);
+    expect(total, 'ngFor 3 项应产生 3 个嵌入视图项').toBe(3);
   });
 
   it('*ngSwitch：命中分支建出嵌入视图', () => {
@@ -195,15 +203,14 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
     fixture.detectChanges();
 
     const names = collectContainerNames(
-      ctxOf(fixture).nodeList as any[]
+      ctxOf(fixture).nodeList as any[],
     ).flatMap((c) => c.names);
     console.log('OUTLET-STATIC names:', JSON.stringify(names));
 
-    expect(names)
-      .withContext(
-        '应推导出模板声明名 alpha（未 patch 环境下由 declTNode 顶上）'
-      )
-      .toContain('alpha');
+    expect(
+      names,
+      '应推导出模板声明名 alpha（未 patch 环境下由 declTNode 顶上）',
+    ).toContain('alpha');
   });
 
   /**
@@ -236,18 +243,16 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
     const picked = ctxName || derivedName || undefined;
 
     console.log(
-      `PRECISION ctx=${JSON.stringify(ctxName)} derived=${JSON.stringify(derivedName)} picked=${JSON.stringify(picked)}`
+      `PRECISION ctx=${JSON.stringify(ctxName)} derived=${JSON.stringify(derivedName)} picked=${JSON.stringify(picked)}`,
     );
 
-    expect(ctxName)
-      .withContext('context 应带上显式传入的 overrideName')
-      .toBe('overrideName');
-    expect(derivedName)
-      .withContext('declTNode 仍是模板声明名 alpha')
-      .toBe('alpha');
-    expect(picked)
-      .withContext('两级取值应优先取 context，而非 declTNode')
-      .toBe('overrideName');
+    expect(ctxName, 'context 应带上显式传入的 overrideName').toBe(
+      'overrideName',
+    );
+    expect(derivedName, 'declTNode 仍是模板声明名 alpha').toBe('alpha');
+    expect(picked, '两级取值应优先取 context，而非 declTNode').toBe(
+      'overrideName',
+    );
   });
 
   it('反向对照：抹掉 declTNode.localNames 后推导取不到名', () => {
@@ -256,7 +261,7 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
 
     // 先确认正常态能推出 alpha
     const before = collectContainerNames(
-      ctxOf(fixture).nodeList as any[]
+      ctxOf(fixture).nodeList as any[],
     ).flatMap((c) => c.names);
     expect(before).toContain('alpha');
 
@@ -277,21 +282,20 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
         }
       });
     }
-    expect(tampered)
-      .withContext('没找到可篡改的 declTNode，反向对照未真正生效')
-      .toBeTrue();
+    expect(tampered, '没找到可篡改的 declTNode，反向对照未真正生效').toBe(true);
 
     const after = collectContainerNames(
-      ctxOf(fixture).nodeList as any[]
+      ctxOf(fixture).nodeList as any[],
     ).flatMap((c) => c.names);
     console.log(
       'REVERSE before=',
       JSON.stringify(before),
       'after=',
-      JSON.stringify(after)
+      JSON.stringify(after),
     );
-    expect(after)
-      .withContext('抹掉 localNames 后仍能推出 alpha，说明推导不是走 declTNode')
-      .not.toContain('alpha');
+    expect(
+      after,
+      '抹掉 localNames 后仍能推出 alpha，说明推导不是走 declTNode',
+    ).not.toContain('alpha');
   });
 });

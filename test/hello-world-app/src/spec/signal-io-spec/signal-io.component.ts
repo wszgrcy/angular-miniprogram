@@ -11,7 +11,8 @@ import { nodeNotEmpty, nodeExist } from '../util';
  * - signal output 可以被父组件的模板监听收到
  */
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [SignalIoComponent],
   selector: 'app-signal-io-spec',
   template: `<app-signal-io
     #instance
@@ -31,7 +32,7 @@ export class SignalIoSPecComponent {
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
     onReady: function (
       this: WechatMiniprogram.Page.Instance<{}, {}> &
-        MiniProgramComponentInstance<SignalIoSPecComponent>
+        MiniProgramComponentInstance<SignalIoSPecComponent>,
     ) {
       this.__ngComponentInstance.componentFinderService
         .get(this.__ngComponentInstance.instance)
@@ -40,7 +41,7 @@ export class SignalIoSPecComponent {
             item: WechatMiniprogram.Page.Instance<
               WechatMiniprogram.IAnyObject,
               WechatMiniprogram.IAnyObject
-            >
+            >,
           ) => {
             const query = item.createSelectorQuery();
 
@@ -51,7 +52,7 @@ export class SignalIoSPecComponent {
             expect(this.__ngComponentInstance.emittedValue).toBe('hello!');
 
             this.__ngComponentInstance.testFinish$$.complete();
-          }
+          },
         );
     },
   };

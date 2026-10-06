@@ -3,13 +3,14 @@ import { type Path, normalize } from '@angular-devkit/core';
 import * as fs from 'fs';
 import * as glob from 'glob';
 import * as path from 'path';
-import { normalizeAssetPatternsSafe } from '../util/asset-path';
+import { toPosix } from '../util/path';
+import { normalizeAssetPatternsSafe } from './asset-patterns';
 
 function globAsync(pattern: string, options: glob.IOptions) {
   return new Promise<string[]>((resolvePromise, reject) =>
     glob.default(pattern, options, (e, m) =>
-      e ? reject(e) : resolvePromise(m)
-    )
+      e ? reject(e) : resolvePromise(m),
+    ),
   );
 }
 
@@ -34,7 +35,7 @@ export async function collectAssets(
     workspaceRoot: string;
     absoluteProjectRoot: Path;
     absoluteProjectSourceRoot: Path;
-  }
+  },
 ): Promise<CopiedAsset[]> {
   if (!assets?.length) {
     return [];
@@ -43,7 +44,7 @@ export async function collectAssets(
     assets,
     options.workspaceRoot,
     options.absoluteProjectRoot,
-    options.absoluteProjectSourceRoot
+    options.absoluteProjectSourceRoot,
   );
   const result: CopiedAsset[] = [];
   for (const pattern of patternList) {
@@ -61,10 +62,7 @@ export async function collectAssets(
       }
       // glob 匹配到目录时（如 `assets/**` 里的目录项）跳过
       result.push({
-        outputRelPath: path
-          .join(pattern.output, file)
-          .split(path.sep)
-          .join('/'),
+        outputRelPath: toPosix(path.join(pattern.output, file)),
         sourcePath,
       });
     }

@@ -4,6 +4,19 @@ import {
   markStructuralChange,
   pushPathData,
 } from './component-template-hook.factory';
+import { mpListenerKeys, mpListenerOnce } from './event-name';
+
+/**
+ * `zIndex` → `z-index`。
+ *
+ * `[style]` 映射的键可以是 camelCase，而 wxml 的行内样式只认 CSS 写法。
+ * 已经带 `-` 的一律原样返回，CSS 自定义属性（`--myColor`）靠这条免遭改写。
+ */
+function dashCase(prop: string): string {
+  return prop.includes('-')
+    ? prop
+    : prop.replace(/[A-Z]/g, (upper) => '-' + upper.toLowerCase());
+}
 
 export class MiniProgramRenderer implements Renderer2 {
   root!: AgentNode;
@@ -45,7 +58,6 @@ export class MiniProgramRenderer implements Renderer2 {
   createElement(name: string, namespace?: string | null) {
     const element = new AgentNode('element');
     element.name = name;
-    element.classList.add(`tag-name-${name}`);
     return element;
   }
   createComment(value: string) {
@@ -69,7 +81,7 @@ export class MiniProgramRenderer implements Renderer2 {
     parent: AgentNode,
     newChild: AgentNode,
     refChild: AgentNode,
-    isMove?: boolean
+    isMove?: boolean,
   ) {
     if (isMove) {
       // todo 应该没用
@@ -88,10 +100,7 @@ export class MiniProgramRenderer implements Renderer2 {
       parent.removeChild(oldChild);
     }
   }
-  selectRootElement(
-    selectorOrNode: string | unknown,
-    preserveContent?: boolean
-  ) {
+  selectRootElement(selectorOrNode: unknown, preserveContent?: boolean) {
     const root = new AgentNode('element');
     root.selector = selectorOrNode;
     this.root = root;
@@ -107,7 +116,7 @@ export class MiniProgramRenderer implements Renderer2 {
     el: AgentNode,
     name: string,
     value: string,
-    namespace?: string | null
+    namespace?: string | null,
   ) {
     el.attribute[name] = value;
     // `toView()` 只把 attribute 里的 class / style 纳入渲染数据，
@@ -138,13 +147,18 @@ export class MiniProgramRenderer implements Renderer2 {
     el: AgentNode,
     style: string,
     value: string,
-    flags?: RendererStyleFlags2
+    flags?: RendererStyleFlags2,
   ) {
-    el.style[style] = value;
+    // Angular 把 `!important` 从值里剔掉、改用 flag 传（DOM renderer 拿它去调
+    // `setProperty(prop, value, 'important')`），这里得拼回来。
+    el.style[dashCase(style)] =
+      (flags ?? 0) & RendererStyleFlags2.Important
+        ? `${String(value).trim()} !important`
+        : value;
     this.emitStyle(el);
   }
-  removeStyle(el: AgentNode, style: string, flags?: RendererStyleFlags2) {
-    delete el.style[style];
+  removeStyle(el: AgentNode, style: string) {
+    delete el.style[dashCase(style)];
     this.emitStyle(el);
   }
   setProperty(el: AgentNode, name: string, value: unknown) {
@@ -153,17 +167,29 @@ export class MiniProgramRenderer implements Renderer2 {
   }
   setValue(node: AgentNode, value: string) {
     node.value = value;
-    this.emit(node, 'value', value);
+    this.emit(node, 'value', node.value);
   }
   listen(
     target: AgentNode,
     eventName: string,
-    callback: (event: WechatMiniprogram.BaseEvent) => boolean | void
+    callback: (event: WechatMiniprogram.BaseEvent) => boolean | void,
   ) {
     if (!(target instanceof AgentNode)) {
       throw new Error('不支持其他类型监听');
     }
-    target.listener[eventName] = callback;
+    // 模板原文（`tap.stop`）与小程序语义键（`catchtap`）一起登记：
+    // 事件派发时只查后者，前者保证既有写法不变。
+    const keys = mpListenerKeys(eventName);
+    let fn = callback;
+    if (mpListenerOnce(eventName)) {
+      fn = (event) => {
+        keys.forEach((key) => delete target.listener[key]);
+        return callback(event);
+      };
+    }
+    keys.forEach((key) => {
+      target.listener[key] = fn;
+    });
     return () => {};
   }
 }

@@ -12,7 +12,7 @@ import {
 
 export function platformMiniProgram<T>(
   extraProviders: StaticProvider[] = [],
-  app?: T
+  app?: T,
 ) {
   // Angular 22 的 createComponentRef 会无条件要一个真 Document，
   // 小程序没有，先装占位物，否则 NG0210。详见 fake-document.ts。

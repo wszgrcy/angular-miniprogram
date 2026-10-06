@@ -6,7 +6,8 @@ import { NgSwitchComponent } from '../../spec-component/ng-switch/ng-switch.comp
 import { nodeExist } from '../util';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [NgSwitchComponent],
   selector: 'app-ng-switch-spec',
   template: `<app-ng-switch #instance></app-ng-switch>`,
 })
@@ -15,7 +16,7 @@ export class NgSwitchSPecComponent {
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
     onReady: function (
       this: WechatMiniprogram.Page.Instance<{}, {}> &
-        MiniProgramComponentInstance<NgSwitchSPecComponent>
+        MiniProgramComponentInstance<NgSwitchSPecComponent>,
     ) {
       this.__ngComponentInstance.componentFinderService
         .get(this.__ngComponentInstance.instance)
@@ -24,7 +25,7 @@ export class NgSwitchSPecComponent {
             item: WechatMiniprogram.Page.Instance<
               WechatMiniprogram.IAnyObject,
               WechatMiniprogram.IAnyObject
-            >
+            >,
           ) => {
             let query = item.createSelectorQuery();
 
@@ -32,7 +33,7 @@ export class NgSwitchSPecComponent {
             expect(await nodeExist(query, '.switch-case2')).toBe(false);
             expect(await nodeExist(query, '.switch-default')).toBe(false);
             this.__ngComponentInstance.testFinish$$.complete();
-          }
+          },
         );
     },
   };

@@ -1,67 +1,36 @@
 /**
- * app.json 编译生成层。
+ * app.json 的语义校验与产物生成。
  *
- * 之前 app.json 是静态 asset 直接拷进产物（copy-assets），构建器对内容
- * 零感知：页面不存在、tabBar 指向野路径、分包 root 冲突，全部要等到
- * 开发者工具打开才炸。本模块把 app 配置升级为「结构化输入 + 编译期
- * 校验 + 生成产物」，对应 uni-app 的 uni-cli-shared/src/json/mp/pages.ts
- * 这一层，也是分包（#2）、tabBar i18n（#8）、preloadRule 透传的公共前置。
+ * 之前 app.json 是静态 asset 直接拷进产物，构建器对内容零感知：页面不存在、
+ * tabBar 指向野路径、分包 root 冲突，全部要等到开发者工具打开才炸。这一层把
+ * app 配置升级为「编译期校验」，形状校验在 `config-schema.ts`，合并规则在
+ * `merge-config.ts`。
  *
- * 逃生舱：不配置 appJson 时维持旧行为（assets 里静态提供 app.json）。
- * 两者同时出现视为配置冲突，直接报错，避免「改了没效果」的玄学。
+ * 校验对象是**合并后的最终对象**：用户手写的、结构化配置补的、构建器算出来的，
+ * 到这一步已经是一份内容，没必要按来源分别校验。
  */
 
-/** 分包内的页面条目：字符串或带 path 的对象（各家小程序均支持） */
-export type MpSubPackagePage = string | { path: string; [key: string]: unknown };
+import { isPathIn } from '../util/path';
+import type {
+  MpAppConfig,
+  MpPreloadRuleEntry,
+  MpSubPackage,
+  MpSubPackagePage,
+} from './config-schema';
 
-export interface MpSubPackage {
-  /** 分包根目录，相对产物根。不得以 / 开头、不得包含 .. */
-  root: string;
-  pages: MpSubPackagePage[];
-  /** 独立分包：不依赖主包即可运行 */
-  independent?: boolean;
-  [key: string]: unknown;
-}
-
-/**
- * 结构化 app 配置。
- *
- * 已知字段（pages/window/tabBar/subpackages/preloadRule/lazyCodeLoading）
- * 参与校验；其余字段（sitemapLocation、darkmode、plugins……）原样透传，
- * 保证对各家 app.json 方言的开放性。
- */
-export interface MpAppConfig {
-  pages?: Array<string | { path: string; [key: string]: unknown }>;
-  window?: Record<string, unknown>;
-  tabBar?: {
-    list?: Array<{ pagePath?: string; [key: string]: unknown }>;
-    [key: string]: unknown;
-  };
-  /** 微信风格 key */
-  subpackages?: MpSubPackage[];
-  /** 支付宝/百度风格 key（输入等价，输出保留用户写法） */
-  subPackages?: MpSubPackage[];
-  preloadRule?: Record<
-    string,
-    {
-      network?: string;
-      packages?: string[] | Record<string, unknown>;
-      [key: string]: unknown;
-    }
-  >;
-  lazyCodeLoading?: string;
-  [key: string]: unknown;
-}
+export type {
+  MpAppConfig,
+  MpSubPackage,
+  MpSubPackagePage,
+} from './config-schema';
 
 /** 取分包列表：兼容 subpackages / subPackages 两种写法 */
 export function getSubPackages(config: MpAppConfig): MpSubPackage[] {
-  return config.subpackages ?? config.subPackages ?? [];
+  return (config.subpackages ?? config.subPackages ?? []) as MpSubPackage[];
 }
 
 /** 页面条目归一化为路径字符串 */
-function pagePathOf(
-  page: string | { path: string; [key: string]: unknown }
-): string {
+function pagePathOf(page: MpSubPackagePage): string {
   return typeof page === 'string' ? page : page.path;
 }
 
@@ -76,9 +45,7 @@ function isValidSubPackageRoot(root: unknown): root is string {
 }
 
 /** preloadRule 的 packages 值归一化为 string[]（对象形态取 keys） */
-function preloadPackagesOf(
-  packages: string[] | Record<string, unknown> | undefined
-): string[] {
+function preloadPackagesOf(packages: MpPreloadRuleEntry['packages']): string[] {
   if (Array.isArray(packages)) {
     return packages;
   }
@@ -89,15 +56,18 @@ function preloadPackagesOf(
 }
 
 /**
- * 编译期校验。返回错误列表（空数组 = 通过）。
+ * 编译期语义校验。返回错误列表（空数组 = 通过）。
  *
- * @param config 结构化 app 配置
- * @param builtPagePaths 本次构建实际产出的主包页面路径（不含扩展名），
- *   来自 PagePattern.outputFiles.path
+ * 只查「形状对但内容不对」的东西：页面本次真的产出了吗、tabBar 的页面在主包吗、
+ * preloadRule 引用的分包存在吗。类型错误在这之前就该被形状校验拦掉。
+ *
+ * @param config 合并后的 app 配置
+ * @param builtPagePaths 本次构建实际产出的页面路径（不含扩展名，分包页为
+ *   已拼上 root 的全路径），来自 PagePattern.outputFiles.path
  */
 export function validateAppConfig(
   config: MpAppConfig,
-  builtPagePaths: string[]
+  builtPagePaths: string[],
 ): string[] {
   const errors: string[] = [];
   const mainPages = (config.pages ?? []).map(pagePathOf);
@@ -127,8 +97,8 @@ export function validateAppConfig(
     if (!isValidSubPackageRoot(sub.root)) {
       errors.push(
         `subpackages[${index}].root 非法（必须为相对路径且不含 ..）: ${String(
-          sub.root
-        )}`
+          sub.root,
+        )}`,
       );
       return;
     }
@@ -148,7 +118,7 @@ export function validateAppConfig(
       }
       if (seen.has(full)) {
         errors.push(
-          `分包页面与主包 pages 冲突: ${full}（主包已声明同路径页面）`
+          `分包页面与主包 pages 冲突: ${full}（主包已声明同路径页面）`,
         );
       }
       if (fullSubPages.has(full)) {
@@ -168,13 +138,43 @@ export function validateAppConfig(
     }
     if (!seen.has(pagePath)) {
       errors.push(
-        `tabBar.pagePath "${pagePath}" 不在主包 pages 中（tabBar 页面必须在主包）`
+        `tabBar.pagePath "${pagePath}" 不在主包 pages 中（tabBar 页面必须在主包）`,
       );
     }
   }
 
-  // preloadRule：key 必须是已知页面，packages 必须是已声明的分包 root
+  // 已知页面全集：主包 pages + 分包页面全路径
   const allPages = new Set([...seen, ...fullSubPages]);
+
+  // 启动页必须是已声明的页面，否则冷启动直接白屏
+  if (config.entryPagePath !== undefined) {
+    if (!config.entryPagePath) {
+      errors.push('entryPagePath 不能为空字符串（不想要就删掉这个字段）');
+    } else if (!allPages.has(config.entryPagePath)) {
+      errors.push(
+        `entryPagePath "${config.entryPagePath}" 不是已声明的页面` +
+          `（主包 pages 与分包页面里都没有）`,
+      );
+    }
+  }
+
+  // 声明了但本次构建没产出入口：漏写 *.entry.ts，或源文件所在目录不在
+  // angular.json 的 pages pattern 覆盖范围内。这类错落到开发者工具里只剩
+  // 一句「页面不存在」，最难查，所以在构建期按页面逐条点名。
+  if (builtPagePaths.length) {
+    const built = new Set(builtPagePaths);
+    for (const page of [...mainPages, ...fullSubPages]) {
+      if (page && !built.has(page)) {
+        errors.push(
+          `页面 "${page}" 声明了但本次构建没有产出入口` +
+            `（检查是否有对应的 *.entry.ts，以及它所在目录是否被 ` +
+            `angular.json 的 pages pattern 覆盖）`,
+        );
+      }
+    }
+  }
+
+  // preloadRule：key 必须是已知页面，packages 必须是已声明的分包 root
   for (const [page, rule] of Object.entries(config.preloadRule ?? {})) {
     if (!allPages.has(page)) {
       errors.push(`preloadRule 的页面 "${page}" 不存在（pages/分包均无）`);
@@ -182,7 +182,7 @@ export function validateAppConfig(
     for (const pkg of preloadPackagesOf(rule.packages)) {
       if (!subRoots.has(pkg)) {
         errors.push(
-          `preloadRule["${page}"].packages 引用了未声明的分包 "${pkg}"`
+          `preloadRule["${page}"].packages 引用了未声明的分包 "${pkg}"`,
         );
       }
     }
@@ -194,8 +194,7 @@ export function validateAppConfig(
 /**
  * 生成 app.json 文本。
  *
- * 输出保留用户写法（subpackages/subPackages key 原样），只做格式化，
- * 不做平台方言转换——配置者明确知道目标平台，隐式改写反而难排查。
+ * 输出保留用户写法（分包 key 已由平台归一），只做格式化，不做平台方言转换。
  */
 export function generateAppJson(config: MpAppConfig): string {
   return `${JSON.stringify(config, null, 2)}\n`;
@@ -218,7 +217,7 @@ export interface ResolvedSubPackage {
  */
 export function resolveSubPackages(config: MpAppConfig): ResolvedSubPackage[] {
   return getSubPackages(config).map((sub) => {
-    const root = sub.root.replace(/\/+$/, '');
+    const root = String(sub.root ?? '').replace(/\/+$/, '');
     const fullPages = (sub.pages ?? []).map((page) => {
       const p = typeof page === 'string' ? page : page.path;
       return `${root}/${p}`;
@@ -237,10 +236,7 @@ export function resolveSubPackages(config: MpAppConfig): ResolvedSubPackage[] {
  */
 export function findSubPackageByPath(
   subPackages: ResolvedSubPackage[],
-  posixPath: string
+  posixPath: string,
 ): ResolvedSubPackage | undefined {
-  return subPackages.find(
-    (sp) =>
-      posixPath === sp.root || posixPath.startsWith(`${sp.root}/`)
-  );
+  return subPackages.find((sp) => isPathIn(sp.root, posixPath));
 }

@@ -6,23 +6,23 @@ import { getComponentOutputPath } from './get-library-path';
 export function getUseComponents(
   libraryPath: UseComponent[],
   localPath: UseComponent[],
-  moduleId: string
+  moduleId: string,
 ) {
   const list = [...libraryPath];
   list.push(
     ...localPath.map((item) => {
       item.path = getComponentOutputPath(moduleId, item.className);
       return item;
-    })
+    }),
   );
   return list.reduce(
     (pre, cur) => {
       pre[cur.selector] = resolve(
         normalize('/'),
-        join(normalize(LIBRARY_OUTPUT_ROOTDIR), cur.path)
+        join(normalize(LIBRARY_OUTPUT_ROOTDIR), cur.path),
       );
       return pre;
     },
-    {} as Record<string, string>
+    {} as Record<string, string>,
   );
 }

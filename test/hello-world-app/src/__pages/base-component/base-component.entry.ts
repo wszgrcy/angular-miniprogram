@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { BaseComponentComponent } from './base-component.component';
-
-bootstrapPage(BaseComponentComponent);
+export { BaseComponentComponent as default } from './base-component.component';

@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { BaseFormsComponent } from './base-forms.component';
-
-bootstrapPage(BaseFormsComponent);
+export { BaseFormsComponent as default } from './base-forms.component';

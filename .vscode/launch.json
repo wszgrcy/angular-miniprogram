@@ -5,39 +5,39 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "测试(jasmine)-library",
+      "name": "测试(vitest)-library",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceRoot}",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run-script", "test", "library"],
+      "runtimeArgs": ["exec", "vitest run src/builder/library/library.spec.ts"],
       "port": 7899
     },
     {
-      "name": "测试(jasmine)-browser",
+      "name": "测试(vitest)-browser",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceRoot}",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run-script", "test", "builder-dev"],
+      "runtimeArgs": ["test"],
       "port": 7899
     },
     {
-      "name": "测试(jasmine)-builder-prod",
+      "name": "测试(vitest)-builder-prod",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceRoot}",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run-script", "test", "builder-prod"],
+      "runtimeArgs": ["test"],
       "port": 7899
     },
     {
-      "name": "测试(jasmine)-browser-watch",
+      "name": "测试(vitest)-watch",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceRoot}",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run-script", "test", "watch"],
+      "runtimeArgs": ["test:watch"],
       "port": 7899
     }
   ]

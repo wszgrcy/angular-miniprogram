@@ -52,6 +52,7 @@ import type {
   Unary,
   Visitor,
 } from '@angular/compiler';
+import { TmplAstText } from '@angular/compiler';
 
 import * as t from '../../angular-internal/ast.type';
 import { ParsedNgBoundText } from './bound-text';
@@ -81,6 +82,88 @@ import { MatchedComponent, MatchedDirective } from './type';
  * 方法顺序刻意照抄 Angular，升级时可以直接 diff 出「Angular 新增了哪种
  * 节点」，避免漏掉。
  */
+/**
+ * 元素开始标签上的 `i18n-<attr>`，连同它是否带插值。
+ *
+ * ## 为什么只能从原文看
+ *
+ * i18n pass 在分析侧拿到 AST 之前就把 `i18n-alt="照片 {{x}}"` 消费了：属性名
+ * 消失，`alt` 变成一个普通插值绑定。实测「带 i18n 的插值属性」与「普通插值
+ * 属性」的 AST 逐字相同，AST 里没有任何残留标记。而 emit 侧的行为两者不同
+ * （见下），猜不到就是整体错位且不报错。
+ *
+ * 元素的 `startSourceSpan` 是解析原文里的偏移，切出开始标签直接看最准。
+ *
+ * ## dynamic 决定两件完全不同的事
+ *
+ * - **dynamic（值含 `{{`）**：发 `ɵɵi18nAttributes`，**多占一个声明槽**；
+ *   译文经 `setProperty` 落在 `property` 上，wxml 的绑定已经指着它。
+ * - **静态**：不发那条指令、不占槽；译文在建元素时 `setAttribute`，落在
+ *   `attribute` 上。wxml 若照旧内联源文案，就永远翻不了——所以必须改成绑定。
+ */
+function startTagOf(
+  element: t.Element,
+  templateText?: string,
+): string | undefined {
+  if (!templateText || !element.startSourceSpan) {
+    return undefined;
+  }
+  const span = element.startSourceSpan as unknown as {
+    start: { offset: number };
+    end: { offset: number };
+  };
+  return templateText.slice(span.start.offset, span.end.offset);
+}
+
+function i18nAttributesOf(
+  element: t.Element,
+  templateText?: string,
+): { name: string; dynamic: boolean }[] {
+  const tag = startTagOf(element, templateText);
+  if (tag === undefined) {
+    return [];
+  }
+  const attr = /i18n-([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  const out: { name: string; dynamic: boolean }[] = [];
+  for (let m = attr.exec(tag); m; m = attr.exec(tag)) {
+    const value = m[2] ?? m[3] ?? '';
+    out.push({ name: m[1], dynamic: value.includes('{{') });
+  }
+  return out;
+}
+
+/**
+ * 元素开始标签上是否带了裸 `i18n`（消息 id / 描述那个，不是 `i18n-<attr>`）。
+ *
+ * 同样只能切原文：i18n pass 会把 `i18n` 从 AST 上吃掉，换成节点上的
+ * `I18nMeta`，分析侧再也看不到它。`i18n-` 前缀不会误命中——`i18n` 后面
+ * 紧跟的是 `-`，被 `[^\s=]` 卡住了。
+ */
+function hasBareI18n(element: t.Element, templateText?: string): boolean {
+  const tag = startTagOf(element, templateText);
+  return tag !== undefined && /(^|\s)i18n\s*=/.test(tag);
+}
+
+/**
+ * 这堆子节点能不能算兜底内容。
+ *
+ * Angular 的判据在 `ingest.ts`：注释与**纯空白文本**都不算，只有剩下的
+ * 节点存在才建兜底视图。默认（`preserveWhitespaces: false`）下解析器
+ * 已经把空白洗掉了，但组件显式开了 `preserveWhitespaces` 时
+ * `<ng-content> </ng-content>` 仍会带一个空白 Text 进来 ——
+ * 这里多占一格，后面所有节点整体错位一位且不报错。
+ *
+ * 注释到不了 r3 AST（`parseTemplate` 就洗掉了），所以只需防空白文本。
+ */
+function hasProjectionFallback(children: t.Node[] | undefined): boolean {
+  return (
+    !!children?.length &&
+    children.some(
+      (child) => !(child instanceof TmplAstText) || !!child.value.trim().length,
+    )
+  );
+}
+
 export class TemplateDefinition implements TmplAstRecursiveVisitor {
   private parentNode: ParsedNgElement | ParsedNgTemplate | undefined;
   list: ParsedNode<NgNodeMeta>[] = [];
@@ -106,7 +189,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
      * 当前视图在组件模板中的路径前缀，用于保证生成的模板名在
      * 同一个 wxml 里全局唯一（否则嵌套的匿名模板会互相覆盖）。
      */
-    private namePrefix = ''
+    private namePrefix = '',
   ) {}
 
   /**
@@ -129,6 +212,22 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    */
   visitElement(element: t.Element) {
     const nodeIndex = this.declIndex++;
+    /**
+     * 带插值的 `i18n-<attr>` 会让 emit 侧多出一条 `ɵɵi18nAttributes(i+1, n)`，
+     * **紧跟在本元素后面**再占一个声明槽（实测：`domElementStart(15,"img",15)`
+     * → `i18nAttributes(16, 6)` → 下一个元素从 17 起）。
+     *
+     * 一个元素只占一个，不管带几个 i18n 属性（exprCount 变大，槽不变）。
+     * 纯静态的 `i18n-title="标题"` 不发这条指令（译文被烘进 consts attrs，
+     * 建元素时直接 setAttribute），所以不能数。
+     */
+    const i18nAttrs = i18nAttributesOf(
+      element,
+      this.componentContext?.templateText,
+    );
+    if (i18nAttrs.some((item) => item.dynamic)) {
+      this.declIndex++;
+    }
     let componentMeta: MatchedComponent | undefined;
     let directiveMeta: MatchedDirective | undefined;
     const result = this.componentContext.matchDirective(element);
@@ -153,7 +252,12 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       this.parentNode,
       componentMeta,
       nodeIndex,
-      directiveMeta
+      directiveMeta,
+      this.componentContext?.declaredWxsModules,
+      // 静态那半要改成绑定（译文在 `attribute` 上），见 `NgElementMeta.i18nAttrs`
+      i18nAttrs.filter((item) => !item.dynamic).map((item) => item.name),
+      // 裸 `i18n` 让子级静态文本也变成运行时文本，见 `NgTextMeta.i18n`
+      hasBareI18n(element, this.componentContext?.templateText),
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
@@ -204,7 +308,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       template,
       this.parentNode,
       nodeIndex,
-      templateName
+      templateName,
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(templateInstance);
@@ -221,7 +325,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     const instance = new TemplateDefinition(
       template.children,
       this.componentContext,
-      `${this.namePrefix}${nodeIndex}_`
+      `${this.namePrefix}${nodeIndex}_`,
     );
     instance.parentNode = templateInstance;
 
@@ -232,25 +336,26 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   }
 
   /**
-   * `<ng-content>` 内容投影。
+   * `<ng-content>` 内容投影，含兜底内容。
    *
    * ```html
-   * <ng-content select=".header"></ng-content>   ← 支持，children 为空
-   * <ng-content>默认内容</ng-content>            ← 不支持，显式抛错
+   * <ng-content select="[slot='head']"></ng-content>  ← 一个槽
+   * <ng-content>默认内容</ng-content>                 ← 两个槽
    * ```
    *
-   * 实测：空标签和纯空白都会被 Angular 归一成 `children = []`，
-   * 只有写了 fallback 才有子节点。小程序的 `<slot>` 没有 fallback
-   * 能力，所以这里对非空 children 显式抛错 —— 静默丢掉 fallback
-   * 会让「投影不到东西」这种问题极难定位。
+   * 兜底内容在 Angular 里不是投影节点的子节点，而是**紧贴在它后面**的
+   * 一个 embedded view（`createProjectionOp` 的
+   * `numSlotsUsed: fallbackView === null ? 1 : 2`，运行时对应
+   * `ɵɵprojection(i, …, fallbackFn)` 里 `fallbackIndex = i + 1`）。
+   * 于是这里也要占两格，并另起一个 `TemplateDefinition` 走子节点 ——
+   * 兜底内容自己有一套从 0 开始的索引空间。
+   *
+   * 小程序的 `<slot>` 没有兜底能力，wxml 侧靠「兜底容器有没有视图」
+   * 二选一，见 `WxContainer.ngContentTransform`。Angular 那边
+   * `ɵɵprojection` 正是这么判的：插槽空着才 `insertFallbackContent`，
+   * 否则走 `applyProjection`，两者互斥。
    */
   visitContent(content: t.Content) {
-    if (content.children && content.children.length) {
-      throw new Error(
-        '暂不支持 <ng-content> 的 fallback 内容（小程序 slot 无对应能力），' +
-          '请把兜底逻辑放到宿主组件里处理'
-      );
-    }
     const nodeIndex = this.declIndex++;
     const instance = new ParsedNgContent(content, this.parentNode, nodeIndex);
     if (this.parentNode) {
@@ -258,6 +363,24 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     } else {
       this.list.push(instance);
     }
+    if (!hasProjectionFallback(content.children)) {
+      return;
+    }
+    const fallbackIndex = this.declIndex++;
+    const fallback = new ParsedNgTemplate(
+      null,
+      instance,
+      fallbackIndex,
+      `projectionFallback_${this.namePrefix}${fallbackIndex}`,
+    );
+    instance.fallback = fallback;
+    const fallbackView = new TemplateDefinition(
+      content.children,
+      this.componentContext,
+      `${this.namePrefix}${fallbackIndex}_`,
+    );
+    fallbackView.parentNode = fallback;
+    fallbackView.run();
   }
 
   /**
@@ -300,14 +423,14 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   private createControlFlowTemplate(
     children: TmplAstNode[],
     index: number,
-    kind: string
+    kind: string,
   ) {
     const name = `${kind}_${this.namePrefix}${index}`;
     const templateInstance = new ParsedNgTemplate(
       null,
       this.parentNode,
       index,
-      name
+      name,
     );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(templateInstance);
@@ -315,7 +438,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     const instance = new TemplateDefinition(
       children,
       this.componentContext,
-      `${this.namePrefix}${index}_`
+      `${this.namePrefix}${index}_`,
     );
     instance.parentNode = templateInstance;
     instance.run();
@@ -344,7 +467,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       return;
     }
     const pipeCount = this.countPipeSlots(
-      ...branches.map((branch) => branch.expression)
+      ...branches.map((branch) => branch.expression),
     );
     const firstIndex = this.declIndex++;
     this.createControlFlowTemplate(branches[0].children, firstIndex, 'ifBlock');
@@ -388,14 +511,14 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       return;
     }
     const caseExpressions = groups.flatMap((group) =>
-      group.cases.map((item) => item.expression)
+      group.cases.map((item) => item.expression),
     );
     const pipeCount = this.countPipeSlots(block.expression, ...caseExpressions);
     const firstIndex = this.declIndex++;
     this.createControlFlowTemplate(
       groups[0].children,
       firstIndex,
-      'switchCase'
+      'switchCase',
     );
     this.declIndex += pipeCount;
     for (let i = 1; i < groups.length; i++) {
@@ -460,7 +583,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       this.createControlFlowTemplate(
         block.empty.children,
         emptyIndex,
-        'forEmpty'
+        'forEmpty',
       );
     }
     this.declIndex += pipeCount;
@@ -487,7 +610,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    */
   visitDeferredBlock(deferred: TmplAstDeferredBlock): void {
     throw new Error(
-      '暂不支持 @defer 语法，请改用 @if 或组件自身的延迟加载能力'
+      '暂不支持 @defer 语法，请改用 @if 或组件自身的延迟加载能力',
     );
   }
 
@@ -549,7 +672,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    */
   visitComponent(component: TmplAstComponent): void {
     throw new Error(
-      `不该出现的 Component AST 节点：${component.componentName}（本 fork 的模板解析路径不产出此节点）`
+      `不该出现的 Component AST 节点：${component.componentName}（本 fork 的模板解析路径不产出此节点）`,
     );
   }
 
@@ -559,7 +682,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    */
   visitDirective(directive: TmplAstDirective): void {
     throw new Error(
-      `不该出现的 Directive AST 节点：${directive.name}（本 fork 的模板解析路径不产出此节点）`
+      `不该出现的 Directive AST 节点：${directive.name}（本 fork 的模板解析路径不产出此节点）`,
     );
   }
 
@@ -620,7 +743,14 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    */
   visitText(text: t.Text) {
     const nodeIndex = this.declIndex++;
-    const instance = new ParsedNgText(text, this.parentNode, nodeIndex);
+    const instance = new ParsedNgText(
+      text,
+      this.parentNode,
+      nodeIndex,
+      // 宿主带 `i18n` 时，这段静态文本在运行时是 `$localize` 查出来的，
+      // 不能烘进 wxml，见 `NgTextMeta.i18n`
+      this.parentNode instanceof ParsedNgElement && this.parentNode.i18nHost,
+    );
     if (this.parentNode) {
       this.parentNode.appendNgNodeChild(instance);
     } else {
@@ -659,11 +789,67 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
    * （`Element, Icu`），留空等于**静默丢掉整段内容**，
    * 且后续所有节点槽位错位。
    */
+  /**
+   * ICU 消息（复数 / 性别选择）。
+   *
+   * ```html
+   * {count, plural, =1 {one item} other {{{count}} items}}
+   * ```
+   *
+   * Angular 把它编成 `ɵɵi18n(i, msgIdx)` —— **一个声明槽**，分支文本节点之后
+   * 由 `ɵɵi18nApply` 建在 expando 下标上。所以这里按一个文本节点记账即可，
+   * 与 `{{a}}` 的 `ɵɵtext` 逐字相同。
+   *
+   * 文案本身不在这里管：序列化层会从 lView 的 expando 上把当前分支的节点收回来
+   * （`component-template-hook.factory.ts` 的 `readI18nText`）。
+   */
   visitIcu(icu: t.Icu) {
-    throw new Error(
-      '暂不支持 ICU 消息语法（{x, plural, ...} / {x, select, ...}），' +
-        '请改用组件内的普通条件渲染'
+    const nodeIndex = this.declIndex++;
+    /**
+     * ICU 由 Angular 原生的 `ɵɵi18n` 渲染，只占**一个**声明槽，与 `{{a}}`
+     * 的 `ɵɵtext` 记账逐字相同，所以这里就当一个文本节点记。
+     *
+     * wxml 这边只需要一个文本槽（`{{nodeList[i].value}}`）；真正的文案由序列化层
+     * 从 lView 的 expando 上收回来，见 `component-template-hook.factory.ts`
+     * 的 `readI18nText`。
+     */
+    const instance = new ParsedNgBoundText(
+      icu as unknown as t.BoundText,
+      this.parentNode,
+      nodeIndex,
     );
+    /**
+     * ICU 自带表达式里的管道各占一个声明槽。
+     *
+     * ```html
+     * {g, select, other {x{{count | number}}}}   ← emit 侧多出 ɵɵpipe(i, "number")
+     * ```
+     *
+     * 判断变量在 `vars`，分支里的插值在 `placeholders`，两边都得走：
+     * 漏一个就是 wxml 下标整体前移一位。
+     */
+    // `placeholders` 不在 `t.Icu` 的公开类型里，只能按形状取
+    const asVariables = (value: unknown): unknown[] =>
+      Array.isArray(value) ? value : Object.values((value ?? {}) as object);
+    const expressions: { visit(v: unknown): void }[] = [];
+    for (const variable of [
+      ...asVariables(icu.vars),
+      ...asVariables(
+        (icu as unknown as { placeholders?: unknown }).placeholders,
+      ),
+    ]) {
+      const value = (variable as { value?: { visit(v: unknown): void } })
+        ?.value;
+      if (value) {
+        expressions.push(value);
+      }
+    }
+    expressions.forEach((expression) => expression.visit(this.astVisitor));
+    if (this.parentNode) {
+      this.parentNode.appendNgNodeChild(instance);
+    } else {
+      this.list.push(instance);
+    }
   }
 
   run() {
@@ -700,7 +886,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
  */
 export function visitAll(
   visitor: TemplateDefinition,
-  nodes: TmplAstNode[]
+  nodes: TmplAstNode[],
 ): void {
   for (const node of nodes) {
     node.visit(visitor);
@@ -778,13 +964,20 @@ export class CustomAstVisitor implements AstVisitor {
    * ```html
    * {{ title | uppercase }}            → 1 个
    * {{ a | date:(b | number) }}       → 2 个（参数里还能再嵌管道）
+   * {{ a | foo | bar }}               → 2 个（接收者本身就是管道）
    * ```
    *
-   * **必须继续访问 `args`**：管道参数本身可以是另一条带管道的表达式，
-   * 漏掉 args 就会少算槽位。
+   * **两个子树都得走**，对齐 `RecursiveAstVisitor.visitPipe`：
+   * - `exp`（接收者）—— 链式管道 `a | foo | bar` 在 AST 里是
+   *   `BindingPipe{ exp: BindingPipe{a, foo}, name: bar }`，漏掉就少算槽位
+   * - `args`（参数）—— 参数本身可以是另一条带管道的表达式
+   *
+   * 少算一个管道 = 少占一个槽 = 后续所有节点下标整体前移一位，
+   * wxml 的 `nodeList[i]` 就指到别的节点上了。
    */
   visitPipe(ast: BindingPipe) {
     this.pipeCallback();
+    this.visit(ast.exp);
     this.visitAll(ast.args);
   }
 

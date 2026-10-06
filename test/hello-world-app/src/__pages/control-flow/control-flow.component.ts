@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { JsonPipe } from '@angular/common';
 import { Component } from '@angular/core';
 
 /**
@@ -14,7 +14,7 @@ import { Component } from '@angular/core';
  */
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [JsonPipe],
   selector: 'app-control-flow',
   templateUrl: './control-flow.component.html',
 })

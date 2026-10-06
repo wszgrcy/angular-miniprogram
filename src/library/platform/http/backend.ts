@@ -12,13 +12,7 @@ import {
   HttpUploadProgressEvent,
 } from '@angular/common/http';
 import { MiniProgramCore } from 'angular-miniprogram/platform/wx';
-import {
-  ɵChangeDetectionScheduler as ChangeDetectionScheduler,
-  ɵNotificationSource as NotificationSource,
-  Injectable,
-  inject,
-  Service,
-} from '@angular/core';
+import { Injectable, inject, Service } from '@angular/core';
 import { Observable, Observer } from 'rxjs';
 import {
   MiniProgramHttpDownloadResponse,
@@ -64,20 +58,6 @@ export const REQUSET_TOKEN = new HttpContextToken<{
  */
 @Service()
 export class MiniprogramHttpBackend implements HttpBackend {
-  private readonly changeDetectionScheduler = inject(ChangeDetectionScheduler);
-
-  /**
-   * 小程序回调里执行 Angular 逻辑，并在结束后调度一次变更检测。
-   * 取代原来依赖 zone.js 的 `Zone.current.run(...)`。
-   */
-  private runInAngular(fn: () => void): void {
-    try {
-      fn();
-    } finally {
-      this.changeDetectionScheduler.notify(NotificationSource.Listener);
-    }
-  }
-
   handle(request: HttpRequest<any>): Observable<HttpEvent<any>> {
     if (request.method === 'POST' && request.context.has(UPLOAD_FILE_TOKEN)) {
       return this.upload(request);
@@ -99,26 +79,22 @@ export class MiniprogramHttpBackend implements HttpBackend {
       // The response header event handler
       const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback =
         ({ header }) => {
-          this.runInAngular(() => {
-            observer.next(
-              new HttpHeaderResponse({
-                url: request.url,
-                headers: new HttpHeaders(header),
-              }),
-            );
-          });
+          observer.next(
+            new HttpHeaderResponse({
+              url: request.url,
+              headers: new HttpHeaders(header),
+            }),
+          );
         };
 
       // The upload progress event handler
       const onUpProgressUpdate: WechatMiniprogram.UploadTaskOnProgressUpdateCallback =
         ({ totalBytesSent, totalBytesExpectedToSend }) => {
-          this.runInAngular(() => {
-            observer.next({
-              type: HttpEventType.UploadProgress,
-              loaded: totalBytesSent,
-              total: totalBytesExpectedToSend,
-            } as HttpUploadProgressEvent);
-          });
+          observer.next({
+            type: HttpEventType.UploadProgress,
+            loaded: totalBytesSent,
+            total: totalBytesExpectedToSend,
+          } as HttpUploadProgressEvent);
         };
 
       const { filePath, name, timeout } =
@@ -131,56 +107,52 @@ export class MiniprogramHttpBackend implements HttpBackend {
         formData: request.body,
         timeout: timeout,
         success: ({ data, statusCode: status, errMsg: statusText }) => {
-          this.runInAngular(() => {
-            let ok = status >= 200 && status < 300;
-            let body: any | null = null;
+          let ok = status >= 200 && status < 300;
+          let body: any | null = null;
 
-            if (
-              request.responseType === 'json' &&
-              typeof data === 'string' &&
-              data !== ''
-            ) {
-              try {
-                body = JSON.parse(data);
-              } catch (error) {
-                if (ok) {
-                  ok = false;
-                  body = { error, text: body };
-                }
+          if (
+            request.responseType === 'json' &&
+            typeof data === 'string' &&
+            data !== ''
+          ) {
+            try {
+              body = JSON.parse(data);
+            } catch (error) {
+              if (ok) {
+                ok = false;
+                body = { error, text: body };
               }
             }
+          }
 
-            if (ok) {
-              observer.next(
-                new HttpResponse({
-                  url: request.url,
-                  body,
-                  status,
-                  statusText,
-                }),
-              );
-              observer.complete();
-            } else {
-              observer.error(
-                new HttpErrorResponse({
-                  url: request.url,
-                  error: body,
-                  status,
-                  statusText,
-                }),
-              );
-            }
-          });
-        },
-        fail: ({ errMsg }: WechatMiniprogram.GeneralCallbackResult) => {
-          this.runInAngular(() => {
+          if (ok) {
+            observer.next(
+              new HttpResponse({
+                url: request.url,
+                body,
+                status,
+                statusText,
+              }),
+            );
+            observer.complete();
+          } else {
             observer.error(
               new HttpErrorResponse({
                 url: request.url,
-                statusText: errMsg,
+                error: body,
+                status,
+                statusText,
               }),
             );
-          });
+          }
+        },
+        fail: ({ errMsg }: WechatMiniprogram.GeneralCallbackResult) => {
+          observer.error(
+            new HttpErrorResponse({
+              url: request.url,
+              statusText: errMsg,
+            }),
+          );
         },
       });
 
@@ -211,26 +183,22 @@ export class MiniprogramHttpBackend implements HttpBackend {
       // The response header event handler
       const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback =
         ({ header }) => {
-          this.runInAngular(() => {
-            observer.next(
-              new HttpHeaderResponse({
-                url: request.url,
-                headers: new HttpHeaders(header),
-              }),
-            );
-          });
+          observer.next(
+            new HttpHeaderResponse({
+              url: request.url,
+              headers: new HttpHeaders(header),
+            }),
+          );
         };
 
       // The download progress event handler
       const onDownProgressUpdate: WechatMiniprogram.DownloadTaskOnProgressUpdateCallback =
         ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
-          this.runInAngular(() => {
-            observer.next({
-              type: HttpEventType.DownloadProgress,
-              loaded: totalBytesWritten,
-              total: totalBytesExpectedToWrite,
-            } as HttpDownloadProgressEvent);
-          });
+          observer.next({
+            type: HttpEventType.DownloadProgress,
+            loaded: totalBytesWritten,
+            total: totalBytesExpectedToWrite,
+          } as HttpDownloadProgressEvent);
         };
 
       const { filePath, timeout } = request.context.get(DOWNLOAD_FILE_TOKEN);
@@ -246,41 +214,37 @@ export class MiniprogramHttpBackend implements HttpBackend {
           tempFilePath,
           profile,
         }) => {
-          this.runInAngular(() => {
-            const ok = status >= 200 && status < 300;
+          const ok = status >= 200 && status < 300;
 
-            if (ok) {
-              observer.next(
-                new MiniProgramHttpDownloadResponse({
-                  url: request.url,
-                  status,
-                  statusText,
-                  filePath,
-                  tempFilePath,
-                  profile,
-                }),
-              );
-              observer.complete();
-            } else {
-              observer.error(
-                new HttpErrorResponse({
-                  url: request.url,
-                  status,
-                  statusText,
-                }),
-              );
-            }
-          });
-        },
-        fail: ({ errMsg }: WechatMiniprogram.GeneralCallbackResult) => {
-          this.runInAngular(() => {
+          if (ok) {
+            observer.next(
+              new MiniProgramHttpDownloadResponse({
+                url: request.url,
+                status,
+                statusText,
+                filePath,
+                tempFilePath,
+                profile,
+              }),
+            );
+            observer.complete();
+          } else {
             observer.error(
               new HttpErrorResponse({
                 url: request.url,
-                statusText: errMsg,
+                status,
+                statusText,
               }),
             );
-          });
+          }
+        },
+        fail: ({ errMsg }: WechatMiniprogram.GeneralCallbackResult) => {
+          observer.error(
+            new HttpErrorResponse({
+              url: request.url,
+              statusText: errMsg,
+            }),
+          );
         },
       });
 
@@ -316,14 +280,12 @@ export class MiniprogramHttpBackend implements HttpBackend {
       // The response header event handler
       const onHeadersReceived: WechatMiniprogram.DownloadTaskOnHeadersReceivedCallback =
         ({ header }) => {
-          this.runInAngular(() => {
-            observer.next(
-              new HttpHeaderResponse({
-                url: request.url,
-                headers: new HttpHeaders(header),
-              }),
-            );
-          });
+          observer.next(
+            new HttpHeaderResponse({
+              url: request.url,
+              headers: new HttpHeaders(header),
+            }),
+          );
         };
       const task = MiniProgramCore.MINIPROGRAM_GLOBAL.request({
         url: request.urlWithParams,
@@ -345,45 +307,41 @@ export class MiniprogramHttpBackend implements HttpBackend {
           cookies,
           profile,
         }) => {
-          this.runInAngular(() => {
-            const ok = status >= 200 && status < 300;
-            const headers = new HttpHeaders(header);
+          const ok = status >= 200 && status < 300;
+          const headers = new HttpHeaders(header);
 
-            if (ok) {
-              observer.next(
-                new MiniProgramHttpResponse({
-                  url: request.url,
-                  body: data,
-                  status,
-                  statusText,
-                  headers,
-                  cookies,
-                  profile,
-                }),
-              );
-              observer.complete();
-            } else {
-              observer.error(
-                new HttpErrorResponse({
-                  url: request.url,
-                  error: data,
-                  status,
-                  statusText,
-                  headers,
-                }),
-              );
-            }
-          });
-        },
-        fail: ({ errMsg }: WechatMiniprogram.GeneralCallbackResult) => {
-          this.runInAngular(() => {
+          if (ok) {
+            observer.next(
+              new MiniProgramHttpResponse({
+                url: request.url,
+                body: data,
+                status,
+                statusText,
+                headers,
+                cookies,
+                profile,
+              }),
+            );
+            observer.complete();
+          } else {
             observer.error(
               new HttpErrorResponse({
                 url: request.url,
-                statusText: errMsg,
+                error: data,
+                status,
+                statusText,
+                headers,
               }),
             );
-          });
+          }
+        },
+        fail: ({ errMsg }: WechatMiniprogram.GeneralCallbackResult) => {
+          observer.error(
+            new HttpErrorResponse({
+              url: request.url,
+              statusText: errMsg,
+            }),
+          );
         },
         ...request.context.get(REQUSET_TOKEN),
       });

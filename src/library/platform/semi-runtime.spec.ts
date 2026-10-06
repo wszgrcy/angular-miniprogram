@@ -51,14 +51,13 @@ describe('半运行时（TestBed）', () => {
 
     console.log(
       `decls=${decls} bsi=${tView.bindingStartIndex} ` +
-        `HEADER_OFFSET=${LVIEW.HEADER_OFFSET} nodeCount=${nodeCount}`
+        `HEADER_OFFSET=${LVIEW.HEADER_OFFSET} nodeCount=${nodeCount}`,
     );
 
-    expect(nodeCount)
-      .withContext(
-        `节点数(${nodeCount}) 应等于模板声明(${decls})，否则 create pass 没跑完`
-      )
-      .toBe(decls);
+    expect(
+      nodeCount,
+      `节点数(${nodeCount}) 应等于模板声明(${decls})，否则 create pass 没跑完`,
+    ).toBe(decls);
   });
 
   it('getPageRefreshContext 产出的 nodeList 长度应等于节点数', () => {
@@ -69,9 +68,7 @@ describe('半运行时（TestBed）', () => {
 
     const ctx: any = getPageRefreshContext(lView as any);
     expect(ctx.hasLoad).toBe(true);
-    expect(ctx.nodeList.length)
-      .withContext('nodeList 长度应等于模板节点数')
-      .toBe(decls);
+    expect(ctx.nodeList.length, 'nodeList 长度应等于模板节点数').toBe(decls);
   });
 
   it('nodeList 每一项都应是真实渲染出来的节点（非空占位）', () => {
@@ -86,8 +83,6 @@ describe('半运行时（TestBed）', () => {
         empty.push(i);
       }
     });
-    expect(empty)
-      .withContext(`这些下标产出了空节点，说明运行时没渲染到`)
-      .toEqual([]);
+    expect(empty, `这些下标产出了空节点，说明运行时没渲染到`).toEqual([]);
   });
 });

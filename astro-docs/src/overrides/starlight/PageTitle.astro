@@ -1,0 +1,28 @@
+---
+import DefaultPageTitle from '@astrojs/starlight/components/PageTitle.astro';
+import CopyMarkdownButton from '../../components/CopyMarkdownButton.astro';
+
+const { entry } = Astro.locals.starlightRoute;
+const src = `${import.meta.env.BASE_URL}raw/${entry.id}.md`;
+// 只有 frontmatter 的页面没内容可复制，直接不渲染按钮
+const copyable = !!entry.body?.trim();
+---
+
+<div class="title-row">
+  <DefaultPageTitle />
+  {copyable && <CopyMarkdownButton {src} />}
+</div>
+
+<style>
+  .title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+  }
+
+  .title-row > :global(h1) {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+</style>

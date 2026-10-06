@@ -26,8 +26,8 @@ describe('node-manifest 提取器：codegen 形态', () => {
   it('基线：普通独立调用', () => {
     const src = wrap(
       ['ɵɵelementStart(0, "div");', 'ɵɵtext(1, "hi");', 'ɵɵelementEnd();'].join(
-        '\n'
-      )
+        '\n',
+      ),
     );
     const ms = extractManifestsFromSource(src, 't.js');
     expect(ms.length).toBe(1);
@@ -43,7 +43,7 @@ describe('node-manifest 提取器：codegen 形态', () => {
         'ɵɵelementStart(1, "span")(2, "p", 0);',
         'ɵɵtext(3, "hi");',
         'ɵɵelementEnd();',
-      ].join('\n')
+      ].join('\n'),
     );
 
     const ms = extractManifestsFromSource(src, 't.js');
@@ -57,7 +57,7 @@ describe('node-manifest 提取器：codegen 形态', () => {
         'ɵɵelementStart(0, "div");',
         'ɵɵtext(1, "hi");',
         'ɵɵelementEnd()();',
-      ].join('\n')
+      ].join('\n'),
     );
     const ms = extractManifestsFromSource(src, 't.js');
     expect([...ms[0].indices].sort((a, b) => a - b)).toEqual([0, 1]);
@@ -69,7 +69,7 @@ describe('node-manifest 提取器：codegen 形态', () => {
         'ɵɵdomElementStart(0, "view");',
         'ɵɵdomElementStart(1, "view")(2, "text", 0);',
         'ɵɵdomElementEnd();',
-      ].join('\n')
+      ].join('\n'),
     );
     const ms = extractManifestsFromSource(src, 't.js');
     expect([...ms[0].indices].sort((a, b) => a - b)).toEqual([0, 1, 2]);

@@ -1,7 +1,6 @@
 import { Component, HostListener, OnInit } from '@angular/core';
 
 @Component({
-  standalone: false,
   selector: 'app-lib-comp1',
   templateUrl: './lib-comp1.component.html',
   styleUrls: ['./lib-comp1.component.css'],
@@ -14,6 +13,5 @@ export class LibComp1Component implements OnInit {
     console.log('library组件的(bind)tap事件', event);
   }
   constructor() {}
-
   ngOnInit() {}
 }

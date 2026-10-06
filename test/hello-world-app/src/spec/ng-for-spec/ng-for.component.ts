@@ -6,7 +6,8 @@ import { NgForComponent } from '../../spec-component/ng-for/ng-for.component';
 import { nodeExist } from '../util';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [NgForComponent],
   selector: 'app-ng-for-spec',
   template: `<app-ng-for #instance [list]="list"></app-ng-for>`,
 })
@@ -16,7 +17,7 @@ export class NgForSPecComponent {
   static mpPageOptions: WechatMiniprogram.Page.Options<{}, {}> = {
     onReady: function (
       this: WechatMiniprogram.Page.Instance<{}, {}> &
-        MiniProgramComponentInstance<NgForSPecComponent>
+        MiniProgramComponentInstance<NgForSPecComponent>,
     ) {
       this.__ngComponentInstance.componentFinderService
         .get(this.__ngComponentInstance.instance)
@@ -25,7 +26,7 @@ export class NgForSPecComponent {
             item: WechatMiniprogram.Page.Instance<
               WechatMiniprogram.IAnyObject,
               WechatMiniprogram.IAnyObject
-            >
+            >,
           ) => {
             let query = item.createSelectorQuery();
             for (let i = 0; i < this.__ngComponentInstance.list.length; i++) {
@@ -33,7 +34,7 @@ export class NgForSPecComponent {
             }
 
             this.__ngComponentInstance.testFinish$$.complete();
-          }
+          },
         );
     },
   };

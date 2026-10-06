@@ -1,6 +1,12 @@
 export * from './platform-core';
+export * from './agent-node';
 export * from './token';
 export * from './mini-program.renderer';
 export * from './mini-program.renderer.factory';
 export * from './component-finder.service';
 export { propertyChange } from './component-template-hook.factory';
+export {
+  registerWxsModule,
+  getWxsModuleDefinition,
+  collectWxsCallMethods,
+} from './wxs-runtime';

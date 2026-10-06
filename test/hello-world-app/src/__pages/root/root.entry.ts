@@ -1,4 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { RootComponent } from './root.component';
-
-bootstrapPage(RootComponent, { useComponent: true });
+export { RootComponent as default } from './root.component';

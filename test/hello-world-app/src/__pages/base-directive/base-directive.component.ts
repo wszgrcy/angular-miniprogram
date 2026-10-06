@@ -1,11 +1,10 @@
-import { CommonModule } from '@angular/common';
-import { DirectiveModule } from 'test-library';
+import { InputOutputDirective } from 'test-library';
 import { Directive1Directive } from './directive1.directive';
 import { Component, OnInit } from '@angular/core';
 
 @Component({
   standalone: true,
-  imports: [CommonModule, DirectiveModule, Directive1Directive],
+  imports: [InputOutputDirective, Directive1Directive],
   selector: 'app-base-directive',
   templateUrl: './base-directive.component.html',
   styleUrls: ['./base-directive.component.css'],

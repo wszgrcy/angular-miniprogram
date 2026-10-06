@@ -9,6 +9,7 @@
   "include": [
     "**/*.d.ts",
     "__pages/**/*.entry.ts",
-    "__components/**/*.entry.ts"
+    "__components/**/*.entry.ts",
+    "custom-tab-bar/**/*.entry.ts"
   ]
 }

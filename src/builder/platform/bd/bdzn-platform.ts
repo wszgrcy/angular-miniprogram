@@ -1,25 +1,33 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { Injectable } from 'static-injector';
-import { BuildPlatform } from '../platform';
-import { BdZnTransform } from './bdzn.transform';
+import { baiduProjectDefaults } from '../mp-project-defaults';
+import { BuildPlatform, type MpPlatformConfig } from '../platform';
 
-@Injectable()
 export class BdZnBuildPlatform extends BuildPlatform {
   packageName = 'bd';
+  mpConfig: MpPlatformConfig = {
+    projectFilename: 'project.swan.json',
+    subPackageKey: 'subPackages',
+    projectDefaults: baiduProjectDefaults,
+    capabilities: {
+      subpackages: true,
+      independentSubpackages: true,
+      darkmode: true,
+      customTabbar: false,
+    },
+  };
+
   globalObject = 'swan';
   globalVariablePrefix = 'swan.__window';
   fileExtname = {
     style: '.css',
     logic: '.js',
     content: '.swan',
+    wxs: '.sjs',
     contentTemplate: '.swan',
   };
   importTemplate = `${fs
     .readFileSync(path.resolve(__dirname, '../template/app-template.js'))
     .toString()};
     swan.__global = swan.__window = obj;`;
-  constructor(public templateTransform: BdZnTransform) {
-    super(templateTransform);
-  }
 }

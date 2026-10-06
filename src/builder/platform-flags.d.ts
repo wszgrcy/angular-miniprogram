@@ -8,7 +8,7 @@
  * if (__MP_WX__) {
  *   // 仅微信：构建期 __MP_WX__ === true，其余平台此分支被 DCE 移除
  * }
- * const app = __MP_PLATFORM__; // "wx" | "zfb" | "zj" | "bdzn" | "qq" | "dd" | "jd"
+ * const app = __MP_PLATFORM__; // "wx" | "zfb" | "zj" | "bdzn" | "qq" | "dd" | "jd" | "ks" | "xhs" | "fs"
  * ```
  *
  * 值由构建器 `platformConditionDefine()` 注入，与构建目标 platform 一致。
@@ -21,4 +21,7 @@ declare const __MP_BDZN__: boolean;
 declare const __MP_ZFB__: boolean;
 declare const __MP_QQ__: boolean;
 declare const __MP_DD__: boolean;
+declare const __MP_KS__: boolean;
+declare const __MP_XHS__: boolean;
+declare const __MP_FS__: boolean;
 declare const __MP_LIBRARY__: boolean;

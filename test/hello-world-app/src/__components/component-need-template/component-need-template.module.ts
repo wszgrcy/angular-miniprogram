@@ -1,9 +1,9 @@
+import { NgIf, NgTemplateOutlet } from '@angular/common';
 import { NgModule } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { ComponentNeedTemplateComponent } from './component-need-template.component';
 
 @NgModule({
-  imports: [CommonModule],
+  imports: [NgIf, NgTemplateOutlet],
   declarations: [ComponentNeedTemplateComponent],
   exports: [ComponentNeedTemplateComponent],
 })

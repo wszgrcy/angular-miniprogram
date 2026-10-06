@@ -5,7 +5,7 @@ import type { NgPackagrOptions } from 'ng-packagr/src/lib/ng-package/options.di'
 import { STYLESHEET_PROCESSOR } from 'ng-packagr/src/lib/styles/stylesheet-processor.di';
 import path from 'path';
 import { myCompileNgcTransformFactory } from './compile-ngc.transform';
-import { flushLibraryMetaMarkers } from './library-meta-marker';
+import { writeLibraryMetaFile } from './library-meta-store';
 import { hookWritePackage } from './remove-publish-only';
 import { CustomStyleSheetProcessor } from './stylesheet-processor';
 
@@ -15,7 +15,7 @@ import { CustomStyleSheetProcessor } from './stylesheet-processor';
  * 传进来的可能是 ng-package.json 本身，也可能是包含它的目录，两种都接。
  */
 export function resolveLibraryDistRoot(
-  ngPackagePath: string
+  ngPackagePath: string,
 ): string | undefined {
   const candidates = [
     ngPackagePath,
@@ -36,37 +36,30 @@ export function resolveLibraryDistRoot(
 }
 
 /**
- * 构建结束后把库元信息标记补写回最终的 `dist/types/*.d.ts`。
+ * 构建收尾时的兵底刷盘。
  *
- * ng-packagr 22 的 d.ts 扁平化会把 `X_Listeners` / `X_Properties` 这些
- * 不在导出引用图里的 `declare const` tree-shake 掉。标记一丢，应用侧
- * `getLibraryDirectiveMeta()` 拿到空数组，并**覆盖掉** `host.listeners`，
- * 生成的 wxml 里一个事件绑定都没有 —— 表单输入、勾选、picker 全部
- * 不响应，而且**没有任何报错**。
+ * 正常情况下 `compile-ngc.transform` 已经在每个 entry 编译完后落过盘，
+ * 这里只是再确认一次：万一某个 entry 走了缓存、没进 transform，
+ * 至少 build 路径上还能补一次。
  *
- * 详见 `library-meta-marker.ts`。
+ * 旧实现是「把被扁平化抖掉的标记补写回 d.ts」，那个问题现在不存在了：
+ * 元数据不在 d.ts 里，扁平化碰不到它。详见 `library-meta-schema.ts`。
  */
-function flushMarkersOrWarn(ngPackagePath: string): void {
+function flushLibraryMetaSidecar(ngPackagePath: string): void {
   const distRoot = resolveLibraryDistRoot(ngPackagePath);
   if (!distRoot) {
     console.warn(
-      '⚠ 未能从 ng-package.json 解析出 dest，跳过库元信息标记补写；' +
-        '依赖 host listeners 的指令（表单等）将不会生成事件绑定。'
+      '⚠ 未能从 ng-package.json 解析出 dest，跳过库元数据 sidecar 刷盘；' +
+        '依赖 host listeners 的指令（表单等）将不会生成事件绑定。',
     );
     return;
   }
-  const written = flushLibraryMetaMarkers(distRoot);
-  if (written.length === 0) {
-    console.warn(
-      '⚠ 没有可补写的库元信息标记（本次构建未产出任何指令元数据）；' +
-        '依赖 host listeners 的指令（表单等）将不会生成事件绑定。'
-    );
-  }
+  writeLibraryMetaFile(distRoot);
 }
 
 export async function ngPackagrFactory(
   project: string,
-  tsConfig: string | undefined
+  tsConfig: string | undefined,
 ) {
   const packager = (await import('ng-packagr')).ngPackagr();
 
@@ -89,14 +82,14 @@ export async function ngPackagrFactory(
   const rawBuild = packager.build.bind(packager);
   packager.build = ((options?: NgPackagrOptions) => {
     return Promise.resolve(rawBuild(options)).then((r) => {
-      flushMarkersOrWarn(project);
+      flushLibraryMetaSidecar(project);
       return r;
     });
   }) as typeof packager.build;
 
   const rawWatch = packager.watch.bind(packager);
   packager.watch = ((options?: NgPackagrOptions) => {
-    flushMarkersOrWarn(project);
+    flushLibraryMetaSidecar(project);
     return rawWatch(options);
   }) as typeof packager.watch;
 

@@ -2,18 +2,22 @@ import type { NgtscProgram, ParsedConfiguration } from '@angular/compiler-cli';
 import type { NgCompiler } from '@angular/compiler-cli/src/ngtsc/core';
 import { join, normalize, resolve } from '@angular-devkit/core';
 import { createHash } from 'crypto';
-import { createCssSelectorForTs } from 'cyia-code-util';
+import * as fs from 'fs';
 import * as path from 'path';
-import { Inject, Injectable, Injector } from 'static-injector';
+import { Injector, inject } from 'static-injector';
 import ts from 'typescript';
 import type { CompilerOptions } from 'typescript';
 import { LIBRARY_OUTPUT_ROOTDIR } from '../library';
 import {
+  InlineStyleSource,
   MiniProgramCompilerService,
   splitComponentKey,
 } from '../mini-program-compiler';
 import { BuildPlatform } from '../platform/platform';
-import { angularCompilerCliPromise } from '../util/load_esm';
+import { isSamePath, pathKey, toNativePath } from '../util/path';
+import { planSharedWxsEmit } from '../wxs/wxs-declare';
+import { parseWxsSource } from '../wxs/wxs-source';
+import { detectEntryComponent } from './entry-component';
 import {
   COMPILER_HOST,
   OLD_BUILDER,
@@ -21,7 +25,7 @@ import {
   TS_CONFIG_TOKEN,
   TS_SYSTEM,
 } from './token';
-import type { CompilerHostLike , PagePattern } from './type';
+import type { CompilerHostLike, PagePattern } from './type';
 
 /**
  * Windows 下把路径外联成 win32 形式（带缓存）。
@@ -43,9 +47,17 @@ function externalizePath(p: string): string {
   return result;
 }
 
-
-@Injectable()
 export class MiniProgramApplicationAnalysisService {
+  private injector = inject(Injector);
+  private system = inject<ts.System>(TS_SYSTEM);
+  private compiler = inject<CompilerHostLike>(COMPILER_HOST);
+  private tsConfig = inject<string>(TS_CONFIG_TOKEN);
+  private oldBuilder = inject<
+    ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined
+  >(OLD_BUILDER);
+  private pagePatternList = inject<PagePattern[]>(PAGE_PATTERN_TOKEN);
+  private buildPlatform = inject(BuildPlatform);
+
   private dependencyUseModule = new Map<string, string[]>();
   private cleanDependencyFileCacheSet = new Set<string>();
   builder!: ts.BuilderProgram | ts.EmitAndSemanticDiagnosticsBuilderProgram;
@@ -53,16 +65,6 @@ export class MiniProgramApplicationAnalysisService {
   private tsProgram!: ts.Program;
   private ngCompiler!: NgCompiler;
   private typeChecker!: ts.TypeChecker;
-  constructor(
-    private injector: Injector,
-    @Inject(TS_SYSTEM) private system: ts.System,
-    @Inject(COMPILER_HOST) private compiler: CompilerHostLike,
-    @Inject(TS_CONFIG_TOKEN) private tsConfig: string,
-    @Inject(OLD_BUILDER)
-    private oldBuilder: ts.EmitAndSemanticDiagnosticsBuilderProgram | undefined,
-    @Inject(PAGE_PATTERN_TOKEN) private pagePatternList: PagePattern[],
-    private buildPlatform: BuildPlatform
-  ) {}
 
   async exportComponentBuildMetaMap() {
     const injector = Injector.create({
@@ -73,7 +75,7 @@ export class MiniProgramApplicationAnalysisService {
             return new MiniProgramCompilerService(
               this.ngTscProgram,
               injector,
-              buildPlatform
+              buildPlatform,
             );
           },
           deps: [Injector, BuildPlatform],
@@ -114,21 +116,73 @@ export class MiniProgramApplicationAnalysisService {
       const { sourceFile, componentClassName } = splitComponentKey(key);
       const entryPattern = this.getComponentPagePattern(
         sourceFile,
-        componentClassName
+        componentClassName,
       );
       styleMap.set(entryPattern.outputFiles.style, value);
+    });
+    const inlineStyleMap = new Map<string, InlineStyleSource[]>();
+    metaMap.inlineStyle.forEach((value, key) => {
+      const { sourceFile, componentClassName } = splitComponentKey(key);
+      const entryPattern = this.getComponentPagePattern(
+        sourceFile,
+        componentClassName,
+      );
+      inlineStyleMap.set(entryPattern.outputFiles.style, value);
     });
     const contentMap = new Map<string, string>();
     metaMap.outputContent.forEach((value, key) => {
       const { sourceFile, componentClassName } = splitComponentKey(key);
       const entryPattern = this.getComponentPagePattern(
         sourceFile,
-        componentClassName
+        componentClassName,
       );
       contentMap.set(entryPattern.outputFiles.content, value);
     });
 
+    const wxsSources = new Map<string, string>();
+    const wxsSourceFiles: string[] = [];
+    const wxsExtname = this.buildPlatform.fileExtname.wxs;
+    const sharedDir = this.buildPlatform.templateTransform.wxsSharedDir;
+
+    /** 先把所有组件的声明解析成「模块 + 源绝对路径」 */
+    const resolvedEntries: Array<{ module: string; resolvedSource: string }> =
+      [];
+    metaMap.wxsModules?.forEach((decls, key) => {
+      const { sourceFile } = splitComponentKey(key);
+      // key 里的 sourceFile 是 pathKey 形态（身份令牌，Windows 上是 `/C/a/b.ts`），
+      // 要拿去拼真实路径必须先 toNativePath，否则 path.resolve 会把它当成
+      // 「C 盘下的 \C\a\b.ts」。
+      const componentFile = toNativePath(sourceFile);
+      for (const decl of decls) {
+        // src 相对**组件源文件**解析，所以共享脚本写 ../common/format.wxs 即可
+        const srcPath = path.resolve(path.dirname(componentFile), decl.src);
+        if (!fs.existsSync(srcPath)) {
+          throw new Error(
+            `wxs 模块 "${decl.module}" 声明的 src="${decl.src}" 解析后不存在：${srcPath}`,
+          );
+        }
+        resolvedEntries.push({
+          module: decl.module,
+          resolvedSource: srcPath,
+        });
+      }
+    });
+
+    /** 归并：每个源只落一份，同名不同源报错 */
+    for (const item of planSharedWxsEmit(
+      resolvedEntries,
+      sharedDir,
+      wxsExtname,
+    )) {
+      const source = fs.readFileSync(item.source, 'utf8');
+      // 语法白名单在落盘前把关，把非法写法扣在编译期而不是真机上
+      parseWxsSource(source, item.module, item.source);
+      wxsSources.set(item.outPath, source);
+    }
+    wxsSourceFiles.push(...resolvedEntries.map((e) => e.resolvedSource));
+
     metaMap.style = styleMap;
+    metaMap.inlineStyle = inlineStyleMap;
     const config = new Map<
       string,
       {
@@ -141,13 +195,13 @@ export class MiniProgramApplicationAnalysisService {
       const { sourceFile, componentClassName } = splitComponentKey(key);
       const entryPattern = this.getComponentPagePattern(
         sourceFile,
-        componentClassName
+        componentClassName,
       );
       const list = [
         ...value.libraryPath.map((item) => {
           item.path = resolve(
             normalize('/'),
-            join(normalize(LIBRARY_OUTPUT_ROOTDIR), item.path)
+            join(normalize(LIBRARY_OUTPUT_ROOTDIR), item.path),
           );
           return item;
         }),
@@ -157,13 +211,18 @@ export class MiniProgramApplicationAnalysisService {
           selector: item.selector,
           path: resolve(
             normalize('/'),
-            normalize(this.getComponentPagePattern(item.path).outputFiles.path)
+            normalize(
+              this.getComponentPagePattern(item.path, item.className)
+                .outputFiles.path,
+            ),
           ),
           className: item.className,
-        }))
+        })),
       );
       config.set(entryPattern.outputFiles.config, {
-        component: entryPattern.type === 'component' || undefined,
+        // 页面走 Page()；组件与自定义 tabBar 都是 Component()，
+        // json 必须带 component: true，否则小程序不把它当组件
+        component: entryPattern.type === 'page' ? undefined : true,
         usingComponents: list,
         existConfig: entryPattern.inputFiles.config,
       });
@@ -173,27 +232,38 @@ export class MiniProgramApplicationAnalysisService {
       if (
         Object.prototype.hasOwnProperty.call(
           metaMap.otherMetaCollectionGroup,
-          key
+          key,
         )
       ) {
         const element = metaMap.otherMetaCollectionGroup[key];
         element.libraryPath.forEach((item) => {
           item.path = resolve(
             normalize('/'),
-            join(normalize(LIBRARY_OUTPUT_ROOTDIR), item.path)
+            join(normalize(LIBRARY_OUTPUT_ROOTDIR), item.path),
           );
         });
         element.localPath.forEach((item) => {
           item.path = resolve(
             normalize('/'),
-            normalize(this.getComponentPagePattern(item.path).outputFiles.path)
+            normalize(
+              this.getComponentPagePattern(item.path, item.className)
+                .outputFiles.path,
+            ),
           );
         });
       }
     }
     return {
       style: styleMap,
+      inlineStyle: inlineStyleMap,
       outputContent: contentMap,
+      wxsSources,
+      wxsSourceFiles,
+      /**
+       * `组件文件#类名` -> wxs 声明。带出来是给 wxs-strip 插件当组件清单用，
+       * 免得它自己扫全盘找哪个组件带了 wxs。
+       */
+      wxsModules: metaMap.wxsModules,
       config: config,
       otherMetaCollectionGroup: metaMap.otherMetaCollectionGroup,
       selfTemplate,
@@ -201,10 +271,28 @@ export class MiniProgramApplicationAnalysisService {
   }
 
   /**
-   * 取 entry 里 `componentRegistry(XxxComponent)` / `bootstrapPage(XxxComponent)`
-   * 真正指向的组件类名。
+   * 取 entry 绑定的组件类表达式。
    *
-   * `getSymbolAtLocation` 拿到的声明通常是 ImportSpecifier（`import { X } from ...`），
+   * 只有一个来源：入口的 `export default`（见 entry-component.ts）。
+   */
+  private getEntryComponentExpression(
+    sourceFile: ts.SourceFile,
+  ): ts.Expression {
+    const expression = detectEntryComponent(sourceFile);
+    if (!expression) {
+      throw new Error(
+        `${sourceFile.fileName} 没声明入口组件：` +
+          `需要 export default 组件类（或 export { 组件类 as default } from './x'）`,
+      );
+    }
+    return expression;
+  }
+
+  /**
+   * 取入口绑定的组件类名。
+   *
+   * `getSymbolAtLocation` 拿到的声明通常是 ImportSpecifier / ExportSpecifier
+   * （`import { X } from ...`、`export { X as default } from ...`），
    * 不是类声明本身，所以要先沿 alias 解到原始 symbol 再取类名。
    * `import { X as Y }` 的情况以原始类名为准。
    */
@@ -215,6 +303,7 @@ export class MiniProgramApplicationAnalysisService {
     let current = symbol;
     // alias 链最多走几层，防御性地防止环
     for (let i = 0; i < 5; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
       if ((current.flags & ts.SymbolFlags.Alias) === ts.SymbolFlags.Alias) {
         current = this.typeChecker.getAliasedSymbol(current);
         continue;
@@ -228,6 +317,27 @@ export class MiniProgramApplicationAnalysisService {
     return '';
   }
 
+  /**
+   * 从 import / export 说明符往上找到携带 moduleSpecifier 的那层。
+   *
+   * `import { X } from './y'` 与 `export { X as default } from './y'`
+   * 到 ImportDeclaration / ExportDeclaration 的层数不一样（前者多一层
+   * NamedNodeArray），所以逐层往上找，不数固定层数。
+   */
+  private findModuleSpecifier(
+    node: ts.Node | undefined,
+  ): ts.Expression | undefined {
+    let current = node;
+    // 层级最多几层，防御性地防环
+    for (let i = 0; i < 5 && current; i++) {
+      if (ts.isImportDeclaration(current) || ts.isExportDeclaration(current)) {
+        return current.moduleSpecifier;
+      }
+      current = current.parent;
+    }
+    return undefined;
+  }
+
   private initHost(config: ParsedConfiguration) {
     const host = ts.createIncrementalCompilerHost(config.options, this.system);
     this.augmentResolveModuleNames(host, config.options);
@@ -235,13 +345,15 @@ export class MiniProgramApplicationAnalysisService {
     return host;
   }
   private async initTscProgram() {
-    const { readConfiguration, NgtscProgram } = await angularCompilerCliPromise;
+    const { readConfiguration, NgtscProgram } = await import(
+      '@angular/compiler-cli'
+    );
     const config = readConfiguration(this.tsConfig, undefined);
     const host = this.initHost(config);
     this.ngTscProgram = new NgtscProgram(
       config.rootNames,
       config.options,
-      host
+      host,
     );
     this.tsProgram = this.ngTscProgram.getTsProgram();
     this.typeChecker = this.tsProgram.getTypeChecker();
@@ -251,7 +363,7 @@ export class MiniProgramApplicationAnalysisService {
         ts.createEmitAndSemanticDiagnosticsBuilderProgram(
           this.tsProgram,
           host,
-          this.oldBuilder
+          this.oldBuilder,
         );
     } else {
       this.builder = ts.createAbstractBuilder(this.tsProgram, host);
@@ -261,122 +373,118 @@ export class MiniProgramApplicationAnalysisService {
   /** 获得组件/页面的入口 */
   private getComponentPagePattern(
     fileName: string,
-    componentClassName?: string
+    componentClassName?: string,
   ) {
     const findList = [fileName];
-    let maybeEntryPath: PagePattern | undefined;
+    const visited = new Set<string>();
 
     while (findList.length) {
-      const module = findList.shift();
-      const moduleList = this.dependencyUseModule.get(path.normalize(module!));
-      if (moduleList && moduleList.length) {
-        findList.push(...moduleList);
-      } else {
-        maybeEntryPath = this.pagePatternList.find(
-          (item) => path.normalize(item.src) === path.normalize(module!)
-        );
-        if (maybeEntryPath) {
-          const sourceFile = this.tsProgram.getSourceFile(maybeEntryPath.src)!;
-          const selector = createCssSelectorForTs(sourceFile);
-          let importComponent: ts.Expression;
-          if (maybeEntryPath.type === 'page') {
-            // `pageStartup(Module, Component)` 的组件在第二个参数，
-            // `bootstrapPage(Component)` 在第一个参数。
-            const legacyNode = selector.queryOne(
-              `CallExpression[expression=pageStartup]`
-            ) as ts.CallExpression;
-            const standaloneNode = selector.queryOne(
-              `CallExpression[expression=bootstrapPage]`
-            ) as ts.CallExpression;
-            if (legacyNode) {
-              importComponent = legacyNode.arguments[1];
-            } else if (standaloneNode) {
-              importComponent = standaloneNode.arguments[0];
-            } else {
-              throw new Error(
-                `${maybeEntryPath.src} 找不到 pageStartup / bootstrapPage 调用`
-              );
-            }
-          } else {
-            const node = selector.queryOne(
-              `CallExpression[expression=componentRegistry]`
-            ) as ts.CallExpression;
-            importComponent = node.arguments[0];
-          }
-          const symbol = this.typeChecker.getSymbolAtLocation(importComponent);
-          const node = symbol?.getDeclarations()?.[0];
-
-          // bootstrapPage(InlineComponent) 这种组件就在 entry 文件里、
-          // 不是 import 进来的，根本没有 ImportDeclaration，
-          // 不能再往下走 parent.parent.parent（会 undefined.parent 崩）。
-          // 组件声明文件就是 entry 本身，直接命中。
-          if (
-            node &&
-            !ts.isImportSpecifier(node) &&
-            path.normalize(node.getSourceFile().fileName) ===
-              path.normalize(maybeEntryPath.src)
-          ) {
-            const declaredName = ts.isClassDeclaration(node)
-              ? node.name?.getText()
-              : undefined;
-            if (
-              !componentClassName ||
-              !declaredName ||
-              declaredName === componentClassName
-            ) {
-              return maybeEntryPath;
-            }
-            maybeEntryPath = undefined;
-            continue;
-          }
-
-          // 同文件多组件时，光比对文件路径分不出到底是哪个组件：
-          // 两个 entry 各自 import 同一个文件的不同组件时，必须连类名一起对上，
-          // 否则先那个组件会被解析到别人的 entry 上，模板就串了。
-          const resolvedComponentName =
-            this.resolveImportedComponentName(symbol);
-          if (
-            componentClassName &&
-            resolvedComponentName &&
-            resolvedComponentName !== componentClassName
-          ) {
-            maybeEntryPath = undefined;
-            continue;
-          }
-          const importDeclaration = node?.parent?.parent
-            ?.parent as ts.ImportDeclaration;
-          if (
-            !importDeclaration ||
-            !ts.isImportDeclaration(importDeclaration)
-          ) {
-            // 解析不到 import（组件不是 import 进来的），这个候选 entry 不匹配，
-            // 继续找下一个而不是直接崩
-            maybeEntryPath = undefined;
-            continue;
-          }
-          const relativeImportComponentPath = importDeclaration.moduleSpecifier
-            .getText()
-            .slice(1, -1);
-
-          const importComponentPath =
-            path.resolve(
-              path.dirname(maybeEntryPath.src),
-              path.normalize(relativeImportComponentPath)
-            ) + '.ts';
-          if (importComponentPath === path.normalize(fileName)) {
-            break;
-          }
-
-          maybeEntryPath = undefined;
-        }
+      const module = findList.shift()!;
+      const key = pathKey(module);
+      // 互相 import 的组件会让反向依赖图带环，不去重就走不完
+      if (visited.has(key)) {
+        continue;
       }
+      visited.add(key);
+
+      const entry = this.pagePatternList.find(
+        (item) =>
+          isSamePath(item.src, module) &&
+          this.entryBindsComponent(item, fileName, componentClassName),
+      );
+      if (entry) {
+        return entry;
+      }
+      // 这个模块自己不是（或不是这个组件的）入口，再往引用它的人走
+      findList.push(...(this.dependencyUseModule.get(key) ?? []));
     }
-    if (!maybeEntryPath) {
-      throw new Error(
-        `没有找到组件[${componentClassName ?? fileName}]对应的入口点`
+    throw new Error(
+      `没有找到组件[${componentClassName ?? '?'}]的产物路径：${fileName}\n` +
+        `它既不是任何入口 export default 绑定的组件，也不在 tsconfig 的编译范围里`,
+    );
+  }
+
+  /**
+   * 这个入口是不是「把 fileName 里的 componentClassName 当组件注册」。
+   *
+   * 两种入口两套认法：
+   *
+   *  - **自动组件**（构建器造的，src 就是组件文件本身）：文件对上再比类名。
+   *  - **声明式入口**：读 entry 的 `export default` 看它绑的是谁。
+   *
+   * 声明式那条必须比类名：同文件多组件时，两个 entry 各自 import 同一文件的
+   * 不同组件，光比对文件路径分不出到底是哪个，先那个组件会被解析到别人的
+   * entry 上，模板就串了。
+   */
+  private entryBindsComponent(
+    entry: PagePattern,
+    fileName: string,
+    componentClassName?: string,
+  ): boolean {
+    if (entry.componentClassName) {
+      return (
+        isSamePath(entry.src, fileName) &&
+        (!componentClassName || entry.componentClassName === componentClassName)
       );
     }
-    return maybeEntryPath;
+    const sourceFile = this.tsProgram.getSourceFile(entry.src);
+    if (!sourceFile) {
+      throw new Error(
+        `${entry.src} 不在 ${this.tsConfig} 的编译范围内，` +
+          `入口文件必须被 tsconfig 的 files / include 覆盖`,
+      );
+    }
+    const importComponent = this.getEntryComponentExpression(sourceFile);
+    const symbol = this.typeChecker.getSymbolAtLocation(importComponent);
+    const node = symbol?.getDeclarations()?.[0];
+
+    // `export default InlineComponent` 这种组件就在 entry 文件里、
+    // 不是 import 进来的，根本没有 ImportDeclaration，
+    // 不能再往下走 parent 链（会 undefined.parent 崩）。
+    // 组件声明文件就是 entry 本身，直接命中。
+    // 注意 re-export（export { X as default } from './y'）的声明节点也在
+    // entry 文件里，但它是别名不是声明，必须排除，否则同文件多组件时
+    // 会错把别人的 entry 认成自己的。
+    if (
+      node &&
+      !ts.isImportSpecifier(node) &&
+      !ts.isExportSpecifier(node) &&
+      isSamePath(node.getSourceFile().fileName, entry.src)
+    ) {
+      const declaredName = ts.isClassDeclaration(node)
+        ? node.name?.getText()
+        : undefined;
+      return (
+        !componentClassName ||
+        !declaredName ||
+        declaredName === componentClassName
+      );
+    }
+
+    const resolvedComponentName = this.resolveImportedComponentName(symbol);
+    if (
+      componentClassName &&
+      resolvedComponentName &&
+      resolvedComponentName !== componentClassName
+    ) {
+      return false;
+    }
+    const moduleSpecifier =
+      // 优先从引用点往上找：`export { X as default } from './y'` 的
+      // symbol 声明可能已经跳到 './y' 里的类声明上，从那里往上就找不到
+      // 模块说明符了
+      this.findModuleSpecifier(importComponent) ??
+      this.findModuleSpecifier(node);
+    if (!moduleSpecifier) {
+      // 解析不到 import / re-export（组件不是外部模块引进来的），这个候选不算
+      return false;
+    }
+    const relativeImportComponentPath = moduleSpecifier.getText().slice(1, -1);
+
+    const importComponentPath =
+      path.resolve(path.dirname(entry.src), relativeImportComponentPath) +
+      '.ts';
+    return isSamePath(importComponentPath, fileName);
   }
 
   private addCleanDependency(host: ts.CompilerHost) {
@@ -392,28 +500,24 @@ export class MiniProgramApplicationAnalysisService {
   private saveModuleDependency(
     filePath: string,
     moduleName: string,
-    module: ts.ResolvedModule
+    module: ts.ResolvedModule,
   ) {
     if (!module) {
       throw new Error(`模块未被解析,文件名${filePath},模块名${moduleName}`);
     }
-    const useList =
-      this.dependencyUseModule.get(path.normalize(module.resolvedFileName)) ||
-      [];
+    const depKey = pathKey(module.resolvedFileName);
+    const useList = this.dependencyUseModule.get(depKey) || [];
     useList.push(filePath);
-    this.dependencyUseModule.set(
-      path.normalize(module.resolvedFileName),
-      useList
-    );
+    this.dependencyUseModule.set(depKey, useList);
   }
   private augmentResolveModuleNames(
     host: ts.CompilerHost,
-    compilerOptions: CompilerOptions
+    compilerOptions: CompilerOptions,
   ) {
     const moduleResolutionCache = ts.createModuleResolutionCache(
       host.getCurrentDirectory(),
       host.getCanonicalFileName.bind(host),
-      compilerOptions
+      compilerOptions,
     );
     const oldResolveModuleNames = host.resolveModuleNames;
     if (oldResolveModuleNames) {
@@ -424,7 +528,7 @@ export class MiniProgramApplicationAnalysisService {
           const result = (oldResolveModuleNames! as any).call(
             host,
             [name],
-            ...args
+            ...args,
           );
           this.saveModuleDependency(args[0], name, result);
 
@@ -437,7 +541,7 @@ export class MiniProgramApplicationAnalysisService {
         containingFile: string,
         _reusedNames: string[] | undefined,
         redirectedReference: ts.ResolvedProjectReference | undefined,
-        options: ts.CompilerOptions
+        options: ts.CompilerOptions,
       ) => {
         return moduleNames.map((name) => {
           const result = ts.resolveModuleName(
@@ -446,7 +550,7 @@ export class MiniProgramApplicationAnalysisService {
             options,
             host,
             moduleResolutionCache,
-            redirectedReference
+            redirectedReference,
           ).resolvedModule;
           if (!containingFile.includes('node_modules')) {
             this.saveModuleDependency(containingFile, name, result!);
@@ -460,9 +564,6 @@ export class MiniProgramApplicationAnalysisService {
   async analyzeAsync() {
     await this.initTscProgram();
     await this.ngCompiler.analyzeAsync();
-  }
-  getBuilder() {
-    return this.builder;
   }
   cleanDependencyFileCache() {
     this.cleanDependencyFileCacheSet.forEach((filePath) => {

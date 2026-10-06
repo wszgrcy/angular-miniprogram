@@ -74,7 +74,7 @@ export function markStructuralChange(): void {
 export function pushPathData(
   mpRef: unknown,
   key: string,
-  value: unknown
+  value: unknown,
 ): void {
   if (!mpRef) {
     return;
@@ -99,7 +99,17 @@ export function resetCycleState(): void {
   waitingRefreshLViewList = [];
 }
 
-/** @internal */
+/**
+ * 模板更新钩子回调：把本轮变更批量 `setData` 下去。
+ *
+ * 只能算「框架内部」——构建器给每个组件注入的 `amp.propertyChange(...)` 调的就是
+ * 它——但**不能打 internal 标记**：它被 `platform/default` → `platform/wx` →
+ * 主入口逐级**具名**再导出，而 `stripInternal` 只剔声明不剔 re-export，
+ * ng-packagr 打 d.ts 时会报「propertyChange is not exported by ...」。
+ *
+ * （注：这段注释里不能出现那个以 at 号开头的词，JSDoc 会把它当标签，
+ * `stripInternal` 就又作用到本函数上了。）
+ */
 export function propertyChange(lView: LView) {
   if (linkMap.has(lView)) {
     waitingRefreshLViewList.push(() => {
@@ -178,11 +188,141 @@ export function getPageRefreshContext(lView: LView, mpRef?: unknown) {
  * 依据：`<template is="..." data="{{...nodeList[N][index]}}">` 把容器项
  * 展开成子模板的作用域，子模板里的 `nodeList` 就是 `item.nodeList`。
  */
+/**
+ * 取出容器里已嵌入的子 lView。
+ *
+ * 为什么不能读 `LVIEW.CONTAINER_VIEW_REFS`：见
+ * {@link LVIEW.CONTAINER_HEADER_OFFSET} 的详细说明——一句话版：
+ * `VIEW_REFS` 只存惰创建的 ViewRef 包装，内建控制流
+ * `@if`/`@for`/`@switch` 不创建它，恒为 `null`。
+ *
+ * 识别「是 lView」用 Angular 自己的判据
+ * （`isLView`：`Array` 且 `value[TYPE=1]` 是 tView 对象），
+ * 不自己发明条件。
+ */
+function readEmbeddedLViews(container: unknown[]): unknown[] {
+  const views: unknown[] = [];
+  for (let i = LVIEW.CONTAINER_HEADER_OFFSET; i < container.length; i++) {
+    const value = container[i];
+    if (
+      Array.isArray(value) &&
+      typeof value[1] === 'object' &&
+      value[1] !== null
+    ) {
+      views.push(value);
+    }
+  }
+  return views;
+}
+
+/**
+ * `TView.data[i]` 上挂的 `TI18n`（`i18n` 属性 / ICU 的静态侧）。
+ *
+ * 形状由 `@angular/core` 的 `interfaces/i18n.ts` 定，未对外导出，只能按形状认。
+ */
+function asT18n(data: any): { ast: any[] } | null {
+  return data && typeof data === 'object' && Array.isArray(data.ast)
+    ? (data as { ast: any[] })
+    : null;
+}
+
+/** `I18nNodeKind`：TEXT / ELEMENT / PLACEHOLDER / ICU */
+const I18N_TEXT = 0;
+const I18N_ELEMENT = 1;
+const I18N_ICU = 3;
+
+/**
+ * 解 ICU 的当前分支下标。
+ *
+ * 编码是 Angular 自己的：`select` 存 `~caseIndex`（必为负），`plural` 存
+ * 原始 `caseIndex`。照抄 `getCurrentICUCaseIndex`，别自己猜——实测两种
+ * ICU 存法不同，只按 `~x` 解会让 plural 全错。
+ */
+function readCaseIndex(lView: LView, lviewIndex: number): number | null {
+  const stored = lView[lviewIndex];
+  if (stored === null || stored === undefined) {
+    return null;
+  }
+  return typeof stored === 'number' && stored < 0
+    ? ~stored
+    : (stored as number);
+}
+
+/**
+ * 把 i18n 块（含 ICU）当前渲染出来的文本拼成一个串。
+ *
+ * ## 为什么需要
+ *
+ * `ɵɵi18n` 不往自己的槽位写值：译文节点是 `applyCreateOpCodes` 建在 **expando**
+ * 下标上的，而下面的循环只走到 `bindingStartIndex`。于是 wxml 在那个位置
+ * 读到的永远是空对象。这里把散在 expando 上的节点收回来，填进槽自己的位置。
+ *
+ * ## 为什么必须按分支下标取
+ *
+ * 换分支时 Angular 只把新分支的节点建出来，**旧分支的节点仍留在 lView 里**
+ * （只是脱离了渲染树）。所以「收集所有非 null 节点」在首次渲染碰巧对，
+ * 一旦切分支就变成 `他TA` 这种拼接结果。必须只走当前分支。
+ *
+ * ## 局限
+ *
+ * 只能拼文本。分支里带标签时元素节点会被跳过、其子文本被拼平，渲染出来
+ * 丢标签——wxml 的一个 `{{value}}` 带不动结构。
+ */
+function readI18nText(lView: LView, ast: any[], parts: string[]): void {
+  for (const node of ast) {
+    if (!node || typeof node !== 'object') {
+      continue;
+    }
+    if (node.kind === I18N_ICU) {
+      const caseIndex = readCaseIndex(lView, node.currentCaseLViewIndex);
+      const activeCase =
+        caseIndex === null ? undefined : (node.cases ?? [])[caseIndex];
+      if (activeCase) {
+        readI18nText(lView, activeCase, parts);
+      }
+      continue;
+    }
+    if (node.kind === I18N_TEXT) {
+      const rendered = lView[node.index];
+      if (rendered instanceof AgentNode && rendered.type === 'text') {
+        parts.push(rendered.value ?? '');
+      }
+    } else if (node.kind === I18N_ELEMENT) {
+      // 元素本身进不了 `{{value}}`，只把它下面的文字收进来
+      readI18nText(lView, node.children ?? [], parts);
+    }
+  }
+}
+
+/**
+ * 算出本节点的可查询 class，非可查询节点返回空串。
+ *
+ * 「可查询」的判据是 `TNode.localNames` 非空，即模板上写了 `#xxx`。
+ * 编译期（`ParsedNgElement.hasRef`）用的是同一个条件的模板 AST 侧，
+ * 两边同进同退：wxml 只在带 `#` 的元素上拼 `nodeList[i].refClass`，
+ * 数据侧也只在那种节点上发这个字段。
+ *
+ * ⚠️ `localNames` 是 `[name, index]` 扁平对，`<div #x>` 存的是
+ * `['x', -1]`（`-1` = 就是这个元素自己，由 `saveResolvedLocalsInData`
+ * 运行时现取）。这里**只取「有没有」**，绝不读 `localNames[i + 1]`：
+ * 那个下标对 `#x="dir"` 指的是指令实例槽，不是元素下标。
+ */
+function refClassOf(tNode: unknown, pathPrefix: string): string {
+  const localNames = (tNode as { localNames?: string[] } | undefined)
+    ?.localNames;
+  if (!localNames?.length) {
+    return '';
+  }
+  // pathPrefix 形如 `nodeList[4][1].nodeList[0]`，里面只有下标是数字
+  const nums = pathPrefix.match(/\d+/g);
+  return nums ? `__ar-${nums.join('-')}` : '';
+}
+
 function lViewToWXView(
   lView: LView,
   parentNodePath: any[] = [],
   dataPrefix = 'nodeList',
-  mpRef?: unknown
+  mpRef?: unknown,
 ) {
   const tView = lView[1];
   const end = tView.bindingStartIndex;
@@ -190,17 +330,41 @@ function lViewToWXView(
   for (let index = LVIEW.HEADER_OFFSET; index < end; index++) {
     const rel = index - LVIEW.HEADER_OFFSET;
     const item = lView[index];
-    if (item instanceof AgentNode) {
+    /**
+     * `#x` 的**影子槽**：`saveResolvedLocalsInData` 把 local ref 的值写进
+     * `lView[tNode.index + 1]`，那个槽里是**同一个 AgentNode**。
+     *
+     * 它不对应任何 wxml 元素（编译期 `prepareRefsArray` 同样为它占一个空槽
+     * 并跳过），所以两件事都不能做：
+     *
+     * - **不能重新打前缀**——后打的影子会把真前缀盖掉，于是节点自报的位置
+     *   比渲染位置大 1：可查询 class 与路径式 setData 一起落到没人读的那个
+     *   槽上，`find()` 永远查不到。
+     * - **不能写 nodeList**——写进去就是把同一个节点的视图数据原样复制一份，
+     *   白占 setData 体积，还会让 diff 多比一份。
+     *
+     * 判据就一句：影子槽与它自己的元素槽**是同一个对象**，且紧贴在后面
+     * （`localIndex = tNode.index + 1`）。不依赖 `tView.data` 的形状。
+     */
+    const isRefShadow = item instanceof AgentNode && item === lView[index - 1];
+    if (item instanceof AgentNode && !isRefShadow) {
       // 顺手打路径前缀：这次遍历本来就要经过每个节点
       item.__pathPrefix = `${dataPrefix}[${rel}]`;
       if (mpRef) {
         item.__mpRef = mpRef;
       }
+      item.__refClass =
+        item.type === 'element'
+          ? refClassOf(tView.data?.[index], item.__pathPrefix)
+          : '';
       nodeList[rel] = item.toView();
     } else if (item && item[1] === true) {
       const lContainerList: MPView[] = [];
-      const viewRefList: any[] = item[LVIEW.CONTAINER_VIEW_REFS] || [];
-      viewRefList.forEach((viewRef, itemIndex) => {
+      // 读 CONTAINER_HEADER_OFFSET 起的裸 lView，不读 VIEW_REFS。
+      // 后者对 `*ngIf` 有值、对内建 `@if` 恒为 null，
+      // 用它会导致内建控制流整块渲染为空。
+      const childLViews = readEmbeddedLViews(item);
+      childLViews.forEach((childLView, itemIndex) => {
         const nodePath = [...parentNodePath, 'directive', rel, itemIndex];
         lContainerList.push({
           /**
@@ -238,15 +402,15 @@ function lViewToWXView(
            * `{{item.__templateName || 'xxxBlock_N'}}` 行为不变。
            */
           __templateName:
-            (viewRef._lView[LVIEW.CONTEXT] &&
-              viewRef._lView[LVIEW.CONTEXT].__templateName) ||
-            viewRef._lView[1]?.declTNode?.localNames?.[0] ||
+            ((childLView as any[])[LVIEW.CONTEXT] &&
+              (childLView as any[])[LVIEW.CONTEXT].__templateName) ||
+            (childLView as any[])[1]?.declTNode?.localNames?.[0] ||
             null,
           nodeList: lViewToWXView(
-            viewRef._lView,
+            childLView as LView,
             nodePath,
             `${dataPrefix}[${rel}][${itemIndex}].nodeList`,
-            mpRef
+            mpRef,
           ),
           nodePath: nodePath,
           index: lContainerList.length,
@@ -254,8 +418,19 @@ function lViewToWXView(
       });
       nodeList[rel] = lContainerList;
     } else {
-      // todo
-      nodeList[rel] = {} as any;
+      /**
+       * i18n / ICU 的槽位：`lView[i]` 是 `null`，译文在 expando 上。
+       * 收回来填到本槽，wxml 那边就是一个普通 `{{nodeList[k].value}}`。
+       */
+      const t18n = asT18n(tView.data?.[index]);
+      if (t18n) {
+        const parts: string[] = [];
+        readI18nText(lView, t18n.ast, parts);
+        nodeList[rel] = { value: parts.join('') } as any;
+      } else {
+        // todo
+        nodeList[rel] = {} as any;
+      }
     }
   }
   return nodeList;
@@ -296,10 +471,9 @@ export function resolveNodePath(list: NodePath): any {
     const item = list.shift()!;
     if (item === 'directive') {
       const index = list.shift()! as number;
-      const lContainer = lView[index + LVIEW.HEADER_OFFSET];
+      const lContainer = lView[index + LVIEW.HEADER_OFFSET] as unknown[];
       const child = list.shift() as number;
-      const viewRef = lContainer[LVIEW.CONTAINER_VIEW_REFS][child];
-      lView = viewRef['_lView'];
+      lView = readEmbeddedLViews(lContainer)[child] as LView;
     } else {
       lView = lView[LVIEW.HEADER_OFFSET + item];
     }
@@ -312,10 +486,9 @@ export function findCurrentElement(lView: LView, list: NodePath = []) {
     const item = list.shift()!;
     if (item === 'directive') {
       const index = list.shift() as number;
-      const lContainer = lView[index + LVIEW.HEADER_OFFSET];
+      const lContainer = lView[index + LVIEW.HEADER_OFFSET] as unknown[];
       const child = list.shift() as number;
-      const viewRef = lContainer[LVIEW.CONTAINER_VIEW_REFS][child];
-      lView = viewRef['_lView'];
+      lView = readEmbeddedLViews(lContainer)[child] as LView;
     } else {
       lView = lView[item + LVIEW.HEADER_OFFSET];
     }

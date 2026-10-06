@@ -11,10 +11,12 @@ import {
   ALL_COMPONENT_NAME_LIST,
   ALL_PAGE_NAME_LIST,
 } from '../../../test/util/file';
+import {
+  BUILD_TIMEOUT_MS,
+  executeOnceShared,
+} from '../../../test/util/shared-build';
 import { PlatformType } from '../platform/platform';
-import { WxBuildPlatform } from '../platform/wx/wx-platform';
-import { WxTransform } from '../platform/wx/wx.transform';
-import { buildPlatformDefine, runViteBuilder } from './index';
+import { buildPlatformDefine, getBuildPlatform, runViteBuilder } from './index';
 
 /**
  * AbortController polyfill 的接入验证。
@@ -37,7 +39,9 @@ import { buildPlatformDefine, runViteBuilder } from './index';
 describe('AbortController polyfill 接入', () => {
   describe('define 重定向（单元）', () => {
     const define = buildPlatformDefine(
-      new WxBuildPlatform(new WxTransform()),
+      // static-injector 7 下 BuildPlatform.templateTransform 靠 inject() 解析，
+      // 不能再 `new WxBuildPlatform(new WxTransform())`，走真实的 provider 配置。
+      getBuildPlatform(PlatformType.wx),
       false,
     );
 
@@ -79,20 +83,19 @@ describe('AbortController polyfill 接入', () => {
       );
       await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
 
-      harness.useTarget('build', {
+      const result = await executeOnceShared(harness, 'build', {
         tsConfig: 'src/tsconfig.app.json',
         outputPath: 'dist/vite-polyfill',
         pages: DEFAULT_ANGULAR_CONFIG.pages,
-        components: DEFAULT_ANGULAR_CONFIG.components,
         platform: PlatformType.wx,
         sourceMap: false,
-      } as never);
-
-      const result = await harness.executeOnce();
+        // 与 localize-polyfill.build 用完全相同的输入，两边共用一份构建产物
+        polyfills: ['@angular/localize/init'],
+      });
       if (!result.result?.success) {
         const errLogs = (result.logs || [])
           .filter((l: { level: string }) => l.level === 'error')
-          .map((l: { message?: unknown; value?: unknown }) =>
+          .map((l: { message?: string; value?: string }) =>
             String(l.message ?? l.value),
           );
         console.log('JS_ERR>>>' + errLogs.join(' ~~ ').slice(0, 4000));
@@ -105,9 +108,7 @@ describe('AbortController polyfill 接入', () => {
       const names = files.map((f) => String(f));
 
       // 1. polyfill chunk 确实落盘了
-      expect(
-        names.some((n) => n.endsWith('polyfills.js')),
-      ).toBeTruthy();
+      expect(names.some((n) => n.endsWith('polyfills.js'))).toBeTruthy();
 
       const appJsPath = names.find((n) => n.endsWith('/app.js'));
       expect(appJsPath).toBeTruthy();
@@ -149,5 +150,77 @@ describe('AbortController polyfill 接入', () => {
       const between = appJs.slice(templateIdx, polyfillIdx);
       expect(between).not.toContain('require(');
     });
+  });
+
+  describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
+    /**
+     * `polyfills` 里声明的本地文件要真的进产物。
+     *
+     * 对齐 `@angular/build` 的 `getEsBuildCommonPolyfillsOptions`：数组每条
+     * 一个 `import`，包名和本地文件都走普通解析。以前本包只从数组里挑
+     * localize 那一条，写 `polyfills: ["src/polyfills.ts"]` 是配了不生效。
+     */
+    it(
+      'polyfills 声明的本地文件被打进 polyfills.js',
+      async () => {
+        const root = harness.host.root();
+        const myTestProjectHost = new MyTestProjectHost(harness.host);
+        const list = await myTestProjectHost.getFileList(
+          normalize(join(root, 'src', '__pages')),
+        );
+        list.push(
+          ...(await myTestProjectHost.getFileList(
+            normalize(join(root, 'src', '__components')),
+          )),
+        );
+        await myTestProjectHost.importPathRename(list);
+        await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
+        await myTestProjectHost.moveDir(
+          ALL_COMPONENT_NAME_LIST,
+          '__components',
+          'components',
+        );
+        await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
+
+        await harness.host
+          .write(
+            normalize(join(root, 'src', 'my-polyfill.ts')),
+            virtualFs.stringToFileBuffer(
+              'globalThis.__MP_PROBE_POLYFILL__ = 1;\n',
+            ),
+          )
+          .toPromise();
+
+        const result = await executeOnceShared(harness, 'build', {
+          tsConfig: 'src/tsconfig.app.json',
+          outputPath: 'dist/vite-polyfill-file',
+          pages: DEFAULT_ANGULAR_CONFIG.pages,
+          platform: PlatformType.wx,
+          sourceMap: false,
+          polyfills: ['src/my-polyfill.ts'],
+        });
+        expect(result.result?.success).toBeTruthy();
+
+        const names = (
+          await myTestProjectHost.getFileList(
+            join(root, 'dist/vite-polyfill-file'),
+          )
+        ).map(String);
+        const polyfillPath = names.find((n) => n.endsWith('polyfills.js'));
+        expect(polyfillPath).toBeTruthy();
+        const code = virtualFs.fileBufferToString(
+          await harness.host.read(normalize(polyfillPath!)).toPromise(),
+        );
+        // define 已把 globalThis 换成 wx.__window，探针落在那张表上
+        expect(code).toContain('__MP_PROBE_POLYFILL__');
+        // 我们那份仍在同一个产物里，且排在用户条目之前（入口内执行顺序
+        // = import 声明顺序，全局能力表必须先于任何用户 polyfill）
+        expect(code).toContain('AbortController');
+        expect(code.indexOf('AbortController')).toBeLessThan(
+          code.indexOf('__MP_PROBE_POLYFILL__'),
+        );
+      },
+      BUILD_TIMEOUT_MS,
+    );
   });
 });

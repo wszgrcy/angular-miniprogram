@@ -6,8 +6,8 @@
 
 ```bash
 npm ci        # 安装依赖
-npm run build # 构建 library + builder + karma（会自动补齐同步源码）
-npm run test  # 运行全部 jasmine 用例
+npm run build # 构建 library + builder（会自动补齐同步源码）
+npm run test  # 运行全部 vitest 用例
 ```
 
 其它常用命令：
@@ -19,23 +19,319 @@ npm run lint       # eslint --max-warnings 0
 npm run sync       # 手动从 angular/angular@17.3.1 同步源码（需要网络）
 ```
 
+> **上面都是 Node 侧用例**。还有一层「在真·微信开发者工具里跑」的
+> 小程序运行时用例，见下面 [微信真机测试（vitest）](#微信真机测试vitest)。
+> 那层需要开发者工具 + 真实 AppID + 手动登录，不能纯命令行无人值守。
+
+---
+
+## 微信真机测试（vitest）
+
+### 两层测试的分工
+
+|                | Node vitest（`npm test`）      | 小程序运行时（`npm run test:wechat`） |
+| -------------- | ------------------------------ | ------------------------------------- |
+| 跑在哪         | Node 进程，`wx` 用 Proxy 桩    | 真·微信开发者工具里的小程序运行时     |
+| 覆盖           | 编译器、纯函数、可 mock 的逻辑 | 渲染、生命周期、`wx.*` 真实行为       |
+| 需要开发者工具 | 否                             | **是**                                |
+| 需要真实 AppID | 否                             | **是**（游客模式不行）                |
+| 需要手动登录   | 否                             | **是**（见下）                        |
+| 速度           | 全量约 4 分钟                  | 13 个 spec 约 17 秒                   |
+| 连接方向       | ——                             | 设备 `wx.connectSocket` 主动连出宿主  |
+
+两层不能互相替代。典型例子：内建控制流 `@if` 的 `nodeList` 填充 bug，
+Node 侧合成 lView 测不出来，只有真机跑才暴露。
+
+### 前置条件（四条，缺一不可）
+
+**1. 微信开发者工具已安装，且服务端口已开启**
+
+IDE → 设置 → 安全设置 → **服务端口：开**。
+没开会直接报：
+
+```
+工具的服务端口已关闭。要使用命令行调用，请手动打开工具 -> 设置 -> 安全设置，将服务端口开启。
+```
+
+**2. 必须手动启动 IDE 并登录 —— CLI 拉不起来登录态**
+
+这是最容易踩的一条。CLI **能**拉起 IDE 进程（`--port` 会让它启动并监听），
+但**那个实例是登出状态**，且等多久都不会恢复：
+
+```
+# 已登录状态下 cli quit，再让 CLI 从零拉起：
+cli --port 40710 islogin   →  {"login":false}
+等待 40s 再查             →  {"login":false}
+
+# 且 profile 是同一个（--debug 实测）：
+userDirPath  C:\Users\<user>\AppData\Local\微信开发者工具\User Data\<hash>\Default
+```
+
+同 profile、同机器，CLI 拉起的实例就是 `login:false`。
+
+**所以正确顺序是：你手动打开 IDE → 扫码登录 → 再跑测试。**
+
+登录没上的表现很坑，**不会报错**：
+
+```
+cli auto  →  ✔ auto          ← 假成功
+# 然后小程序永远连不上宿主，脚本干等到超时
+```
+
+**3. AppID 用游客的就行**
+
+> ⚠️ **两次纠正**。早先记的两条都是错的：
+>
+> 1. 「游客模式网络被掐」—— 错，当时把「未登录」归因到了 appid 上
+> 2. 「游客模式 `cli auto` 不可靠」—— 也错，当时把「会话互斥」归因到了 appid 上
+>
+> **游客 appid 可以跑测试，实测 13/13 SUCCESS 且可复现。**
+
+网络硬证据（带唯一标记的服务器，验证**内容真的回来了**，不是只看状态码）：
+
+```
+loopback >> status=200 marker回传=true
+           body={"marker":"FX-TOURIST-OK-9911","echo":"/hello","host":"127.0.0.1:9901"}
+LAN      >> status=200 marker回传=true
+           body={"marker":"FX-TOURIST-OK-9911","echo":"/lan","host":"192.168.31.198:9901"}
+```
+
+标记串、echo 路径、host 头全部原样返回 —— 真实往返，不是缓存也不是假应答。
+
+**之前反复失败的真正原因：会话互斥。**
+
+DevTools 的自动化会话**同一时刻只能有一个**。上一轮跑完脚本只杀了
+node/vitest，**项目窗口还开在 IDE 里**；新一轮 `cli auto` 去抢会话，
+旧连接被强制关掉，设备端刚连上就断：
+
+```
+Connected on socket
+WARN [小程序]: Disconnected (0 times) reconnect failed before timeout of 2000ms (transport close)
+Executed 0 of null
+```
+
+干净 A/B（同代码、同机器、同游客 appid）：
+
+| 前置动作            | 结果                                         |
+| ------------------- | -------------------------------------------- |
+| 先 `cli close` 再跑 | ✅ `Executed 13 of null SUCCESS`（连复两次） |
+| 不 close 直接跑     | ❌ `transport close` → `Executed 0`          |
+
+**脚本已修**：跑之前自动 `cli close --project <产物>` 并等 8 秒，
+不用手动干预。修后连跑两次均全自动 PASS。
+
+**唯一真正需要真实 AppID 的场景**：`cli open`。游客 appid 走 `open`
+会报 `code: 10 不存在此 AppID`。但测试链路走的是 `auto`，不是 `open`，
+所以碰不到这个限制。
+
+**4. `urlCheck: false`（就是 IDE 里那个「不校验合法域名」勾选）**
+
+IDE → 详情 → 本地设置 →
+**「不校验合法域名、web-view（业务域名）、TLS 版本以及 HTTPS 证书」**
+
+这个勾选对应 `project.config.json` 里的 `setting.urlCheck`（**反逻辑**：
+勾选 = `false`）：
+
+```json
+// test/hello-world-app/src/project.config.json
+{ "setting": { "urlCheck": false } }
+```
+
+**游客模式下这个是必需的，不是可选的。** 原因：
+
+> 域名白名单是挂在 AppID 上的。**游客模式没有 AppID → 没有任何白名单
+> 上下文 → 所有域名都不合法**。不关掉校验，连 `127.0.0.1` 都过不了。
+
+所以「游客 + 本地开发」的正确组合是：
+
+| 项             | 值                                                    |
+| -------------- | ----------------------------------------------------- |
+| AppID          | `touristappid`                                        |
+| 不校验合法域名 | **勾选**（`urlCheck: false`）                         |
+| 登录           | **需要**（未登录时 `wx.request` 直接 `request:fail`） |
+
+注意最后一行：**游客模式免的是 AppID，不免登录。** 开发者工具本身
+仍然要扫码登录，否则请求根本发不出去。
+
+这个设置没开的典型报错：
+
+```
+request:fail url not in domain list
+```
+
+而登录没上的报错长得不一样（没有 `url not in domain list`）：
+
+```
+request:fail        status: undefined     ← 请求根本没发出
+```
+
+两个报错能用来快速区分是「域名校验没关」还是「没登录」。
+
+### 怎么跑
+
+```bash
+# 1. 手动打开微信开发者工具并扫码登录（CLI 拉不起登录态）
+# 2. 跑（游客 appid 直接可用，不用 --appid）
+npm run test:wechat     # vitest 链路：编产物 → 起 WS → 开项目 → 收结果
+
+```
+
+仓库里 `src/project.config.json` 提交的就是 `touristappid`，**直接就能跑
+测试**，不用换真实 AppID（appid 只从 `project.config.json` 读，脚本没有
+`--appid` 参数，想换成自己的就改那个文件、别进版本库）。
+
+脚本做的事：**登录态/服务端口预检** → `ng run app:test` → 起 vitest 并等
+WS 监听就绪 → `cli auto --project <产物> --auto-port <p>` 开项目 →
+**等小程序连入（默认 20s）** → 等 vitest 跑完（默认 120s 上限）→
+透传 vitest 退出码（可直接进 CI）。
+
+**几个容易退回去的坑**（都是踩过换来的）：
+
+- **开项目必须用 `cli auto`，不是 `cli open`**。`open` 会过 IDE 里的
+  `formatProject`，对空/游客 appid 直接 throw `CLI_INVALID_APPID`，就是
+  `不存在此 AppID (code 10)`；`auto` 走另一条路径，不校 appid。之前
+  vitest 脚本一度写成 `open`，于是同一个环境里 karma 能跑、vitest 跑不了。
+- **CLI 失败得当场断**。`auto`/`open` 失败时只打 `✖ 准备中` + `[error] {...}`
+  就返回 0 似的退回去，不检就得干等到超时且看不出原因。现在脚本看到
+  `[error]` / `✖` 直接报错退出，并把最能说明问题那行糊在脸上。
+- **连入超时要短**（默认 20s）。项目已经打开了，正常几秒内就连回来；迟迟
+  不连就是根本连不上（urlCheck 没关 / 产物里的 `MP_VITEST_PORT` 和 `--port`
+  不一致），多等只是白等。区分「已监听」和「真连上」靠的是 session 打的
+  `[mp-vitest] 设备已连接`。
+- **残留窗口**：`cli auto` 自己会先关掉同路径的旧窗口，所以不用像 karma
+  那样手动 close + 睡 8 秒；但自动化端口被占时脚本会直接报错，
+  而不是开一个抢不到会话的窗口。
+- **端口/超时只有一个来源**：脚本把 `--port` 和 `--connect-timeout` 透成
+  `MP_VITEST_PORT` / `MP_VITEST_CONNECT_TIMEOUT`，`vitest.config.mts` 读它们，
+  不然脚本日志里的端口和宿主真听的端口能是两回事（指错了还“莫名成功”）。
+  产物里的端口是构建期由 angular.json `test.options.port` define 进去的，
+  所以 `--port` 改了就得连 angular.json 一起改并重新编产物。
+
+### 设备端运行时的四个硬前提
+
+「项目打开了、宿主也在监听、设备就是不连 / 一连就报错」这一整类问题，根因
+都在**小程序运行时不是浏览器**：没有 `window`/`global`，`globalThis` 被
+`buildPlatformDefine` 改写成 `wx.__window`（app.js 自建的普通对象），
+ES 新内建也缺。少一样都是「静默不连」或「报错盖报错」，记清楚：
+
+| 前提                                              | 少了什么表现                                                                                                                                                    | 在哪补                                                                                                                                                                                                                                       |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| spec 里的裸 `describe/it/expect` 要重定向到全局表 | `describe is not defined` / `wx.__window.describe is not a function`，宿主干等                                                                                  | `src/builder/vitest/vite/globals-define.ts` 的 `miniProgramVitestGlobalDefine`（对齐 karma 的 `jasmineGlobalDefine`）；值由 vitest `registerApiGlobally` 挂，开关是 `test.globals`——`miniProgramVitest()` 默认打开，不用在测试工程里再写一遍 |
+| `Event` / `EventTarget`                           | `Event is not defined` / `EventTarget is not defined`，把真错误整个盖掉（tinybench 顶层 `class extends EventTarget`，vite preload helper 失败路径 `new Event`） | `runtime/global-polyfills.ts` + `miniProgramBuiltinDefine`                                                                                                                                                                                   |
+| `Date` / 定时器 / `console` 在全局表上            | `The global scope doesn't have a Date object`（fake timers）→ `clearTimeout$1 is not a function`                                                                | 同上 `copyRealmGlobals`。**必须模块加载时执行**：`@vitest/runner` 在 `import` 阶段就把定时器抄成常量，等 `startupMiniProgramTest()` 再补就晚了                                                                                               |
+| `AggregateError`                                  | 每条失败用例变成 `Right-hand side of 'instanceof' is not an object`，断言差异全丢（`failTask` 里那句 `instanceof` 没做保护）                                    | 同上，表里放 `MpAggregateError`                                                                                                                                                                                                              |
+
+另外两条容易忽略的：
+
+- **spec 不能在 app 启动前被 eager `require`**。`spec-modules.plugin.ts` 注进去的
+  是惰性的（`key: () => require(...)`），改成急切 require 的话，spec 在 vitest
+  全局装好之前就执行，`main()` 直接炸，设备永远不连。
+- **require 的路径必须是字面量，而且必须是打包后才写进去**。两头都实测过：
+  字面量让 rolldown 看见 → `UNRESOLVED_IMPORT`（`specs/...` 是产物路径，源码里
+  没有，走 define 也一样，define 是打包前展开的）；用变量绕开静态分析 → 能
+  构建过，但微信的模块系统也是静态扫 `require` 决定哪些文件进包，运行时
+  `Error: module 'specs/...' is not defined`。所以只能在 `generateBundle` 里改
+  `chunk.code`（karma 时代同一个结论，见 `git log` 里的 `require-context-shim`）。
+- **worker 必须自己调 `onQueued` / `onCollected`**。Node 那边是 vitest 的
+  `resolveTestRunner` 包的，自定义 runner 得自己补，少了宿主报
+  `AssertionError: Entity must be found for task xxx`。
+
+排查这类问题最快的办法：把产物 `dist/vitest/app/test.js` 里
+`worker.reportError(\`处理 worker 请求失败：...\`)`那行临时拼上`error.stack`——宿主端默认只给你两帧，加上栈基本一眼定位。
+
+IDE 服务端口与 `.ide` 记录不一致时，本脚本没有 `--ide-port`（karma 时代才有），
+直接把真实端口写回 `.ide` 文件最快，见下一节。
+
+### 端口机制（`.ide` 文件）
+
+CLI **不直接问 IDE 端口**，而是读一个状态文件：
+
+```
+%LOCALAPPDATA%\微信开发者工具\User Data\<hash>\Default\
+  ├── .ide          ← IDE 服务端口
+  ├── .ide-status   ← 服务端口开关（"On" / "Off"）
+  └── .cli          ← CLI 自己的端口
+```
+
+IDE 每次启动**随机挑端口**，而 `.ide` 只在 IDE 自己的启动流程里写。
+用 `taskkill /F` 强杀、或直接双击 exe 启动，都会让 `.ide` 与实际端口脱节：
+
+```
+.ide = 40710（陈旧）
+实际监听 = 41994
+→ CLI 读 40710 → ECONNREFUSED → 判定「IDE 没启动」→ 去拉新实例
+→ 但已有实例占着 → 40710 永远开不出来 → wait IDE port timeout
+```
+
+**`--port` 的关键限制**（实测确认）：
+
+> `--port` 只在「CLI 亲自拉起 IDE」那一次生效。
+> 要连**已经在跑**的 IDE，CLI 仍然只认 `.ide` 文件。
+
+所以 IDE 已在跑但端口对不上时，直接把真实端口写回去最快：
+
+```bash
+echo 41994 > "$LOCALAPPDATA/微信开发者工具/User Data/<hash>/Default/.ide"
+```
+
+### 故障速查表
+
+| 现象                                                  | 原因                                          | 解法                                                  |
+| ----------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------- |
+| `不存在此 AppID (code 10)`                            | 用了 `touristappid` 走 `cli open`             | 改用 `cli auto`（脚本已改）；或换真实 AppID           |
+| `需要重新登录 (code 10)`                              | IDE 登录态丢了                                | 手动登录 IDE                                          |
+| `✔ auto` 但无测试结果，最后超时                      | 登录态为 `false`（假成功）                    | `islogin` 预检，登录后重跑                            |
+| `wait IDE port timeout`                               | `.ide` 与实际端口不一致                       | 写回真实端口，或干净退出后 `--port` 重拉              |
+| `工具的服务端口已关闭`                                | IDE 安全设置里服务端口没开                    | 设置 → 安全设置 → 服务端口 开                         |
+| `Connected on socket` 后 `no message in 30000 ms`     | 上一轮 DevTools 实例还在，把新会话挤掉        | 脚本已自动 `cli close`；手动跑就先 close 旧项目等几秒 |
+| `Disconnected ... transport close` → `Executed 0`     | 同上，**会话互斥**（不是 appid 问题）         | 同上                                                  |
+| 连上但零推进                                          | 产物里的端口和宿主不一致                      | 核对 `--port` 与 `test.options.port` 是否同一个值     |
+| `describe is not defined`（设备控制台）               | `test.globals` 被显式关掉了，或 define 没生效 | 见「设备端运行时的四个硬前提」                        |
+| `Event is not defined` / `EventTarget is not defined` | 全局表缺这俩，真错误被盖掉                    | 同上；先补 polyfill 再看下一条真错误                  |
+| `Right-hand side of 'instanceof' is not an object`    | `AggregateError` 缺失，只在失败路径炸         | 同上                                                  |
+| `Entity must be found for task xxx`                   | runner 没调 `onQueued`/`onCollected`          | 同上                                                  |
+
+### 已验证的网络矩阵
+
+```
+目标                              真实 AppID    游客 appid
+loopback  http://127.0.0.1:9901     ✅           ✅（标记串回传验证）
+LAN       http://192.168.31.198:9901 ✅           ✅（标记串回传验证）
+external  https://registry.npmjs.org  ✅           ✅
+```
+
+**局域网可通**：手机连同 WiFi 就能打本机 dev server，真机联调不用改代码
+（把 `test.options.clientHost` 指到本机局域网 IP 即可）。
+
+游客与真实 AppID 在网络上**没有区别**，两者都需要：已登录 + `urlCheck:false`。
+
+### 为什么 http spec 打本地服务而不是外部 API
+
+原来打的是 `https://api.realworld.io/api/articles`，该域名已返
+**HTTP 530**（Cloudflare 源站不在，宿主机 `curl` 同样 530），测试会
+长期红且与代码无关。现在由 vitest 宿主（`src/builder/vitest/node/fixture-server.ts`）在同一端口上出 fixture，
+请求仍是真的 `wx.request → 127.0.0.1`，**适配层链路一字不变**，
+只是响应可控、可重复。见 `src/spec/util/fixture-server.ts`。
+
+---
+
 ## 🔴 发布产物形态：包必须是 `type: commonjs`
 
 `src/library/package.json` 里显式写了 `"type": "commonjs"`，**不要删**。
 
 ng-packagr 生成产物时是 `packageJson.type ??= 'module'`——你没写它就给你 `module`。
-而 `builder/**` 和 `karma/**` 是 `script/build.ts` 用 CommonJS 编出来的
+而 `builder/**` 是 `tsc -p ./tsconfig.builder.json` 用 CommonJS 编出来的
 （`require` / `exports` + 无扩展名的相对 import）。一旦包顶层是 `type: module`，
 Node 会把所有 `.js` 当 ESM，于是：
 
 ```
-require('angular-miniprogram/karma/plugin')
+require('angular-miniprogram/vitest')
   → exports is not defined in ES module scope
   → Cannot find module './main'   // ESM 解析要求带扩展名
 ```
 
 库自己的产物是 `.mjs`（扩展名优先，永远是 ESM），所以顶层写 `commonjs`
-**不影响 ESM 消费方**，只是让 `builder/` 和 `karma/` 的 CJS 能正常加载。
+**不影响 ESM 消费方**，只是让 `builder/` 的 CJS 能正常加载。
 线上 1.5.2 没有 `type` 字段（等价 commonjs），就是同一个道理。
 
 发布前自检（`npm run build` 之后）：
@@ -43,14 +339,42 @@ require('angular-miniprogram/karma/plugin')
 ```bash
 cd dist && npm pack && cd /tmp && mkdir s && cd s && npm init -y
 npm i <绝对路径>/dist/angular-miniprogram-1.5.2.tgz @angular-devkit/architect --legacy-peer-deps
-node -e "console.log(Object.keys(require('angular-miniprogram/karma/plugin')))"
-# 期望：[ 'framework:@angular-devkit/build-angular', 'launcher:miniprogram' ]
+node -e "console.log(Object.keys(require('angular-miniprogram/package.json').exports))"
+# 期望含 ./vitest 与 ./vitest/runtime
 ```
 
-另：`src/builder/karma/plugin/tsconfig.json` 的 `outDir` 是 `dist/karma` 而不是
-`dist/karma/plugin`——因为 `index.ts` import 了 `../vite/karma-framework`，
-TS 把 rootDir 推断到 `src/builder/karma`，outDir 多写一层会让产物变成
-`karma/plugin/plugin/index.js`，与 `exports["./karma/plugin"]` 对不上。
+## 🔴 builder 的运行时依赖必须写在 `src/library/package.json`
+
+发布产物的根是 `src/library/package.json`（ng-packagr 生成 `dist/package.json`，
+`copy:assets` 把 builder 塞进 `dist/builder`）。仓库根的 `package.json` 是
+`private: true` 的开发依赖表，**发布时不会被安装**。
+
+所以 `src/builder/**` 里运行时 `import`（`import type` 不算，编译后就没了）
+用到的包，必须出现在 `src/library/package.json` 的 `dependencies` 或
+`peerDependencies` 里。只写在根 devDependencies = 装包的人拿不到。
+
+真实形状：`ng new` v22 的 devDependencies 只有 `@angular/cli` /
+`@angular/compiler-cli` / `prettier` / `typescript`，builder 默认走
+`@angular/build` —— `@angular-devkit/build-angular` 在新工作区里根本不存在，
+而 `library/builder.ts`、`util/asset-path.ts` 模块加载时就要 require 它。
+
+分工：
+
+- `dependencies`：我们自己实现要用的（`ws`、`fs-extra`、`glob`…）。新增要同步
+  `src/library/ng-package.json` 的 `allowedNonPeerDependencies`，否则 ng-packagr
+  直接报错（`Dependency xxx must be explicitly allowed…`）
+- `peerDependencies`：宿主工作区提供的工具链（`@angular/*`、`@angular-devkit/*`、
+  `typescript`、`ng-packagr`）
+- `peerDependenciesMeta.optional`：只有某条链路才需要（`vitest` 只有
+  `angular-miniprogram:vitest` 用到），ng-packagr 会原样带进 dist
+
+改 `src/builder/**` 的 import 时扫一眼新增的包名（动态 `import()` 也算）：
+
+```bash
+grep -rn "^import \|await import(" src/builder --include=*.ts | grep -v "import type"
+```
+
+出现的包名在发布 package.json 里就得有。
 
 ## 🔴 开工前先读这一条
 
@@ -82,7 +406,7 @@ TS6053: File '.../src/library/common/http/index.ts' not found.
 自动补跑一次 `npm run sync`，因此直接 `npm run build` 即可。
 
 > 注意：`ng-packagr` 的 `deleteDestPath: true`，单独跑 `npm run build:library`
-> 会清空 `dist`，其中包含 builder/karma 的产物。需要完整产物时请跑 `npm run build`。
+> 会清空 `dist`，其中包含 builder 的产物。需要完整产物时请跑 `npm run build`。
 
 ### 2. Node 22+ 原生 TS 加载会绕过 ts-node
 
@@ -96,25 +420,16 @@ Jasmine 5 默认用 `import()` 加载 spec 文件。Node 22/23/24 自带 `.ts` �
 `require()`，由 ts-node 编译（等价于 Node 21 及以下的行为），因此不再需要
 `NODE_OPTIONS=--no-experimental-strip-types`。
 
-## 关于 karma 用例（2 个 pending）
-
-`src/builder/karma/index.spec.ts` 里的 `karma 运行` / `karma watch` 用例是作者标记
-为 `xdescribe` / `xit` 的本地用例：它需要真实的小程序运行环境（微信开发者工具）
-连上 karma server 才能跑完，CI/容器环境下无法执行，保持 pending 属正常状态。
-
-`karma` builder 本身的编译链路（`npm run build:karma`、`dist/karma/client`、
-`dist/karma/plugin`）在 `npm run build` 中已验证可用。
-
 ## 验证结果（Node v24.21.0）
 
-| 命令               | 结果                                            |
-| ------------------ | ----------------------------------------------- |
-| `npm ci`           | ✅ 1432 packages                                |
-| `npm run build`    | ✅ library + builder + karma 全部产出到 `dist/` |
-| `npm run test`     | ✅ 26 specs, 0 failures, 2 pending              |
-| `npm run test:ci`  | ✅                                              |
-| `npm run coverage` | ✅                                              |
-| `npm run lint`     | ✅ 0 error / 0 warning                          |
+| 命令               | 结果                                    |
+| ------------------ | --------------------------------------- |
+| `npm ci`           | ✅ 1432 packages                        |
+| `npm run build`    | ✅ library + builder 全部产出到 `dist/` |
+| `npm run test`     | ✅ 26 specs, 0 failures, 2 pending      |
+| `npm run test:ci`  | ✅                                      |
+| `npm run coverage` | ✅                                      |
+| `npm run lint`     | ✅ 0 error / 0 warning                  |
 
 ## Angular 版本升级记录（17 → 18 → 19 → 20）
 
@@ -146,14 +461,14 @@ Jasmine 5 默认用 `import()` 加载 spec 文件。Node 22/23/24 自带 `.ts` �
 
 ### 19 → 20
 
-| 项目                    | 变更                                                                                                                                                                                                                                           |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 版本                    | `@angular/*` 20.3.x、devkit 20.3.x（architect `0.2003.x`）、ng-packagr 20.3.x、TS 5.8、webpack 5.101、rxjs 7.8.2                                                                                                                               |
-| **ng-packagr 目录结构** | `lib/**` 全部移动到 `src/lib/**`，所有 `ng-packagr/lib/...` 深引用改为 `ng-packagr/src/lib/...`                                                                                                                                                |
-| 表达式 AST              | 移除 `KeyedWrite` / `PropertyWrite`（赋值改为带赋值运算符的 `Binary`）；新增 `visitVoidExpression` / `visitTaggedTemplateLiteral` / `visitParenthesizedExpression`                                                                             |
-| 模板 AST                | `Visitor` 新增 `visitComponent` / `visitDirective`                                                                                                                                                                                             |
-| webpack                 | `splitChunks.cacheGroups.test` 参数类型收紧为 `Module`（需向下转型 `NormalModule`），返回值必须是 `boolean`                                                                                                                                    |
-| 测试顺序                | `test/hello-world-app/node_modules/test-library` 是上一次 library 构建的拷贝，跨大版本时必须先跑 `npm run test:jasmine library`（即 `npm run test:ci`）刷新，否则会残留旧版本指令（如 v19 的 `ɵɵhostProperty` 在 v20 已删除）导致 app 构建失败 |
+| 项目                    | 变更                                                                                                                                                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 版本                    | `@angular/*` 20.3.x、devkit 20.3.x（architect `0.2003.x`）、ng-packagr 20.3.x、TS 5.8、webpack 5.101、rxjs 7.8.2                                                                                           |
+| **ng-packagr 目录结构** | `lib/**` 全部移动到 `src/lib/**`，所有 `ng-packagr/lib/...` 深引用改为 `ng-packagr/src/lib/...`                                                                                                            |
+| 表达式 AST              | 移除 `KeyedWrite` / `PropertyWrite`（赋值改为带赋值运算符的 `Binary`）；新增 `visitVoidExpression` / `visitTaggedTemplateLiteral` / `visitParenthesizedExpression`                                         |
+| 模板 AST                | `Visitor` 新增 `visitComponent` / `visitDirective`                                                                                                                                                         |
+| webpack                 | `splitChunks.cacheGroups.test` 参数类型收紧为 `Module`（需向下转型 `NormalModule`），返回值必须是 `boolean`                                                                                                |
+| 测试顺序                | `test/hello-world-app/node_modules/test-library` 是上一次 library 构建的拷贝，跨大版本时必须先跑 `npm run test:ci` 刷新，否则会残留旧版本指令（如 v19 的 `ɵɵhostProperty` 在 v20 已删除）导致 app 构建失败 |
 
 ### 升级操作清单（可复用）
 
@@ -172,7 +487,7 @@ git clean -xdfq src/library/common src/library/forms
 npm run sync && npm run build
 
 # 5. 先刷新 test-library 再跑全量
-npm run test:jasmine library && npm run test
+npm run build:library && npm test
 npm run lint && npm run coverage
 ```
 
@@ -223,7 +538,7 @@ Angular 的模板插值不会自动 unwrap signal。
   覆盖返回值、通知次数、抛错时仍然通知、自定义通知来源。
 - `src/builder/zoneless.spec.ts`：构建整个 fixture 后扫描产物，
   断言没有 `__zone_symbol__` / `zone.js/dist`，且包含 `ChangeDetectionSchedulerImpl`。
-- `test/hello-world-app/src/spec/signal-io-spec/`：小程序内 karma 用例，
+- `test/hello-world-app/src/spec/signal-io-spec/`：小程序内运行时用例，
   验证 signal input 渲染 + signal output 回传（需微信开发者工具，容器内跑不了）。
 
 ### 已知限制
@@ -309,15 +624,15 @@ bootstrapPage(FooComponent); // 页面
 bootstrapPage(FooComponent, { useComponent: true }); // 以 Component 而非 Page 启动
 ```
 
-`pageStartup(module, component)` 标记 `@deprecated` 但保持可用，内部走
-`__ngStartPageWithModule`。
+`pageStartup(module, component)` 与 `AppOptions.__ngStartPageWithModule` 已删除，
+页面组件必须 `standalone: true`。
 
 ### 运行时改动
 
 - `AppOptions.__ngStartPage(component, instance)` 改为 standalone 语义，
-  内部 `createComponent` + `EnvironmentInjector`，不再产生 `NgModuleRef`。
+  内部 `createComponent` + `EnvironmentInjector`，直接返回 `ComponentRef`。
 - `PageService.createPageInjector()` 统一构造带 `PAGE_TOKEN` 的子注入器。
-- `linkNgComponentWithPage` 的 `ngModuleRef` 改为可选，destroy 时用可选链。
+- `linkNgComponentWithPage` 不再接收 `NgModuleRef`，destroy 时只销毁 `componentRef`。
 
 ### 编译器改动（standalone 引入 NgModule 的展开）
 
@@ -342,8 +657,7 @@ standalone 组件的 `imports` 允许直接写 NgModule。这时
 | `inputs: string[]`（绑定名） | `ClassPropertyMapping` | 取 `reverseMap` 的 key            |
 | `outputs: string[]`          | `ClassPropertyMapping` | 取 `reverseMap` 的 key            |
 
-`getComponentPagePattern()` 同时识别两种入口调用：`pageStartup` 取
-`arguments[1]`，`bootstrapPage` 取 `arguments[0]`。
+`getComponentPagePattern()` 只认 `bootstrapPage` 入口，组件取 `arguments[0]`。
 
 ## miniprogram-api-typings 3 → 4 → 5
 
@@ -399,19 +713,20 @@ Options<{}, {}, {}>            ->  Options<{}, {}, {}, []>
 
 ### 21 → 22
 
-| 项目                                | 说明                                                                                                                                                                                                                                   |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 版本                                | `@angular/*` 22.1.7 / `@angular-devkit/*` 22.1.8 / ng-packagr 22.1.1 / TS 6.0.3 / webpack 5.109.2                                                                                                                                      |
-| **TS 6.0：strict 默认开启**         | 空 tsconfig 也会开 `noImplicitAny`。本仓库 `tsconfig.base.json` 已显式 `strict: false`，但 fixture 的没写，直接继承新默认值，冒出成堆 TS7006 / TS7008 / TS2564。显式补 `strict: false`（单独设置的 `strictNullChecks` 不受影响）       |
-| TS 6.0：废弃项变硬错误              | `baseUrl` / `moduleResolution=node10` / `downlevelIteration` / `target=ES5` 全部报错，加 `"ignoreDeprecations": "6.0"`                                                                                                                 |
-| TS 6.0：根 tsconfig                 | 根 `tsconfig.json` 是 solution-style（只有 references），但 `code-recycle` 跑 sync 时 ts-node 会拿它直接用。空 `compilerOptions` 让 TS 6 用默认 `target=ES5` 并因缺 `rootDir` 报 TS5107 / TS5011，补上 `target` / `module` / `rootDir` |
-| TS 6.0：@types 不再自动全量注入     | karma client 的 tsconfig 显式声明 `typeRoots` 与 `types`（`jasmine` 命名空间、`node` 的 `Console`）                                                                                                                                    |
-| `createNgModuleRef` 移除            | 改用 `createNgModule`（签名一致）                                                                                                                                                                                                      |
-| `ComponentFactoryResolver` 整体移除 | `NgModuleRef.componentFactoryResolver` 也没了。废弃的 `pageStartup(module, component)` 路径改为用模块 injector 当 `environmentInjector` 走 `createComponent`                                                                           |
-| `@content` 新块                     | 内容查询块，依赖运行时 content query 观察投影内容并重渲染。小程序 slot / self 模板是静态的，对不上，按 `@defer` 先例显式抛错                                                                                                           |
-| **ICU 消息**（`{x, plural/select}`） | 编译成 `ɵɵpipe` + `I18nSelect` 动态切换子模板。**实测该节点会真的出现在 `parseTemplate` 结果里**，而 `visitIcu` 曾是空实现 → 整段内容静默消失 + 后续节点槽位错位且不报错。现显式抛错。注：这**不是「做不到」**——本 fork 已有的 `__templateName`（`<template is="{{item.__templateName}}">`）恰好就是它需要的能力，只是未实现 |
-| **`<ng-content>` fallback 内容**     | 实测空标签与纯空白会被 Angular 归一成 `children = []`，只有写了兜底才有子节点。小程序 `<slot>` 无 fallback 能力，对非空 children 显式抛错（已确认仓内无此用法，不打破现有代码）                                                              |
-| `Object.hasOwn`                     | 同步过来的 `@angular/common` 用到 ES2022 的 `Object.hasOwn`，库的 `lib` 从 es2019 提到 es2022                                                                                                                                          |
+| 项目                                 | 说明                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 版本                                 | `@angular/*` 22.1.7 / `@angular-devkit/*` 22.1.8 / ng-packagr 22.1.1 / TS 6.0.3 / webpack 5.109.2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **TS 6.0：strict 默认开启**          | 空 tsconfig 也会开 `noImplicitAny`。本仓库 `tsconfig.base.json` 已显式 `strict: false`，但 fixture 的没写，直接继承新默认值，冒出成堆 TS7006 / TS7008 / TS2564。显式补 `strict: false`（单独设置的 `strictNullChecks` 不受影响）                                                                                                                                                                                                                                                                                                                                                                                |
+| TS 6.0：废弃项变硬错误               | `baseUrl` / `moduleResolution=node10` / `downlevelIteration` / `target=ES5` 全部报错，加 `"ignoreDeprecations": "6.0"`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| TS 6.0：根 tsconfig                  | 根 `tsconfig.json` 是 solution-style（只有 references），但 `code-recycle` 跑 sync 时 ts-node 会拿它直接用。空 `compilerOptions` 让 TS 6 用默认 `target=ES5` 并因缺 `rootDir` 报 TS5107 / TS5011，补上 `target` / `module` / `rootDir`                                                                                                                                                                                                                                                                                                                                                                          |
+| TS 6.0：@types 不再自动全量注入      | 测试工程 `tsconfig.spec.json` 显式声明 `types: ["vitest/globals"]`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `createNgModuleRef` 移除             | 改用 `createNgModule`（签名一致）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `ComponentFactoryResolver` 整体移除  | `NgModuleRef.componentFactoryResolver` 也没了。当时为废弃的 `pageStartup(module, component)` 路径改用模块 injector 当 `environmentInjector` 走 `createComponent`（该路径已随 `pageStartup` 一并删除）                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `@content` 新块                      | 内容查询块，依赖运行时 content query 观察投影内容并重渲染。小程序 slot / self 模板是静态的，对不上，按 `@defer` 先例显式抛错                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **ICU 消息**（`{x, plural/select}`） | 编译成 `ɵɵpipe` + `I18nSelect` 动态切换子模板。**实测该节点会真的出现在 `parseTemplate` 结果里**，而 `visitIcu` 曾是空实现 → 整段内容静默消失 + 后续节点槽位错位且不报错。现显式抛错。注：这**不是「做不到」**——本 fork 已有的 `__templateName`（`<template is="{{item.__templateName}}">`）恰好就是它需要的能力，只是未实现                                                                                                                                                                                                                                                                                    |
+| **`<ng-content>` fallback 内容**     | 实测空标签与纯空白会被 Angular 归一成 `children = []`，只有写了兜底才有子节点。小程序 `<slot>` 无 fallback 能力，对非空 children 显式抛错（已确认仓内无此用法，不打破现有代码）                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `Object.hasOwn`                      | 同步过来的 `@angular/common` 用到 ES2022 的 `Object.hasOwn`，库的 `lib` 从 es2019 提到 es2022                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **CLI workspace schema**             | 发布包自带 `lib/config/schema.json`（`npm run build:schema` → `script/build-cli-schema.ts`），让 `angular.json` 的 `$schema` 指到本包时也能拿到 `angular-miniprogram:application / library / vitest` 的补全与校验。基底直接读 devDependencies 里的 `@angular/cli/lib/config/schema.json`（不入库也不缓存），**跟的也就是 `package.json` 里钉住的那个 CLI 版本**，升 CLI 时产物自动跟着走。拼装逻辑对齐 CLI 的 `tools/ng_cli_schema_generator.js`（内联时剥掉 `required` / `$schema` / `x-prompt`，内部 `$ref` 命名空间化），并把本包 builder 加进兜底分支的 `not.enum`——漏了会让 `oneOf` 同时命中两条而校验失败 |
 
 ### 升级操作清单（21/22 修订版）
 
@@ -431,7 +746,7 @@ ANGULAR_REPO=../angular npm run sync
 npm run build
 
 # 5. 先刷新 test-library 再跑全量
-npm run test:jasmine library && npm run test
+npm run build:library && npm test
 npm run lint && npm run coverage
 ```
 
@@ -804,7 +1119,7 @@ wxml 里烧的是绝对下标（`nodeList[0]` / `nodeList[2]` / ...），运行�
 所以 Angular 把连续的同类调用写成链：
 
 ```js
-ɵɵelementStart(2, "app-content-multi")(3, "div", 0);
+ɵɵelementStart(2, 'app-content-multi')(3, 'div', 0);
 ɵɵelementEnd()();
 ```
 
@@ -875,11 +1190,11 @@ function unwrapCallChain(node: ts.CallExpression): ts.CallExpression[] {
 
 ### 当前状态
 
-| 清单 | 演进 | 现状 |
-|---|---|---|
+| 清单                    | 演进      | 现状                      |
+| ----------------------- | --------- | ------------------------- |
 | `KNOWN_ROOT_BLOCK_GAPS` | 4 → **1** | 剩 `ControlFlowComponent` |
-| `KNOWN_EXTRACTION_GAPS` | 1 → **0** | 已清空 |
-| `KNOWN_PRECISION_GAPS` | 4 → **1** | 仅 `ControlFlowComponent` |
+| `KNOWN_EXTRACTION_GAPS` | 1 → **0** | 已清空                    |
+| `KNOWN_PRECISION_GAPS`  | 4 → **1** | 仅 `ControlFlowComponent` |
 
 `KNOWN_PRECISION_GAPS` 保留的那一项是**该测试口径本身的局限**，不是产物
 错误：「按组件精确」把组件所有 wxml 下标拍成并集去比，而
@@ -891,16 +1206,15 @@ ControlFlowComponent 的 wxml 含大量具名块（`ifBlock_3` / `forBlock_11` /
 
 ### 验证矩阵（当前）
 
-| 断言 | 覆盖 |
-|---|---|
-| 下标并集两端一致 | 全部组件 |
-| 按组件精确 | 除 ControlFlow（口径局限，已注释说明） |
-| **按视图分块** | 除 ControlFlow 根块（具名块下标串扰） |
-| 具名模板块无豁免 | 全部 |
-| 反向对照（假等价必须被抓） | 3 条 |
-| 分块器单测 | 4 条 |
-| 提取器 codegen 形态单测 | 5 条 |
-
+| 断言                       | 覆盖                                   |
+| -------------------------- | -------------------------------------- |
+| 下标并集两端一致           | 全部组件                               |
+| 按组件精确                 | 除 ControlFlow（口径局限，已注释说明） |
+| **按视图分块**             | 除 ControlFlow 根块（具名块下标串扰）  |
+| 具名模板块无豁免           | 全部                                   |
+| 反向对照（假等价必须被抓） | 3 条                                   |
+| 分块器单测                 | 4 条                                   |
+| 提取器 codegen 形态单测    | 5 条                                   |
 
 ### 根因三：repeaterCreate 的锚点槽未被记入（已修复）
 
@@ -908,18 +1222,30 @@ ControlFlowComponent 的 wxml 含大量具名块（`ifBlock_3` / `forBlock_11` /
 参数**传入，不像 `@if` 那样为锚点单独发一条指令：
 
 ```js
-repeaterCreate(10, ControlFlowComponent_For_11_Template, 2, 3, "div", 8,
-               ɵɵrepeaterTrackByIdentity, false,
-               ControlFlowComponent_ForEmpty_12_Template, 2, 0, "div", 9);
+repeaterCreate(
+  10,
+  ControlFlowComponent_For_11_Template,
+  2,
+  3,
+  'div',
+  8,
+  ɵɵrepeaterTrackByIdentity,
+  false,
+  ControlFlowComponent_ForEmpty_12_Template,
+  2,
+  0,
+  'div',
+  9,
+);
 ```
 
 槽布局（与 builder 侧 `template-definition.ts` 注释一致）：
 
-| 槽 | 含义 |
-|---|---|
-| 10 | RepeaterMetadata（不可渲染但占位） |
-| 11 | 主模板锚点 |
-| 12 | @empty 模板锚点（若有） |
+| 槽  | 含义                               |
+| --- | ---------------------------------- |
+| 10  | RepeaterMetadata（不可渲染但占位） |
+| 11  | 主模板锚点                         |
+| 12  | @empty 模板锚点（若有）            |
 
 按「指令名 + 首参」提取只得到 `repeaterCreate@10`，漏掉 11/12。
 wxml 却引用 `nodeList[11]` / `nodeList[12]` → 报未覆盖。
@@ -931,11 +1257,11 @@ wxml 却引用 `nodeList[11]` / `nodeList[12]` → 报未覆盖。
 
 ### 最终状态
 
-| 清单 | 演进 | 现状 |
-|---|---|---|
-| `KNOWN_EXTRACTION_GAPS` | 1 → **0** | 已清空 |
-| `KNOWN_ROOT_BLOCK_GAPS` | 4 → 1 → **0** | 已清空 |
-| `KNOWN_PRECISION_GAPS` | 4 → **1** | 仅 `ControlFlowComponent`（口径缺陷） |
+| 清单                    | 演进          | 现状                                  |
+| ----------------------- | ------------- | ------------------------------------- |
+| `KNOWN_EXTRACTION_GAPS` | 1 → **0**     | 已清空                                |
+| `KNOWN_ROOT_BLOCK_GAPS` | 4 → 1 → **0** | 已清空                                |
+| `KNOWN_PRECISION_GAPS`  | 4 → **1**     | 仅 `ControlFlowComponent`（口径缺陷） |
 
 `KNOWN_PRECISION_GAPS` 那一项是**该测试口径本身的缺陷**：组件级并集
 把各视图的 0 基下标空间混在一起，而 Angular 明确「not unique between
@@ -944,16 +1270,16 @@ views」。更强的「按视图分块」已零缺口覆盖同一批组件，本
 
 ### 验证矩阵
 
-| 断言 | 覆盖 | 抓到什么 |
-|---|---|---|
-| 下标并集两端一致 | 全部组件 | 下标整体漂移 |
-| **按视图分块** | **全部组件，零缺口** | 视图级下标错位 |
-| 具名模板块无豁免 | 全部 | 漏验某个具名块 |
-| **标签类型对应** | **115 对** | 下标对但节点类型错 |
-| **运行时 lView→nodeList** | **4 条** | HEADER_OFFSET 用错 / 漏算槽 |
-| 反向对照（假等价必须被抓） | 5 条 | 校验本身失效 |
-| 分块器单测 | 4 条 | 嵌套具名模板切分 |
-| 提取器 codegen 形态单测 | 6 条 | 链式调用 / repeater 锚点 |
+| 断言                       | 覆盖                 | 抓到什么                    |
+| -------------------------- | -------------------- | --------------------------- |
+| 下标并集两端一致           | 全部组件             | 下标整体漂移                |
+| **按视图分块**             | **全部组件，零缺口** | 视图级下标错位              |
+| 具名模板块无豁免           | 全部                 | 漏验某个具名块              |
+| **标签类型对应**           | **115 对**           | 下标对但节点类型错          |
+| **运行时 lView→nodeList**  | **4 条**             | HEADER_OFFSET 用错 / 漏算槽 |
+| 反向对照（假等价必须被抓） | 5 条                 | 校验本身失效                |
+| 分块器单测                 | 4 条                 | 嵌套具名模板切分            |
+| 提取器 codegen 形态单测    | 6 条                 | 链式调用 / repeater 锚点    |
 
 ### 「一一对应」的澄清
 
@@ -969,7 +1295,7 @@ wxml 里没有对应元素是正常的。
 
 真实组件在小程序运行时里的完整渲染（`getCurrentPages()` / DevTools）。
 本环境无法运行微信开发者工具。`test/hello-world-app/src/spec/**`
-那些 karma spec 需要小程序模拟器，属于另一条链路。
+那些运行时 spec 需要小程序模拟器，属于另一条链路。
 
 但下标算术、节点身份、类型映射这三段已在 Node 侧覆盖，
 真实渲染若出问题，出在这三段之外的概率已大幅降低。
@@ -984,7 +1310,7 @@ wxml 里没有对应元素是正常的。
 在 Node 里 boot 真实组件，拿 `getPageRefreshContext` 产出的**真实
 `nodeList`**，与页面 wxml 的下标需求比对：
 
-  nodeList.length  必须 >  wxml 里最大的 nodeList[k]
+nodeList.length 必须 > wxml 里最大的 nodeList[k]
 
 现有 `lview-to-node-list.spec.ts` 用的是**合成** lView（N 是编的），
 只验证下标算术，没跟真实 wxml 比对。这条补上后，「运行时数据是否
@@ -992,9 +1318,9 @@ wxml 里没有对应元素是正常的。
 
 ### 已铺好的前置（已提交 4d5bf73）
 
-| 障碍 | 解法 |
-|---|---|
-| 50 处包自引用 Node 运行时解析不了 | `tsconfig-paths` 挂 `Module._resolveFilename` |
+| 障碍                                   | 解法                                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| 50 处包自引用 Node 运行时解析不了      | `tsconfig-paths` 挂 `Module._resolveFilename`                           |
 | `MINIPROGRAM_GLOBAL = wx` 直接引用全局 | Proxy 兜底装 `wx` + `App`/`Page`/`Component`/`getApp`/`getCurrentPages` |
 
 ### 关于 zone 的澄清
@@ -1002,7 +1328,7 @@ wxml 里没有对应元素是正常的。
 项目**就是 zoneless**，zone.js 连装都没装。真实配置在 app 的 NgModule：
 
 ```ts
-providers: [provideZonelessChangeDetection()]
+providers: [provideZonelessChangeDetection()];
 ```
 
 spike 一度撞 NG0908 是因为用了裸 `createEnvironmentInjector` 且试图
@@ -1010,14 +1336,14 @@ import `NG_ZONE_CONFIG`（`ɵ` 私有 token，非公开 API）。
 
 ### spike 进展（逐关打通）
 
-| 关卡 | 结果 |
-|---|---|
-| 包自引用解析 | ✅ 通 |
-| `wx` / `App` 全局 | ✅ 通 |
-| zone（NG0908） | ✅ 用 `provideZonelessChangeDetection()` 后消失 |
-| `RendererFactory2`（NG0407） | ✅ 提供 `MiniProgramRendererFactory` 后解决 |
-| `ChangeDetectionSchedulerImpl`（NG0201） | ✅ 见下 |
-| 真实 boot | ✅ **已跑通**，拿到真实 lView / nodeList |
+| 关卡                                     | 结果                                            |
+| ---------------------------------------- | ----------------------------------------------- |
+| 包自引用解析                             | ✅ 通                                           |
+| `wx` / `App` 全局                        | ✅ 通                                           |
+| zone（NG0908）                           | ✅ 用 `provideZonelessChangeDetection()` 后消失 |
+| `RendererFactory2`（NG0407）             | ✅ 提供 `MiniProgramRendererFactory` 后解决     |
+| `ChangeDetectionSchedulerImpl`（NG0201） | ✅ 见下                                         |
+| 真实 boot                                | ✅ **已跑通**，拿到真实 lView / nodeList        |
 
 ### 打通最后两关的做法
 
@@ -1033,13 +1359,13 @@ import { ɵChangeDetectionScheduler } from '@angular/core';
 
 const env = createEnvironmentInjector(
   [
-    ...flattenZonelessProviders(),   // 摊平 ɵproviders（含一层嵌套）
-    ɵChangeDetectionScheduler,      // 实现类要自己补
+    ...flattenZonelessProviders(), // 摊平 ɵproviders（含一层嵌套）
+    ɵChangeDetectionScheduler, // 实现类要自己补
     MiniProgramRendererFactory,
     { provide: RendererFactory2, useExisting: MiniProgramRendererFactory },
   ],
   platform.injector,
-  'spike'
+  'spike',
 );
 const ref = createComponent(SpikeComponent, {
   elementInjector: env,
@@ -1047,7 +1373,7 @@ const ref = createComponent(SpikeComponent, {
 });
 ref.changeDetectorRef.detectChanges();
 const lView = (ref.hostView as any)._lView;
-const ctx = getPageRefreshContext(lView);   // 真实 nodeList
+const ctx = getPageRefreshContext(lView); // 真实 nodeList
 ```
 
 注意**不要**在 spec 文件里内联 `@NgModule` 并 import `MiniProgramModule`
@@ -1058,19 +1384,19 @@ NG0202。直接提供 renderer 绕开。
 
 boot 出来的数据：
 
-| 量 | 值 |
-|---|---|
-| `ɵcmp.decls` | 6（模板 `<div>hello<span>x</span><p>y</p></div>`，编译正确） |
-| `tView.bindingStartIndex` | 28 |
-| `LVIEW.HEADER_OFFSET` | 27（已对 Angular 交叉验证） |
-| `nodeList.length` | **1** |
+| 量                        | 值                                                           |
+| ------------------------- | ------------------------------------------------------------ |
+| `ɵcmp.decls`              | 6（模板 `<div>hello<span>x</span><p>y</p></div>`，编译正确） |
+| `tView.bindingStartIndex` | 28                                                           |
+| `LVIEW.HEADER_OFFSET`     | 27（已对 Angular 交叉验证）                                  |
+| `nodeList.length`         | **1**                                                        |
 
 `bindingStartIndex(28) - HEADER_OFFSET(27) = 1`，但 `decls = 6`。
 两种可能：
 
-  (a) `ref.hostView._lView` 取的是**宿主视图**而非模板视图，
-      模板节点在子 lView 里；
-  (b) `detectChanges()` 没跑完 create pass，`bindingStartIndex` 是中间态。
+(a) `ref.hostView._lView` 取的是**宿主视图**而非模板视图，
+模板节点在子 lView 里；
+(b) `detectChanges()` 没跑完 create pass，`bindingStartIndex` 是中间态。
 
 **这个差异正是该测试要抓的东西** —— 如果真实运行时 nodeList 真的比
 模板声明的节点少，wxml 引用高位下标就会越界。所以这不是「测试没写好」，
@@ -1113,7 +1439,7 @@ DI，走的是另一套元数据，Angular 的 JIT 读不到）。
 
 `node_modules/@angular/core/fesm2022/_pending_tasks-chunk.mjs`:
 
-  const HEADER_OFFSET = 27
+const HEADER_OFFSET = 27
 
 **我们的 `LVIEW.HEADER_OFFSET = 27` 是对的**，之前怀疑它错了可以排除。
 
@@ -1126,10 +1452,10 @@ DI，走的是另一套元数据，Angular 的 JIT 读不到）。
 
 于是形成闭环死结：
 
-| 路径 | 缺什么 |
-|---|---|
-| 裸 injector | 缺 `ApplicationRef` → create pass 不完整 |
-| 真实 `bootstrapModule` | JIT 元数据缺失 → NG0202 |
+| 路径                   | 缺什么                                   |
+| ---------------------- | ---------------------------------------- |
+| 裸 injector            | 缺 `ApplicationRef` → create pass 不完整 |
+| 真实 `bootstrapModule` | JIT 元数据缺失 → NG0202                  |
 
 ### 若要继续，两条可选路（都需要新增件）
 
@@ -1163,11 +1489,11 @@ Setting data field "nodeList.11.0.__templateName" to undefined is invalid.
 
 ## 三种「没有值」的区别
 
-| 写法 | `setData` 接受？ | wxml `{{x \|\| '兜底'}}` | 说明 |
-|---|---|---|---|
-| `undefined` | ❌ **整次调用失败** | — | 绝对禁止 |
-| `null` | ✅ | 走兜底（`null` 是 falsy） | **无值时的正确表示** |
-| 字段不存在 | ✅ | 走兜底 | 但会让 diff 误判「key 数量变了」→ 退化成全量 |
+| 写法        | `setData` 接受？    | wxml `{{x \|\| '兜底'}}`  | 说明                                         |
+| ----------- | ------------------- | ------------------------- | -------------------------------------------- |
+| `undefined` | ❌ **整次调用失败** | —                         | 绝对禁止                                     |
+| `null`      | ✅                  | 走兜底（`null` 是 falsy） | **无值时的正确表示**                         |
+| 字段不存在  | ✅                  | 走兜底                    | 但会让 diff 误判「key 数量变了」→ 退化成全量 |
 
 **结论：无值一律用 `null`，不要用 `undefined`，也不要省字段。**
 
@@ -1198,10 +1524,10 @@ Setting data field "nodeList.11.0.__templateName" to undefined is invalid.
 
 `__templateName` 取自模板声明名 `tView.declTNode.localNames[0]`：
 
-| 分支 | 模板 | 有无 `#ref` | 名字 |
-|---|---|---|---|
-| `if` | `*ngIf` 脱糖出的 `<ng-template>` | **无** | 取不到 |
-| `else` | `<ng-template #ngIfElseTemplate>` | 有 | `'ngIfElseTemplate'` |
+| 分支   | 模板                              | 有无 `#ref` | 名字                 |
+| ------ | --------------------------------- | ----------- | -------------------- |
+| `if`   | `*ngIf` 脱糖出的 `<ng-template>`  | **无**      | 取不到               |
+| `else` | `<ng-template #ngIfElseTemplate>` | 有          | `'ngIfElseTemplate'` |
 
 于是：
 
@@ -1240,11 +1566,11 @@ __templateName:
 patch 删掉后，`*ngIf` 这种脱糖无 `#ref` 的模板一路 fall through 到
 `undefined` —— **回归就是这么引入的**。
 
-| 版本 | 无名模板的值 | 结果 |
-|---|---|---|
-| 旧（patch） | `null` | ✅ |
-| `c290628` | `undefined` | ❌ 切换两次即坏 |
-| `492876b` | `null` | ✅ 恢复旧语义 |
+| 版本        | 无名模板的值 | 结果            |
+| ----------- | ------------ | --------------- |
+| 旧（patch） | `null`       | ✅              |
+| `c290628`   | `undefined`  | ❌ 切换两次即坏 |
+| `492876b`   | `null`       | ✅ 恢复旧语义   |
 
 ### 一个把判断带偏的细节
 
@@ -1298,11 +1624,1491 @@ __templateName:
 
 ## 相关测试
 
-| 位置 | 覆盖 |
-|---|---|
+| 位置                                                | 覆盖                                                                                                                       |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `diff-node-data.spec.ts` →「绝不产出 undefined 值」 | 顶层/嵌套/数组变 `undefined` → 转 `null`；复现 `nodeList.N.0.__templateName` 有名→无名；**反向对照**（朴素实现确实会漏出） |
-| `template-name-coverage.spec.ts` | 断言容器项 `__templateName` 是 `null` 或 `string`（**不是** `undefined`） |
+| `template-name-coverage.spec.ts`                    | 断言容器项 `__templateName` 是 `null` 或 `string`（**不是** `undefined`）                                                  |
 
 > 注：`template-name-coverage.spec.ts` 原先的断言写的是
 > 「值可为 `undefined`，但字段必须存在」—— **这个断言本身就是错的**，
 > 正是它让这个 bug 过了测试。已修正。
+
+---
+
+# 库元数据 sidecar（`mp-library-meta.json`）
+
+## 一句话
+
+库编译期算出的「指令 host 事件 / host 属性 / 组件产物路径」，**不再拼进 `.d.ts`**，
+改成写一个独立的 `<库根>/mp-library-meta.json`；应用构建读这个文件。
+`.d.ts` 回归成纯类型契约，一个字都不改。
+
+## 为什么原来那套要换掉
+
+旧实现是「把元数据当文本塞进产物」，一共三条通道，其中 d.ts 那条为了对抗
+ng-packagr 的扁平化，叠了三层补丁：
+
+| 通道                                                                  | 载体        | 写入                                                          | 读取                                                     |
+| --------------------------------------------------------------------- | ----------- | ------------------------------------------------------------- | -------------------------------------------------------- |
+| `<T>_Listeners` / `<T>_Properties`                                    | `.d.ts`     | `AddDeclarationMetaDataService` 拼接                          | `getLibraryDirectiveMeta()` 用 CSS-selector-over-TS 反解 |
+| `<T>_OutputPath`                                                      | `.d.ts`     | 同上                                                          | `getLibraryComponentMeta()`                              |
+| `<C>_ExtraData` / `$self_Global_Template` / `library_Global_Template` | **JS 产物** | `SetupComponentDataService` / `OutputTemplateMetadataService` | `library-template.plugin.ts`                             |
+
+d.ts 那条的真实问题不是「不好看」，而是**它和打包器打架**：
+
+```
+ng-packagr 22 扁平化 → 不在导出引用图里的 declare const 被 tree-shake
+  → 标记丢失
+  → getLibraryDirectiveMeta() 返回 listeners: []
+  → ComponentContext 用 [] **覆盖** host.listeners
+  → wxml 一个事件绑定都没有
+  → 表单输入 / 勾选 / picker 全部不响应，且**零报错**
+```
+
+于是有了 `library-meta-marker.ts`：进程内暂存 + 构建后补写 + 哨兵幂等 +
+「把全部 entry 的标记写进每一个 entry 的 d.ts」（散弹枪）。
+实测旧产物 `dist/types/angular-miniprogram.d.ts` 645 行里 **311 行是标记（48%）**。
+
+## 现在的结构
+
+```
+库构建（compile-ngc.transform）
+  ├─ registerLibraryMetaEntry(moduleId, declarationsBundled, distRoot)   ← 登记主键
+  ├─ compileSourceFiles → AddDeclarationMetaDataService.run() 只登记，不改 d.ts
+  └─ writeLibraryMetaFile(distRoot)                                      ← 每个 entry 落一次盘
+                                    ↓
+                    <库根>/mp-library-meta.json
+                                    ↓
+应用构建（getLibraryDirectiveMeta / getLibraryComponentMeta）
+  └─ lookupLibraryMeta(sourceFile.fileName, className)
+```
+
+### 主键为什么是「扁平化 d.ts 相对库根的 posix 路径」
+
+读取侧唯一的线索是 `classDeclaration.getSourceFile().fileName`。
+ng-packagr 把一个 entry point 扁平化成**恰好一个** `.d.ts`，所以
+「d.ts 相对路径 ↔ entry point」是 1:1。拿它当 key，读取侧只需
+`path.relative(包根, d.ts)` + 查表，**不用解析 `exports` map**。
+
+包根定位：从 d.ts 向上找**第一个带 `name` 的 `package.json`**，找到就停
+（哪怕它没有 sidecar 也不往上走，否则会误吃上层无关包的元数据）。
+这条链路对以下场景都不用适配：
+
+- node_modules 正常安装
+- pnpm 的 `.pnpm/<pkg>/node_modules/<pkg>`
+- `npm link` / symlink（TS 默认 resolve 到 realpath，包根跟着走）
+- tsconfig `paths` 把 `angular-miniprogram/forms` 指到 `../../dist/forms`
+  （解析到的 d.ts 在 `dist/types/`，最近 package.json 就是 `dist/package.json`）
+
+### 文件形状
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "generator": "angular-miniprogram",
+  "libVersion": "2.0.2",
+  "entries": {
+    "types/angular-miniprogram-forms.d.ts": {
+      "moduleId": "angular-miniprogram/forms",
+      "typings": "types/angular-miniprogram-forms.d.ts",
+      "directives": {
+        "DefaultValueAccessor": {
+          "listeners": ["bindinput", "bindblur"],
+          "properties": ["value", "disabled"],
+        },
+      },
+      "components": {},
+    },
+  },
+}
+```
+
+## 收益（实测）
+
+| 指标                                  | 旧                                | 新                         |
+| ------------------------------------- | --------------------------------- | -------------------------- |
+| `dist/types/angular-miniprogram.d.ts` | 645 行（311 行是标记）            | 332 行（0 标记）           |
+| 标记重复份数                          | 12 份（每个 entry d.ts 一份全量） | 1 份                       |
+| 构建后补写 / 哨兵 / 幂等逻辑          | 需要                              | 不需要                     |
+| 与 d.ts 扁平化的冲突                  | 有                                | 无（不在 d.ts 里，碰不到） |
+| 同名冲突处理                          | 散弹枪蒙混                        | 写侧显式告警               |
+
+## 顺带修掉的静默失败
+
+旧 `getLibraryDirectiveMeta()` 查不到就返回 `{ listeners: [] }` 并覆盖
+`host.listeners`，**零报错**。现在所有「没查到」都进
+`library-meta-diagnostics.ts`，每轮构建结束由 `runViteBuilder` 打汇总日志，
+分两类：
+
+- `sidecar-missing-class` —— 库有元数据文件但没这个类，**多半是库改完没重新构建**
+- `no-sidecar` —— 来源包根本没有 sidecar（第三方库 / 应用自己的源码）
+
+后者是正常情况（`NgIf` 这类非本工具链指令本来就没有），但「它不会生成 host
+绑定」这个事实应该被看见，所以也列出来。
+
+## 不做版本兼容
+
+**旧版 d.ts 内联标记的读取通道已删除，不做任何版本兼容。**
+
+- `readLegacyDtsMarkers` / `readLegacyDtsOutputPath` 不存在
+- `LIBRARY_DIRECTIVE_LISTENERS_SUFFIX` / `LIBRARY_DIRECTIVE_PROPERTIES_SUFFIX` /
+  `LIBRARY_COMPONENT_OUTPUT_PATH_SUFFIX` 三个常量已从 `const.ts` 删除
+
+含义：应用只能用**当前工具链构建出来的库**。绑一个旧版（d.ts 内联标记格式）
+的库，它会被当成「没有元数据的包」归入 `no-sidecar`，不会生成 host 绑定。
+这是有意为之 —— 宁可少一个没人用的兼容分支，也不要多一处会腐坏的代码。
+
+## 还没做（明确记下来）
+
+（无。JS 通道已于下一节全部搬进 sidecar。）
+
+---
+
+# 库构建只出元数据（schemaVersion 3）
+
+## 一句话
+
+库构建不再改写自己的任何产物。`amp.propertyChange` 注入、`<C>_ExtraData`、
+`$self_Global_Template` / `library_Global_Template` 全部取消：前者移到
+**主构建**，后三者搬进 `mp-library-meta.json`。
+
+库的 fesm = **vanilla ng-packagr 输出**，`grep angular-miniprogram` 一个命中都没有。
+
+## 为什么
+
+上一节把 `.d.ts` 那条通道治了，但库 JS 产物里还埋着三条：
+
+| 载荷                                                        | 旧载体  | 问题                                                    |
+| ----------------------------------------------------------- | ------- | ------------------------------------------------------- |
+| `import * as amp` + `amp.propertyChange(...)`               | 库 fesm | 运行时 hook 与库版本死锁；库产物不是 vanilla            |
+| `let <C>_ExtraData = {...}`                                 | 库 fesm | 顶层变量本模块内无人引用，全靠 ng-packagr 不 DCE 才活着 |
+| `let $self_Global_Template` / `let library_Global_Template` | 库 fesm | 同上，且主构建要用 CSS-selector 从 JS 文本里反捞        |
+
+共同病根：**把 JS bundle 当 key-value 存储用**，和 `.d.ts` 那条一模一样。
+
+## 什么必须留在库构建（但只产出 JSON）
+
+| 项                                  | 为什么留                                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 中间模板文本 `content`              | 需要库自己的 `R3ComponentMetadata.template.nodes`；主构建只有 fesm，从 `ɵɵproperty` 反推不出模板 |
+| scss → css                          | 需要库源文件 + ng-packagr 的 stylesheet processor                                                |
+| listeners / properties / outputPath | 需要库的 directive meta                                                                          |
+
+关键区别：这些是「**算完写 JSON**」，不是「改 JS 产物」。
+
+## 为什么 `content` 能让一份库通吃所有平台
+
+`content` 不是最终 wxml，是一段带 **`${}` 插值的模板串**（平台中立）。
+渲染引擎是 `es-toolkit/compat` 的 `template`，只是把分隔符自定义成 `${x}`。
+
+```html
+<block ${directivePrefix}:if="{{hasLoad}}">
+  <view class="{{nodeList[0].class}}" ${eventListConvert(["tap"])}>hi</view>
+</block>
+```
+
+| 写法                             | 是什么                        | 渲染结果（wx）            |
+| -------------------------------- | ----------------------------- | ------------------------- |
+| `${directivePrefix}`             | 我们的**插槽**，主构建填值    | `wx`                      |
+| `${eventListConvert(["tap"])}`   | 我们的**插槽**，函数调用      | `bind:tap`                |
+| `${fileExtname.contentTemplate}` | context 取值                  | `.wxml`                   |
+| `{{hasLoad}}`                    | wxml 自己的插值，**静态文本** | `{{hasLoad}}`（原样进出） |
+
+定义在 `src/builder/library/mp-template.ts`，**两步**：
+
+| 步   | 函数                                     | 发生在 | 做什么                       |
+| ---- | ---------------------------------------- | ------ | ---------------------------- |
+| 导出 | `LibraryTransform` 产出带 `${}` 的模板串 | 库构建 | 写进 sidecar，不烘平台信息   |
+| 导入 | `renderLibraryTemplate(src, values)`     | 主构建 | `template(src, opts)` + 调用 |
+
+所以库构建一次，wx / zfb / bd / qq 都能用 —— 平台相关的东西一个都不烘进库里。
+
+### 为什么是 `${}` 而不是 `{{}}`
+
+**wxml 自己就用 `{{ }}`。** 拿 `{{}}` 当我们的分隔符，库模板里那些
+`{{hasLoad}}` / `{{nodeList[0].class}}` 会被当成待填变量吃掉，只能靠转义绕。
+
+`${}` 和 wxml 井水不犯河水 —— **转义那一层整个消失了**，`LibraryTransform`
+连 `templateInterpolation` 都不用覆盖。
+
+### 分隔符配置里两个必须知道的坑（均实测）
+
+**坑一：不能用 `/(?!)/g` 这类「永不匹配」正则去顶掉 `escape`。**
+
+那样会让 capture group 角色错位，`interpolate` 的内容被 `_.escape` 做 HTML 转义：
+
+```
+template('${v}', { interpolate: R, escape: /(?!)/g })({ v: 'a<b>&"c' })
+// → 'a&lt;b&gt;&amp;&quot;c'   ← wxml 属性被直接污染
+```
+
+必须给一个「语法合法但内容永不出现」的分隔符，这里用 **NUL**：
+
+```ts
+escape: new RegExp(`\u0000=([\\s\\S]+?)=\u0000`, 'g');
+```
+
+**坑二：必须显式关掉默认的 `evaluate`（`<% %>`）。**
+
+只覆盖 `interpolate` 时，lodash 默认的 `<% ... %>` **仍然生效**，会在构建期
+**执行任意 JS**。所以 `evaluate` 也配成 NUL 分隔符，让它永不触发。
+
+### 白名单预检：杜绝静默求值
+
+光靠「未定义变量会 `ReferenceError`」不够，因为：
+
+| 写法               | 不预检的话                                             |
+| ------------------ | ------------------------------------------------------ |
+| `${Math.random()}` | 逃到全局，**静默**渲染出一个数                         |
+| `${100}`           | 合法表达式，用户 wxml 里的字面 `${100}` 被**静默**求值 |
+
+所以渲染前先把已知占位符摘掉，**残留的 `${` 一律抛错**：
+
+```ts
+const residue = source.replace(KNOWN_PLACEHOLDER, '');
+if (residue.indexOf('${') !== -1) throw new Error('未登记的插值…');
+```
+
+已知集是封闭的，与 `LibraryTransform` / `LibraryBuildPlatform` 的产出严格一一对应。
+
+### 为什么不用自研结构
+
+之前试过三种做法，都不合适：
+
+**`vm` eval。** `literalResolve(`\`${content}\``, opts)` 把 content 反引号一包，
+当 JS 模板字面量丢进 `vm.runInNewContext` 求值 —— 绕一圈「文本 → 假代码 → eval
+→ 文本」。代价四条（均实测）：
+
+| 情形                    | 旧行为                                                                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| content 含反引号        | 模板字面量提前终止 → `SyntaxError`                                                                                         |
+| content 含非我方 `${x}` | `x is not defined`                                                                                                         |
+| content 含反斜杠        | 被当转义序列吃掉，内容被改                                                                                                 |
+| 上面任一失败            | `runScript` 吞异常返回 `undefined`，拼出 `"<import .../>undefined"` 这种**非空**的损坏 wxml，`emit.asset` 的空值守卫挡不住 |
+
+**正则替换。** 避开了上面几条，但仍需「把数据塞进字符串再认出来」。
+
+**自研 `{ strings, values }` 结构。** 语义最干净，但要自己维护一套编码/解码接缝
+（NUL 哨兵）去过 transform 那道只认字符串的关卡，代码量和心智负担都不小。
+
+**现在：`es-toolkit/compat` 的 `template` + `${}` 分隔符。**
+插值、编译缓存都是现成的，且不跟 wxml 抢语法。静态段里的反引号 / 反斜杠 /
+引号 / CRLF 全部安全（实测），因为它们是作为字符串常量写进生成码的，
+不会被当代码解析。
+
+## 现在的结构
+
+```
+库构建（compile-ngc.transform → compileSourceFiles）
+  ├─ registerLibraryMetaEntry(moduleId, dtsBundled, distRoot, fesm2022)  ← 主键 + fesm 映射
+  ├─ compilerHost.writeFile 钩子：只读采集，写出去的一律是原内容
+  │    ├─ .d.ts        → AddDeclarationMetaDataService  listeners / properties / outputPath
+  │    ├─ flat .js     → OutputTemplateMetadataService  selfTemplate / scopeTemplates
+  │    └─ 其余 .js     → SetupComponentDataService      content / useComponents / style
+  └─ writeLibraryMetaFile(distRoot)                                      ← 每个 entry 落一次盘
+                                    ↓
+                    <库根>/mp-library-meta.json  (schemaVersion 3)
+                                    ↓
+主构建（vite）
+  ├─ component-transform.plugin  给库 fesm 注 amp.propertyChange
+  └─ library-template.plugin     读 sidecar → emit wxml / wxss / library entry chunk
+```
+
+### 为什么采集钩子还挂在 `compilerHost.writeFile` 上
+
+它是唯一能「按正在写的这个源文件」天然圈定当前 entry point 的时机。
+直接扫 `componentMap` / `directiveMap` 会把上游 entry point 的类一并摄进来
+（那两个 map 是整个 program 的）。钩子现在**只读不改**，写出去的一律是
+TS 传进来的原始 `data`。
+
+### 主构建怎么判断「这个 node_modules 包该不该处理」
+
+**用 sidecar 存在作为唯一标记**（`isMpLibraryFile` / `readLibraryMetaForModule`）。
+
+这点很关键：`@angular/common` 的 fesm 里同样有 `ɵɵdefineComponent`（NgIf /
+NgFor），用「所有 node_modules」这种粗筛会把注入打进第三方库，等于给每个
+`*ngIf` 加一次 setData。
+
+注入还带幂等保护（`/\.propertyChange\s*\(/`）：按 `.propertyChange(` 而不是
+`amp.propertyChange(` 判，因为 bundlers 会给命名空间导入改名，前缀不可靠。
+
+### library entry chunk 的 import 用 bare specifier
+
+`import * as lib from 'test-library'` 而不是绝对路径 —— 交给 rollup 按
+`package.json#exports` 解析，npm link / pnpm 的 realpath 布局不用适配。
+
+## 不做版本兼容
+
+schemaVersion 1 → 2 → 3，**不读旧格式**：
+
+- 老主构建读新库：`readLibraryMetaFile` 现有版本不匹配告警会响，库组件模板缺失
+- 新主构建读老库（v1，只有 listeners/properties）：`assertTemplatePayload()`
+  **直接抛错**「该库必须用当前版本工具链重新构建」
+
+这里故意抛而不降级：这个仓库已经栽过好几次「静默丢事件绑定 / 静默丢模板，
+零报错，页面白屏」。
+
+## 主构建的键：组件名，不是文件路径
+
+这是第两轮修正。上一版把注入闸门做成「包根有没有 sidecar」（
+`isMpLibraryFile`），把 emit 范围做成「`meta.entry ? [entry] : 整包」——
+**两个键粒度不一样**，同一个文件上会打架：
+
+| 文件                                 | 注入（包级）  | emit（文件级）   |
+| ------------------------------------ | ------------- | ---------------- |
+| `entry.fesm`                         | ✅            | ✅ 该 entry      |
+| 包内非 fesm 文件（worker / 工具 JS） | ✅ **也注入** | ⚠️ **emit 整包** |
+
+### 不变式
+
+**任何库里的组件都必须有清单。** 不存在「库里的组件但不用进清单」这种东西
+—— 它最终要在小程序里渲染，就得变成 wxml，就得在 `mp-library-meta.json` 里。
+
+所以「文件里有组件、清单里没有」不是合法状态，是**库构建的 bug**。
+
+### 推论：键只能是组件名
+
+```
+transform(file):
+  if (!code.includes('ɵɵdefineComponent'))  skip     廉价前置
+  if (!包根有 sidecar)                      skip     生态判定
+  names = detectComponentNames(code)                 真检测
+  if (names.length === 0)                   skip     worker / 工具 JS，零成本
+  missing = names 里清单查不到的
+  if (missing.length)                       ERROR    不变式：没清单就炸
+  emit(names)                                        精确 emit，绝不整包
+```
+
+立住的等式：**本文件检出的组件集 == 清单覆盖集 == emit 出去的集**。
+
+### 为什么不是「按 `entry.fesm` 做文件级匹配」
+
+那也是一种文件路径键。一旦某个组件不在声明的 fesm 里，它会**静默跳过**
+—— 少产 wxml、白屏、零报错。恰好是要干掉的那类失败。
+
+所以 `fesm` 不再是 load-bearing 的匹配键，降级成诊断字段（「这个 entry 的
+组件应该在哪个文件」），**也不需要改成必填**。
+
+### `isMpLibraryFile` 退回它该干的事
+
+只做生态判定：这个包归不归本工具链管（挡 `@angular/common` 那种也含
+`ɵɵdefineComponent` 的）。它**不再决定 emit 范围** —— 以前就是在这里越界，
+才导致碰一个无关文件就整包 emit。
+
+## 改动清单
+
+**库侧**
+
+| 文件                                      | 改动                                                                                                                                                                                          |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `library-meta-schema.ts`                  | `schemaVersion` → 3；component record 加 `id`/`className`/`content`/`contentTemplate`/`useComponents`/`style`（模板字段为 `${}` 插值模板串）；entry 加 `fesm`/`selfTemplate`/`scopeTemplates` |
+| `library-meta-store.ts`                   | 登记改成**合并语义**（host 绑定与模板载荷两路写入，谁都不能抹掉对方）；新增 `patchLibraryComponentMeta` / `setLibrarySelfTemplate` / `setLibraryScopeTemplate`                                |
+| `setup-component-data.service.ts`         | 从「拼 JS 文本」改成登记进 store，`run()` 原样返回 `data`                                                                                                                                     |
+| `output-template-metadata.service.ts`     | 同上                                                                                                                                                                                          |
+| `compile-source-files.ts`                 | `augmentLibraryMetadata` 改成只读采集，写出去的一律是原内容                                                                                                                                   |
+| `change-component.ts`                     | 新增 `detectComponentNames()`（只认组件不改码，给库侧用）                                                                                                                                     |
+| `const.ts` / `type.ts` / `shared/type.ts` | 删掉 `_ExtraData` / `Global_Template` 常量与 `ExportLibraryComponentMeta` / `LibraryLoaderContext` 等死类型                                                                                   |
+
+**主构建侧**
+
+| 文件                                         | 改动                                                                                                                                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vite/plugins/component-transform.plugin.ts` | 放开 node_modules：应用 `.ts` + mp 库 `.mjs`；sidecar 作生态标记；用 `changed.componentNames` 做组件闸门（不额外解析）。**没有「已注入则跳过」的幂等保护**，理由见下                        |
+| `vite/plugins/library-template.plugin.ts`    | 删掉 CSS-selector 反解 `let X_ExtraData`，改成读 sidecar；**删掉 `meta.entry ? [entry] : 整包` 退化分支**，改成 `detectComponentNames` + 按组件名定位所属 entry + 清单未覆盖则 `this.error` |
+| `library/library-meta-reader.ts`             | 新增 `isMpLibraryFile`（仅生态判定）/ `readLibraryMetaForModule`                                                                                                                            |
+
+## 相关测试
+
+| 位置                                                                     | 覆盖                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `library/library.spec.ts`                                                | **反向断言**：库 fesm 里 `angular-miniprogram` / `propertyChange` / `_ExtraData` / `Global_Template` 一个都不能有；sidecar 带 `fesm` / `selfTemplate` / `content` / `useComponents` / `style`               |
+| `library-meta-sidecar.spec.ts` →「库组件的 propertyChange 由主构建注入」 | 库 fesm 自身零 `propertyChange`；app chunk 里每个库组件恰好被注入 1 次；注入落在 `rf & 2` 块末尾、无游离调用                                                                                                |
+| `library-multiplatform.spec.ts`                                          | **一份库产物跑非 wx 平台**（zfb）：模板出 `.axml` 不出 `.wxml`、`wx:if`→`a:if`、`bind:tap`→`onTap`、样式出 `.acss`；库**不重新构建**，只换主构建平台；注入与平台无关（仍恰好 1 次）                         |
+| `library/library-meta-unit.spec.ts` →「注入与包边界加固」                | `assertLibraryTemplatePayload` 对 v1 形态抛错且点名库+版本、空组件表不误伤、空串不算载荷；`isMpLibraryFile` 包边界（无 sidecar / schema 不合法 / 找不到包根均 false）                                       |
+| `library/library-meta-unit.spec.ts` →「键的选择：组件名，不是文件路径」  | 无组件文件 `detectComponentNames` 返回空→不处理（但包级闸门仍 true，两者是两件事）；检出组件能在清单里查到；清单未覆盖时 `missing` 非空（主构建报错的依据）                                                 |
+| `library-meta-sidecar.spec.ts` →「二级出口在主构建下」                   | 二级出口组件产出自己的 wxml/wxss，内容只含它自己的模板（不串一级组件）；host 事件 `bind:tap` 从 sidecar listeners 过来；一级产物没被顶掉；`usingComponents` 同时指到一级与二级出口；二级组件被注入恰好 1 次 |
+
+### 为什么没有「已注入则跳过」的幂等保护
+
+曾经有过一个 `hasPropertyChangeInjection`，已删。两个理由：
+
+**1. 结构上重复注入到不了。** 能走到注入那一行，`isMpLibraryFile` 必须为
+true → 包根必须有 **v3** sidecar（旧版本在 `readLibraryMetaFile` 的版本检查里
+就被判 undefined）→ 而 v3 sidecar 只有当前构建器会产，当前构建器**不
+注入**。所以能到这里文件不可能已经带着注入调用。
+
+**2. 它有害，不只是多余。** 它是整文件级的正则 `return null`，而正则匹配
+整段文本 —— 注释和字符串字面量都算：
+
+```
+amp.propertyChange(view);                        → true   真注入
+// 这里调用 amp.propertyChange(view) 触发 setData  → true   注释
+const msg = "amp.propertyChange(x)";             → true   字符串
+/** 见 amp.propertyChange() */                   → true   文档注释
+```
+
+一个库 fesm 里只要有一句注释提到 `.propertyChange(`，这个文件里**所有
+组件**的注入全被静默跳过。它防的问题不存在，却能制造「整文件组件静默
+少注入、零报错」这个真问题。
+
+真出现重复注入，那是模块图 / 构建链路本身出了 bug，应该查源头，不是
+在这里把它挡掉。
+
+### 为什么 `assertLibraryTemplatePayload` 被提出来
+
+它原来闭在插件函数内部，**不跑一次真实构建就测不到**。提到
+`library-meta-schema.ts` 后，相关 describe 跑完只要 0.08 秒。「旧库必须
+炸」这条恰好是最不能靠肉眼看的，必须便宜到愿意跑。
+
+## 相关文件
+
+| 文件                                                        | 职责                                                           |
+| ----------------------------------------------------------- | -------------------------------------------------------------- |
+| `src/builder/library/library-meta-schema.ts`                | 常量 + 类型 + 宽松校验                                         |
+| `src/builder/library/library-meta-store.ts`                 | 写侧暂存区 + 落盘（全量重写，幂等）                            |
+| `src/builder/library/library-meta-reader.ts`                | 读侧：包根定位 + sidecar 查找 + mtime 缓存 + `isMpLibraryFile` |
+| `src/builder/library/library-meta-diagnostics.ts`           | 缺失 / 回退记录 + 汇总文案                                     |
+| `src/builder/library/compile-ngc.transform.ts`              | 登记主键、编译完落盘                                           |
+| `src/builder/library/compile-source-files.ts`               | 只读采集钩子（三个 service）                                   |
+| `src/builder/component-template-inject/change-component.ts` | 注入器（主构建用）+ `detectComponentNames`（库侧用）           |
+| `src/builder/vite/plugins/component-transform.plugin.ts`    | 主构建注入（app `.ts` + mp 库 `.mjs`）                         |
+| `src/builder/vite/plugins/library-template.plugin.ts`       | 读 sidecar 产 wxml / wxss / entry chunk                        |
+
+## 相关文件
+
+| 文件                                                                 | 职责                                       |
+| -------------------------------------------------------------------- | ------------------------------------------ |
+| `src/builder/library/library-meta-schema.ts`                         | 常量 + 类型 + 宽松校验                     |
+| `src/builder/library/library-meta-store.ts`                          | 写侧暂存区 + 落盘（全量重写，幂等）        |
+| `src/builder/library/library-meta-reader.ts`                         | 读侧：包根定位 + sidecar 查找 + mtime 缓存 |
+| `src/builder/library/library-meta-diagnostics.ts`                    | 缺失 / 回退记录 + 汇总文案                 |
+| `src/builder/library/compile-ngc.transform.ts`                       | 登记主键、编译完落盘                       |
+| `src/builder/library/add-declaration-metadata.service.ts`            | 只登记，**不改 d.ts**                      |
+| `src/builder/mini-program-compiler/mini-program-compiler.service.ts` | 读侧接入（只读 sidecar，无回退通道）       |
+
+## 相关测试
+
+| 位置                                            | 覆盖                                                                                                                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/builder/library/library-meta-unit.spec.ts` | 写侧 key 形态 / 幂等 / 冲突告警；读侧包边界、schema 校验、大小写兜底、mtime 缓存失效                                                                                                  |
+| `src/builder/library-meta-sidecar.spec.ts`      | 端到端：sidecar 内容正确 → wxml 生成 `bind:input` / `bind:change`；**反向对照**（wxml 事件全部可追溯到 sidecar）；**d.ts 里不再出现任何内联标记**                                     |
+| 同上 →「库元数据 demo 页」                      | 专用 demo 页 `pages/library-meta-demo`，逐字段钉住 **test-library（第二个库）** 的调用：指令 listeners/properties、组件 properties、组件+指令叠加合并、`outputPath → usingComponents` |
+
+## demo 库 fixture 的三个坑
+
+这两个都是写 demo 时踩到、已修的问题，记下来避免再犯。
+
+### 1. fixture 组件的模板不能是空的
+
+`TestLibraryComponent` 原来是 `template: \`\``，导出的
+`library/test-library/test-library-component/test-library-component.wxml` 就只剩：
+
+```html
+<import src="/library-template/TestLibrary.wxml" /><import
+  src="/library/test-library/self.wxml"
+/><block wx:if="{{hasLoad}}"></block>
+```
+
+**空 block —— 根本看不出“渲染了还是没渲染”**，拿它做验收没意义。
+现在给了带标记的真实模板：
+
+```html
+<p class="lib-test-library__body">
+  [LIB_TEST_LIBRARY_RENDERED] input1={{ input1() }}
+</p>
+```
+
+产物变成（有子节点，可断言）：
+
+```html
+<block wx:if="{{hasLoad}}"
+  ><view class="{{nodeList[0].class}}" ...>{{nodeList[1].value}}</view></block
+>
+```
+
+注意两点：
+
+- 库里的组件模板用**标准 HTML 元素**（`<p>`），用 `<view>` 会 `NG8001: 'view' is not a known element`。
+- **文本不会以字面量形式进 wxml**，而是存进 vnode、运行时由 `{{nodeList[N].value}}` 填。
+  所以“渲染标记在不在”不能靠 wxml 字面量查；可字面量验收的是 **wxss 类名**
+  （`.lib-test-library__body{color:#06c}`）和 **JS 产物里的模板文本**。
+
+### 2. input / output **不在 wxml 里**，也不在 sidecar 里
+
+实测：`<lib-test-library [input1]="x">` 生成的 wxml 与不传时**一模一样**：
+
+```html
+<lib-test-library
+  nodePath="{{nodePath}}"
+  nodeIndex="6"
+  class="..."
+  style="..."
+  property1="{{nodeList[6].property.property1}}"
+></lib-test-library>
+```
+
+没有 `input1="..."`。原因：
+
+- **wxml 只需要两类东西**：host 事件（`bind:*`）和 host 属性（`{{...property.X}}`）。
+- **input 走 vnode**：运行时由组件自己从 `nodeList[N].property.input1` 读，
+  不需要 wxml 属性。
+- **output 也走运行时**：组件 `output1.emit(v)` → 父组件回调，同样不落 wxml。
+- 而且 input/output 名**也不在 sidecar 里**（sidecar 只有 `listeners` /
+  `properties` / `outputPath`），它们仍走未迁移的 JS 通道 `_ExtraData`。
+
+所以“input 到底传没传”只能在**编译后的 JS** 里看，Angular 会把绑定名保留成
+字符串字面量：
+
+```js
+consts: [
+  [`libTestLibrary`, ``],
+  [3, `input1`],                                              // <lib-test-library [input1]>
+  [`libTestLibrary`, ``, 3, `input1`],                        // 叠加指令那个
+  [`libInputOutput`, ``, 3, `output1`, `output2`, `input1`, `input2`],
+],
+template: (t, n) => {
+  t & 2 && (
+    e.I(6), e.ht(`input1`, n.libInputValue),                  // ɵɵproperty：input 绑定
+    e.I(6), e.ht(`input1`, n.libInputValue)(`input2`, n.libInputCount),
+    ...
+  );
+}
+```
+
+spec 里对应两条断言（查 JS，不查 wxml）：值进了产物 + `input1`/`input2`/`output1`/`output2`
+绑定名作为字面量保留。
+
+> 教训：**别拿 wxml 字面量去验 input**。之前模板里写了 `input1={{ input1() }}`
+> 却没在调用侧传值，页面渲染出来就是 `input1=`，看着像坏了——其实是 demo 本身缺接线。
+
+### 3. `node_modules/test-library` 副本会过期
+
+app 侧 spec 读的是 `node_modules/test-library`，而它由
+`src/builder/library/library.spec.ts` 构建后拷入。但按文件名排序，
+`builder/library-meta-sidecar.spec.ts` 在 `builder/library/library.spec.ts`
+**之前**（`library-` < `library/`），所以单跑 `npm test` 时可能读到**上一次残留的旧副本**。
+
+本 harness 的 builder 是 app builder，跑不了 library target，无法自己重建，
+所以 `load()` 里加了**新鲜度守卫**：读不到、或 JS 里没有当前模板标记，就直接报错。
+
+宁可大声失败，也不要测着旧副本给假绿灯。
+
+顺序问题后来由 `vitest.config.mts` 的 sequencer 正面解决（见下文「文件执行顺序」），
+不再需要靠脚本先单独跑一个文件。守卫保留，它挡的是**只跑某一个 spec** 的场景。
+
+（读副本要用 devkit host + `Buffer.from(...)`：`host.root()` 是虚拟路径
+`/C/code/...`，Windows 下 Node 的 `fs` 解不了；`host.read()` 发的是 `ArrayBuffer`，
+`fileBufferToString` 对它返回的是 `"[object ArrayBuffer]"`。）
+
+## 库成员可以完全脱离 NgModule（已验证）
+
+`test-library` 里的指令和组件**全部改成 standalone**，`DirectiveModule` 已删除，
+工具链全链路正常。
+
+### `standalone` 可以不写（Angular 19+ 默认就是 `true`）
+
+本库所有成员都已**不写** `standalone`，编译产物依旧全部是 `standalone: true`：
+
+```
+TestLibraryComponent         cmp -> standalone = true     // 源码里没写
+TestLibraryDirective         dir -> standalone = true     // 源码里没写
+OtherComponent               cmp -> standalone = true
+LibComp1Component            cmp -> standalone = true
+LibDir1Directive             dir -> standalone = true
+InputOutputDirective         dir -> standalone = true
+OutsideTemplateComponent     cmp -> standalone = true
+GlobalSelfTemplateComponent  cmp -> standalone = true
+```
+
+sidecar 登记走的是 `ɵdir` / `ɵcmp` 静态成员，**不关心 `standalone` 是写的还是
+默认的**，所以两种写法对工具链等价。
+
+> 反过来说：只有 **`standalone: false`** 才会挡住直接 import（进不了 standalone
+> 组件的 `imports`，并且被模块 `declarations` 时才会报错）。想被直接引用，
+> 要么不写，要么写 `true`；写 `false` 就必须走模块。
+
+### 为什么可以
+
+sidecar 的登记逻辑是 **扫 d.ts 里的 `ɵdir` / `ɵcmp` 静态成员**
+（`add-declaration-metadata.service.ts` 里
+`createCssSelectorForTs(data).queryAll('ClassDeclaration')`），
+**不是**沿 NgModule 的 `exports` 走的。所以只要类出现在扁平化 d.ts 里
+（= 被 entry point 导出），它就会被记录，跟有没有模块包着它无关。
+
+删除 `DirectiveModule` 后，sidecar 记录**一条没少**：
+
+```
+指令: TestLibraryDirective{L:[tap,touchstart] P:[value]} | LibDir1Directive{L:[tap,bindtap] P:[]} | InputOutputDirective{L:[] P:[]}
+组件: TestLibraryComponent{L:[] P:[property1]} | OtherComponent{L:[] P:[]} | LibComp1Component{L:[tap,bindtap] P:[]} | ...
+```
+
+### 推荐写法
+
+```ts
+// 直接 import standalone 成员，不经过任何 NgModule
+import {
+  InputOutputDirective,
+  LibComp1Component,
+  TestLibraryComponent,
+  TestLibraryDirective,
+} from 'test-library';
+
+@Component({
+  standalone: true,
+  imports: [CommonModule, TestLibraryDirective, TestLibraryComponent, LibComp1Component],
+  // ...
+})
+```
+
+### 两个约定
+
+1. **standalone 成员不能进 `declarations`**（NG6008），也不能没 import 就
+   `exports`（NG6004）。若要保留模块做兼容，只能 `imports` + `exports` 转发：
+
+   ```ts
+   @NgModule({
+     imports: [TestLibraryComponent, TestLibraryDirective],
+     exports: [TestLibraryComponent, TestLibraryDirective],
+   })
+   export class TestLibraryModule {}
+   ```
+
+2. **standalone 组件不从模块继承作用域**，模板里用到的东西必须自己 `imports`。
+   例如 `GlobalSelfTemplateComponent` 的模板用了 `app-outside-template` / `app-other`，
+   就得在组件上写 `imports: [OutsideTemplateComponent, OtherComponent]`，
+   写在模块里没用。
+
+---
+
+# 构建器改用 vite 出码，测试改用 vitest（旧 jasmine / tsc 链路已删除）
+
+## 一句话
+
+`build:builder` / `build:karma` 的 JS 产物从 `tsc` 换成 vite（`script/vite-build.ts`），
+`npm test` 从 jasmine 换成 vitest，**旧的 jasmine 运行器、ts-node 编译、nyc 覆盖率
+整套已删除**，不留并行路径。
+
+产物文件集与 spec 数量都做了逐项比对：
+**106/106 模块导出签名一致，843/843 spec 全绿**。
+
+## 删掉了什么
+
+| 删除                                                      | 原因                                                                                         |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `script/startup-jasmine.ts` / `.js`                       | jasmine 运行器本体（ts-node 注册 + `Module._resolveFilename` 钩子 + wx 全局替身 + 耗时统计） |
+| `jasmine.json`                                            | jasmine 的 spec 清单与顺序                                                                   |
+| `script/tsconfig.startup-jasmine.json`                    | 只为编译 startup-jasmine 而存在                                                              |
+| `.nycrc.json` + `nyc` 依赖                                | 覆盖率改由 `@vitest/coverage-v8` 出                                                          |
+| `test/cyia-ngx-devkit` 里的 `createFailureExpectation`    | 依赖 jasmine 未公开的 `expector.addFilter`，改成文件不存在时直接带上下文抛                   |
+| `describeBuilder` 里的 `jasmine.DEFAULT_TIMEOUT_INTERVAL` | 超时改由 `vitest.config.mts` 的 `testTimeout` / `hookTimeout` 独占                           |
+| 依赖 `jasmine`、`ts-node`、`nyc`                          | 只服务于旧链路                                                                               |
+
+**保留的 jasmine**（属于产品表面，不是旧测试链路）：
+
+- `src/builder/karma/**` —— karma builder 对外暴露的就是 jasmine 接口，
+  用户在小程序运行时里写的 spec 用的是 jasmine。
+  所以 `@types/jasmine` 与 `jasmine-core` 必须留着
+  （`test/hello-world-app/src/test.ts` 用 `jasmine-core` 在 wx 侧起 env）。
+- `test/hello-world-app/src/spec/**` —— karma builder 的 fixture spec。
+
+## 构建侧
+
+| 脚本            | 现在                                                              |
+| --------------- | ----------------------------------------------------------------- |
+| `build:builder` | `typecheck:builder`（`tsc --noEmit`）+ `tsx script/vite-build.ts` |
+| `build:karma`   | 两个 karma tsconfig 改成 `--emitDeclarationOnly`，只出 `.d.ts`    |
+| `typecheck`     | `typecheck:builder` + `typecheck:spec`                            |
+
+`script/vite-build.ts` 一次产出三棵树：
+
+| 目标           | 源                                                                | 产物                |
+| -------------- | ----------------------------------------------------------------- | ------------------- |
+| `builder`      | `src/builder`（排除 `karma/client`、`karma/plugin`）              | `dist/builder`      |
+| `karma-plugin` | `src/builder/karma`，入口 `plugin/index` + `vite/karma-framework` | `dist/karma`        |
+| `karma-client` | `src/builder/karma/client`                                        | `dist/karma/client` |
+
+### 必须 `preserveModules`，不能打包
+
+不是审美问题，是三处硬约束：
+
+1. `builders.json` 的 implementation 是 `./vite` / `./library/builder` / `./karma/vite`，
+   Angular CLI **按文件路径**加载 builder；
+2. 7 个 platform 实现里都有 `path.resolve(__dirname, '../template/app-template.js')`
+   这类「按相对路径取自己的产物」；
+3. `package.json#exports` 的 `./karma/plugin` 指到具体文件。
+
+所以产物目录必须与源码一比一。验证方式：把 tsc 产物和 vite 产物逐文件
+`require` 后比对 `Object.keys()`，**106/106 完全一致**（vite 只多一个
+`_virtual/_rolldown/runtime.js` 辅助模块）。
+
+### 类型检查不能跟着一起换掉
+
+vite 走 oxc/esbuild，**只转译不检查**。原先 `tsconfig.builder.json` 里
+`noEmitOnError: true` 提供的「类型不过就不落盘」保证会消失，
+所以 `build:builder` 显式串了一条 `tsc --noEmit` 在前面。
+
+顺带把 spec 侧的类型检查也补上了（`typecheck:spec`）。
+**旧链路里它从来不存在** —— ts-node 是逐文件转译、不做全量检查，
+`tsconfig.spec.json` 只被 ts-node 和 eslint 用。换成 vitest 后
+把它接进 `npm run typecheck`，并修掉了此前无人发现的 424 个类型错误
+（大头是 `withContext` / `toBeTrue` / `spy.calls` 这些没声明的测试全局）。
+
+### vite 出不了 `.d.ts`
+
+`package.json#exports` 的 `./karma/plugin` 带 `types` 字段，
+所以 `build:karma` 保留，但降级成 `--emitDeclarationOnly`。
+
+### 为什么 `src/library` 不换
+
+库走 ng-packagr：Angular 的 AOT 编译、扁平 d.ts、`package.json` 生成、
+partial-Ivy 都是它做的，vite 没有等价物（`@analogjs/vite-plugin-angular`
+是应用侧插件，不做库打包）。**这条不换，也不该换。**
+
+## 测试侧
+
+`npm test` = `vitest run`。配置 `vitest.config.mts`，
+环境准备 `test/vitest-setup.ts`（**只装小程序全局，60 行**）。
+75 个 spec 文件、843 个 spec。
+
+**没有任何断言 / spy 兼容层**，spec 全部用 vitest 原生 API。
+早期版本曾在 `setupFiles` 里挂一层 jasmine 兼容 shim 换取「零改写」，
+那等于把旧写法永久固化进新仓库，已整体改写掉，见下。
+
+### 必须补的两层兼容
+
+#### 1. 小程序全局
+
+`platform-core.ts` 里 `MINIPROGRAM_GLOBAL = wx` 在**模块求值时**读全局，
+所以 `wx` / `App` / `Page` / `Component` / `getApp` / `getCurrentPages`
+的替身必须放 `setupFiles`，不能放 spec 里。
+
+#### 2. 包自引用
+
+`src/library` 里几十处 `import 'angular-miniprogram/platform/wx'`。
+旧链路靠 `Module._resolveFilename` 钩子，vite 有自己的解析器、钩子不生效，
+只能在 `resolve.alias` 再声明一遍。**长 key 必须排在短 key 前**，
+否则 `angular-miniprogram/platform` 会先把 `/platform/wx` 吃掉。
+
+#### 3. `@angular/core` 的 `const enum`（**这条是真发现**）
+
+`NotificationSource` 在 Angular 里是 `declare const enum`：
+tsc 编译时把 `NotificationSource.Listener` 直接内联成 `5`，
+产物里**根本没有这个导出**。oxc/esbuild **不做跨文件 const enum 内联**，于是
+
+```
+TypeError: Cannot read properties of undefined (reading 'Listener')
+```
+
+一处炸在 `MpApiService.runInAngular` / `MpEventBus.runInAngular` 的 `finally`，
+连带 85 个 spec 失败。
+
+库产物本身走 ng-packagr（tsc），线上没这个问题。但
+**任何用 esbuild / vite 直接吃源码的消费方都会踩**，值得记住。
+
+测试侧用一个 vite 插件把 `@angular/core` 转发到
+`export * from '@angular/core'` + 手工补的 `ɵNotificationSource` 常量。
+
+#### 4. ESM-only 的 `@angular/compiler` / `@angular/compiler-cli`
+
+两个包都只有 ESM（`exports` 里只有一个 `default` → `.mjs`），builder 产物是 CJS。
+早期有个 `src/builder/util/load_esm.ts`，抄的是 Angular 官方的 `loadEsmModule`：
+`new Function('modulePath', 'return import(modulePath)')`，包一层是为了躲打包器的
+静态分析。**这个文件已经删了**，中间层没了，谁用谁哪里拿：
+
+- `@angular/compiler`：谁用谁在文件顶部静态 `import`（CJS 产物里就是 require）。
+  用到的只有 `wxs/wxs-rewrite.ts` 和
+  `mini-program-compiler/mini-program-compiler.service.ts`。
+- `@angular/compiler-cli`：只有 `shared/mini-program-application-analysis.service.ts`
+  的 `initTscProgram` 用得到，就在那一行 `await import('@angular/compiler-cli')`，
+  保持 lazy。
+
+`@angular/compiler` 不能写成 `import()`：`parse-node/element.ts` 顶层就 require 它，
+而 Node 的 require(esm) 处理不了“同一个模块已被 `import()` 起载、但还没
+link/evaluate”这个状态（`internal/modules/esm/loader.js:341` 直接 `assert.fail`，
+即 `Unexpected module status 0`）。条件三条，缺一不可：同一个 URL +
+`import()` 先起且未 settle + 同一拍里 require。跟文件多大、有没有循环无关，
+零依赖的一行 `.mjs` 一样炸。
+
+测试侧以前还得给它单独配
+`server.deps.external: [/util[\/]load_esm[.]ts$/]`（`new Function` 那层壳 vite
+看不见，落在 `vm.runInThisContext` 里 `import()` 会抛
+`ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING`）。现在源码里没有壳了，那条配置也删了。
+
+### spec 从 jasmine 写法改成 vitest 原生写法
+
+兼容 shim 看着省事，实际是把 jasmine 的 API 形状（`.and.callFake`、
+`.calls.mostRecent()`、`expectAsync`）当成长期契约背下来，
+后来人读 spec 还得先懂 jasmine。所以全部改成了原生写法：
+
+| 旧写法                                           | 新写法                                                |
+| ------------------------------------------------ | ----------------------------------------------------- |
+| `expect(x).toBeTrue()` / `.toBeFalse()`          | `toBe(true)` / `toBe(false)`                          |
+| `expect(fn).toThrowError(re)`                    | `toThrow(re)`                                         |
+| `expect(x).withContext(msg).m(...)`              | `expect(x, msg).m(...)`                               |
+| `spyOn(o,k).and.callFake(f)`                     | `vi.spyOn(o,k).mockImplementation(f)`                 |
+| `.and.returnValue(v)` / `.and.stub()`            | `.mockReturnValue(v)` / `.mockReturnValue(undefined)` |
+| `spy.calls.mostRecent().args`                    | `spy.mock.calls.at(-1)`                               |
+| `spy.calls.count()` / `.length` / `.any()`       | `spy.mock.calls.length`（`.any()` 用 `> 0`）          |
+| `jasmine.createSpy('x')`                         | `vi.fn()`                                             |
+| `expectAsync(p).toBeResolved()`                  | `await expect(p).resolves.toBeDefined()`              |
+| `.toBeResolvedTo(v)` / `.toBeRejectedWith(v)`    | `.resolves.toEqual(v)` / `.rejects.toEqual(v)`        |
+| `.toBeRejected()` / `.toBeRejectedWithError(re)` | `.rejects.toBeDefined()` / `.rejects.toThrow(re)`     |
+| `jasmine.arrayWithExactContents([...])`          | 两边 `.sort()` 后 `toEqual`（顺序无关的集合比较）     |
+
+两个坑：
+
+- `expect(x, msg)` 是 vitest 的上下文消息位置，**不是** chai 的 `withContext`。
+  后者运行时确实存在（chai 带的），但类型上没有，补声明不如直接换掉。
+- `toBeResolved()` 换 `.resolves.toBeDefined()` 而不是 `.resolves.not.toThrow()`：
+  后者对「resolve 一个非函数值」语义含糊，`toBeDefined` 直白。
+
+改写用了一次性 codemod（括号配对扫描，不是纯正则），
+但 codemod 会咬人，两处值得记一笔：
+
+- **不幂等**：`.calls.length → .mock.calls.length` 跑第二遍会变成
+  `.mock.mock.calls.length`。codemod 要么只跑一遍，要么先加幂等保护。
+- **`.calls` 不一定是 spy**：`path-based-setdata.spec.ts` 里的
+  `mp = { setData(d){ calls.push(d) }, calls }` 是手写 stub，
+  它的 `.calls` 是普通数组，被误改成 `.mock.calls` 后 typecheck 才抓出来。
+  **有 typecheck 兜底才敢这么改。**
+
+### 执行模型
+
+`pool: 'forks'` + **`maxWorkers: 1`（串行）** + `isolate: false` +
+`sequence.concurrent: false`。
+
+钉串行是因为 **spec 之间存在跨文件的进程级依赖**：`@angular/core` 被 vitest
+外部化，一个 worker 里只有一份，而 Ivy 的 `TView` 状态（指令匹配、
+`TNode.localNames` 等）是跨文件累加的。实测：`--sequence.shuffle` 下会随机碎
+`src/library/platform/template-name-coverage.spec.ts`（断言 `__templateName`
+推不出米源，`TNode.localNames` 为 `null`），而**强制 `maxWorkers: 1` + 洗牌
+同样会碎** —— 即这是文件顺序依赖，不是并发竞态；`isolate: true` 也挡不住
+（被外部化的 `@angular/core` 不受 isolate 控制）。
+
+默认顺序（`OrderedSequencer`，按文件路径）下全绿，所以先钉串行。
+`MP_TEST_MAX_WORKERS=N` 这个旋钮留着，但上面那个顺序依赖修好之前不要开。
+
+已经确定并修掉的一个跨文件依赖：`@angular/compiler` 必须早于任何用 TestBed 的
+spec 加载，见文末「`@angular/compiler` 从哪来」。
+
+sandbox 本身是隔离的：`TestProjectHost.initialize()` 每次用
+`claimUniqueSandboxRoot()` 以 `mkdir` 原子地占一个独立目录
+（`test/test-project-host-hello-world-app-<pid>-<序号>/`）。
+
+### 并发安全清单
+
+下面是「worker 之间有没有共享可写状态」的逐项审计结果。文件系统的部分都是
+干净的（下面这些结论仍然成立）；卡住并发的是上面说的 `@angular/core` 跨文件
+状态，不是文件/端口/环境变量那一类。
+
+| 共享的东西                                                         | 为什么（不）冲突                                                                                                                                                                             |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| sandbox 目录                                                       | 每次 `initialize()` 一个独立目录，天然隔离。但「名字怎么保证不重名」有讲究，见下                                                                                                             |
+| 模板目录 `test/hello-world-app`                                    | 只读。唯一的写者（library.spec 拷库产物）已挪进 globalSetup，跑在 worker 起来之前                                                                                                            |
+| spec 里的裸 `fs` 写                                                | 只有 `sandbox-copy.spec.ts` / `library-meta-unit.spec.ts`，两者都写 `mkdtemp(os.tmpdir())`，各自独立                                                                                         |
+| 端口 / 网络                                                        | 没有。`test:wechat` 才占 17900，走的是另一套 config                                                                                                                                          |
+| `process.cwd()`                                                    | 没有 spec 依赖它，也没有 `process.chdir`                                                                                                                                                     |
+| 模块级注册表（`manifest-registry`、library meta store、wxs 缓存…） | `isolate: false` 下同 worker 共享 —— 但**串行时是 74 个文件挤在一个 worker 里**，拆成 6 个 worker 只会共享得更少，不会更多。worker 内仍靠 `sequence.concurrent: false` 保证一次只跑一个 spec |
+| `test/.shared-build`                                               | 唯一真正需要设计的地方，见「构建去重」一节                                                                                                                                                   |
+
+#### 占坑：名字构造唯一，创建用原子操作
+
+上游 `findUniqueFolderPath()` 只做「exists 检查 → 返回路径」，**中间不创立**，
+目录是后面 `cpSync` 顺手建的 —— 两个 worker 双双通过检查就会共用一份 sandbox。
+它靠 `Math.random().toString(36).slice(2)` 碰唯一性（上游注释写着 "11 character
+alphanumeric string"，实测长度 7~14 不等），那是概率，不是保证。
+
+`FastTestProjectHost` 里换成 `claimUniqueSandboxRoot()`，名字
+`test-project-host-<模板名>-<pid>-<序号>`，两段各自堵死一种撞法：
+
+| 可能来抢的         | 为什么抢不到                        |
+| ------------------ | ----------------------------------- |
+| 别的进程 / worker  | 同一台机器上活着的进程 PID 互不相同 |
+| 本进程别的 harness | 序号单调递增，发出去的名字不回收    |
+
+两条都成立，`mkdirSync` 必然一次成功 —— **没有重试，也没有随机数**。真抛
+`EEXIST`（PID 被回收后撞上上轮崩溃留下的同名目录）就让它响，静默换个名字
+只会把问题埋掉。计数器挂在 `globalThis` 而不是模块变量：同一进程里这个模块
+可能被实例化两份，那样两个计数器会同时从 0 开始而 `pid` 又相同。
+
+占坑用 `mkdirSync`（不带 `recursive`）：目录已存在会 `EEXIST` 而不是静默通过，
+`mkdir(2)` 本身原子 —— 拿内核占坑，不需要锁文件，进程崩了也不留待回收的状态。
+锁文件自己也得靠 `O_CREAT|O_EXCL` 或 `mkdir` 才有效，还得额外处理 stale lock。
+同理，`test/.shared-build` 的发布用的是 `<key>.tmp-<pid>` + `rename`，也是原子
+占坑，不是锁。
+
+并发度参考（那个顺序依赖修好后才能用）：本机 16 核实测 2 个 38s / 4 个 29s /
+6 个 25s / 8 个 27s，6 个就到顶。内存每个 worker 一次真实 AOT 约 1.5~2GB
+（6 个并发峰值约 14GB，4 个约 9.5GB）。
+
+`isolate: false` 照旧：同一个 worker 里多个 spec 共用模块图，
+`manifest-registry` 这类模块级注册表才不会串台。
+
+`testTimeout` / `hookTimeout` 给到 60s —— builder 类 spec 会真的跑一遍小程序
+全量构建，但**必须有界**：以前写的 500s（8 分钟）等于没有上限，真卡住就是零
+反馈干等，而不是报超时。
+
+### 库产物前置（globalSetup）
+
+`library-meta-sidecar.spec.ts` / `library-multiplatform.spec.ts` 构建 app 时
+要消费 `node_modules/test-library`。这份产物以前由
+`library/library.spec.ts` 构建完顺手拷进模板目录，于是三个文件之间有了隐式
+先后依赖：按文件名排序 `library-` < `library/`（`-` 是 0x2D，`/` 是 0x2F），
+**默认顺序下读到的是上一轮残留的旧副本 —— 假绿灯**。
+
+现在由 `test/global-setup.ts` 在 builder 的 worker 起跑前统一产出，文件之间
+不再有先后依赖，`RUN_FIRST` 因此是空的（`OrderedSequencer` 留着，以后确实需要
+打头文件时往里加一行即可）。
+
+`globalSetup` 挂在 `BUILDER_PROJECT` 上而不是根配置：读这份副本的全在
+`src/builder/` 下，library 那边纯内存，不该为它白跑一次构建（实测
+`vitest run --project library` 单文件 7.7s → 1.8s）。
+
+**globalSetup 走的是出厂的那个 builder，不是底层 ng-packagr。** 它调
+`execute()`（`builders.json` 里 `library` 指向的实现），产物落在
+`test/hello-world-app/dist/test-library`，再拷一份进 `node_modules/test-library`。
+于是 `library.spec.ts` **不再自己构建**，直接断言这份制品 —— 同一件事不用花两遍
+2s。harness 本来也是直接调 `execute`（`BuilderHarness` 里
+`this.builderHandler(data, context)`，并没有经过 `createBuilder`），所以这条
+路径就是原来的被测路径本身，覆盖没降级。
+
+代价是 harness 顺带的两样东西没了，得显式补：
+
+- **options schema 校验**。以前 `executeOnce()` 走 architect 的
+  `CoreSchemaRegistry`。现在 `library.spec.ts` 里单开一组用例直接校验，
+  而且读的是**出厂那份** `src/builder/library/schema.json` —— 以前 harness
+  校验的是 `test/test-builder/schema.library.json` 手抄副本，迟早和出厂的对不上。
+  副本和 `LIBRARY_BUILDER_INFO` 已一并删掉。
+- **`cli.cache` 的 context**。globalSetup 的 stub context 显式给了
+  `cli.cache.enabled: false`，与 harness 的 `DEFAULT_PROJECT_METADATA` 对齐，
+  否则 ng-packagr 会往模板目录写 `.angular/cache`（既没被 gitignore，
+  又把上一轮编译缓存留给下一次运行）。
+
+构建失败在 globalSetup 里直接抛，带 ng-packagr 的原始错误（实测
+`ENOENT ... NOPE.json` 会整条打出来）—— 夹具都没出来，跑下去全是连带失败。
+
+两个消费 spec 里保留的「副本新鲜度」守卫仍然有意义 —— 它挡的是模板目录里那份
+副本压根没生成 / 已过期的情况。
+
+构建参数与落点集中在 `test/library-fixture.ts`，globalSetup 与 spec 共用一份，
+不在两处各写一遍。
+
+### 构建去重（shared-build）
+
+一次全量构建 ≈ 2s，其中约一半是 Angular AOT（analog 插件在 `buildStart`
+里整包重编），跟断言内容无关。而一批 spec 用的是同一份 fixture + 同一份构建
+参数，只是各看产物的一个侧面，于是同一件事被构建了七八遍。
+
+`test/util/shared-build.ts` 的 `executeOnceShared()` 按「构建参数（不含
+`outputPath`）+ sandbox 文件树内容」做记忆化：命中就把上次产物拷进当前
+sandbox，不重跑构建。
+
+两条边界值得记住：
+
+- **只在进程内**。键覆盖不了「构建器自己的源码变了」；一旦落盘跨运行复用，
+  改了 `src/builder/**` 命中的还是旧产物，是典型的假绿灯。
+- **依赖构建的进程内副作用的 spec 不能用**。命中缓存就不跑构建，
+  `manifest-registry` / library meta 那些模块级注册表会是空的。
+  `node-index-equivalence.spec.ts` 的按组件精确比对就是这一类，
+  它靠文件内的 `loadSharedArtifacts()` 只构建一次。
+- **发布必须原子**。缓存表是进程内的，两个 worker 会同时算出同一个 key 并
+  各自往 `CACHE_ROOT/<key>` 里 `cpSync`，互相删对方刚建的目录 ——
+  `fs.cpSync` 会直接 `terminate`（`std::filesystem_error: cannot create
+directory`）把整个 worker 带卡，coverage 跑时实测到过。现在先写
+  `<key>.tmp-<pid>` 再 `rename` 发布，缓存根目录的清理也从 worker 挪到了
+  globalSetup（worker 里 `rmSync` 会删掉别人正在读写的那份）。
+
+### 覆盖率
+
+`npm run coverage` = `vitest run --coverage`（`@vitest/coverage-v8`）。
+`reportsDirectory` 指到 `docs/coverage`，因为
+`script/coverage-badge.ts` 读的是 `docs/coverage/coverage-summary.json` 的
+`total.lines.pct`，v8 的 `json-summary` reporter 形状正好对得上。
+
+### 耗时
+
+|                                     | 时长     | spec |
+| ----------------------------------- | -------- | ---- |
+| 旧（jasmine + ts-node）             | ~88s     | 843  |
+| vitest（串行，去重前）              | ~101s    | 883  |
+| **vitest（串行 + 构建去重，当前）** | **~67s** | 883  |
+| vitest（并发 + 构建去重）           | ~25s     | 883  |
+
+串行那一档省下的 34s 全来自「少构建」：十家平台的全量冒烟收敛成 wx + zfb
+（平台差异由 `platform-registry.spec.ts` 逐字覆盖）、同参数构建合并 / 去重、
+test-library 只构建一次、删掉与 `vite/watch.spec.ts` 重复的
+`builder.watch.spec.ts`。价值不只在速度：不再全量 ts-node 编译，还有标准的
+reporter / watch / UI 生态。
+
+并发那一档能再拿掉 40s，但因为上面说的跨文件顺序依赖没修，**当前不开**。
+
+### `@angular/compiler` 从哪来
+
+`@angular/common/http` 的 `_xhr-chunk.mjs` 里 `BrowserXhr` 带的是**部分编译**
+（partial）的 `ɵɵngDeclareFactory`，静态初始化时要么已被 Angular Linker 处理过，
+要么进程里已加载 `@angular/compiler`，否则直接抛：
+
+```
+The service 'BrowserXhr' needs to be compiled using the JIT compiler,
+but '@angular/compiler' is not available.
+```
+
+以前能跑过，靠的是 `src/builder/wxs/*.spec.ts` 顺手
+`import { parseTemplate } from '@angular/compiler'`，而 `builder` 按字母序排在
+`library` 前面 —— 文件顺序巧合，不是设计：单跑
+`src/library/platform/application.spec.ts` 就是失败的。
+
+**现在走的是 linker 那条路，不是把 `@angular/compiler` 拉进进程。** `library`
+project 挂了 `angularPartialIocLinker()` + `server.deps.inline: [/@angular\//]`，
+`@angular/common` 被内联后插件才轮得到它，partial 标记在加载时就链成了完整的
+`ɵɵdefineInjectable`，与真实应用构建一致（`jit: false`）。
+
+所以 `test/vitest-setup.ts` 里**不**应该再 `import '@angular/compiler'`：
+
+- `setupFiles` 是根配置，builder project 也得跟着加载这个几 MB 的包，而它
+  根本用不上；
+- 更要紧的是，进程里一旦有 JIT 编译器，linker 插件碎了就没人发现 —— 拿
+  兼容层把真问题盖住。
+
+验证方法：`npx vitest run --project library src/library/platform/application.spec.ts`
+单独跑一遗，不报 `BrowserXhr` 就是 linker 在干活。
+
+## 相关测试
+
+本轮没有新增 spec —— 换的是跑测试的机器，不是测试内容。
+等价性靠几条外部验证：
+
+| 验证                                             | 结果                      |
+| ------------------------------------------------ | ------------------------- |
+| tsc 产物 vs vite 产物逐模块 `Object.keys()` 比对 | 106/106 一致              |
+| `npm run build` 全量                             | 通过                      |
+| `npm run typecheck`（builder + spec）            | 0 error                   |
+| `npm test`（vitest）                             | 75 files / 843 specs 全绿 |
+
+---
+
+# 用 vitest 取代 karma 跑小程序运行时测试
+
+`npm test` 跑的是 **Node 侧**的测试（本仓库自己的逻辑）。
+小程序**运行时里**的测试原来是 karma 链路，现在 `npm run test:wechat`
+已经是 vitest 链路；karma 降级为 `npm run test:karma`，留着当参照，
+两条路方向相反（vitest 是设备主动连出，karma 是反向控制开发者工具）。
+
+代码在 `src/builder/vitest/`：
+
+```
+protocol.ts          宿主 ↔ 小程序的线协议
+node/                跑在 vitest 进程里（pool / WS 服务 / 选项）
+runtime/             跑在小程序运行时里（worker / runner / 传输 / 注册表）
+vite/                builder：把 spec 编进小程序产物
+```
+
+## 为什么不是 browser provider
+
+文档上「自定义环境」看起来该用 `test.browser.provider`，但那条路走不通：
+
+browser 模式下 provider 只负责 `openPage(url)`，**模块图是浏览器自己走的** ——
+被测试文件由页面 `<script type="module">` 从 Vite dev server 逐个拉。
+小程序运行时不执行远程 ES 模块，spec 必须事先全部编进包。
+
+所以走**自定义 pool**（`project.config.poolRunner`）：
+宿主照常跑 vitest，只是「执行一个文件」变成往 WebSocket 发一条 `WorkerRequest`。
+`@nativescript/unit-test-runner` 面对的是同一个约束（设备上没有 dev server），
+选的是同一条路。
+
+## 通信怎么接上的
+
+vitest 宿主 ↔ worker 本来就是一套与传输无关的协议：
+
+- 下行 `WorkerRequest`（`start` / `run` / `collect` / `cancel` / `stop`）
+- 上行 `WorkerResponse`（`started` / `testfileFinished` / `stopped`）
+- 中间再套一层 birpc 做双向 RPC（`onTaskUpdate` / `onQueued` / `onCollected`…）
+
+只要把这三样搬到 WebSocket 上，reporter 完全不知道对端是小程序。
+信封是 `{kind, frame}`，`frame` 用 **flatted** 序列化 ——
+task 结果里带循环引用（Error.cause、context），`JSON.stringify` 直接炸。
+
+**只有一条连接、一个 worker，所以并发恒为 1。**小程序一个 appservice 进程就一个
+常驻运行环境，`session.onConnection` 还是「新连接顶掉旧连接」，因此协议里没有
+分流编号这种东西（v1 曾有个 `slot`，永远恒 0，除了误导 `slots > 1` 以外毫无作用，
+v2 删了）。真并发得是多台设备各连一条 socket，那条路现在没接。
+
+设备端要点：
+
+- `vitest` 根入口和 `vitest/browser` **都不含 Node 内建模块**（实测扫过传递依赖），
+  所以能直接打进小程序包，不需要像参考实现那样手搓一个 `expect`。
+  `startTests` / `collectTests` / `setupCommonEnv` 都从 `vitest/browser` 拿。
+- `WorkerGlobalState` 得自己拼（vitest 没导出工厂），
+  照 `chunks/init.*.js` 里 `execute()` 的字段清单来。
+- runner 的 `importFile` 是唯一实质差别：Node 走 module runner 拉模块，
+  小程序只能查编译期就编进包的注册表（按路径后缀匹配宿主给的绝对路径）。
+
+## 三个必须同源的端口/常量
+
+`MP_VITEST_PORT` / `MP_VITEST_HOST` 由 builder 的 `define` 编进产物，
+宿主 WS 监听同一个值。**两处各写一个端口是这类桥最常见的死法**：
+产物去连 A、宿主在 B，表现是永远连不上。
+所以端口只在 `resolveMiniProgramVitestPluginOptions()` 解析一次。
+
+## 用法（三步，两个进程）
+
+```bash
+# 1. 把 spec 编进小程序产物
+ng build <project> --configuration test
+
+# 2. 微信开发者工具打开产物目录
+
+# 3. 起 vitest，它会开 WS 等小程序连上
+npx vitest run
+```
+
+```ts
+// vitest.config.mts
+import { defineConfig } from 'vitest/config';
+import { miniProgramVitest } from 'angular-miniprogram/vitest';
+
+export default defineConfig({
+  plugins: [miniProgramVitest({ port: 17900 })],
+});
+```
+
+builder **只编译不跑测试**，这是和 karma builder 的关键差别：
+karma server 可以开在 builder 里，vitest 的 WS 必须开在 **vitest 进程**里（pool 在那儿）。
+
+## 顺手抽出共用的插件栈
+
+测试构建的插件顺序是硬约束（platformFileResolve → assets → wxsStrip →
+analog → libraryTemplate → componentTransform → specModules），
+所以抽到 `shared/mini-program-test-stack.ts`，只交两组数组
+（`preAnalogPlugins` / `postAnalogPlugins`）而不是一个数组加一个下标——
+analog 得插在中间，用 `slice(0, N)` 的话加个插件就得同步改下标，迟早改漏。
+
+## 状态
+
+**已验证**：typecheck / lint / build 全通，`npm test` 843 specs 未受影响
+（karma 切共用栈后重跑过）。
+**未验证**：真机 / 开发者工具里的端到端 —— 沙箱里没有微信开发者工具。
+`WorkerGlobalState` 的字段是照 vitest 5.0.3 的 `init` chunk 拼的，
+升级 vitest 时这块最容易漂。
+
+---
+
+# 抹除 karma：小程序运行时测试只剩 vitest 一条路
+
+karma 链路此前一直保留作参照，但「保留参照」实际变成了「两条并行、
+`test:wechat` 还是 karma」——和「用 vitest 替换 karma」的初衷相反。
+这次把 karma 整个拿掉，只留 vitest。
+
+## 删掉的东西
+
+| 删除                                                         | 说明                                              |
+| ------------------------------------------------------------ | ------------------------------------------------- |
+| `src/builder/karma/**`                                       | builder / launcher / client / jasmine-define 全链 |
+| `script/wechat-karma.cjs`                                    | 971 行的 karma 启动器                             |
+| `test/hello-world-app/karma.conf.js`                         | 含挂在 karma server 上的 fixture 中间件           |
+| `angular.json` 的 `test`（karma）目标                        | 由 vitest 目标顶替，仍叫 `test`                   |
+| `builders.json` 的 `karma` 条目                              | 只剩 application / library / vitest               |
+| `karma` / `@types/karma` / `jasmine-core` / `@types/jasmine` | 依赖                                              |
+| `weapp.socket.io`                                            | karma 客户端的传输层，没别人用                    |
+| `exports` 的 `./karma/client`、`./karma/plugin`              | 只剩 `./vitest`、`./vitest/runtime`               |
+
+## 搬走而不是删掉的两个模块
+
+`vitest/vite/index.ts` 还在用它们，先搬到 `src/builder/shared/`：
+
+- `derived-tsconfig.ts`
+- `spec-discovery.ts`
+
+搬完记得改相对路径——`../../util/asset-path` 这类是从旧目录深度算出来的。
+
+## fixture 服务换了东家
+
+http spec 要真 `wx.request`，所以必须有真 HTTP 端点。原来那个中间件挂在
+karma server 上；现在由 `src/builder/vitest/node/fixture-server.ts` 出，
+**和 WS 共用同一个端口**（upgrade 走 WS，普通请求走 fixture）。
+
+端口仍然只有一个来源：`MP_VITEST_PORT`。spec 侧的 `fixture-url.ts`
+从 `KARMA_HOST/KARMA_PORT` 改成 `MP_VITEST_HOST/MP_VITEST_PORT`。
+
+分两个端口是以前踩过的坑（两头各写一个 9899，改一处必须改另一处），
+共用端口从结构上消掉了这类错。
+
+## 运行时 spec 改用 vitest 原生 API
+
+`test/hello-world-app/src/spec/**` 原来跑在 jasmine 下，现在设备端是
+vitest（`setupCommonEnv` 装全局），所以：
+
+- `it('run', (done) => ...)` → `it('run', () => componentTestComplete(...))`。
+  **vitest 不支持 `done` 回调**，返回 promise 即可。
+- `jasmine.DEFAULT_TIMEOUT_INTERVAL` → per-test 的第三个参数。
+  vitest 没有那种全局开关。
+- `tsconfig.spec.json` 的 `types: ["jasmine"]` → `["vitest/globals"]`。
+
+## 设备侧必须是 CJS
+
+微信小程序只能执行 CJS，这条约束下产物形态是：
+
+- `dist/vitest/runtime`（设备端）：cjs
+- `dist/vitest/plugin`（宿主端 vite 插件）：**esm**，因为被
+  `vitest.config.mts` 以 ESM 命名导入引用，且 `dist/package.json`
+  没有 `type: module`，所以必须 `.mjs`
+- spec 加载走构建期注入的懒 require 表（`vite/plugins/spec-modules.plugin.ts`），
+  **不走** `vite/module-runner` 的动态 `import()`——那条路小程序里跑不了
+
+`BuildTarget` 因此多了 `format` 字段。
+
+## eslint 7 → 10：eslintrc 换成 flat config
+
+eslint 7 只吃 `.eslintrc.json`，v10 里那条路已经彻底拆掉，所以配置整体
+搬进 `eslint.config.mjs`，`.eslintrc.json` / `.eslintignore` 删除，
+ignore 列表并进 config 的 `ignores`。
+
+依赖侧的对应关系：
+
+| 旧                                            | 新                                  | 备注                                                                             |
+| --------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------- |
+| `eslint@7`                                    | `eslint@10`                         |                                                                                  |
+| `@typescript-eslint/{parser,eslint-plugin}@5` | `typescript-eslint@8`（含上面两个） | v5 的 `recommended-requiring-type-checking` = v8 的 `recommendedTypeChecked`     |
+| `eslint-plugin-import`                        | `eslint-plugin-import-x`            | 前者 peer 只到 eslint 9；import-x 自带 TS 解析，规则名 `import/*` → `import-x/*` |
+| `env: {node, es6}`                            | `globals` + `@eslint/js`            | flat config 没有 `env`                                                           |
+
+`parserOptions.project` 按文件集分三份（spec / builder / library），
+和原来 overrides 一一对应；根 `tsconfig.json` 兜底，落在三份之外的文件
+会直接报「not found in project」而不是静默丢掉类型信息。
+
+代码侧被新版本揪出来的问题，**一律只改类型，不改行为**；确实无法用类型消掉的，
+保留原代码 + 行内 disable：
+
+- 一堆**已经失效的 `eslint-disable`**（文件顶上的 `no-explicit-any` 之类，
+  文件里早就不用 `any` 了）。v9 起 `reportUnusedDisableDirectives` 默认开，
+  `--fix` 直接清掉。
+- `no-useless-assignment`（v9 新核规则）：`let x = ''` 紧接着每个分支都重新赋值
+  → 去掉初值，strict 的 definite-assignment 检查负责兜底。
+- `no-redundant-type-constituents`：`string | unknown`、`unknown | Promise<unknown>`
+  这种被 `unknown` 吞掉的联合类型。
+- `no-unsafe-enum-comparison`：`input.type !== 0` 改成 `BindingType.Property`
+  （枚举成员就是 0，值等价），`Object.entries` 出来的 `string` key 加断言。
+- `no-base-to-string`：`'…' + this` 这类会打成 `[object Object]` 的拼串**保持原样**，
+  行内 disable——改文案属于改行为。
+- `prefer-promise-reject-errors`：小程序 API 的错误载荷本来就是平台原始对象
+  （`{errMsg: ...}`），原样 reject 是刻意的，行内 disable。
+- `ban-types` 在 v8 拆成 `no-empty-object-type` / `no-unsafe-function-type`，
+  沿用原来 `ban-types: off` 的取舍一并关掉。
+
+## 配置文件合并（app.json / project 配置）
+
+用户写的配置文件与构建器生成的内容**是合并关系**，不是二选一。规则一句话：
+**写过的键一个字不动，没写的键才补**；唯一例外是 `pages`——用户的在前，
+构建器扫出来的追加在后面，按路径去重。
+
+代码分四层，各层职责不许串：
+
+| 文件 | 职责 |
+| --- | --- |
+| `vite/merge-config.ts` | 纯合并函数，不认识平台也不认识文件 |
+| `vite/config-schema.ts` | valibot 形状 + 形状校验 + `_platform` 检查 |
+| `vite/mp-config.ts` | 来源解析、合并顺序、派生条目、诊断汇总 |
+| `platform/platform.ts` 的 `mpConfig` | 平台事实（文件名、分包键、默认值、能力、改写） |
+
+几条必须守住的：
+
+- **合并函数不得改入参**。app 配置对象被分包插件、assets 插件、校验共用，
+  就地改一处会污染另一处。`mergeConfig` / `mergeDerived` / `unifySubPackageKey`
+  一律返回新对象，`merge-config.spec.ts` 里有「不改入参」的断言，别删。
+- **builder 里不写 `if (platform === 'zfb')`**。平台差异全部走 `mpConfig` 声明：
+  `projectFilename` / `subPackageKey` / `projectDefaults` / `capabilities` /
+  `normalizeAppJson` / `normalizeProjectJson`。环境差异走 angular.json 的 `configurations`。
+- **构建器不发明字段**，也不替用户填平台默认的 `window` / `style`。
+  唯一的例外是 project 配置的内置默认值（`compileType` 等「没有就打不开」的字段），
+  以及 `appid` 缺省 `touristappid`。
+- **校验对合并结果跑，不对源文件跑**。结构化选项通道按 `appJsonValidate`
+  （默认 error），只写静态 `app.json` 的通道固定 warn——那条通道读得到内容读不到意图，
+  拦太狠会卡死正常项目。
+- `_platform` / `$schema` 只存在于源文件，产物里必须没有（`stripInternalKeys`，
+  名单就是 `INTERNAL_KEYS`）；`_platform` 写了不存在的平台名是错误，不是忽略。
+
+### 派生条目
+
+`MP_CONFIG_SPECS[*].derive` 是一个有序表，每项 `{patch, deep?}`，在默认值之后按序补空。
+app 的顺序是 `subpackages` → `pages` → `customTabbarFlag`，不能换：
+`pages` 派生要**排除落在分包 root 下的入口**（那些是分包页，混进主包会被
+语义校验判成「分包页面与主包 pages 冲突」），所以分包声明得先到位；
+`condition` 在 project 那边，拿到的已是 app 的成品。
+
+`deep: true` 只给了 `customTabbarFlag`（要往用户已写的 `tabBar` 里塞 `custom`）
+和 `subpackages`（用户只写了 `root` 时要往里填 `pages`）——
+新条目默认用浅合并，别顺手都开 deep。
+
+追加型 key（`APPEND_KEYS`）目前两个：`pages` 按 `path` 认，`subpackages` 按 `root` 认。
+标识已存在的条目：非 deep 一个字不动，deep 只补它漏写的子字段。
+
+### 形状与 JSON Schema
+
+形状定义在 `config-schema.ts`，全部 `looseObject`：没列出的字段既不报错也不丢
+（平台字段一直在加）。同一份形状既用于构建期校验，也用 `@valibot/to-json-schema`
+生成 `src/builder/schemas/*.schema.json`（编辑器补全用）。那个目录会被
+`copy:assets` 整体拷进发布包，用户装完就能在 `node_modules/angular-miniprogram/builder/schemas/`
+里指给编辑器。**改了形状必须跑 `npm run gen:config-schema`**，
+`npm run check:schema` 会比对生成物，不一致直接失败。
+
+valibot 因此成了 builder 的运行时依赖，必须同时出现在
+`src/library/package.json` 的 `dependencies` 和 `ng-package.json` 的
+`allowedNonPeerDependencies` 里（见前面「builder 的运行时依赖」一节）。
+
+### 测试
+
+- 单元（快，先跑这些）：`merge-config.spec.ts`、`mp-config.spec.ts`、`app-config.spec.ts`
+- 集成（真跑 vite build）：`app-config.build.spec.ts`、`project-config.build.spec.ts`、
+  `subpackage.build.spec.ts`
+
+两个已知坑：
+
+- 现在**没有 assets 也会产出 `app.json`**（内容由扫出来的 pages 派生），
+  产物目录里 `app.json` 排序在页面 json 之前，`build.spec.ts` 里那种
+  「取第一个 json」的断言要先把 app.json / project.config.json 滤掉。
+- 集成测试里往 `pages` 追加一个不存在的页面路径会被语义校验拦下来
+  （「声明了但本次构建没有产出入口」），这是对的，别为了过测试放宽校验。
+
+## 自定义 vite 配置（`viteConfig`）
+
+### 为什么只能走文件
+
+angular.json 是 JSON，装不下函数，所以「让用户改 vite 配置」没有第二种形状：
+选项给路径，文件默认导出 `(config, ctx) => config`。两个 builder
+（`application` / `vitest`）**各收各的 `viteConfig`、各指各的文件** ——
+测试链路不一定存在，把两个钩子塞一份文件里等于逼用户建一个用不到的 key。
+
+### 没有守卫，这是刻意的
+
+钩子在 `createMiniProgramViteConfig` / `createVitestViteConfig` 的**最后**执行，
+拿到的就是真正交给 vite 的那份，改完什么就用什么。不做保护项比对、不回正、
+不 warn：默认配置由构建器自己组装、本来就是对的，钩子改坏了报错会自然落在
+vite / rolldown 那一层，加一层「不许改这个」只会把用户的合法需求也挡掉。
+
+`config-hook/index.ts` 里剩下的错误处理全是防手滑：文件不存在、默认导出不是
+函数、钩子抛错、返回非对象。四条都把**文件绝对路径**写进消息，因为这几类
+错误的共同症状都是「构建失败但看不出跟自己的钩子文件有关」。
+
+### 读 TS 用 jiti，不用 vite 的 `loadConfigFromFile`
+
+`loadConfigFromFile` 对函数默认导出会先 `await fn(configEnv)` 再要求结果是
+对象（vite 把它当 vite 配置工厂），裸钩子会被它吃掉。jiti 不做任何语义解释，
+纯加载，且 `moduleCache: false` 正好是 watch 要的「每轮重新求值」，transform
+结果仍进它的 fs 缓存。
+
+- jiti 已经在树上（`vite` 自己依赖它），但**必须显式声明**：根
+  `devDependencies` + `src/library/package.json` 的 `dependencies` +
+  `ng-package.json` 的 `allowedNonPeerDependencies`。pnpm 严格解析下没声明就是
+  解析不到，vite 哪天不依赖它也会当场断。下限 `>=2`，1.x 是完全不同的 API。
+- `.js` / `.mjs` / `.cjs` 走原生 `import()`，这类工程连 jiti 都不必加载；
+  代价是必须自己带 `?t=` 破缓存，否则 watch 期间一直拿第一轮那份。
+- `createJiti(configPath, ...)` 的实例 id 用钩子文件本身：传给 `jiti.import`
+  的一直是绝对路径，实例 id 只影响相对解析与 tsconfig 自动发现。
+- `tsconfigPaths` 传工程的 `tsConfig`，钩子文件里就能用 `@app/*` 这类别名。
+- 发布面是 `angular-miniprogram/builder`：运行时是 `dist/builder/vite/config-hook/index.js`
+  （`vite-build.ts` 的 preserveModules 自动产出），类型是手写的 `types.d.ts`
+  （`copy:assets` 拷过去，同 `platform-flags.d.ts` 的路子）。实现里只用
+  `import type` 引它，编译期擦除，运行时不需要同名 `.js`。
+
+### watch
+
+`mpConfigWatchFiles` 里追加了钩子文件。只盯文件本身：jiti 关掉模块缓存后
+拿不到可靠的依赖清单，钩子里再 import 的本地文件不追踪。
+
+### 测试
+
+- `config-hook/index.spec.ts`（快，不碰 vite）：三种模块形态、ctx、返回值规则、
+  改文件下一轮是新内容（watch 的前提）、tsconfigPaths 真能解析。
+- `config-wiring.spec.ts`（中等，直接调 `create*ViteConfig` 拿 config，不 build）：
+  钉的是「两个 builder 组装完的配置确实经过了钩子」——钩子本身上面一层已经
+  验透了，这里只防「应用了但结果被丢掉」。夹具用 `test/hello-world-app`（只读），
+  钩子写临时目录用绝对路径引用，不往夹具里落脏文件。
+
+## class / style 通道按需输出
+
+### 之前的样子
+
+`elementPropertyAndEvent()` 无条件给每个元素塞两条绑定：
+
+```html
+<view class="{{nodeList[i].class}}" style="{{nodeList[i].style}}">hi</view>
+```
+
+数据侧 `AgentNode.toView()` 也跟着无条件发 `class` / `style`。于是模板里
+一个 class 都没写的元素，也要在 wxml 里带 60 来字节、在首次 setData 里带
+一个 `"tag-name-view"` 和一个空串。实测这两条属性占掉测试工程 wxml 的三成。
+
+### 现在的判据
+
+编译期静态判定每个元素的 `needsClass` / `needsStyle`（`ParsedNgElement.usesChannel()`），
+判不出来就整条属性不输出。判据必须盖住 class 的**全部**来源——漏一条不是
+省字节，是「运行时改了 class 而 wxml 不读」的静默丢样式：
+
+| 写法                            | AST 形态                                                    |
+| ------------------------------- | ----------------------------------------------------------- |
+| `class="a"` / `style="a:b"`     | 静态 attribute                                              |
+| `[class]` / `[style]`           | Property，名字就是 class / style                            |
+| `class="a {{x}}"`               | 同上（编译器把整条当整体绑定）                              |
+| `[class.x]` / `[style.x]`       | Class / Style 类型，名字是那个 token / 属性                 |
+| `[attr.class]` / `[attr.style]` | Attribute 类型                                              |
+| `[class]="mod.f(x)"`            | 已被改写层换成合成 property，只能认 `wxsClass` / `wxsStyle` |
+| `#box`                          | 查询用 class 拼在 class 通道上                              |
+| 组件 / 指令宿主                 | host 元数据里的 class/style 编译期看不见，只能保守保留      |
+| `@slide` / `[@slide]="x"`       | 动画靠往元素上加 class 生效                                 |
+
+`[class.x]` 这类**不进** `this.inputs`（那里只收 `type === Property`），
+所以判据直接遍历 `node.inputs`，不看那个筛过的数组。
+
+### 为什么运行时不能自己判
+
+`refClass` 那套是运行时从 `TNode.localNames` 现推的，与编译期同一个条件、
+两边同进同退。class / style 推不了：Ivy 把 `[class.x]` / `[style.x]` /
+`[attr.class]` 记在模板函数的绑定槽里，**`TNode.inputs` 里根本没有它们**
+（实测恒为 `null`，只有指向指令的绑定才进）。所以数据侧换了个更简单也更
+稳的办法：`toView()` 只发非空的 class / style。真有人改到了，
+`emitClass` / `emitStyle` 会把 key 补上，不依赖首次就发。
+
+key 集合因此是「按节点稳定」的：同一节点要么一直有、要么从无到有，不会在
+两轮之间反复抖，`diffNodeData` 的「key 数不一致就整体送出子树」不会被误触发。
+
+### `tag-name-*` 挪到编译期
+
+标记的用途是「模板写 `div`、wxml 里已经是 `view`」时补一个选中把手。
+映射没改写的标签（`view`、自定义组件）本来就能直接选中，带着它只是每个元素
+多一个 class token。
+
+它现在由 `tagNameClassOf()` 在编译期算，烘成 wxml 里的**字面量**：
+
+```html
+<view class="tag-name-div">hi</view>
+<!-- 没别的 class 来源 -->
+<view class="tag-name-div {{nodeList[0].class}}">hi</view>
+<!-- 有 -->
+```
+
+必须烘成字面量而不是留在运行时：留在运行时就得给每个被改写的元素留一条
+`nodeList[i].class` 绑定，那正好是这次要省掉的东西。运行时也不再
+`classList.add('tag-name-...')`——它压根不知道映射表。
+
+构建选项 `tagNameClass`：`mapped`（默认）/ `all` / `off`。
+
+库构建（`LibraryTransform`）按它自己的默认值烘这个字面量，消费方改
+`tagNameClass` 不会回头改已经产出的库模板。只是标记在不在的差异，
+不影响任何数据链路。
+
+### 两个必须同进同退的点
+
+1. wxml 有绑定而数据不发 → 渲染成空；数据发了 wxml 不读 → 白占体积。
+   所以 `needsClass` 的判据只能比实际来源**更宽**，不能更窄。
+2. 空 class 不发之后，`refClass` 的拼接表达式必须给 class 那一半也兜
+   `|| ''`：`{{}}` 里的字符串拼接会把缺字段当 `undefined` 拼出字面量，
+   于是 class 里多出一个假的 `undefined` token。
+
+### 测试
+
+- `src/builder/class-style-wxml.spec.ts`：每种 class / style 写法逐个钉，
+  外加 `tag-name` 三种模式。
+- `src/library/platform/default/agent-node.spec.ts`：`toView()` 不发空串。
+- `ref-class-wxml.spec.ts` / `wxs-emit.spec.ts` / `rich-text.spec.ts` 里把
+  `tagNameClass` 设成 `off`：那几个文件测的不是 class 通道，让标记插进来
+  只会把断言撑得跟主题无关。

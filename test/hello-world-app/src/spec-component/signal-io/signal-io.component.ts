@@ -5,7 +5,7 @@ import { Component, OnInit, computed, input, output } from '@angular/core';
  * 用于验证 signal 形式的输入输出在小程序渲染链路下工作正常。
  */
 @Component({
-  standalone: false,
+  standalone: true,
   selector: 'app-signal-io',
   template: `<div class="signal-io-content">
     {{ input1() }}-{{ doubled() }}

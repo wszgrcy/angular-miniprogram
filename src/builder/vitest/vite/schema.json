@@ -1,0 +1,249 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "title": "MiniProgram Vitest Target",
+  "description": "把 spec 编进小程序产物，由 vitest 通过 WebSocket 驱动执行。",
+  "type": "object",
+  "properties": {
+    "main": {
+      "type": "string",
+      "description": "测试引导入口（test.ts），里面调 startupMiniProgramTest()。"
+    },
+    "tsConfig": {
+      "type": "string",
+      "description": "The name of the TypeScript configuration file."
+    },
+    "outputPath": {
+      "type": "string",
+      "description": "测试产物输出目录（相对 workspaceRoot）。不填默认 dist/vitest/<project>；不要指向 dist 根，emptyOutDir 会把应用产物一并删掉。"
+    },
+    "platform": {
+      "type": "string",
+      "description": "小程序平台",
+      "default": "wx"
+    },
+    "pages": {
+      "type": "array",
+      "description": "页面配置",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/assetPattern"
+      }
+    },
+    "subpackages": {
+      "type": "array",
+      "description": "分包入口：写法与 pages 一样，output 就是分包 root（约定 root 同时是源码目录与产物目录）。配了就不用在 app 配置里写 subpackages：root 取 output，分包页由扫出来的入口算；自己写了同一个 root 就以自己那份为准",
+      "items": {
+        "type": "object",
+        "properties": {
+          "glob": {
+            "type": "string",
+            "description": "匹配入口文件的 glob"
+          },
+          "input": {
+            "type": "string",
+            "description": "源目录"
+          },
+          "output": {
+            "type": "string",
+            "description": "分包 root（同时是产物目录）"
+          },
+          "ignore": {
+            "description": "An array of globs to ignore.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "independent": {
+            "type": "boolean",
+            "description": "独立分包：不依赖主包即可运行"
+          }
+        },
+        "required": [
+          "glob",
+          "input",
+          "output"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "customTabbar": {
+      "type": "array",
+      "description": "自定义 tabBar 入口的源文件位置。产物目录由平台决定（微信系 custom-tab-bar，支付宝 customize-tab-bar），output 字段会被覆盖；不配则默认取 <sourceRoot>/custom-tab-bar 下的 *.entry.ts",
+      "items": {
+        "$ref": "#/definitions/assetPattern"
+      }
+    },
+    "assets": {
+      "type": "array",
+      "description": "List of static application assets.",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/assetPattern"
+      }
+    },
+    "styles": {
+      "description": "Global styles to be included in the build.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/extraEntryPoint"
+      }
+    },
+    "include": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "spec 文件 glob，相对项目 sourceRoot。空数组按没传处理（否则表现为 0 个 spec 全绿）。"
+    },
+    "exclude": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "spec 文件排除 glob。"
+    },
+    "port": {
+      "type": "number",
+      "description": "回连宿主的 WebSocket 端口，默认 17900。必须和 vitest.config 里 miniProgramVitest({ port }) 完全一致，否则产物连 A、宿主在 B，永远连不上。"
+    },
+    "clientHost": {
+      "type": "string",
+      "description": "小程序内回连宿主的地址，默认 127.0.0.1（微信模拟器解不了 localhost）。真机调试改成开发机局域网 IP。"
+    },
+    "polyfills": {
+      "description": "语义与 application builder 的同名选项一致。声明 `@angular/localize`（或 `@angular/localize/init`）会让测试构建注入 `@angular/localize/init`，这是运行时 i18n 唯一的开关：不注入时 `$localize` 是 core 的恒等实现，ICU 分支不解析，i18n spec 会直接看到 `{VAR_SELECT, select, ...}` 原文。",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "sourceMap": {
+      "type": "boolean",
+      "description": "Output source maps.",
+      "default": true
+    },
+    "watch": {
+      "type": "boolean",
+      "description": "Watch source files and rebuild."
+    },
+    "dedupe": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "强制单例的包，透传给 Vite 的 resolve.dedupe。只有 file: / npm link 接入本库时才需要。"
+    },
+    "appJson": {
+      "type": "string",
+      "description": "与 application builder 同名同义：结构化 app 配置源文件（相对 workspaceRoot），与 assets 里的静态 app.json 合并而不是二选一。"
+    },
+    "projectConfig": {
+      "type": "string",
+      "description": "结构化 project 配置源文件（相对 workspaceRoot）；没写的字段由内置默认值打底。"
+    },
+    "appJsonValidate": {
+      "type": "string",
+      "enum": [
+        "error",
+        "warn",
+        "off"
+      ],
+      "default": "error",
+      "description": "app 配置校验严格度，默认 error；只有静态 app.json 的工程固定 warn。"
+    },
+    "deriveCondition": {
+      "type": "boolean",
+      "default": false,
+      "description": "自动生成 project 配置的调试启动项（condition）。"
+    },
+    "viteConfig": {
+      "type": "string",
+      "description": "与 application builder 同名同义：自定义 vite 配置的钩子文件（相对 workspaceRoot），默认导出 (config, ctx) => config。测试产物也是一个完整小程序工程，两条链路要加插件 / 加 alias 用的是同一个入口。"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "main",
+    "tsConfig"
+  ],
+  "definitions": {
+    "assetPattern": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "glob": {
+              "type": "string",
+              "description": "The pattern to match."
+            },
+            "input": {
+              "type": "string",
+              "description": "The input directory path in which to apply 'glob'. Defaults to the project root."
+            },
+            "output": {
+              "type": "string",
+              "description": "Absolute path within the output."
+            },
+            "ignore": {
+              "description": "An array of globs to ignore.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "glob",
+            "input",
+            "output"
+          ]
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "extraEntryPoint": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "string",
+              "description": "The file to include."
+            },
+            "bundleName": {
+              "type": "string",
+              "pattern": "^[\\w\\-.]*$",
+              "description": "The bundle name for this extra entry point."
+            },
+            "inject": {
+              "type": "boolean",
+              "description": "If the bundle will be referenced in the HTML file.",
+              "default": true
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "input"
+          ]
+        },
+        {
+          "type": "string",
+          "description": "The file to include."
+        }
+      ]
+    }
+  }
+}

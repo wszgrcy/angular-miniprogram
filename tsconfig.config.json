@@ -1,0 +1,27 @@
+{
+  /**
+   * 只用来类型检查根目录的 vite / vitest 配置文件。
+   *
+   * 为什么单开一份：根 tsconfig.json 是 solution-style，`moduleResolution: "node"`
+   * 是给 ts-node 跑 sync 脚本兜底用的（见 tsconfig.json 里的注释）。而 vite 8 /
+   * vitest 4 的 .d.ts 大量用 `#types/...` 内部子路径导出和 `rolldown/xxx` 子路径，
+   * 只有 `bundler`（或 nodenext）才解析得了 —— 拿 node 解析去查配置文件，
+   * 得到的是一整屏 node_modules 里的 TS2307，真正配置文件自己的错反而被埋掉。
+   *
+   * 背景：`vitest.config.mts` 此前不在任何 tsconfig 的 include 里，从来没被
+   * 类型检查过，于是写出过三个错：Plugin 上没有 `close` 钩子、`defineProject`
+   * 不收 `extends`、`slowTestThreshold` 属于 NonProjectOptions 不能下放给 project。
+   */
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "types": ["node"]
+  },
+  "files": ["vitest.config.mts"]
+}

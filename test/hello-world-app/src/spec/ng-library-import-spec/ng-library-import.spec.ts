@@ -3,15 +3,13 @@ import { NgLibraryImportSPecComponent } from './ng-library-import.component';
 describe('NgLibraryImportSPecComponent', () => {
   beforeEach(async () => {
     await openComponent(
-      `/spec/ng-library-import-spec/ng-library-import-spec-entry`
+      `/pages/ng-library-import-spec/ng-library-import-spec-entry`,
     );
   });
-  it('run', (done) => {
+  it('run', () => {
     let pages = getCurrentPages();
     let page = pages[0];
     let component = getComponent<NgLibraryImportSPecComponent>(page);
-    componentTestComplete(component.testFinish$$).then(() => {
-      done();
-    });
+    return componentTestComplete(component.testFinish$$);
   });
 });

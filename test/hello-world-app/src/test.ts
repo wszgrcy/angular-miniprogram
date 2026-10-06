@@ -1,29 +1,30 @@
 import { bootstrapApplication } from 'angular-miniprogram';
-import { startupTest } from 'angular-miniprogram/karma/client';
+import {
+  startupMiniProgramTest,
+  type TestModuleMap,
+} from 'angular-miniprogram/vitest/runtime';
 
-let jasmineRequire = require('jasmine-core/lib/jasmine-core/jasmine.js');
+/**
+ * spec 清单，形如 `{ "./spec/x.spec.ts": () => require("./specs/spec/x.spec.js") }`。
+ * 值由构建期的 spec-modules 插件就地替换进来（见
+ * `src/builder/vite/plugins/spec-modules.plugin.ts`）。
+ */
+declare const __MP_SPEC_MODULES__: TestModuleMap;
 
-function bootWithoutGlobals() {
-  let jasmineInterface;
-  const jasmine = jasmineRequire.core(jasmineRequire);
-  const env = jasmine.getEnv({ suppressLoadErrors: true });
-  jasmineInterface = jasmineRequire.interface(jasmine, env);
+/**
+ * 测试引导入口。
+ *
+ * 顺序要求：**先 bootstrapApplication，再起 worker**。
+ * spec 里 import 的组件要能拿到已初始化的 Angular 运行时；
+ * 反过来（先起 worker）会因为宿主下发 run 太快而拿到半初始化的 injector。
+ */
+async function main(): Promise<void> {
+  await bootstrapApplication();
 
-  return jasmineInterface;
+  startupMiniProgramTest({ modules: __MP_SPEC_MODULES__ });
 }
 
-let obj = bootWithoutGlobals();
-for (const key in obj) {
-  if (Object.prototype.hasOwnProperty.call(obj, key)) {
-    (wx as any).__global[key] = obj[key];
-  }
-}
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 10 * 1000;
-
-bootstrapApplication().catch((e) => console.error(e));
-// Then we find all the tests.
-// And load the modules.
-// 因为ng修改了test的获取实例的时机,改为拼在最后面,而启动操作要在最后面的后面,所以使用了延时(网页端正常是因为spec=>component,而小程序目前设计是component spec平行)
-setTimeout(() => {
-  startupTest();
-}, 1000);
+main().catch((error) => {
+  // eslint-disable-next-line no-console
+  console.error('[vitest] 引导失败', error);
+});

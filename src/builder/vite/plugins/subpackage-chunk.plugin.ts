@@ -1,17 +1,14 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import type { Plugin } from 'vite';
+import { pathKey } from '../../util/path';
 import { MpAppConfig, resolveSubPackages } from '../app-config';
+import { unwrapEntryVirtualId } from './entry-bootstrap.plugin';
 
 /** 只处理这些扩展名的源文件归属判定 */
 const SOURCE_EXT = /\.(t|j)sx?$/;
 
-function toPosix(p: string): string {
-  return p.replace(/\\/g, '/');
-}
-
 /**
- * 归属判定专用的路径归一化：posix 分隔符 + 小写盘符。
+ * 归属判定用 `pathKey`（posix 分隔符 + 小写盘符），全仓同一把尺。
  *
  * Windows 下 `sourceRoot` 走 `getSystemPath()` 拿到的是 `C:\...`（大写盘符），
  * 而 bundler 回传的 moduleIds 盘符大小写并不保证一致（取决于解析入口是谁给的）。
@@ -20,20 +17,21 @@ function toPosix(p: string): string {
  *  - `chunkFileNames` 不再把分包 chunk 归进分包目录（分包代码全落主包，白拆）；
  *  - 跨分包 / 独立分包校验全部漏报（该拦的拦不住）。
  *
- * Windows 文件系统本身大小写不敏感，所以统一小写盘符不会引入误判；
- * posix 下路径不带盘符，这个 replace 是 no-op，不影响大小写敏感的 Linux。
+ * 见 `98a3f96`：本文件以前自带一份 toPosix + normalizeId、各修各的那一处，
+ * 现在归到 util/path。
  */
-function normalizeId(p: string): string {
-  return toPosix(p).replace(/^([A-Za-z]):/, (_m, drive: string) =>
-    drive.toLowerCase()
-  );
-}
+const normalizeId = pathKey;
 
 export interface SubpackageChunkPluginOptions {
   /** 已解析的 app 配置（含 subpackages） */
   appConfig: MpAppConfig;
   /** 项目 sourceRoot 绝对路径（posix） */
   sourceRoot: string;
+  /**
+   * 主包 chunk 的文件名模板，分包在它前面拼上分包目录。
+   * 跟 `outputHashing` 归一出来的值保持一致，不传维持旧的带 hash 行为。
+   */
+  chunkFileNames?: string;
 }
 
 /**
@@ -52,10 +50,10 @@ export interface SubpackageChunkPluginOptions {
  *     时报错（独立分包不得依赖主包，需自带全部依赖）。
  */
 export function subpackageChunkPlugin(
-  options: SubpackageChunkPluginOptions
+  options: SubpackageChunkPluginOptions,
 ): Plugin {
   const subPackages = resolveSubPackages(options.appConfig);
-  const sourceRoot = toPosix(options.sourceRoot);
+  const sourceRoot = pathKey(options.sourceRoot);
   // 分包源码绝对目录，按长度降序，保证最深匹配优先
   const subSrcDirs = subPackages
     .map((sp) => ({
@@ -67,7 +65,8 @@ export function subpackageChunkPlugin(
 
   /** 一个模块源路径属于哪个分包（源码目录前缀匹配），undefined=主包 */
   const zoneOfModule = (moduleId: string) => {
-    const id = normalizeId(moduleId);
+    // 入口虚拟模块带着它包装的入口文件的路径，脱壳后才能参与归属判定
+    const id = normalizeId(unwrapEntryVirtualId(moduleId));
     return subSrcDirs.find((d) => id.startsWith(`${d.srcDir}/`));
   };
 
@@ -81,6 +80,7 @@ export function subpackageChunkPlugin(
         string,
         unknown
       >;
+      const baseChunkNames = options.chunkFileNames ?? '[name]-[hash].js';
       output.chunkFileNames = (chunk: {
         moduleId?: string;
         moduleIds?: string[];
@@ -89,19 +89,19 @@ export function subpackageChunkPlugin(
         const ids = chunk.moduleIds?.length
           ? chunk.moduleIds
           : chunk.moduleId
-          ? [chunk.moduleId]
-          : [];
+            ? [chunk.moduleId]
+            : [];
         // 全部模块都在同一个分包源码目录下 → 归入该分包目录
         const zones = new Set(
-          ids.filter((id) => SOURCE_EXT.test(id)).map((id) => zoneOfModule(id))
+          ids.filter((id) => SOURCE_EXT.test(id)).map((id) => zoneOfModule(id)),
         );
         if (zones.size === 1) {
           const zone = [...zones][0];
           if (zone) {
-            return `${zone.root}/[name]-[hash].js`;
+            return `${zone.root}/${baseChunkNames}`;
           }
         }
-        return '[name]-[hash].js';
+        return baseChunkNames;
       };
       config.build = config.build ?? {};
       config.build.rollupOptions = {
@@ -120,13 +120,13 @@ export function subpackageChunkPlugin(
         imports: string[];
       }
       const chunks = Object.values(bundle).filter(
-        (i) => i.type === 'chunk'
+        (i) => i.type === 'chunk',
       ) as unknown as Chunk[];
       const zoneOfChunk = (chunk: Chunk) => {
         const zones = new Set(
           (chunk.moduleIds ?? [])
             .filter((id) => SOURCE_EXT.test(id))
-            .map((id) => zoneOfModule(id))
+            .map((id) => zoneOfModule(id)),
         );
         // 只返回「纯属于某分包」的 zone；混包/主包返回 undefined
         if (zones.size === 1) {
@@ -152,14 +152,14 @@ export function subpackageChunkPlugin(
             errors.push(
               `跨分包静态依赖：分包 "${fromZone.root}" 的 chunk ` +
                 `"${chunk.fileName}" 依赖了分包 "${toZone.root}" 的 ` +
-                `"${toChunk.fileName}"（小程序不允许跨分包 require）`
+                `"${toChunk.fileName}"（小程序不允许跨分包 require）`,
             );
           }
           // 独立分包不得依赖主包 chunk
           if (fromZone.independent && !toZone) {
             errors.push(
               `独立分包 "${fromZone.root}" 依赖了主包 chunk ` +
-                `"${toChunk.fileName}"（独立分包不得依赖主包，需自带依赖）`
+                `"${toChunk.fileName}"（独立分包不得依赖主包，需自带依赖）`,
             );
           }
         }
@@ -167,14 +167,9 @@ export function subpackageChunkPlugin(
 
       if (errors.length) {
         this.error(
-          `分包校验失败：\n  - ${[...new Set(errors)].join('\n  - ')}`
+          `分包校验失败：\n  - ${[...new Set(errors)].join('\n  - ')}`,
         );
       }
     },
   };
-}
-
-/** 从 appJson 文件路径读取并解析配置（供 vite/index.ts 复用） */
-export function readAppConfig(appJsonPath: string): MpAppConfig {
-  return JSON.parse(fs.readFileSync(appJsonPath, 'utf8')) as MpAppConfig;
 }

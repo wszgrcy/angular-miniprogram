@@ -1,6 +1,6 @@
 {
   "name": "angular-miniprogram",
-  "version": "1.5.2",
+  "version": "2.0.6",
   "type": "commonjs",
   "description": "使用Angular开发小程序",
   "keywords": [
@@ -21,22 +21,51 @@
   },
   "homepage": "https://github.com/wszgrcy/angular-miniprogram#readme",
   "dependencies": {
+    "@analogjs/vite-plugin-angular": "^2.7.2",
+    "abortcontroller-polyfill": "^1.7.8",
+    "birpc": "^4.2.0",
+    "clsx": "^2.1.1",
     "cyia-code-util": "1.8.0",
-    "static-injector": "4.0.2"
+    "es-toolkit": "^1.52.0",
+    "flatted": "^3.4.4",
+    "fs-extra": "11.2.0",
+    "jiti": "^2.7.0",
+    "glob": "^7.2.0",
+    "ora": "^9.4.1",
+    "static-injector": "7.0.0",
+    "vite": "^8.3.0",
+    "ws": "^8.22.0",
+    "valibot": "^1.5.0"
   },
   "peerDependencies": {
-    "ng-packagr": "^22.1.1",
-    "@angular/core": "^22.1.7",
+    "@angular-devkit/architect": "^0.2201.8",
+    "@angular-devkit/build-angular": "^22.1.8",
+    "@angular-devkit/core": "^22.1.8",
+    "@angular/build": "^22.1.8",
     "@angular/common": "^22.1.7",
-    "jasmine-core": "5.1.2"
+    "@angular/compiler": "^22.1.7",
+    "@angular/compiler-cli": "^22.1.7",
+    "@angular/core": "^22.1.7",
+    "ng-packagr": "^22.1.1",
+    "rxjs": "^7.4.0",
+    "typescript": ">=6.0 <6.1",
+    "vitest": "^4.1.11"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   },
   "exports": {
-    "./karma/client": {
-      "default": "./karma/client/index.js"
+    "./vitest/runtime": {
+      "default": "./vitest/runtime/index.js"
     },
-    "./karma/plugin": {
-      "default": "./karma/plugin/index.js",
-      "types": "./karma/plugin/index.d.ts"
+    "./vitest": {
+      "default": "./vitest/plugin/node/index.mjs"
+    },
+    "./builder": {
+      "types": "./builder/vite/config-hook/types.d.ts",
+      "default": "./builder/vite/config-hook/index.js"
     }
   },
   "builders": "./builder/builders.json"

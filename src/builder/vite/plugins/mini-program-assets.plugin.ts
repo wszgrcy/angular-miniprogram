@@ -1,12 +1,21 @@
 import type { BuilderContext } from '@angular-devkit/architect';
-import type { AssetPattern } from '@angular-devkit/build-angular';
 import type { Path } from '@angular-devkit/core';
 import * as fs from 'fs';
+import { CssUrl } from 'ng-packagr/src/lib/styles/stylesheet-processor';
 import * as path from 'path';
 import { Injector } from 'static-injector';
 import ts from 'typescript';
 import type { Plugin } from 'vite';
-import { CustomStyleSheetProcessor } from '../../library/stylesheet-processor';
+import {
+  CustomStyleSheetProcessor,
+  StyleCompileEntry,
+  compileStyles,
+  inlineStyleEntries,
+} from '../../library/stylesheet-processor';
+import type {
+  InlineStyleSource,
+  WxsAnalysisRef,
+} from '../../mini-program-compiler/type';
 import { BuildPlatform } from '../../platform/platform';
 import { LibraryTemplateScopeService } from '../../shared/library-template-scope.service';
 import { MiniProgramApplicationAnalysisService } from '../../shared/mini-program-application-analysis.service';
@@ -17,18 +26,13 @@ import {
   TS_CONFIG_TOKEN,
   TS_SYSTEM,
 } from '../../shared/token';
-import type {
-  LibraryTemplateLiteralConvertOptions,
-  PagePattern,
-} from '../../shared/type';
-import { literalResolve } from '../../util';
-import { toPosixPath } from '../../util/asset-path';
-import {
-  MpAppConfig,
-  generateAppJson,
-  validateAppConfig,
-} from '../app-config';
-import { collectAssets } from '../copy-assets';
+import type { PagePattern } from '../../shared/type';
+import { transformMiniProgramStyle } from '../../util/mini-program-style';
+import { isPathIn, toNativePath, toPosixPath } from '../../util/path';
+import type { CopiedAsset } from '../copy-assets';
+import { mergeConfig } from '../merge-config';
+import type { MpConfigBundle } from '../mp-config';
+import { checkReferencedFiles } from '../mp-config';
 
 /**
  * 一个纯 node fs 的 ts.System。
@@ -37,7 +41,7 @@ import { collectAssets } from '../copy-assets';
  * Vite 侧没有那层，直接拿 node fs 拼一个够用的实现。
  */
 export function createNodeTsSystem(
-  getCurrentDirectory: () => string
+  getCurrentDirectory: () => string,
 ): ts.System {
   return {
     ...ts.sys,
@@ -71,6 +75,24 @@ export function createNodeTsSystem(
 }
 
 /**
+ * 读一份已有的 json 配置（页面 / 组件目录里用户自己写的那份）。
+ *
+ * 读不到就当空对象，构建器算出来的字段就是全部输出；不是对象直接报错，
+ * 静默丢掉用户内容比报错难查得多。
+ */
+function readJsonObject(file: string | undefined): Record<string, unknown> {
+  if (!file || !fs.existsSync(file)) {
+    return {};
+  }
+  const text = fs.readFileSync(file, 'utf8');
+  const parsed = JSON.parse(text) as unknown;
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`${file} 必须是一个 JSON 对象`);
+  }
+  return parsed as Record<string, unknown>;
+}
+
+/**
  * 顶替 webpack.Compiler。
  *
  * MiniProgramApplicationAnalysisService 实际只读两处：
@@ -101,17 +123,45 @@ export interface MiniProgramAssetsPluginOptions {
   watch?: boolean;
   /** 与 library-template 插件共享同一个实例，否则 scope 注册信息对不上 */
   templateScope?: LibraryTemplateScopeService;
-  /** builder 配置里的 assets，app.json / project.config.json 从这里来 */
-  assets?: AssetPattern[];
+  /** builder 配置里的 assets 展开结果（app.json / project.config.json 从这里来） */
+  assets?: CopiedAsset[];
   /**
-   * 结构化 app 配置源文件（相对 workspaceRoot）。
-   * 配置后由构建器编译生成 app.json，与 assets 里的静态 app.json 互斥。
+   * 解析好的配置文件（静态那份 + 结构化那份 + 构建器补的，已合并完）。
+   *
+   * 解析在 vite 配置组装前就做了，分包插件要用同一份结果；不传则配置文件
+   * 只能原样拷贝。
    */
-  appJson?: string;
+  mpConfigs?: MpConfigBundle;
   /** builder 配置里的全局样式，产出 app.wxss */
   styles?: (string | { input: string })[];
+  /**
+   * `@Component.styles` 内联样式的语言，默认 'css'。
+   *
+   * 内联样式存的是原文，不指定语言就只能当 css 编译；写了 scss 嵌套的
+   * 组件会静默产出一份缺样式的 wxss。
+   */
+  inlineStyleLanguage?: string;
+  /**
+   * app.js 从哪个 chunk 出发做可达性分析。
+   *
+   * 测试链路的应用入口叫 `test.js`，
+   * 不把它说清楚的话 app.js 会认为「没有引导入口」，
+   * 退化成「除 entry 类 chunk 外全 require」，
+   * 引导 chunk 反而进不了 app.js，小程序启动时什公都不会发生。
+   */
+  bootstrapChunk?: string;
   absoluteProjectRoot?: Path;
   absoluteProjectSourceRoot?: Path;
+  /**
+   * 分析结果共享引用。
+   *
+   * wxs-strip 插件靠它拿「哪些组件声明了 wxs」，不再自己扫全盘。本插件
+   * buildStart 里就填（不是 generateBundle）—— 两个插件的 buildStart 顺序
+   * 是先 assets 后 strip，strip 要在那之前拿到。
+   */
+  analysisRef?: {
+    current: WxsAnalysisRef;
+  };
 }
 
 /**
@@ -122,54 +172,203 @@ export interface MiniProgramAssetsPluginOptions {
  *   2. metaMap.style          -> wxss（样式源文件编译后按组件拼接）
  *   3. metaMap.config         -> json（合并已存在的配置文件）
  *   4. library 组件 config    -> json
- *   5. library 模板          -> 经 literalResolve 转换后落盘
+ *   5. library 模板          -> 直接落盘（已在读 sidecar 时渲染完）
  *   6. metaMap.selfTemplate   -> self template
  */
 /**
  * 样式编译器。一轮构建里复用同一个实例，避免每个文件重建 sass 环境。
+ *
+ * `cssUrl: inline` 不是优化，是小程序的硬限制：wxss 拿不到本地文件，
+ * `url()` 里写相对路径在真机上就是一张图都出不来，只剩网络图和 base64 两条路。
+ * 交给 esbuild 的 dataurl loader 内联，比事后正则替 base64 可靠；
+ * `/static/x.png` 这种绝对地址不受影响（小程序自己会去包里找）。
  */
 function createStyleProcessor(
-  options: MiniProgramAssetsPluginOptions
+  options: MiniProgramAssetsPluginOptions,
 ): CustomStyleSheetProcessor {
   return new CustomStyleSheetProcessor(
     options.workspaceRoot,
     options.workspaceRoot,
-    undefined,
+    CssUrl.inline,
     undefined,
     undefined,
     false,
-    !!options.watch
+    !!options.watch,
   );
 }
 
 /**
- * 逐个编译样式源文件，返回 path -> css 文本。
- * 单个文件编译失败只记警告并落空串，不中断整轮构建。
+ * 样式告警的定位包装：把「哪个产物」拼到每条告警前面。
  */
-async function compileStyleSources(
+function createStyleWarnOf(
   options: MiniProgramAssetsPluginOptions,
+): (outPath: string) => (message: string) => void {
+  return (outPath) => (message) =>
+    options.context.logger.warn(`[样式 ${toPosixPath(outPath)}] ${message}`);
+}
+
+/**
+ * wxs 落盘 + watch 登记。
+ *
+ * wxs 不是 ES module，没有任何 import 指向它，Vite 的模块图看不见。
+ * 不显式 addWatchFile 的话，watch 模式下改 .wxs 根本不会触发重建。
+ *
+ * 语法已在分析阶段由 parseWxsSource 把关，这里原样落盘不转译。
+ */
+export function emitWxs(
+  resolved: {
+    wxsSources?: Map<string, string>;
+    wxsSourceFiles?: string[];
+  },
+  emit: (fileName: string, source: string) => void,
+  addWatchFile: (srcPath: string) => void,
+) {
+  resolved.wxsSources?.forEach((source, outPath) => {
+    emit(outPath, source);
+  });
+  resolved.wxsSourceFiles?.forEach((srcPath) => {
+    addWatchFile(srcPath);
+  });
+}
+
+/**
+ * 样式源文件路径 → 编译条目。
+ *
+ * key 统一 normalize：`styleMap` 和 `emitStyles` 两边得用同一个形状对得上。
+ */
+function fileStyleEntries(
   styleProcessor: CustomStyleSheetProcessor,
-  styleSourcePaths: Set<string>
-): Promise<Map<string, string>> {
-  const compiled = new Map<string, string>();
-  for (const stylePath of styleSourcePaths) {
-    try {
-      const result = await styleProcessor.bundleFile(stylePath);
-      compiled.set(path.normalize(stylePath), result.contents ?? '');
-    } catch (error) {
-      options.context.logger.warn(
-        `样式编译失败 ${stylePath}: ${String(
-          (error as Error)?.message ?? error
-        )}`
-      );
-      compiled.set(path.normalize(stylePath), '');
-    }
+  paths: Iterable<string>,
+): StyleCompileEntry[] {
+  return [...paths].map((p) => {
+    // 这里要的是**可用**路径（key 同时当 bundleFile 的入参，ng-packagr 拿它读盘），
+    // 所以用 toNativePath 而不是 pathKey：后者是身份令牌（`/C/a/b`），
+    // 交给 fs 在 Windows 上直接读不到。
+    const key = toNativePath(p);
+    return { key, bundle: () => styleProcessor.bundleFile(key) };
+  });
+}
+
+/**
+ * 一轮分析里需要被样式管线碰到的那部分。
+ */
+type StyleSlice = {
+  style: Map<string, string[]>;
+  inlineStyle: Map<string, InlineStyleSource[]>;
+};
+
+/**
+ * 编译本轮所有组件样式：样式源文件 + 内联样式，两份分开返回。
+ *
+ * 分开是因为 key 不同域：前者按磁盘路径，后者按合成的组件级 key。
+ * 到 `emitStyles` 那里再汇成一份 wxss。
+ */
+async function compileResolvedStyles(
+  options: MiniProgramAssetsPluginOptions,
+  ensureStyleProcessor: () => CustomStyleSheetProcessor,
+  resolved: StyleSlice,
+) {
+  const files: string[] = [];
+  resolved.style.forEach((sourceList) => files.push(...sourceList));
+  const inline: InlineStyleSource[] = [];
+  resolved.inlineStyle.forEach((sourceList) => inline.push(...sourceList));
+  // 一个样式都没有就别拉样式编译器：建一次 StylesheetProcessor 要跑
+  // browserslist + postcss 配置探测，纯脚本项目白付这笔钱。
+  if (!files.length && !inline.length) {
+    return {
+      files: new Map<string, string>(),
+      inline: new Map<string, string>(),
+    };
   }
-  return compiled;
+  const styleProcessor = ensureStyleProcessor();
+  const warn = (label: string) => (error: unknown, key: string) =>
+    options.context.logger.warn(
+      `${label} ${key}: ${String((error as Error)?.message ?? error)}`,
+    );
+  return {
+    files: await compileStyles(
+      styleProcessor,
+      fileStyleEntries(styleProcessor, files),
+      warn('样式编译失败'),
+    ),
+    inline: await compileStyles(
+      styleProcessor,
+      inlineStyleEntries(styleProcessor, inline, options.inlineStyleLanguage),
+      warn('内联样式编译失败'),
+    ),
+  };
+}
+
+/**
+ * wxss 落盘。
+ *
+ * 一个产物样式可能同时来自样式文件和内联样式（两边都拼，不是二选一），
+ * 所以先汇到同一份列表里再写。
+ *
+ * 拼接完必须过 `transformMiniProgramStyle`：多份样式拼一起正是
+ * `@charset` / `@import` 跑到文件中部的原因。
+ */
+function emitStyles(
+  resolved: StyleSlice,
+  compiled: { files: Map<string, string>; inline: Map<string, string> },
+  emit: (fileName: string, source: string) => void,
+  warnOf: (outPath: string) => (message: string) => void,
+) {
+  const parts = new Map<string, string[]>();
+  const append = (outPath: string, css: string) => {
+    const list = parts.get(outPath);
+    if (list) {
+      list.push(css);
+    } else {
+      parts.set(outPath, [css]);
+    }
+  };
+  resolved.style.forEach((sourceList, outPath) => {
+    for (const s of sourceList) {
+      append(outPath, compiled.files.get(toNativePath(s)) ?? '');
+    }
+  });
+  resolved.inlineStyle.forEach((sourceList, outPath) => {
+    for (const s of sourceList) {
+      append(outPath, compiled.inline.get(s.key) ?? '');
+    }
+  });
+  parts.forEach((list, outPath) =>
+    emit(
+      outPath,
+      transformMiniProgramStyle(list.join('\n'), { warn: warnOf(outPath) }),
+    ),
+  );
+}
+
+/**
+ * 是不是 page / component / tabbar / library 的入口 chunk。
+ *
+ * 这类 chunk 必须由小程序运行时在**正确上下文**里加载，不能从 app.js 里
+ * require（那等于在 app 上下文调 Page() / Component()）。
+ *
+ * 入参是**产物路径**（rollup chunk 的 fileName，相对产物根），不是源路径；
+ * 前缀就是各类入口的约定产物目录，tabBar 那个由平台给。
+ */
+function isEntryChunk(
+  fileName: string,
+  bootstrapChunk: string,
+  tabbarDir: string | undefined,
+): boolean {
+  const posix = toPosixPath(fileName);
+  if (posix === bootstrapChunk) {
+    return false;
+  }
+  return (
+    posix.startsWith('pages/') ||
+    posix.startsWith('components/') ||
+    posix.startsWith('library/') ||
+    (!!tabbarDir && isPathIn(tabbarDir, posix))
+  );
 }
 
 export function miniProgramAssetsPlugin(
-  options: MiniProgramAssetsPluginOptions
+  options: MiniProgramAssetsPluginOptions,
 ): Plugin {
   const libraryTemplateScopeService =
     options.templateScope ?? new LibraryTemplateScopeService();
@@ -182,7 +381,7 @@ export function miniProgramAssetsPlugin(
   let styleProcessor: CustomStyleSheetProcessor | undefined;
 
   const runAnalysis = async (
-    entryPatterns: PagePattern[] = options.entryPatterns
+    entryPatterns: PagePattern[] = options.entryPatterns,
   ) => {
     const system = createNodeTsSystem(() => options.workspaceRoot);
     const stubCompiler = createStubWebpackCompiler(!!options.watch);
@@ -210,27 +409,32 @@ export function miniProgramAssetsPlugin(
   };
 
   /**
-   * 编译样式源文件，返回 path -> css 文本。
-   * processor 需要跳轮复用，所以由闭包持有，具体编译在模块级函数里。
+   * 样式编译器跳轮复用，所以由闭包持有；具体编译在模块级函数里。
    */
-  const compileStyles = async (styleSourcePaths: Set<string>) => {
-    if (!styleSourcePaths.size) {
-      return new Map<string, string>();
-    }
-    styleProcessor ??= createStyleProcessor(options);
-    return compileStyleSources(options, styleProcessor, styleSourcePaths);
-  };
+  const ensureStyleProcessor = () =>
+    (styleProcessor ??= createStyleProcessor(options));
+
+  const warnStyleOf = createStyleWarnOf(options);
 
   return {
     name: 'mini-program:assets',
-    enforce: 'post',
-    buildStart() {
+    enforce: 'pre',
+    async buildStart() {
       // watch 模式下每轮 buildStart 都要作废上一轮的分析结果，
       // 否则改模板不会重新产出 wxml
       if (options.watch) {
         analysisPromise = null;
       }
       analysisPromise ??= runAnalysis();
+      /**
+       * 必须 await。不 await 的话这条 promise 在 buildStart 返回后没人接，
+       * 分析一失败就是 unhandled rejection，直接把 node 进程崩掉：
+       * 报错不走 vite 的插件错误通道，用户只看到一坨裸堆栈。
+       */
+      await analysisPromise;
+      if (options.analysisRef) {
+        options.analysisRef.current = await analysisPromise;
+      }
     },
     async generateBundle(_opts, bundle) {
       if (options.watch) {
@@ -239,14 +443,11 @@ export function miniProgramAssetsPlugin(
       analysisPromise ??= runAnalysis();
       const resolved = await analysisPromise;
 
-      // 收集所有要编译的样式源文件
-      const styleSources = new Set<string>();
-      resolved.style.forEach((sourceList) => {
-        for (const s of sourceList) {
-          styleSources.add(path.normalize(s));
-        }
-      });
-      const compiledStyles = await compileStyles(styleSources);
+      const compiledStyles = await compileResolvedStyles(
+        options,
+        ensureStyleProcessor,
+        resolved,
+      );
 
       const emit = (fileName: string, source: string) => {
         // 不能用 path.normalize：Windows 上它会把 `/` 转成 `\`，
@@ -271,31 +472,26 @@ export function miniProgramAssetsPlugin(
         emit(outPath, content);
       });
 
-      // 2. wxss：按组件把编译后的样式拼起来
-      resolved.style.forEach((sourceList, outPath) => {
-        const css = sourceList
-          .map((s) => compiledStyles.get(path.normalize(s)) ?? '')
-          .join('\n');
-        emit(outPath, css);
-      });
+      // 1.5 wxs：渲染层脚本原样落盘 + watch 登记
+      emitWxs(resolved, emit, (p) => this.addWatchFile(p));
 
-      // 3. json：合并组件目录里已存在的配置文件
+      // 2. wxss：按组件把编译后的样式拼起来，再过一遍小程序兼容处理
+      emitStyles(resolved, compiledStyles, emit, warnStyleOf);
+
+      // 3. json：用户已有的那份打底，构建器算出来的只补没写过的
       resolved.config.forEach((value, outPath) => {
-        let config: Record<string, unknown> = {};
-        if (value.existConfig && fs.existsSync(value.existConfig)) {
-          config = JSON.parse(fs.readFileSync(value.existConfig, 'utf8'));
-        }
-        config.component ??= value.component;
-        config.usingComponents = {
-          ...(config.usingComponents as Record<string, string> | undefined),
-          ...value.usingComponents.reduce(
-            (pre, cur) => {
-              pre[cur.selector] = cur.path;
-              return pre;
-            },
-            {} as Record<string, string>
-          ),
-        };
+        const existing = readJsonObject(value.existConfig);
+        const usingComponents = value.usingComponents.reduce(
+          (pre, cur) => {
+            pre[cur.selector] = cur.path;
+            return pre;
+          },
+          {} as Record<string, string>,
+        );
+        const config = mergeConfig(existing, {
+          component: value.component,
+          usingComponents,
+        });
         emit(outPath, JSON.stringify(config));
       });
 
@@ -303,7 +499,7 @@ export function miniProgramAssetsPlugin(
       //    这一步必须在 exportLibraryTemplate() 之前，否则 templateList 是空的，
       //    library-template/*.wxml 会产出一个空文件。
       for (const [key, element] of Object.entries(
-        resolved.otherMetaCollectionGroup
+        resolved.otherMetaCollectionGroup,
       )) {
         libraryTemplateScopeService.setScopeExtraUseComponents(key, {
           useComponents: {
@@ -312,7 +508,7 @@ export function miniProgramAssetsPlugin(
                 pre[cur.selector] = cur.path;
                 return pre;
               },
-              {} as Record<string, string>
+              {} as Record<string, string>,
             ),
           },
           templateList: element.templateList.map((item) => item.content),
@@ -325,24 +521,12 @@ export function miniProgramAssetsPlugin(
       }
 
       // 6. library 模板
+      // 注意：这里**不再渲染**。库模板已在 library-template.plugin 从 sidecar
+      // 取出时渲染成目标平台文本；这里拼进来的还有 app 自己的 wxml（带真实
+      // `{{hasLoad}}` 插值），再过一遍模板渲染会把它们吃掉。
       const templateGroup = libraryTemplateScopeService.exportLibraryTemplate();
       for (const [key, element] of Object.entries(templateGroup)) {
-        emit(
-          key,
-          literalResolve<LibraryTemplateLiteralConvertOptions>(
-            `\`${element}\``,
-            {
-              directivePrefix:
-                options.buildPlatform.templateTransform.getData()
-                  .directivePrefix,
-              eventListConvert:
-                options.buildPlatform.templateTransform.eventListConvert,
-              templateInterpolation:
-                options.buildPlatform.templateTransform.templateInterpolation,
-              fileExtname: options.buildPlatform.fileExtname,
-            }
-          )
-        );
+        emit(key, element);
       }
 
       // 7. self template
@@ -350,67 +534,44 @@ export function miniProgramAssetsPlugin(
         emit(key, content);
       }
 
-      // 8. builder 配置里的 assets（project.config.json 等）
-      if (
-        options.assets?.length &&
-        options.absoluteProjectRoot &&
-        options.absoluteProjectSourceRoot
-      ) {
-        const copied = await collectAssets(options.assets, {
-          workspaceRoot: options.workspaceRoot,
-          absoluteProjectRoot: options.absoluteProjectRoot,
-          absoluteProjectSourceRoot: options.absoluteProjectSourceRoot,
-        });
-        const appJsonName = `app${options.buildPlatform.fileExtname.config}`;
-        const hasStaticAppJson = copied.some(
-          (item) => toPosixPath(item.outputRelPath) === appJsonName
-        );
-        if (options.appJson && hasStaticAppJson) {
-          this.error(
-            `appJson 配置与 assets 中的 ${appJsonName} 冲突：` +
-              `app 配置只能有一个来源，请删除 assets 里的 ${appJsonName} 或改用 appJson`
-          );
+      // 8. builder 配置里的 assets。被合并流程接管的配置文件不能在这里拷，
+      //    否则会把合并结果盖回用户原文。
+      const consumed = options.mpConfigs?.consumedAssets ?? new Set<string>();
+      const emittedPaths = new Set<string>();
+      for (const item of options.assets ?? []) {
+        if (consumed.has(item.sourcePath)) {
+          continue;
         }
-        for (const item of copied) {
-          emit(item.outputRelPath, fs.readFileSync(item.sourcePath, 'utf8'));
-        }
+        const text = fs.readFileSync(item.sourcePath, 'utf8');
+        emit(item.outputRelPath, text);
+        emittedPaths.add(toPosixPath(item.outputRelPath));
       }
 
-      // 8.5 app.json 编译生成（#1）：结构化配置 + 编译期校验。
-      // 之前 app.json 是静态拷贝，页面不存在 / tabBar 野路径等错误
-      // 全部延后到开发者工具才能发现，这里前置拦截。
-      if (options.appJson) {
-        const appJsonName = `app${options.buildPlatform.fileExtname.config}`;
-        const appJsonPath = path.resolve(
-          options.workspaceRoot,
-          options.appJson
+      // 8.5 配置文件输出：没有任何可合并内容时逐字节用用户那份原文
+      if (options.mpConfigs) {
+        for (const resolvedConfig of [
+          options.mpConfigs.app,
+          options.mpConfigs.project,
+        ]) {
+          const text =
+            resolvedConfig.verbatimText ??
+            `${JSON.stringify(resolvedConfig.config, null, 2)}\n`;
+          emit(resolvedConfig.filename, text);
+          emittedPaths.add(resolvedConfig.filename);
+        }
+        const missing = checkReferencedFiles(
+          options.mpConfigs.app.config,
+          emittedPaths,
         );
-        if (!fs.existsSync(appJsonPath)) {
-          this.error(`appJson 配置文件不存在: ${options.appJson}`);
+        if (missing.length) {
+          const message = `app 配置引用了产物里不存在的文件:\n  - ${missing.join('\n  - ')}`;
+          // 静态那份 app.json 是用户从别的项目搬过来的，漏拷一个文件不该停整个构建
+          if (options.mpConfigs.app.level === 'error') {
+            this.error(message);
+          } else {
+            this.warn(message);
+          }
         }
-        let appConfig: MpAppConfig;
-        try {
-          appConfig = JSON.parse(
-            fs.readFileSync(appJsonPath, 'utf8')
-          ) as MpAppConfig;
-        } catch (e) {
-          this.error(
-            `appJson 配置 JSON 解析失败 ${options.appJson}: ${String(
-              (e as Error)?.message ?? e
-            )}`
-          );
-        }
-        const builtPagePaths = options.entryPatterns
-          .filter((p) => p.type === 'page')
-          .map((p) => toPosixPath(p.outputFiles.path));
-        const errors = validateAppConfig(appConfig, builtPagePaths);
-        if (errors.length) {
-          this.error(
-            `app 配置校验失败（${options.appJson}）:\n  - ` +
-              errors.join('\n  - ')
-          );
-        }
-        emit(appJsonName, generateAppJson(appConfig));
       }
 
       // 9. app.js：小程序没有模块系统，靠 app.js 里一串 require 把启动
@@ -424,9 +585,12 @@ export function miniProgramAssetsPlugin(
         imports: string[];
       }
       const jsChunks = Object.values(bundle).filter(
-        (item) => item.type === 'chunk' && item.fileName.endsWith('.js')
+        (item) => item.type === 'chunk' && item.fileName.endsWith('.js'),
       ) as unknown as JsChunk[];
       const byFileName = new Map(jsChunks.map((c) => [c.fileName, c]));
+      // app.js 的引导 chunk（应用 = main.js，测试 = test.js）
+      const bootstrapChunk = options.bootstrapChunk ?? 'main.js';
+      const tabbarDir = options.buildPlatform.customTabbar?.dir;
       const emittedOrder: string[] = [];
       const visiting = new Set<string>();
       const visited = new Set<string>();
@@ -470,19 +634,6 @@ export function miniProgramAssetsPlugin(
        * 只含 app 主入口依赖的那几个 chunk（main/runtime/vendor/...），
        * 不含 page/component entry。
        */
-      const isEntryChunk = (fileName: string) => {
-        const posix = toPosixPath(fileName);
-        // page / component / library 的 entry 产物都落在这几个目录下，
-        // 且不是 main.js
-        if (posix === 'main.js') {
-          return false;
-        }
-        return (
-          posix.startsWith('pages/') ||
-          posix.startsWith('components/') ||
-          posix.startsWith('library/')
-        );
-      };
       // 从 main.js 出发收集可达 chunk（含自身）
       const reachable = new Set<string>();
       const collect = (fileName: string) => {
@@ -496,17 +647,21 @@ export function miniProgramAssetsPlugin(
           collect(dep);
         }
       };
-      if (byFileName.has('main.js')) {
-        collect('main.js');
+      if (byFileName.has(bootstrapChunk)) {
+        collect(bootstrapChunk);
       }
       // 保持拓扑顺序（依赖在前）
       const required = emittedOrder.filter((f) =>
-        reachable.has(toPosixPath(f))
+        reachable.has(toPosixPath(f)),
       );
-      if (!byFileName.has('main.js')) {
+      if (!byFileName.has(bootstrapChunk)) {
         // 没有 main 引导入口时退化成「排除 entry 类 chunk」，
         // 至少不会再把 Page()/Component() 拉进 app 上下文
-        required.push(...emittedOrder.filter((f) => !isEntryChunk(f)));
+        required.push(
+          ...emittedOrder.filter(
+            (f) => !isEntryChunk(f, bootstrapChunk, tabbarDir),
+          ),
+        );
       }
       /**
        * polyfill 必须在最前面。
@@ -531,7 +686,7 @@ export function miniProgramAssetsPlugin(
         .join(';');
       emit(
         'app.js',
-        `${options.buildPlatform.importTemplate};\n${requireList};`
+        `${options.buildPlatform.importTemplate};\n${requireList};`,
       );
 
       // 10. 全局样式（app 级）。对应 builder 配置里的 styles
@@ -541,12 +696,28 @@ export function miniProgramAssetsPlugin(
           .map((s) => (typeof s === 'string' ? s : s.input))
           .filter((s) => fs.existsSync(path.resolve(options.workspaceRoot, s)))
           .map((s) => path.resolve(options.workspaceRoot, s));
+        const styleProcessor = ensureStyleProcessor();
         const compiledGlobal = await compileStyles(
-          new Set(globalStyleSources.map((s) => path.normalize(s)))
+          styleProcessor,
+          fileStyleEntries(styleProcessor, globalStyleSources),
+          (error, key) =>
+            options.context.logger.warn(
+              `全局样式编译失败 ${key}: ${String(
+                (error as Error)?.message ?? error,
+              )}`,
+            ),
         );
-        const globalCss = globalStyleSources
-          .map((s) => compiledStyles.get(path.normalize(s)) ?? '')
-          .join('\n');
+        const globalCss = transformMiniProgramStyle(
+          globalStyleSources
+            .map((s) => compiledGlobal.get(toNativePath(s)) ?? '')
+            .join('\n'),
+          {
+            warn: (message) =>
+              options.context.logger.warn(
+                `[样式 app${options.buildPlatform.fileExtname.style}] ${message}`,
+              ),
+          },
+        );
         // 文件名跟着平台走：wx 是 app.wxss，bdzn 是 app.css，
         // zfb 是 app.acss……写死 wxss 会让其他平台拿不到全局样式。
         emit('app' + options.buildPlatform.fileExtname.style, globalCss);

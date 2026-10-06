@@ -4,7 +4,22 @@
   "deleteDestPath": true,
   "allowedNonPeerDependencies": [
     "cyia-code-util",
-    "static-injector"
+    "static-injector",
+    "@analogjs/vite-plugin-angular",
+    "abortcontroller-polyfill",
+    "birpc",
+    "clsx",
+    "cyia-code-util",
+    "es-toolkit",
+    "flatted",
+    "fs-extra",
+    "jiti",
+    "glob",
+    "ora",
+    "static-injector",
+    "vite",
+    "ws",
+    "valibot"
   ],
   "lib": {
     "entryFile": "./platform/index.ts"

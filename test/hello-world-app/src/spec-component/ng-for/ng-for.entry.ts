@@ -1,3 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { NgForComponent } from './ng-for.component';
-componentRegistry(NgForComponent);
+export { NgForComponent as default } from './ng-for.component';

@@ -1,7 +1,9 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [NgTemplateOutlet],
   selector: 'app-ng-template-outlet',
   templateUrl: './ng-template-outlet.component.html',
 })

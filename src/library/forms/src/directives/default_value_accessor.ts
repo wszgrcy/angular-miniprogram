@@ -36,7 +36,7 @@ export const DEFAULT_VALUE_ACCESSOR: any = {
  * @publicApi
  */
 export const COMPOSITION_BUFFER_MODE = new InjectionToken<boolean>(
-  'CompositionEventMode'
+  'CompositionEventMode',
 );
 
 /**

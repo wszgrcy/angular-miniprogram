@@ -18,14 +18,14 @@ describe('diffNodeData', () => {
       a: { b: 2 },
     });
     expect(
-      diffNodeData({ a: { b: 1, b1: 1 }, c: 1 }, { a: { b: 2, b1: 1 }, c: 1 })
+      diffNodeData({ a: { b: 1, b1: 1 }, c: 1 }, { a: { b: 2, b1: 1 }, c: 1 }),
     ).toEqual({
       ['a.b']: 2,
     });
   });
   it('减少数量全量', () => {
     expect(
-      diffNodeData({ a: { b: 1, b1: 1 }, c: 1 }, { a: { b: 2 }, c: 1 })
+      diffNodeData({ a: { b: 1, b1: 1 }, c: 1 }, { a: { b: 2 }, c: 1 }),
     ).toEqual({
       a: { b: 2 },
     });
@@ -35,7 +35,7 @@ describe('diffNodeData', () => {
   });
   it('增加数量全量', () => {
     expect(
-      diffNodeData({ a: { b: 2 }, c: 1 }, { a: { b: 1, b1: 1 }, c: 1 })
+      diffNodeData({ a: { b: 2 }, c: 1 }, { a: { b: 1, b1: 1 }, c: 1 }),
     ).toEqual({
       a: { b: 1, b1: 1 },
     });
@@ -65,8 +65,11 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
       Object.keys(obj as Record<string, unknown>).forEach((k) => {
         const p = prefix ? `${prefix}.${k}` : k;
         const v = (obj as Record<string, unknown>)[k];
-        if (v === undefined) {out.push(p);}
-        else {out.push(...undefPaths(v, p));}
+        if (v === undefined) {
+          out.push(p);
+        } else {
+          out.push(...undefPaths(v, p));
+        }
       });
     }
     return out;
@@ -79,10 +82,9 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
   });
 
   it('嵌套对象字段变 undefined → 转 null', () => {
-    const d = diffNodeData(
-      { a: { b: 'name' } },
-      { a: { b: undefined } } as any
-    );
+    const d = diffNodeData({ a: { b: 'name' } }, {
+      a: { b: undefined },
+    } as any);
     expect(undefPaths(d)).toEqual([]);
   });
 
@@ -96,7 +98,7 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
 
     const d = diffNodeData(from as any, to as any);
 
-    expect(undefPaths(d)).withContext('diff 里不允许出现 undefined').toEqual([]);
+    expect(undefPaths(d), 'diff 里不允许出现 undefined').toEqual([]);
     // 该路径应被显式清成 null
     expect((d as any)['nodeList[0][0].__templateName']).toBeNull();
   });
@@ -121,10 +123,7 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
   });
 
   it('值未变（都是 null）不产生 diff', () => {
-    const d = diffNodeData(
-      { a: { b: null } },
-      { a: { b: null } }
-    );
+    const d = diffNodeData({ a: { b: null } }, { a: { b: null } });
     expect(d).toEqual({});
   });
 });
@@ -179,7 +178,6 @@ describe('diffNodeData: 优化后正确性与性能', () => {
     expect(Object.keys(d).length).toBe(N);
     // 宽松阈值：线性实现应远小于 O(N^2)。N=2000 全变更应在百毫秒级。
     expect(elapsed).toBeLessThan(1500);
-    // eslint-disable-next-line no-console
     console.log(`[diff bench] N=${N} 全变更耗时 ${elapsed}ms`);
   });
 
@@ -198,7 +196,6 @@ describe('diffNodeData: 优化后正确性与性能', () => {
     const elapsed = Date.now() - t0;
     expect(Object.keys(d).length).toBe(1);
     expect(elapsed).toBeLessThan(500);
-    // eslint-disable-next-line no-console
     console.log(`[diff bench] 单点变更 N=${N} 耗时 ${elapsed}ms`);
   });
 
@@ -213,7 +210,10 @@ describe('diffNodeData: 优化后正确性与性能', () => {
    * Object.assign → O(N)。
    */
   it('新旧对比：结果逐字相等，且新算法在 O(N^2) 负载上更快', () => {
-    const N = 3000;
+    // 旧实现是 O(N^2)，N 直接决定本用例耗时（N=3000 时单跑一次近 1s，
+    // 四个轮子下来近 4s）。平价断言与 N 无关，加速比在 N=1000 已经
+    // 足够跳出噪声，所以这里取小值。
+    const N = 1000;
     const from: any = {};
     const to: any = {};
     for (let i = 0; i < N; i++) {
@@ -227,10 +227,10 @@ describe('diffNodeData: 优化后正确性与性能', () => {
     // 正确性平价：新旧输出必须完全一致
     expect(newResult).toEqual(oldResult);
 
-    // 计时：各自跑多轮取最小值，降低噪声
+    // 计时：各自跑两轮取最小值，降低噪声
     const time = (fn: () => unknown) => {
       let min = Infinity;
-      for (let r = 0; r < 3; r++) {
+      for (let r = 0; r < 2; r++) {
         const t = Date.now();
         fn();
         min = Math.min(min, Date.now() - t);
@@ -239,11 +239,10 @@ describe('diffNodeData: 优化后正确性与性能', () => {
     };
     const oldMs = time(() => diffNodeDataOld(from, to));
     const newMs = time(() => diffNodeData(from, to));
-    // eslint-disable-next-line no-console
     console.log(
       `[diff 对比] N=${N}  旧=${oldMs}ms  新=${newMs}ms  加速≈${(
         oldMs / Math.max(newMs, 1)
-      ).toFixed(1)}x`
+      ).toFixed(1)}x`,
     );
 
     // 新算法绝不应比旧算法慢（宽松断言，避免机器噪声误报）
@@ -257,14 +256,14 @@ describe('diffNodeData: 优化后正确性与性能', () => {
  */
 function diffNodeDataOld(
   from: Record<string, unknown>,
-  to: Record<string, unknown>
+  to: Record<string, unknown>,
 ): Record<string, unknown> {
   function _diff(
     count: number,
     prefix: string,
     fromItem: unknown,
     toItem: unknown,
-    changeObject: Record<string, unknown>
+    changeObject: Record<string, unknown>,
   ) {
     if (fromItem instanceof Array && toItem instanceof Array) {
       const result = arr(fromItem, toItem, prefix);
@@ -286,7 +285,7 @@ function diffNodeDataOld(
       const result = obj(
         fromItem as Record<string, unknown>,
         toItem as Record<string, unknown>,
-        prefix
+        prefix,
       );
       if (result.allChange || result.object) {
         if (result.allChange) {
@@ -307,7 +306,7 @@ function diffNodeDataOld(
   function obj(
     from: Record<string, unknown>,
     to: Record<string, unknown>,
-    prefix: string
+    prefix: string,
   ) {
     const toKeyList = Object.keys(to);
     let changeObject: Record<string, unknown> = {};
@@ -323,7 +322,7 @@ function diffNodeDataOld(
         `${prefix}${point}${key}`,
         from[key],
         to[key],
-        changeObject
+        changeObject,
       );
       count = r.count;
       changeObject = r.changeObject;

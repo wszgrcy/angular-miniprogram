@@ -5,6 +5,6 @@ export function getComponentOutputPath(entry: string, className: string) {
   return join(
     normalize(entry),
     dasherize(camelize(className)),
-    dasherize(camelize(className))
+    dasherize(camelize(className)),
   );
 }

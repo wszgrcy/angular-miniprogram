@@ -11,10 +11,10 @@
       "schema": "./library/schema.json",
       "description": "小程序构建library"
     },
-    "karma": {
-      "implementation": "./karma/vite",
-      "schema": "./karma/schema.json",
-      "description": "小程序测试（Vite 打包 + karma runner，不依赖 webpack）"
+    "vitest": {
+      "implementation": "./vitest/vite",
+      "schema": "./vitest/vite/schema.json",
+      "description": "小程序测试构建（把 spec 编进产物，由 vitest 通过 WebSocket 驱动）"
     }
   }
 }

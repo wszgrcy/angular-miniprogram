@@ -1,4 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { Component1Component } from './component1.component';
-
-componentRegistry(Component1Component);
+export { Component1Component as default } from './component1.component';

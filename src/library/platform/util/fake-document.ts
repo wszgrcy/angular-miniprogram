@@ -60,7 +60,127 @@ import { DOCUMENT, ɵsetDocument } from '@angular/core';
  */
 export const MINI_PROGRAM_FAKE_DOCUMENT = {
   head: {},
+  /** i18n 分支解析用：`walkIcuTree` 靠 `nodeType === COMMENT_NODE` 认嵌套 ICU */
+  implementation: {
+    createHTMLDocument: (): Document => createInertDocument() as never,
+  },
 } as unknown as Document;
+
+/**
+ * ICU 分支解析需要的最小 DOM。
+ *
+ * `parseIcuCase` 无条件跑 `getInertBodyHelper(getDocument())`，拿不到就
+ * `Cannot read properties of undefined (reading 'createHTMLDocument')`。两个候选实现里：
+ *
+ * - `DOMParserHelper`：要 `window.DOMParser`，小程序没有，`isDOMParserAvailable()`
+ *   自己 catch 掉，不会选它；
+ * - `InertDocumentHelper`：`doc.implementation.createHTMLDocument()` →
+ *   `createElement('template')` → 写 `innerHTML` → 读 `content`。
+ *
+ * 所以只需把第二条这条路搭起来。`walkIcuTree` 真正读的字段只有
+ * `nodeType` / `nodeName` / `textContent` / `firstChild` / `nextSibling`（元素额外要
+ * `tagName` / `attributes` / `namespaceURI`），这里只给得出**纯文本分支**：
+ * 分支里带标签时这里只能整段当文本返回，渲染会丢标签。
+ */
+/**
+ * 把分支文案切成「文本 / 注释」节点链。
+ *
+ * 注释节点不是可选项：嵌套 ICU 在消息里就是 `<!--\uFFFD1\uFFFD-->`，
+ * `walkIcuTree` 只在 `case Node.COMMENT_NODE` 分支里认它
+ * （`NESTED_ICU = /\uFFFD(\d+)\uFFFD/`）。当纯文本返回的话外层分支会渲染出
+ * 字面量 `<!--1-->`，嵌套的那层则整个不存在。
+ *
+ * 仍然只认这两种节点：分支里带真标签时只能整段当文本，渲染会丢标签。
+ */
+function parseIntoNodes(html: string): InertNode | null {
+  // DOMParserHelper 会加 `<body><remove></remove>` 前缀，InertDocumentHelper
+  // 不加；两种形态都剥干净
+  const body = html
+    .replace(/^<body>/, '')
+    .replace(/^<remove><\/remove>/, '')
+    .replace(/<\/body>$/, '');
+
+  const head: InertNode = {
+    nodeType: 11,
+    nodeName: '#document-fragment',
+    textContent: '',
+    firstChild: null,
+    nextSibling: null,
+  };
+  let tail = head;
+  let rest = body;
+  while (rest.length) {
+    const open = rest.indexOf('<!--');
+    const close = open === -1 ? -1 : rest.indexOf('-->', open + 4);
+    if (open === -1 || close === -1) {
+      tail.nextSibling = makeText(rest);
+      break;
+    }
+    if (open > 0) {
+      tail.nextSibling = makeText(rest.slice(0, open));
+      tail = tail.nextSibling;
+    }
+    tail.nextSibling = {
+      nodeType: 8,
+      nodeName: '#comment',
+      textContent: rest.slice(open + 4, close),
+      firstChild: null,
+      nextSibling: null,
+    };
+    tail = tail.nextSibling;
+    rest = rest.slice(close + 3);
+  }
+  return head.nextSibling;
+}
+
+function makeText(text: string): InertNode {
+  return {
+    nodeType: 3,
+    nodeName: '#text',
+    textContent: text,
+    firstChild: null,
+    nextSibling: null,
+  };
+}
+
+function createInertDocument() {
+  return {
+    createElement(tag: string) {
+      // `InertDocumentHelper` 只会要 template；其余一律不给，避免默默走空
+      if (tag !== 'template') {
+        throw new Error(`i18n DOM 占位物不造 <${tag}>`);
+      }
+      let content: InertNode | null = null;
+      return {
+        // getTemplateContent 认这两项，缺一个整棵分支树会被静默跳过
+        nodeType: 1,
+        nodeName: 'TEMPLATE',
+        set innerHTML(html: string) {
+          // `content` 是**容器**，`walkIcuTree` 从 `content.firstChild` 起走。
+          // 直接把文本节点当 content 会让它一上来就拿到 null，整棵分支树静默为空。
+          content = {
+            nodeType: 11,
+            nodeName: '#document-fragment',
+            textContent: '',
+            firstChild: parseIntoNodes(html),
+            nextSibling: null,
+          };
+        },
+        get content() {
+          return content;
+        },
+      };
+    },
+  };
+}
+
+interface InertNode {
+  nodeType: number;
+  nodeName: string;
+  textContent: string;
+  firstChild: InertNode | null;
+  nextSibling: InertNode | null;
+}
 
 /**
  * 在平台初始化时调用，把 Angular 的 document 指向占位物。

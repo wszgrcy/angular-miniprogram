@@ -24,17 +24,23 @@ export const PLATFORM_FLAG_NAMES: Record<PlatformType, string> = {
   [PlatformType.zfb]: '__MP_ZFB__',
   [PlatformType.qq]: '__MP_QQ__',
   [PlatformType.dd]: '__MP_DD__',
+  [PlatformType.ks]: '__MP_KS__',
+  [PlatformType.xhs]: '__MP_XHS__',
+  [PlatformType.fs]: '__MP_FS__',
   [PlatformType.library]: '__MP_LIBRARY__',
 };
 
 /** 生成注入 Vite `define` 的平台常量表 */
 export function platformConditionDefine(
-  platform: PlatformType
+  platform: PlatformType,
 ): Record<string, string> {
   const define: Record<string, string> = {
     __MP_PLATFORM__: `"${platform}"`,
   };
-  for (const [candidate, flag] of Object.entries(PLATFORM_FLAG_NAMES)) {
+  for (const [candidate, flag] of Object.entries(PLATFORM_FLAG_NAMES) as [
+    PlatformType,
+    string,
+  ][]) {
     define[flag] = candidate === platform ? 'true' : 'false';
   }
   return define;

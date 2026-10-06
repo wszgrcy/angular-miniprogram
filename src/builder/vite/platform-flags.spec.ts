@@ -1,8 +1,5 @@
 import { PlatformType } from '../platform/platform';
-import {
-  PLATFORM_FLAG_NAMES,
-  platformConditionDefine,
-} from './platform-flags';
+import { PLATFORM_FLAG_NAMES, platformConditionDefine } from './platform-flags';
 
 describe('platform-flags: define 生成', () => {
   it('wx 平台：__MP_WX__ 为 true，其余为 false', () => {
@@ -18,10 +15,10 @@ describe('platform-flags: define 生成', () => {
 
   it('__MP_PLATFORM__ 是带引号的平台字符串', () => {
     expect(platformConditionDefine(PlatformType.zfb).__MP_PLATFORM__).toBe(
-      '"zfb"'
+      '"zfb"',
     );
     expect(platformConditionDefine(PlatformType.wx).__MP_PLATFORM__).toBe(
-      '"wx"'
+      '"wx"',
     );
   });
 
@@ -29,7 +26,7 @@ describe('platform-flags: define 生成', () => {
     for (const platform of Object.values(PlatformType)) {
       const define = platformConditionDefine(platform);
       const trues = Object.values(PLATFORM_FLAG_NAMES).filter(
-        (flag) => define[flag] === 'true'
+        (flag) => define[flag] === 'true',
       );
       expect(trues.length).toBe(1);
       expect(trues[0]).toBe(PLATFORM_FLAG_NAMES[platform]);

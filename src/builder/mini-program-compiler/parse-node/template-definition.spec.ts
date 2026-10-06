@@ -29,9 +29,13 @@ function parseExprs(html: string): any[] {
   const out: any[] = [];
   const walk = (nodes: any[]) => {
     (nodes || []).forEach((n) => {
-      if (n.value && n.value.ast) {out.push(n.value.ast);}
+      if (n.value && n.value.ast) {
+        out.push(n.value.ast);
+      }
       ['children', 'branches', 'groups', 'cases'].forEach((k) => {
-        if (Array.isArray(n[k])) {walk(n[k]);}
+        if (Array.isArray(n[k])) {
+          walk(n[k]);
+        }
       });
     });
   };
@@ -63,7 +67,11 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
   const CASES: Array<[string, string, number]> = [
     ['无管道', '<div>{{ plainValue }}</div>', 0],
     ['单个管道', '<div>{{ a | number }}</div>', 1],
-    ['两个兄弟插值各一带管道', '<div>{{ a | number }}{{ b | number }}</div>', 2],
+    [
+      '两个兄弟插值各一带管道',
+      '<div>{{ a | number }}{{ b | number }}</div>',
+      2,
+    ],
     ['管道参数里再嵌管道', '<div>{{ a | date:(b | number) }}</div>', 2],
     ['管道参数三层嵌套', '<div>{{ a | b:(c | d:(e | number)) }}</div>', 3],
     ['安全属性读内含管道', '<div>{{ (a | number)?.b }}</div>', 1],
@@ -72,7 +80,11 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
     ['this 接收者带管道', '<div>{{ this.a | number }}</div>', 1],
     ['this 深层链带管道', '<div>{{ this.a.b.c | number }}</div>', 1],
     ['二元两侧各一管道', '<div>{{ (a | number) + (b | number) }}</div>', 2],
-    ['三元三分支', '<div>{{ (c|number) ? (a | number) : (b | number) }}</div>', 3],
+    [
+      '三元三分支',
+      '<div>{{ (c|number) ? (a | number) : (b | number) }}</div>',
+      3,
+    ],
     ['数组字面量内含管道', '<div>{{ [a | number, b] }}</div>', 1],
     ['对象字面量值含管道', '<div>{{ {k: a | number} }}</div>', 1],
     ['下标 key 含管道', '<div>{{ list[k | number] }}</div>', 1],
@@ -88,7 +100,11 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
     ['展开元素内含管道', '<div>{{ [...(a | number)] }}</div>', 1],
     ['一元负号内含管道', '<div>{{ -(a | number) }}</div>', 1],
     ['括号表达式内含管道', '<div>{{ ((a | number)) }}</div>', 1],
-    ['嵌套组合大表达式', '<div>{{ ((a|number)?.b ?? [c | number]) + (d ? (e|number) : f) }}</div>', 3],
+    [
+      '嵌套组合大表达式',
+      '<div>{{ ((a|number)?.b ?? [c | number]) + (d ? (e|number) : f) }}</div>',
+      3,
+    ],
   ];
 
   for (const [name, html, expected] of CASES) {
@@ -99,10 +115,10 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
       const ours = exprs.reduce((sum, e) => sum + countWithOurs(e), 0);
       const angular = exprs.reduce((sum, e) => sum + countWithAngular(e), 0);
 
-      expect(ours).withContext(`我们数到的管道数 (${name})`).toBe(expected);
-      expect(ours)
-        .withContext(`必须与 Angular RecursiveAstVisitor 一致 (${name})`)
-        .toBe(angular);
+      expect(ours, `我们数到的管道数 (${name})`).toBe(expected);
+      expect(ours, `必须与 Angular RecursiveAstVisitor 一致 (${name})`).toBe(
+        angular,
+      );
     });
   }
 
@@ -138,9 +154,7 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
         return s + c.count;
       }, 0);
 
-      expect(broken)
-        .withContext(`旧写法应当少数（${html}）`)
-        .toBeLessThan(truth);
+      expect(broken, `旧写法应当少数（${html}）`).toBeLessThan(truth);
     }
   });
 });
@@ -152,45 +166,154 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
  * 属于最难排查的一类。本 fork 对 @defer / @content 已采用同一策略。
  */
 describe('TemplateDefinition: 不支持的构造显式抛错', () => {
-  function run(html: string) {
-    const r: any = parseTemplate(html, 'p.html');
+  function run(html: string, options?: { preserveWhitespaces?: boolean }) {
+    const r: any = parseTemplate(html, 'p.html', options);
     if (r.errors && r.errors.length) {
       throw new Error('模板解析失败: ' + r.errors[0].message);
     }
-    return new TemplateDefinition(r.nodes, new ComponentContext(undefined)).run();
+    return new TemplateDefinition(
+      r.nodes,
+      new ComponentContext(undefined),
+    ).run();
   }
 
-  it('ICU 复数消息抛错（实测该节点会真实产出，留空即静默丢弃）', () => {
-    expect(() =>
-      run('<p>{count, plural, =1 {one} other {many}}</p>')
-    ).toThrowError(/ICU/);
-  });
+  /**
+   * ICU 走 Angular 原生 `ɵɵi18n`，与 `{{a}}` 的 `ɵɵtext` 一样只占一个声明槽，
+   * 所以记账必须与等价插值逐字相同 —— 这是 wxml 下标不错位的前提。
+   */
+  for (const [name, html] of [
+    ['plural', '<p>{count, plural, =1 {one} other {many}}</p>'],
+    ['select', '<p>{gender, select, male {他} other {TA}}</p>'],
+  ] as const) {
+    it(`ICU（${name}）按一个文本槽记账，与等价插值一致`, () => {
+      const icu = JSON.stringify(run(html).map((n) => n.getNodeMeta()));
+      const plain = JSON.stringify(
+        run('<p>{{ a }}</p>').map((n) => n.getNodeMeta()),
+      );
+      expect(icu).toBe(plain);
+    });
+  }
 
-  it('ICU select 消息同样抛错', () =>
-    expect(() => run('<p>{gender, select, male {他} other {TA}}</p>')).toThrowError(
-      /ICU/
-    ));
-
-  it('ng-content 带 fallback 内容抛错（小程序 slot 无对应能力）', () => {
-    expect(() => run('<ng-content>fallback</ng-content>')).toThrowError(
-      /fallback/
+  /**
+   * ICU 分支里的插值带管道时，emit 侧会多出 `ɵɵpipe(i, "number")`，
+   * 占一个声明槽。漏数就是 wxml 下标整体前移一位——实测踩过，
+   * 表现是后续所有节点错位一格且零报错。
+   */
+  it('ICU 分支里的管道各占一个声明槽', () => {
+    // 把所有节点（含 children）的下标拍平取最大，即「最后一个槽」
+    const lastIndex = (html: string) => {
+      const seen: number[] = [];
+      const walk = (meta: any) => {
+        if (typeof meta?.index === 'number') {
+          seen.push(meta.index);
+        }
+        (meta?.children ?? []).forEach(walk);
+      };
+      run(html).forEach((n) => walk(n.getNodeMeta() as any));
+      return Math.max(...seen);
+    };
+    const without = lastIndex(
+      '<p>{g, select, other {x{{c}}}}</p><b>{{ y }}</b>',
+    );
+    const withPipe = lastIndex(
+      '<p>{g, select, other {x{{c | number}}}}</p><b>{{ y }}</b>',
+    );
+    expect(withPipe, '分支里多一个管道，后面的节点必须整体后移一格').toBe(
+      without + 1,
     );
   });
 
-  it('对照：ng-content 无 fallback 正常通过', () => {
-    const list = run('<ng-content select=".header"></ng-content>');
-    expect(list.length).toBe(1);
+  /**
+   * `ɵɵi18nAttributes` 占一个独立声明槽，但 i18n pass 在我们拿到 AST 前
+   * 就把 `i18n-*` 消费干净了，AST 里没有任何残留（实测带 i18n 的插值属性
+   * 与普通插值属性逐字相同）。所以只能从模板原文数，这里把规则钉住：
+   * **值含插值的 `i18n-<attr>` → 该元素后多一格**，静态的不算。
+   */
+  describe('i18n-* 属性占的声明槽', () => {
+    const lastIndex = (html: string) => {
+      const seen: number[] = [];
+      const walk = (meta: any) => {
+        if (typeof meta?.index === 'number') {
+          seen.push(meta.index);
+        }
+        (meta?.children ?? []).forEach(walk);
+      };
+      const ctx = new ComponentContext(undefined);
+      ctx.templateText = html;
+      new TemplateDefinition(parseTemplate(html, 'p.html').nodes, ctx)
+        .run()
+        .forEach((n) => walk(n.getNodeMeta() as any));
+      return Math.max(...seen);
+    };
+
+    for (const [name, attr, expectShift] of [
+      ['无 i18n', '', false],
+      ['静态 i18n 值', 'i18n-title="标题"', false],
+      ['插值 i18n 值', 'i18n-alt="照片 {{n}}"', true],
+      ['插值 i18n + 静态 i18n', 'i18n-alt="照片 {{n}}" i18n-title="题"', true],
+      [
+        '两个插值 i18n（仍只多一格）',
+        'i18n-alt="照 {{n}}" i18n-title="题 {{n}}"',
+        true,
+      ],
+    ] as const) {
+      it(`${name} → ${expectShift ? '多占一格' : '不多占'}`, () => {
+        const withAttr = lastIndex(`<img ${attr} alt="a" /><b>{{ y }}</b>`);
+        const without = lastIndex('<img alt="a" /><b>{{ y }}</b>');
+        expect(withAttr - without).toBe(expectShift ? 1 : 0);
+      });
+    }
   });
 
-  it('对照：ng-content 纯空白不算 fallback（Angular 归一成空 children）', () => {
-    const list = run('<ng-content>   </ng-content>');
-    expect(list.length).toBe(1);
+  /**
+   * 兜底内容在 Angular 里是投影节点紧后面的一个 embedded view
+   * （`createProjectionOp` 的 `numSlotsUsed: fallbackView === null ? 1 : 2`），
+   * 所以带兜底要多占一格，且兜底内容自己在另一个视图里从 0 编号。
+   */
+  it('ng-content 带兜底内容：投影槽 + 紧贴的兜底容器槽', () => {
+    const meta: any = run('<ng-content>fallback</ng-content>')[0].getNodeMeta();
+    expect(meta.index).toBe(0);
+    expect(meta.fallback.index, '兜底容器必须紧贴投影节点').toBe(1);
+    expect(meta.fallback.defineTemplateName).toBe('projectionFallback_1');
+    // 兜底内容自成一套下标，不占宿主视图的槽
+    expect(meta.fallback.children.map((c: any) => c.index)).toEqual([0]);
+  });
+
+  it('ng-content 带兜底内容：后续节点整体后移一格', () => {
+    const list = run('<ng-content>fallback</ng-content><b></b>');
+    expect(list.map((n) => n.getNodeMeta().index)).toEqual([0, 2]);
+  });
+
+  it('对照：ng-content 无兜底内容只占一格', () => {
+    const list = run('<ng-content select="[slot=header]"></ng-content><b></b>');
+    expect(list.map((n) => n.getNodeMeta().index)).toEqual([0, 1]);
+  });
+
+  it('对照：ng-content 纯空白不算兜底内容（Angular 归一成空 children）', () => {
+    const meta: any = run('<ng-content>   </ng-content>')[0].getNodeMeta();
+    expect(meta.fallback).toBeUndefined();
+  });
+
+  /**
+   * `preserveWhitespaces: true` 时解析器不洗空白，AST 里真的会剩一个
+   * 空白 Text。Angular 的兜底判据不数它，这里跟着数就多占一格。
+   */
+  it('preserveWhitespaces 下的纯空白 Text 仍不算兜底内容', () => {
+    const blank: any = run('<ng-content>   </ng-content>', {
+      preserveWhitespaces: true,
+    })[0].getNodeMeta();
+    expect(blank.fallback, '空白文本不建兜底视图').toBeUndefined();
+
+    const real: any = run('<ng-content> a </ng-content>', {
+      preserveWhitespaces: true,
+    })[0].getNodeMeta();
+    expect(real.fallback.index).toBe(1);
   });
 
   it('@defer / @content 仍按既有策略抛错', () => {
-    expect(() => run('@defer { <a></a> }')).toThrowError(/defer/);
-    expect(() => run('@content { @case (foo) { <a></a> } }')).toThrowError(
-      /@content/
+    expect(() => run('@defer { <a></a> }')).toThrow(/defer/);
+    expect(() => run('@content { @case (foo) { <a></a> } }')).toThrow(
+      /@content/,
     );
   });
 
@@ -199,16 +322,16 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
     // 都只出 Element），所以直接构造节点喂进去，验证「出现即报错」。
     const def: any = new TemplateDefinition(
       [],
-      new ComponentContext(undefined)
+      new ComponentContext(undefined),
     );
 
     expect(() =>
-      def.visitComponent({ componentName: 'Foo', tagName: 'app-foo' })
-    ).toThrowError(/Component AST 节点/);
+      def.visitComponent({ componentName: 'Foo', tagName: 'app-foo' }),
+    ).toThrow(/Component AST 节点/);
 
-    expect(() =>
-      def.visitDirective({ name: 'MyDirective' })
-    ).toThrowError(/Directive AST 节点/);
+    expect(() => def.visitDirective({ name: 'MyDirective' })).toThrow(
+      /Directive AST 节点/,
+    );
   });
 });
 
@@ -230,15 +353,22 @@ describe('TemplateDefinition: 整模板槽位与 Angular 基准对齐', () => {
     const gt = new GroundTruthPipeCounter();
     const walkAst = (nodes: any[]) => {
       (nodes || []).forEach((n) => {
-        if (n.value && n.value.ast) {gt.visit(n.value.ast);}
+        if (n.value && n.value.ast) {
+          gt.visit(n.value.ast);
+        }
         ['children', 'branches', 'groups', 'cases'].forEach((k) => {
-          if (Array.isArray(n[k])) {walkAst(n[k]);}
+          if (Array.isArray(n[k])) {
+            walkAst(n[k]);
+          }
         });
       });
     };
     walkAst(r.nodes);
 
-    const def = new TemplateDefinition(r.nodes, new ComponentContext(undefined));
+    const def = new TemplateDefinition(
+      r.nodes,
+      new ComponentContext(undefined),
+    );
     def.run();
     // declIndex 是私有字段，用 astVisitor 的副作用反推：
     // 走完模板后 declIndex 应等于「渲染节点数 + 管道数」
@@ -249,13 +379,19 @@ describe('TemplateDefinition: 整模板槽位与 Angular 基准对齐', () => {
   const CASES: Array<[string, string]> = [
     ['纯静态', '<div>hello</div>'],
     ['单管道', '<div>{{ a | number }}</div>'],
-    ['多节点多管道', '<div>{{ a | number }}</div><span>{{ b | number }}</span>'],
+    [
+      '多节点多管道',
+      '<div>{{ a | number }}</div><span>{{ b | number }}</span>',
+    ],
     [
       '嵌套 + 参数嵌套管道',
       '<div><p>{{ a | date:(b | number) }}</p><b>{{ c }}</b></div>',
     ],
     ['安全读带管道', '<div>{{ (a | number)?.b }}</div>'],
-    ['@if 分支含管道', '@if (a | number) { <p>{{ x }}</p> } @else { <q>{{ y | number }}</q> }'],
+    [
+      '@if 分支含管道',
+      '@if (a | number) { <p>{{ x }}</p> } @else { <q>{{ y | number }}</q> }',
+    ],
   ];
 
   for (const [name, html] of CASES) {
@@ -266,9 +402,10 @@ describe('TemplateDefinition: 整模板槽位与 Angular 基准对齐', () => {
       expect(t.declIndex).toBeGreaterThanOrEqual(t.nodes);
       // declIndex 与「节点数 + 权威管道数」的差不应超过控制流锚点开销，
       // 关键是不允许出现「管道没数到」导致的欠计
-      expect(t.declIndex)
-        .withContext(`${name}: declIndex 应 >= 节点数 + 权威管道数`)
-        .toBeGreaterThanOrEqual(t.nodes + t.angularPipes);
+      expect(
+        t.declIndex,
+        `${name}: declIndex 应 >= 节点数 + 权威管道数`,
+      ).toBeGreaterThanOrEqual(t.nodes + t.angularPipes);
     });
   }
 

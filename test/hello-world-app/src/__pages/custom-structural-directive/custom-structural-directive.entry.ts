@@ -1,5 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-
-import { CustomStructuralDirectiveComponent } from './custom-structural-directive.component';
-
-bootstrapPage(CustomStructuralDirectiveComponent);
+export { CustomStructuralDirectiveComponent as default } from './custom-structural-directive.component';

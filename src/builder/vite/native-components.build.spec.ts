@@ -24,19 +24,19 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     const root = harness.host.root();
     const myTestProjectHost = new MyTestProjectHost(harness.host);
     const list = await myTestProjectHost.getFileList(
-      normalize(join(root, 'src', '__pages'))
+      normalize(join(root, 'src', '__pages')),
     );
     list.push(
       ...(await myTestProjectHost.getFileList(
-        normalize(join(root, 'src', '__components'))
-      ))
+        normalize(join(root, 'src', '__components')),
+      )),
     );
     await myTestProjectHost.importPathRename(list);
     await myTestProjectHost.moveDir(ALL_PAGE_NAME_LIST, '__pages', 'pages');
     await myTestProjectHost.moveDir(
       ALL_COMPONENT_NAME_LIST,
       '__components',
-      'components'
+      'components',
     );
     await myTestProjectHost.addPageEntry(ALL_PAGE_NAME_LIST);
     return { root, myTestProjectHost };
@@ -46,14 +46,14 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     await harness.host
       .write(
         join(harness.host.root(), rel),
-        virtualFs.stringToFileBuffer(content)
+        virtualFs.stringToFileBuffer(content),
       )
       .toPromise();
   };
 
   const readOutput = async (rel: string) =>
     virtualFs.fileBufferToString(
-      await harness.host.read(join(harness.host.root(), rel)).toPromise()
+      await harness.host.read(join(harness.host.root(), rel)).toPromise(),
     );
 
   describe('vite: 原生组件', () => {
@@ -62,15 +62,15 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       // 原生组件：wxcomponents/van-button/van-button.{json,wxml,js}
       await write(
         'src/wxcomponents/van-button/van-button.json',
-        JSON.stringify({ component: true })
+        JSON.stringify({ component: true }),
       );
       await write(
         'src/wxcomponents/van-button/van-button.wxml',
-        '<view>native van-button</view>'
+        '<view>native van-button</view>',
       );
       await write(
         'src/wxcomponents/van-button/van-button.js',
-        'Component({ properties: {} });'
+        'Component({ properties: {} });',
       );
       // 使用原生组件的页面
       await write(
@@ -88,16 +88,14 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
           '})',
           'export class NativeHostComponent {}',
           '',
-        ].join('\n')
+        ].join('\n'),
       );
       await write(
         'src/pages/native-host/native-host.entry.ts',
         [
-          "import { bootstrapPage } from 'angular-miniprogram';",
-          "import { NativeHostComponent } from './native-host.component';",
-          'bootstrapPage(NativeHostComponent);',
+          "export { NativeHostComponent as default } from './native-host.component';",
           '',
-        ].join('\n')
+        ].join('\n'),
       );
       // app.json 补上这个页面
       await write(
@@ -107,7 +105,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
             ...ALL_PAGE_NAME_LIST.map((n) => `pages/${n}/${n}-entry`),
             'pages/native-host/native-host-entry',
           ],
-        })
+        }),
       );
 
       harness.useTarget('build', {
@@ -115,7 +113,6 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
         outputPath: 'dist/vite-native',
         main: DEFAULT_ANGULAR_CONFIG.main,
         pages: DEFAULT_ANGULAR_CONFIG.pages,
-        components: DEFAULT_ANGULAR_CONFIG.components,
         assets: (
           DEFAULT_ANGULAR_CONFIG.assets as Array<{ glob: string }>
         ).filter((a) => a.glob !== 'app.json'),
@@ -128,25 +125,25 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       if (!result.result?.success) {
         const errLogs = (result.logs || [])
           .filter((l: { level: string }) => l.level === 'error')
-          .map((l: { message?: unknown }) => String(l.message));
+          .map((l: { message?: string }) => String(l.message));
         console.log('NATIVE_ERR>>>' + errLogs.join(' ~~ ').slice(0, 4000));
       }
       expect(result.result?.success).toBeTruthy();
 
       // 原生组件文件被拷进产物
       const copiedWxml = await readOutput(
-        'dist/vite-native/wxcomponents/van-button/van-button.wxml'
+        'dist/vite-native/wxcomponents/van-button/van-button.wxml',
       );
       expect(copiedWxml).toContain('native van-button');
 
       // 页面 json 注入了 usingComponents
       const pageJson = JSON.parse(
         await readOutput(
-          'dist/vite-native/pages/native-host/native-host-entry.json'
-        )
+          'dist/vite-native/pages/native-host/native-host-entry.json',
+        ),
       ) as { usingComponents: Record<string, string> };
       expect(pageJson.usingComponents['van-button']).toBe(
-        '../../wxcomponents/van-button/van-button'
+        '../../wxcomponents/van-button/van-button',
       );
     }, 300000);
   });

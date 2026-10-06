@@ -50,7 +50,7 @@ export class MyTestProjectHost {
       await this.host
         .rename(
           normalize(join(this.host.root(), 'src', from, item)),
-          normalize(join(this.host.root(), 'src', to, item))
+          normalize(join(this.host.root(), 'src', to, item)),
         )
         .toPromise();
     }

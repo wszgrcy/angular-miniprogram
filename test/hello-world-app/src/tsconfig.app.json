@@ -7,5 +7,10 @@
     "target": "ES2022"
   },
   "files": ["main.ts"],
-  "include": ["**/*.d.ts", "pages/**/*.entry.ts", "components/**/*.entry.ts"]
+  "include": [
+    "**/*.d.ts",
+    "pages/**/*.entry.ts",
+    "components/**/*.entry.ts",
+    "custom-tab-bar/**/*.entry.ts"
+  ]
 }

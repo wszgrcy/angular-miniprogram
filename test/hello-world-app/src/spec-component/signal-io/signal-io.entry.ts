@@ -1,3 +1,1 @@
-import { componentRegistry } from 'angular-miniprogram';
-import { SignalIoComponent } from './signal-io.component';
-componentRegistry(SignalIoComponent);
+export { SignalIoComponent as default } from './signal-io.component';

@@ -1,21 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { Injectable } from 'static-injector';
-
-export type TemplateScopeOutside = Omit<
-  LibraryTemplateScopeService,
-  Exclude<
-    keyof LibraryTemplateScopeService,
-    'setScopeLibraryUseComponents' | 'setScopeExtraUseComponents'
-  >
->;
 export interface ExtraTemplateData {
   useComponents: Record<string, string>;
+  /** `${}` 插值模板串 */
   templateList: string[];
   configPath?: string;
   templatePath?: string;
 }
 
-@Injectable()
 export class LibraryTemplateScopeService {
   private scopeExtraUseComponentsMap = new Map<string, ExtraTemplateData>();
   private scopeLibraryUseComponentsMap = new Map<string, ExtraTemplateData[]>();
@@ -67,10 +57,10 @@ export class LibraryTemplateScopeService {
   }
   setScopeExtraUseComponents = (
     libraryScope: string,
-    extraData: ExtraTemplateData
+    extraData: ExtraTemplateData,
   ) => {
     const data: ExtraTemplateData = this.scopeExtraUseComponentsMap.get(
-      libraryScope
+      libraryScope,
     ) || { useComponents: {}, templateList: [] };
     this.scopeExtraUseComponentsMap.set(libraryScope, {
       useComponents: { ...data.useComponents, ...extraData.useComponents },
@@ -80,7 +70,7 @@ export class LibraryTemplateScopeService {
 
   setScopeLibraryUseComponents = (
     libraryScope: string,
-    libraryUseComponents: ExtraTemplateData[]
+    libraryUseComponents: ExtraTemplateData[],
   ) => {
     this.scopeLibraryUseComponentsMap.set(libraryScope, libraryUseComponents);
   };

@@ -1,0 +1,29 @@
+<view>=== 1. 库指令：host 事件 + host 属性 ===</view>
+<view libTestLibrary
+  >libTestLibrary（listeners: tap/touchstart，properties: value）</view
+>
+
+<view>=== 2. 库组件：host 属性 + input 传值 ===</view>
+<lib-test-library [input1]="libInputValue"></lib-test-library>
+
+<view>=== 3. 库组件 + 库指令叠加（两组元数据合并）===</view>
+<lib-test-library
+  [input1]="libInputValue + '/叠加指令'"
+  libTestLibrary
+></lib-test-library>
+
+<view>=== 4. 库组件 host 事件 ===</view>
+<app-lib-comp1></app-lib-comp1>
+
+<view>=== 5. 库指令 input 传值 + output 回抛 ===</view>
+<p
+  libInputOutput
+  [input1]="libInputValue"
+  [input2]="libInputCount"
+  (output1)="onLibOutput1($event)"
+  (output2)="onLibOutput2($event)"
+></p>
+<view>output1={{ libOutput1 }} / output2={{ libOutput2 }}</view>
+
+<view>=== 6. 二级出口（test-library/src/secondary）===</view>
+<lib-secondary-entry [label]="libInputValue"></lib-secondary-entry>

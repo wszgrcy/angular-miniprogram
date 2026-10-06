@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "小程序 project 配置（project.config.json）",
+  "type": "object",
+  "properties": {
+    "appid": {
+      "type": "string",
+      "description": "小程序 appid；没填时构建器补 touristappid"
+    },
+    "projectname": {
+      "type": "string",
+      "description": "项目名"
+    },
+    "compileType": {
+      "type": "string",
+      "description": "miniprogram / plugin"
+    },
+    "libVersion": {
+      "type": "string",
+      "description": "调试基础库版本"
+    },
+    "miniprogramRoot": {
+      "type": "string",
+      "description": "小程序代码根目录"
+    },
+    "cloudfunctionRoot": {
+      "type": "string",
+      "description": "云函数根目录"
+    },
+    "pluginRoot": {
+      "type": "string",
+      "description": "插件根目录"
+    },
+    "setting": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "description": "开发者工具设置"
+    },
+    "packOptions": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "description": "打包选项"
+    },
+    "scripts": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "description": "自定义编译命令"
+    },
+    "watchOptions": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "description": "监听选项"
+    },
+    "condition": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "description": "调试启动项；支付宝会改写成 compileModeJson"
+    },
+    "_platform": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "description": "按平台分段补字段，key 用平台名（wx / zfb / …）"
+    }
+  },
+  "required": []
+}

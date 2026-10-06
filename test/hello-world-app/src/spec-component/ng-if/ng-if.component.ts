@@ -1,7 +1,9 @@
+import { NgIf } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 
 @Component({
-  standalone: false,
+  standalone: true,
+  imports: [NgIf],
   selector: 'app-ng-if',
   templateUrl: './ng-if.component.html',
 })

@@ -1,0 +1,5 @@
+---
+// 站点根路径没有内容页，直接跳中文首页（默认语言）。
+// 静态构建下 Astro 会把它输出成带 meta refresh 的 index.html。
+return Astro.redirect(`${import.meta.env.BASE_URL}zh/`, 301);
+---

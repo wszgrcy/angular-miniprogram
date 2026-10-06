@@ -1,0 +1,8 @@
+{
+  "name": "angular-miniprogram-api",
+  "version": "0.0.0-PLACEHOLDER",
+  "peerDependencies": {
+    "@angular/core": "^22.1.7"
+  },
+  "sideEffects": false
+}

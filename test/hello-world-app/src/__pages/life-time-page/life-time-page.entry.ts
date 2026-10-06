@@ -1,3 +1,1 @@
-import { bootstrapPage } from 'angular-miniprogram';
-import { LifeTimePage } from './life-time.component';
-bootstrapPage(LifeTimePage);
+export { LifeTimePage as default } from './life-time.component';
