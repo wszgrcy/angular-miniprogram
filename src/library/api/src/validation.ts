@@ -22,8 +22,7 @@ import type { MpInvokeContext } from './pipe-registry';
 export type MpApiSchema = BaseSchema<unknown, unknown, BaseIssue<unknown>>;
 
 /**
- * 业务侧 multi 贡献自有 schema（同 `MP_API_PIPES` 用法）。
- * 同名会覆盖内置 schema，作为「我觉得这 API 不该这么严」的逃生口。
+ * 业务侧 multi 贡献自有 schema。同名会覆盖内置 schema，作为「我觉得这 API 不该这么严」的逃生口。
  *
  * ```ts
  * providers: [
@@ -42,9 +41,8 @@ const FRAMEWORK_KEYS = ['signal'];
 
 /**
  * 内置规则：只覆盖高频且易写错的 API，未收录的不校验。
- *
- * ⚠️ 必须是函数惰性构建，不能是模块级常量 —— 顶层调用 valibot
- * 会被打包器当成模块副作用保留，`ngDevMode=false` 也删不掉。
+ * 必须是函数惰性构建，不能是模块级常量——顶层调用 valibot 会被打包器当成模块副作用保留，
+ * `ngDevMode=false` 也删不掉。
  */
 function buildBuiltinSchemas(): Record<string, MpApiSchema> {
   const str = vString();
@@ -126,10 +124,8 @@ function formatIssue(issue: BaseIssue<unknown>): string {
 }
 
 /**
- * 参数校验管道：命中规则的 API 做一次 `strictObject` 校验，
- * 拼错的键、缺必填、类型/枚举不符都会报出来。
- *
- * 只告警不阻断 —— 校验本身出错不该拖垮业务调用。
+ * 参数校验管道：命中规则的 API 做一次 `strictObject` 校验，拼错的键、缺必填、类型/枚举不符都会报出来。
+ * 只告警不阻断——校验本身出错不该拖垮业务调用。
  */
 export function mpValidationPipe(
   schemas: Record<string, MpApiSchema>,
@@ -159,11 +155,9 @@ export function mpValidationPipe(
 }
 
 /**
- * 开发期判定。仅供测试 / 业务自查使用。
- *
- * ⚠️ 库内部需要「生产可消除」时不要调这个函数 —— 函数调用对打包器是黑盒，
- * 它无法证明分支已死，schema 会跟整进产物。必须内联写：
- * `if (typeof ngDevMode !== 'undefined' && ngDevMode)`
+ * 开发期判定。仅供测试 / 业务自查使用。库内部需要「生产可消除」时不要调这个函数——函数调用对
+ * 打包器是黑盒，它无法证明分支已死，schema 会跟整进产物。必须内联写
+ * `if (typeof ngDevMode !== 'undefined' && ngDevMode)`。
  */
 export function isMpDevMode(): boolean {
   return typeof ngDevMode !== 'undefined' && ngDevMode !== null;

@@ -1,36 +1,20 @@
 /**
  * 库元数据缺失诊断。
  *
- * ## 为什么需要它
+ * 「查不到元数据」如果返回空集合并覆盖掉 `host.listeners`，结果是 wxml 一个事件绑定都没有、
+ * 表单全部不响应，而且没有任何报错。这里把所有「没查到」显式登记，由构建器在每轮构建结束时
+ * 打一条汇总日志——第三方库指令也会走到这里，逐个打会刷屏。
  *
- * 旧实现里「查不到元数据」会返回 `{ listeners: [], properties: [] }` 并
- * **覆盖掉** `host.listeners`，结果是 wxml 一个事件绑定都没有、表单全部
- * 不响应，而且**没有任何报错**。这是整条链路上最危险的失败模式。
- *
- * 现在把所有「没查到」显式登记到这里，由构建器在每轮构建结束时打一条
- * 汇总日志。之所以是汇总而不是一条条 warn：第三方库指令也会走到这里，
- * 逐个打会刷屏。
- *
- * 诊断只针对「本可以用本工具链构建、但没构建」的第三方库。`@angular/*`
- * 直接跳过，见 `isAngularFrameworkSource`。
+ * 诊断只针对「本可以用本工具链构建、但没构建」的第三方库。`@angular/*` 直接跳过。
  */
 
 /**
- * `@angular/*` 不登记元数据缺失。
+ * `@angular/*` 不登记元数据缺失。框架自己的包永远不会有 sidecar，报出来只会淹没真信号：
+ * `NgClass` / `NgStyle` 的结果直接进 `nodeList[i].class` / `.style`，`NgIf` / `NgForOf`
+ * 被编成 `wx:if` / `wx:for`，都不靠 host 绑定；`NgPlural` 之类本工具链用不到。
  *
- * 框架自己的包永远不会有 sidecar，报出来只会淹没真信号。具体到
- * `@angular/common` 那一堆：
- *
- * 1. 静态编译期已经支持的 —— `NgClass` / `NgStyle` 的结果直接进
- *    `nodeList[i].class` / `.style`，`NgIf` / `NgForOf` / `NgSwitch*` 被
- *    编成 `wx:if` / `wx:for` / `<template>`，都不靠 host 绑定；
- * 2. 已废弃、有更优写法的 —— `@if` / `@for` / `@switch` 取代
- *    `NgIf` / `NgForOf` / `NgSwitch*`（`imports: [CommonModule]` 会把它们
- *    一并拖进作用域，即使模板里一个字没用）；
- * 3. 本工具链用不到的 —— `NgPlural` / `NgPluralCase`。
- *
- * 按路径段匹配，兼容两种分隔符、pnpm 的
- * `.pnpm/@angular+common@…/node_modules/@angular/…` 与 fesm 子路径。
+ * 按路径段匹配，兼容两种分隔符、pnpm 的 `.pnpm/@angular+common@…/node_modules/@angular/…`
+ * 与 fesm 子路径。
  */
 const ANGULAR_PACKAGE_RE = /(^|[/\\])@angular[/\\]/;
 
@@ -76,9 +60,7 @@ export function clearLibraryMetaMisses(): void {
 
 /**
  * 汇总成人可读的一段话。没有缺失时返回空串。
- *
- * `sidecar-missing-class` 排在前面 —— 它比「对方压根不是本工具链的库」
- * 更可能是真问题。
+ * `sidecar-missing-class` 排在前面——它比「对方压根不是本工具链的库」更可能是真问题。
  */
 export function formatLibraryMetaSummary(): string {
   if (misses.length === 0) {

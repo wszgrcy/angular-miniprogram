@@ -91,8 +91,7 @@ describe('component-template-inject: changeComponent', () => {
   describe('if (rf & 2) 是空块', () => {
     it('不能崩，退化成补一个完整更新块', () => {
       // 空块时 statements 为 []，取 statements[length - 1] 得到 undefined，
-      // 老逻辑会在 insertNode 里读 getStart 直接抛
-      // "Cannot read properties of undefined (reading 'getStart')"
+      // 老逻辑会在 insertNode 里读 getStart 直接抛。
       const r = changeComponent(EMPTY_UPDATE_BLOCK);
       expect(r).toBeTruthy();
       const body = templateBody(r!.content);
@@ -102,14 +101,9 @@ describe('component-template-inject: changeComponent', () => {
 
   describe('回归：多组件文件 + 类上有 template 字段', () => {
     /**
-     * OutsideTemplateComponent 就是这个形状：类自己有个 `template` 字段，
-     * 同时 ɵɵdefineComponent 里也有 `template: function`。
-     *
-     * 旧实现用 createCssSelectorForTs 的相邻兄弟组合符定位元数据对象，
-     * 同文件多组件时兄弟关系错位，`PropertyAssignment[name=template]::initializer`
-     * 会解析到一个 StringLiteral，initIfNode 拿不到，整个组件被 `continue`
-     * 静默跳过——函数照常返回结果，但一条 propertyChange 都没插进去。
-     * 线上表现是该组件的属性变更不会同步到小程序侧。
+     * OutsideTemplateComponent 就是这个形状：类自己有个 `template` 字段，同时 ɵɵdefineComponent
+     * 里也有 `template: function`。用相邻兄弟组合符定位元数据对象时，同文件多组件的兄弟关系会错位，
+     * `PropertyAssignment[name=template]::initializer` 会解析到一个 StringLiteral，整个组件被静默跳过。
      */
     it('两个组件都必须被注入', () => {
       const r = changeComponent(MULTI_WITH_TEMPLATE_FIELD);
@@ -153,8 +147,7 @@ describe('component-template-inject: changeComponent', () => {
     });
 
     it('空模板（无 rf & 1）不注入，但仍按契约返回结果', () => {
-      // 不能返回 undefined：SetupComponentDataService 靠返回值决定组件是否产出，
-      // 空模板组件也得正常产出，只是没有注入点而已
+      // 不能返回 undefined：调用方靠返回值决定组件是否产出，空模板组件也得正常产出，只是没有注入点
       const r = changeComponent(EMPTY_TEMPLATE);
       expect(r).toBeTruthy();
       expect(r!.componentName).toBe('EmptyTpl');
@@ -167,8 +160,7 @@ describe('component-template-inject: changeComponent', () => {
     const r = changeComponent(TWO_COMPONENTS);
     expect(r!.componentName).toBe('Comp1');
     const body = templateBody(r!.content);
-    // Comp1 走「有更新块」分支，Comp2 走「无更新块」分支，
-    // 两个组件的 template 里都应出现 propertyChange
+    // Comp1 走「有更新块」分支，Comp2 走「无更新块」分支，两个组件的 template 里都应出现 propertyChange
     const occurrences = (r!.content.match(/amp\.propertyChange/g) || []).length;
     // import 行本身不含 propertyChange，所以 2 次 = 两个组件各被插了一次
     expect(occurrences).toBe(2);

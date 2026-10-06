@@ -16,10 +16,8 @@ import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
 /**
- * budgets / statsJson 的构建集成验证。
- *
- * 判定逻辑本身在 plugins/budgets.spec.ts 里用假 bundle 钉死了，这里只验
- * 「插件真的挂上了、真的能决定构建成败」—— 判定对但没接线同样是零效果。
+ * budgets / statsJson 的构建集成验证。判定逻辑本身在 plugins/budgets.spec.ts 里用假 bundle 钉死了，
+ * 这里只验「插件真的挂上了、真的能决定构建成败」——判定对但没接线同样是零效果。
  */
 describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
   const setupFixture = async () => {

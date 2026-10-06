@@ -3,12 +3,8 @@
 import { Observable, Subscription } from 'rxjs';
 
 /**
- * 节点查询 / 观察器。
- *
- * 对标 uni 的 uni.createSelectorQuery / createIntersectionObserver /
- * createMediaQueryObserver。与 uni 的差异只在返回形态：
- * `exec()` 返回 Promise、`observe$()` 返回 Observable。
- * 回调不再手动调度变更检测：状态走 signal，写入时 Angular 自己标脏。
+ * 节点查询 / 观察器。差异只在返回形态：`exec()` 返回 Promise、`observe$()` 返回 Observable。
+ * 回调不手动调度变更检测：状态走 signal，写入时 Angular 自己标脏。
  */
 
 /** 节点字段查询结果（boundingClientRect / scrollOffset / scrollSize 等字段的并集） */
@@ -77,7 +73,7 @@ export interface MpIntersectionObserver {
   [method: string]: any;
 }
 
-/** 媒体查询条件（对标 uni 的 DescriptorOptions） */
+/** 媒体查询条件 */
 export interface MpMediaQueryDescriptor {
   minWidth?: number;
   maxWidth?: number;
@@ -169,7 +165,7 @@ export function createMpIntersectionObserver(raw: any): MpIntersectionObserver {
   return wrapper as MpIntersectionObserver;
 }
 
-/** 纯 JS 求值（各家小程序无原生媒体查询 API，uni 也是 JS 实现） */
+/** 纯 JS 求值（各家小程序无原生媒体查询 API） */
 export function matchMpMediaQuery(
   descriptor: MpMediaQueryDescriptor,
   windowWidth: number,

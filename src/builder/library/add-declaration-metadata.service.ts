@@ -16,16 +16,8 @@ import { ENTRY_POINT_TOKEN } from './token';
 
 /**
  * 把本 entry 编译期拿到的指令 / 组件 host 元数据登记进 sidecar 暂存区。
- *
- * **不再改写 `.d.ts`。**
- *
- * 旧实现在这里 `return data + markers`，把 `declare const X_Listeners:[...]`
- * 拼到中间 d.ts 尾巴上；因为 ng-packagr 22 的 d.ts 扁平化会把这些不在导出
- * 引用图里的 `declare const` tree-shake 掉，还得在构建后再补写一次到最终
- * `dist/types/*.d.ts`。等于把类型契约文件当 key-value 存储，还要跟打包器搏斗。
- *
- * 现在 `.d.ts` 原样返回，元数据走 `mp-library-meta.json` sidecar，
- * 扁平化爱怎么 shake 怎么 shake，与我们无关。
+ * 不改写 `.d.ts`：`.d.ts` 是类型契约，不当 key-value 存储用。元数据走
+ * `mp-library-meta.json` sidecar，扁平化怎么处理与我们无关。
  */
 export class AddDeclarationMetaDataService {
   private entryPoint = inject(ENTRY_POINT_TOKEN);
@@ -39,10 +31,7 @@ export class AddDeclarationMetaDataService {
     this.componentMap = miniProgramCompilerService.getComponentMap();
   }
 
-  /**
-   * 扫描本文件产出的 d.ts，把里面的指令/组件登记进暂存区，
-   * 然后**原样返回**内容。
-   */
+  /** 扫描本文件产出的 d.ts，把里面的指令/组件登记进暂存区，然后原样返回内容。 */
   run(_dTsFileName: string, data: string): string {
     const list = createCssSelectorForTs(data).queryAll(
       `ClassDeclaration`,
@@ -71,8 +60,7 @@ export class AddDeclarationMetaDataService {
 
   private recordDirectives(list: ts.ClassDeclaration[]) {
     for (const classDeclaration of list) {
-      // 组件的 `ɵcmp` 里也带 `ɵdir`，但组件已在上面登记过，
-      // 这里只处理纯指令，避免同一个类进两个桶。
+      // 组件的 `ɵcmp` 里也带 `ɵdir`，但组件已在上面登记过，这里只处理纯指令，避免同一个类进两个桶
       if (hasStaticMember(classDeclaration, 'ɵcmp')) {
         continue;
       }

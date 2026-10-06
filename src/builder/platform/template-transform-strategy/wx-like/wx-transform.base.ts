@@ -4,20 +4,15 @@ import { TemplateTransformBase } from '../transform.base';
 import { WxContainer } from './wx-container';
 
 /**
- * 事件名上的 wx 系绑定前缀。
- *
- * `:?` 不可省：前缀与事件名之间约定用冒号分隔（`catch:tap`），
+ * 事件名上的 wx 系绑定前缀。`:?` 不可省：前缀与事件名之间用冒号分隔（`catch:tap`），
  * 少了它 `(.*)` 会把冒号当成事件名的一部分，拼出 `catch::tap`。
  */
 export const EVENT_PREFIX_REGEXP =
   /^(bind|catch|mut-bind|capture-bind|capture-catch):?(.*)$/;
 
 /**
- * 渲染层脚本引入标签的平台方言。
- *
- * 各家差异不只在扩展名，**标签名和属性名也不同**：
- * 微信 `<wxs module src>`，支付宝却是 `<import-sjs name from>`。
- * 作者统一写微信形态，这里描述目标平台该长什么样。
+ * 渲染层脚本引入标签的平台方言。各家差异不只在扩展名，标签名和属性名也不同：
+ * 微信 `<wxs module src>`，支付宝却是 `<import-sjs name from>`。作者统一写微信形态，这里描述目标平台该长什么样。
  */
 export interface WxsDialect {
   tag: string;

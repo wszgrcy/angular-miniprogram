@@ -27,13 +27,7 @@ import {
 } from './token';
 import type { CompilerHostLike, PagePattern } from './type';
 
-/**
- * Windows 下把路径外联成 win32 形式（带缓存）。
- *
- * 原先从 `@ngtools/webpack/src/ivy/paths` 引入——那是 webpack 的
- * 内部实现细节，我们只是碰巧复用。现在本地实现，去掉对 webpack 的依赖。
- * 语义与原实现一致：非 win32 恒等；win32 走 win32.normalize + 缓存。
- */
+/** Windows 下把路径外联成 win32 形式（带缓存）。非 win32 恒等。 */
 const externalizationCache = new Map<string, string>();
 function externalizePath(p: string): string {
   if (process.platform !== 'win32') {
@@ -149,12 +143,10 @@ export class MiniProgramApplicationAnalysisService {
       [];
     metaMap.wxsModules?.forEach((decls, key) => {
       const { sourceFile } = splitComponentKey(key);
-      // key 里的 sourceFile 是 pathKey 形态（身份令牌，Windows 上是 `/C/a/b.ts`），
-      // 要拿去拼真实路径必须先 toNativePath，否则 path.resolve 会把它当成
-      // 「C 盘下的 \C\a\b.ts」。
+      // key 里的 sourceFile 是 pathKey 形态，要拿去拼真实路径必须先 toNativePath
       const componentFile = toNativePath(sourceFile);
       for (const decl of decls) {
-        // src 相对**组件源文件**解析，所以共享脚本写 ../common/format.wxs 即可
+        // src 相对组件源文件解析，所以共享脚本写 ../common/format.wxs 即可
         const srcPath = path.resolve(path.dirname(componentFile), decl.src);
         if (!fs.existsSync(srcPath)) {
           throw new Error(
@@ -259,10 +251,7 @@ export class MiniProgramApplicationAnalysisService {
       outputContent: contentMap,
       wxsSources,
       wxsSourceFiles,
-      /**
-       * `组件文件#类名` -> wxs 声明。带出来是给 wxs-strip 插件当组件清单用，
-       * 免得它自己扫全盘找哪个组件带了 wxs。
-       */
+      /** `组件文件#类名` -> wxs 声明。带出来是给 wxs-strip 插件当组件清单用。 */
       wxsModules: metaMap.wxsModules,
       config: config,
       otherMetaCollectionGroup: metaMap.otherMetaCollectionGroup,
@@ -270,11 +259,7 @@ export class MiniProgramApplicationAnalysisService {
     };
   }
 
-  /**
-   * 取 entry 绑定的组件类表达式。
-   *
-   * 只有一个来源：入口的 `export default`（见 entry-component.ts）。
-   */
+  /** 取 entry 绑定的组件类表达式。只有一个来源：入口的 `export default`。 */
   private getEntryComponentExpression(
     sourceFile: ts.SourceFile,
   ): ts.Expression {
@@ -289,12 +274,8 @@ export class MiniProgramApplicationAnalysisService {
   }
 
   /**
-   * 取入口绑定的组件类名。
-   *
-   * `getSymbolAtLocation` 拿到的声明通常是 ImportSpecifier / ExportSpecifier
-   * （`import { X } from ...`、`export { X as default } from ...`），
-   * 不是类声明本身，所以要先沿 alias 解到原始 symbol 再取类名。
-   * `import { X as Y }` 的情况以原始类名为准。
+   * 取入口绑定的组件类名。`getSymbolAtLocation` 拿到的声明通常是 ImportSpecifier /
+   * ExportSpecifier，要先沿 alias 解到原始 symbol 再取类名。
    */
   private resolveImportedComponentName(symbol: ts.Symbol | undefined): string {
     if (!symbol) {
@@ -319,10 +300,7 @@ export class MiniProgramApplicationAnalysisService {
 
   /**
    * 从 import / export 说明符往上找到携带 moduleSpecifier 的那层。
-   *
-   * `import { X } from './y'` 与 `export { X as default } from './y'`
-   * 到 ImportDeclaration / ExportDeclaration 的层数不一样（前者多一层
-   * NamedNodeArray），所以逐层往上找，不数固定层数。
+   * 两者到声明的层数不一样，所以逐层往上找，不数固定层数。
    */
   private findModuleSpecifier(
     node: ts.Node | undefined,
@@ -406,15 +384,8 @@ export class MiniProgramApplicationAnalysisService {
 
   /**
    * 这个入口是不是「把 fileName 里的 componentClassName 当组件注册」。
-   *
-   * 两种入口两套认法：
-   *
-   *  - **自动组件**（构建器造的，src 就是组件文件本身）：文件对上再比类名。
-   *  - **声明式入口**：读 entry 的 `export default` 看它绑的是谁。
-   *
-   * 声明式那条必须比类名：同文件多组件时，两个 entry 各自 import 同一文件的
-   * 不同组件，光比对文件路径分不出到底是哪个，先那个组件会被解析到别人的
-   * entry 上，模板就串了。
+   * 自动组件（src 就是组件文件本身）文件对上再比类名；声明式入口读 `export default` 看绑的是谁。
+   * 声明式那条必须比类名：同文件多组件时光比对文件路径分不出是哪个。
    */
   private entryBindsComponent(
     entry: PagePattern,

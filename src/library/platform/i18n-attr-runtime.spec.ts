@@ -7,21 +7,11 @@ import { LVIEW } from './default/lview-layout';
 import { initMiniProgramTestEnv } from './test-util/init-env';
 
 /**
- * `i18n-*` 属性的半运行时验收。
- *
- * ## 值落在哪
- *
- * 带插值的 `i18n-alt` 由 `ɵɵi18nAttributes` + `ɵɵi18nApply` 在运行时写回，
- * 走的是 **`setProperty`**，所以值在元素 AgentNode 的 `property` 上，
- * 而 `lViewToWXView` 对元素槽本来就会序列化 `property` —— 运行时这条路
- * 不需要新代码，需要的是构建侧把 `ɵɵi18nAttributes` 那个声明槽数对。
- *
- * 纯静态的 `i18n-title` 走 `setAttribute`（译文烘进 consts，建元素时写），
- * 落在 `attribute` 上，不占声明槽。
- *
- * ## 改属性同样要标脏组件自己的视图
- *
- * 见 `icu-runtime.spec.ts` 顶部那条坑。
+ * `i18n-*` 属性的半运行时验收。值落在哪：带插值的 `i18n-alt` 由 `ɵɵi18nAttributes` + `ɵɵi18nApply`
+ * 在运行时写回，走的是 `setProperty`，所以值在元素 AgentNode 的 `property` 上，而 `lViewToWXView`
+ * 对元素槽本来就会序列化 `property`——运行时这条路不需要新代码，需要的是构建侧把
+ * `ɵɵi18nAttributes` 那个声明槽数对。纯静态的 `i18n-title` 走 `setAttribute`，落在 `attribute` 上，不占声明槽。
+ * 改属性同样要标脏组件自己的视图，见 `icu-runtime.spec.ts` 顶部那条坑。
  */
 
 @Component({
@@ -110,12 +100,10 @@ describe('i18n 属性半运行时', () => {
 
   it('纯静态 i18n 属性走 setAttribute，不占声明槽', () => {
     const fixture = show(StaticAttrComponent);
-    // 译文（没装翻译包时就是源文案）由建元素时 setAttribute 写，落在
-    // AgentNode.attribute 上；nodeList 只序列化 class/style/property，
-    // 静态属性由 wxml 直接内联，所以这里看 AgentNode。
+    // 译文（没装翻译包时就是源文案）由建元素时 setAttribute 写，落在 AgentNode.attribute 上；
+    // nodeList 只序列化 class/style/property，静态属性由 wxml 直接内联，所以这里看 AgentNode。
     expect(agentAt(fixture, 0).attribute.title).toBe('Settings');
-    // wxml 把静态 i18n 属性写成 `{{nodeList[i].attribute.title}}` 的绑定，
-    // 所以它必须出现在序列化结果里，否则渲染出来是空
+    // wxml 把静态 i18n 属性写成 `{{nodeList[i].attribute.title}}` 的绑定，所以它必须出现在序列化结果里，否则渲染出来是空
     expect(render(fixture)[0]?.attribute).toEqual({ title: 'Settings' });
     // 没有多余的 TI18n 槽：span 在 1，文本在 2
     const list = render(fixture);

@@ -28,18 +28,10 @@ const angularConfig = {
 /**
  * 全量构建的冒烟用例：跑通「页面 + 组件 + 库」整条链路，并核对产物扩展名。
  *
- * ## 为什么只跑 wx 和 zfb
- *
- * 十家平台以前各构建一次，一次 2s，光这个文件就 21s。但每条用例真正断言的
- * 只有两件事：构建没报错、产物扩展名对得上（`app.wxss` / `self.wxml` /
- * 库组件的 `.qml` `.axml` …）。而「每家平台的 globalObject / 指令前缀 /
- * 四种产物扩展名」已经被 `platform/platform-registry.spec.ts` 逐字钉死在
- * 一张表里（十家 1ms 跑完），构建侧的平台差异（define、`.wx.ts` 变体、
- * 死分支 DCE）另有 `vite/platform-flags.build.spec.ts` 覆盖。
- *
- * 所以这里留两个代表：wx 是基准，zfb 是差异最大的一家
- * （全局对象 `my`、前缀 `a`、`.axml/.acss/.sjs`）。
- * 新增平台若带来了这两张表没覆盖的行为，再往数组里加。
+ * 每条用例真正断言的只有两件事：构建没报错、产物扩展名对得上。而「每家平台的 globalObject /
+ * 指令前缀 / 四种产物扩展名」已被 `platform/platform-registry.spec.ts` 逐字钉死在一张表里，
+ * 构建侧的平台差异另有 `vite/platform-flags.build.spec.ts` 覆盖。所以这里留两个代表：
+ * wx 是基准，zfb 是差异最大的一家（全局对象 `my`、前缀 `a`、`.axml/.acss/.sjs`）。
  */
 const SMOKE_PLATFORMS = [PlatformType.wx, PlatformType.zfb];
 
@@ -72,8 +64,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         });
         expect(result).toBeTruthy();
         expect(result.error).toBeFalsy();
-        // Vite 链路可能不产生日志，logs[0] 会是 undefined；
-        // 本意是「构建没报错」，那就查全部而不是只看第一条。
+        // Vite 链路可能不产生日志，logs[0] 会是 undefined；本意是「构建没报错」，那就查全部
         expect(
           result.logs.filter((l) => l.level === 'error').map((l) => l.value),
         ).toEqual([]);

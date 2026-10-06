@@ -18,8 +18,7 @@ export interface MiniProgramTestRunnerOptions {
     events: RunnerTaskEventPack[],
   ): void | Promise<void>;
   /**
-   * 一个文件收集完了。宿主靠它建 file 实体，少调一次后面每条更新都是
-   * `AssertionError: Entity must be found for task xxx`。
+   * 一个文件收集完了。宿主靠它建 file 实体，少调一次后面每条更新都是 `Entity must be found for task xxx`。
    */
   onCollected?(files: RunnerTestFile[]): void | Promise<void>;
   /** 文件开跑前的排队通知（Node 那边是 rpc.onQueued）。 */
@@ -28,11 +27,8 @@ export interface MiniProgramTestRunnerOptions {
 }
 
 /**
- * 跑在小程序运行时里的 VitestRunner。
- *
- * 和 Node 版 runner 的唯一实质差别是 `importFile`：
- * Node 走 vite 的 module runner 去 dev server 拉模块，
- * 小程序只能从**编译期就编进包**的注册表里取。
+ * 跑在小程序运行时里的 VitestTestRunner。和 Node 版 runner 的唯一实质差别是 `importFile`：
+ * Node 走 vite 的 module runner 去 dev server 拉模块，小程序只能从编译期就编进包的注册表里取。
  */
 export class MiniProgramTestRunner implements VitestTestRunner {
   private readonly cancelled = new Set<string>();
@@ -65,10 +61,8 @@ export class MiniProgramTestRunner implements VitestTestRunner {
   }
 
   /**
-   * `@vitest/runner` 在收集完一个文件后调这里。
-   *
-   * Node worker 不用自己管：vitest 的 `resolveTestRunner` 会把这个方法
-   * 包一层去调 rpc。我们自己拼 runner，所以得自己补上。
+   * `@vitest/runner` 在收集完一个文件后调这里。Node worker 不用自己管：vitest 的 `resolveTestRunner`
+   * 会把这个方法包一层去调 rpc。我们自己拼 runner，所以得自己补上。
    */
   async onCollected(files: RunnerTestFile[]): Promise<void> {
     await this.options.onCollected?.(files);
@@ -107,8 +101,8 @@ export class MiniProgramTestRunner implements VitestTestRunner {
   }
 
   /**
-   * 只能把「之后还没跑的」标成 skip，已经在跑的那条靠 @vitest/runner
-   * 自己的检查点退出 —— 这是 VitestRunner 接口的能力上限，不是实现偷懒。
+   * 只能把「之后还没跑的」标成 skip，已经在跑的那条靠 @vitest/runner 自己的检查点退出——
+   * 这是 VitestRunner 接口的能力上限，不是实现偷懒。
    */
   cancel(_reason: CancelReason): void {
     for (const filepath of this.registeredFiles) {

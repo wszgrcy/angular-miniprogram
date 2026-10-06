@@ -11,10 +11,7 @@ import {
 } from './index';
 
 /**
- * 钩子的加载与应用。
- *
- * 全部走临时目录 + 真文件，不碰 vite：这一层要验的就是「读文件 + 交还
- * config」，构建链路里另有 build.spec 覆盖。
+ * 钩子的加载与应用。全部走临时目录 + 真文件，不碰 vite：这一层要验的就是「读文件 + 交还 config」。
  */
 
 interface Logged {
@@ -51,15 +48,18 @@ function writeHook(rel: string, content: string): string {
 
 function apply(viteConfig: string | undefined, tsConfig?: string) {
   const { logger, logged } = makeLogger();
-  return applyMpViteConfig({ define: { fromBuilder: '1' } }, {
-    viteConfig,
-    target: 'application',
-    platform: 'wx',
-    isProduction: false,
-    workspaceRoot: workspace,
-    tsConfig,
-    logger,
-  }).then((config) => ({ config, logged }));
+  return applyMpViteConfig(
+    { define: { fromBuilder: '1' } },
+    {
+      viteConfig,
+      target: 'application',
+      platform: 'wx',
+      isProduction: false,
+      workspaceRoot: workspace,
+      tsConfig,
+      logger,
+    },
+  ).then((config) => ({ config, logged }));
 }
 
 describe('defineMpViteConfig', () => {
@@ -194,10 +194,7 @@ describe('applyMpViteConfig', () => {
   });
 
   it('返回非对象直接报错，不静默', async () => {
-    const rel = writeHook(
-      'tools/bad.ts',
-      `export default () => 42;`,
-    );
+    const rel = writeHook('tools/bad.ts', `export default () => 42;`);
     await expect(apply(rel)).rejects.toThrow(/必须返回配置对象/);
   });
 

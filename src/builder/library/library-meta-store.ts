@@ -15,14 +15,10 @@ import {
 } from './library-meta-schema';
 
 /**
- * 库构建期的元数据暂存区（**写侧**）。
- *
- * 生命周期：`compileSourceFiles` 每写完一个中间 `.d.ts` 就把这个文件里的
- * 指令/组件登记进来；每个 entry 编译完再落一次盘。落盘是**全量重写**，
- * 天然幂等，watch 模式下反复触发也不会累加。
- *
- * 注意：这里刻意只存结构化数据，不存文本。旧方案存拼好的 `declare const`
- * 文本，导致「存储格式」和「载体格式」绑死，换载体就得重写一遍。
+ * 库构建期的元数据暂存区（写侧）。
+ * 生命周期：每写完一个中间 `.d.ts` 就把这个文件里的指令/组件登记进来；每个 entry
+ * 编译完再落一次盘。落盘是全量重写，天然幂等。
+ * 这里只存结构化数据，不存文本，避免存储格式和载体格式绑死。
  */
 
 interface MutableEntryRecord {
@@ -53,10 +49,7 @@ function ensureEntry(moduleId: string): MutableEntryRecord {
 
 /**
  * 登记 entry 的产物路径（读取侧主键 + 模块 id 到实际文件的映射）。
- *
- * 由 `compile-ngc.transform` 调用 —— 那里能直接从 ng-packagr 的
- * `destinationFiles.declarationsBundled` / `.fesm2022` 拿到绝对路径，
- * 不需要事后扫 `package.json#exports` 反推。
+ * 由 `compile-ngc.transform` 调用，那里能直接拿到绝对路径。
  */
 export function registerLibraryMetaEntry(
   moduleId: string,
@@ -76,13 +69,8 @@ function toRelativePosix(absPath: string, root: string): string {
 }
 
 /**
- * 同 key 重复登记且**重叠字段**不一致时告警。
- *
- * 旧方案靠「把标记写进所有 d.ts」蒙混，同名冲突会静默拿错。
- * 这里至少让它响一次。
- *
- * 只比 `next` 里实际带的字段：组件记录现在是「多个地方分次合并」
- * （host 绑定一路、模板载荷一路），整体比会假报警。
+ * 同 key 重复登记且重叠字段不一致时告警。只比 `next` 里实际带的字段：
+ * 组件记录是多个地方分次合并的，整体比会假报警。
  */
 function conflictCheck(
   kind: 'directive' | 'component',
@@ -111,11 +99,7 @@ function conflictCheck(
   );
 }
 
-/**
- * 登记 / 合并指令的 host 元数据。
- *
- * 合并而非覆盖：同一个类可能分多次登记不同字段。
- */
+/** 登记 / 合并指令的 host 元数据。合并而非覆盖：同一个类可能分多次登记不同字段。 */
 export function recordLibraryDirectiveMeta(
   moduleId: string,
   className: string,
@@ -136,11 +120,7 @@ export function recordLibraryDirectiveMeta(
 }
 
 /**
- * 登记 / 合并组件元数据。
- *
- * 合并语义很关键：host 绑定（listeners / properties / outputPath）由
- * `AddDeclarationMetaDataService` 扫 d.ts 登记，模板载荷（content / style /
- * useComponents）由 `SetupComponentDataService` 登记，两路写入同一个记录，
+ * 登记 / 合并组件元数据。合并语义很关键：host 绑定与模板载荷由两路写入同一个记录，
  * 谁先到都不能抹掉对方。
  */
 export function recordLibraryComponentMeta(
@@ -163,14 +143,8 @@ export function recordLibraryComponentMeta(
 }
 
 /**
- * 只补局部字段，不动其他字段。
- *
- * 组件记录是两路写入的：
- *   - `AddDeclarationMetaDataService` 扫 d.ts → listeners / properties / outputPath
- *   - `SetupComponentDataService` 扫 JS 产物 → content / style / useComponents / id
- *
- * 两路顺序不确定，所以各自只写自己那几个字段，谁都不能抹掉对方。
- * `undefined` 的键直接跳过，避免「显式传 undefined」把已有值盖掉。
+ * 只补局部字段，不动其他字段。组件记录由两路写入（host 绑定 / 模板载荷），
+ * 顺序不确定，各自只写自己那几个字段。`undefined` 的键直接跳过。
  */
 export function patchLibraryComponentMeta(
   moduleId: string,
@@ -190,7 +164,7 @@ export function patchLibraryComponentMeta(
   entry.components.set(className, next as LibraryComponentMetaRecord);
 }
 
-/** 登记本 entry 的自引用模板（原 `$self_Global_Template`）。 */
+/** 登记本 entry 的自引用模板。 */
 export function setLibrarySelfTemplate(
   moduleId: string,
   record: LibraryGlobalTemplateRecord,
@@ -198,7 +172,7 @@ export function setLibrarySelfTemplate(
   ensureEntry(moduleId).selfTemplate = record;
 }
 
-/** 登记一个跨组件共享模板（原 `library_Global_Template` 的一项）。 */
+/** 登记一个跨组件共享模板的一项。 */
 export function setLibraryScopeTemplate(
   moduleId: string,
   scopeKey: string,

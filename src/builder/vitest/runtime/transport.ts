@@ -1,11 +1,8 @@
 /// <reference types="miniprogram-api-typings" />
 
 /**
- * 设备端的 WebSocket 传输。
- *
- * 小程序没有 `new WebSocket(url)`，只有 `wx.connectSocket` 返回的 SocketTask，
- * 事件名也不同（onOpen / onMessage / onError / onClose），
- * 所以这里抽一层极窄的接口，测试时可以直接塞假的进来。
+ * 设备端的 WebSocket 传输。小程序没有 `new WebSocket(url)`，只有 `wx.connectSocket` 返回的 SocketTask，
+ * 事件名也不同（onOpen / onMessage / onError / onClose），所以这里抽一层极窄的接口，测试时可以直接塞假的进来。
  */
 export interface MpSocketLike {
   send(options: {
@@ -37,13 +34,9 @@ interface MpWxLike {
 }
 
 /**
- * 拿宿主的 `wx`。
- *
- * 必须用**裸标识符**，不能走 `globalThis`：打包时 `globalThis` 会被平台层
- * 改写成 `wx.__window`，而那是 app.js 自建的普通对象
- * （`wx.__global = wx.__window = obj`），上头并没有 `wx`。写成
- * `globalThis.wx` 就是永远是 undefined，表现是「项目开了、宿主也在监听，
- * 但设备永远不连」，报错只落在小程序控制台里。
+ * 拿宿主的 `wx`。必须用裸标识符，不能走 `globalThis`：打包时 `globalThis` 会被平台层改写成
+ * `wx.__window`，而那是 app.js 自建的普通对象，上头并没有 `wx`。写成 `globalThis.wx` 就是永远是
+ * undefined，表现是「项目开了、宿主也在监听，但设备永远不连」。
  */
 export function hostWx(): MpWxLike | undefined {
   return typeof wx === 'undefined'
@@ -62,10 +55,8 @@ function defaultFactory(url: string): MpSocketLike {
 }
 
 /**
- * 用 SocketTask 或任何兼容对象拼出一个统一的事件接口。
- *
- * SocketTask 的 onXxx 是「注册回调」而不是「addEventListener」，
- * 而且注册时机必须在 send 之前，否则首帧会丢 —— 这里在构造时就全挂上。
+ * 用 SocketTask 或任何兼容对象拼出一个统一的事件接口。SocketTask 的 onXxx 是「注册回调」而不是
+ * 「addEventListener」，而且注册时机必须在 send 之前，否则首帧会丢——这里在构造时就全挂上。
  */
 export class MpTransport {
   private readonly socket: MpSocketLike;

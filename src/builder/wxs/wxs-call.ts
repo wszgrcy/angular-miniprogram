@@ -2,16 +2,12 @@
 import type { AST } from '@angular/compiler';
 
 /**
- * 模板里 wxs 调用的识别。
- *
- * 模块名来自模板声明：
+ * 模板里 wxs 调用的识别。模块名来自模板声明：
  *
  *   <wxs module="format" src="./format.wxs"></wxs>
  *   {{ format.money(cents) }}
  *
- * 识别靠**已声明模块集合**查表，与 uni-app 的
- * `filters.includes(node.callee.object.name)` 同一套路。
- * 没有固定前缀 —— `module="format"` 已经给了名字，再加 `wxs.` 是冗余。
+ * 识别靠已声明模块集合查表，没有固定前缀——`module="format"` 已经给了名字。
  *
  * 实测 AST 形状（二级链）：
  *
@@ -20,12 +16,11 @@ import type { AST } from '@angular/compiler';
  *      └─ PropertyRead  format     ← 必须在 declared 集合里
  *         └─ ImplicitReceiver
  *
- * 之所以走「声明集合 + 结构判定」而不是类型系统：编译器不在 Angular
- * 编译管线内部，拿不到符号解析结果，只能吃 AST。
+ * 走「声明集合 + 结构判定」而不是类型系统：编译器不在 Angular 编译管线内部，
+ * 拿不到符号解析结果，只能吃 AST。
  *
- * 节点判别用 `constructor.name` 而非 `instanceof`：手上那批 AST 节点是调用方
- * 构造好传进来的，不保证跟本地 import 的是同一份 `@angular/compiler` 实例，
- * 按名字判不依赖“同一份类对象”这个前提。
+ * 节点判别用 `constructor.name` 而非 `instanceof`：手上那批 AST 节点不保证跟本地
+ * import 的是同一份 `@angular/compiler` 实例。
  */
 
 /** 已声明的 wxs 模块名集合，识别的唯一依据 */
@@ -66,9 +61,7 @@ function isImplicitReceiver(node: unknown): boolean {
 }
 
 /**
- * 解析 `<module>.<fn>` 这条属性链。
- *
- * 不检查最外层是 Call 还是引用，由调用方决定。
+ * 解析 `<module>.<fn>` 这条属性链。不检查最外层是 Call 还是引用，由调用方决定。
  * `module` 必须在 declared 里，否则就是普通的组件属性访问。
  */
 function readWxsChain(
@@ -108,10 +101,8 @@ export function matchWxsCall(
 }
 
 /**
- * 精确匹配 `<module>.<fn>`（**不带调用**）形态，用于事件 handler
- * 以及模块常量引用（`{{ format.MSG }}`）。
- *
- * 与 uni-app 一致：wxs 事件处理器是成员引用而非调用。
+ * 精确匹配 `<module>.<fn>`（不带调用）形态，用于事件 handler 以及模块常量引用
+ * （`{{ format.MSG }}`）。wxs 事件处理器是成员引用而非调用。
  */
 export function matchWxsHandler(
   ast: AST | undefined | null,
@@ -148,11 +139,8 @@ const CHILD_KEYS = [
 
 /**
  * 子树里是否引用了任一已声明的 wxs 模块。
- *
  * 判据：存在 `PropertyRead(name=M, receiver=ImplicitReceiver)` 且 M 已声明。
- *
- * CHILD_KEYS 漏一个字段 = 漏一类节点。漏检的后果是「写了 wxs 但被
- * 当成普通表达式」，静默产出错误代码，比报错糟糕得多。
+ * CHILD_KEYS 漏一个字段就是漏一类节点，漏检会静默产出错误代码。
  */
 export function containsWxsRoot(
   node: unknown,

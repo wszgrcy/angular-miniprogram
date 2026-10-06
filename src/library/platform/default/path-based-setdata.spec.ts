@@ -16,30 +16,23 @@ import { MiniProgramRenderer } from './mini-program.renderer';
 /**
  * 路径式 setData（快速通道）行为验证。
  *
- * ## 要证明的核心命题
- *
  * 1. 全量序列化会顺手给每个 AgentNode 打上 `__pathPrefix` / `__mpRef`。
- * 2. 纯叶子变更（class / style / property / value）时，`endRender()`
- *    **一次 `toView()` 都不调用**，直接发路径式 key。
- *    —— 这是整笔收益的落点：成本从 O(视图) 变成 O(变更)。
- * 3. 任何结构性变更（增 / 删 / 移动）→ 整体回退到旧的全量管线。
+ * 2. 纯叶子变更（class / style / property / value）时，`endRender()` 一次 `toView()`
+ *    都不调用，直接发路径式 key——成本从 O(视图) 变成 O(变更)。
+ * 3. 任何结构性变更（增 / 删 / 移动）→ 整体回退到全量管线。
  * 4. 拿不到路径前缀的节点 → 强制回退，绝不猜路径。
  * 5. 无变更 → 一次 setData 都不发。
- * 6. 开关关掉后行为与改造前一致。
+ * 6. 开关关掉后行为与全量管线一致。
  *
- * ## 为什么用「数 toView 调用次数」来断言
- *
- * `diffNodeData` 产出的也是路径式 key，光看 payload 形状分不出
- * 「走了快路径」还是「走了全量 + diff」。但全量必然经过
- * `lViewToWXView` → 每个节点一次 `toView()`。
- * 所以 **toView 调用次数 = 0** 就是「没走全量」的硬证据。
+ * 用「数 toView 调用次数」断言：`diffNodeData` 产出的也是路径式 key，光看 payload
+ * 形状分不出走了哪条路，但全量必然每个节点一次 `toView()`，所以次数为 0 就是硬证据。
  */
 describe('路径式 setData 快速通道', () => {
   const renderer = new MiniProgramRenderer();
   let toViewCount = 0;
   let origToView: any;
 
-  /** 造一个 n 个元素节点的合成 lView（与 lview-to-node-list.spec 同一套路） */
+  /** 造一个 n 个元素节点的合成 lView */
   function makeLView(n: number) {
     const lView: any[] = [];
     lView[1] = { bindingStartIndex: LVIEW.HEADER_OFFSET + n };
@@ -64,8 +57,7 @@ describe('路径式 setData 快速通道', () => {
   }
 
   /**
-   * link + 首次全量序列化（打上前缀）+ 播种 diff 快照。
-   * 与 `linkNgComponentWithPage` 的真实流程一一对应。
+   * link + 首次全量序列化（打上前缀）+ 播种 diff 快照，与 `linkNgComponentWithPage` 的流程一一对应。
    */
   function bootstrap(n: number) {
     const { lView, nodes } = makeLView(n);
@@ -226,9 +218,7 @@ describe('路径式 setData 快速通道', () => {
 
   it('removeChild → 回退全量序列化', () => {
     const { lView, nodes, mp } = bootstrap(2);
-    // 先把 nodes[1] 挂到 nodes[0] 下（真实场景里节点已在树上），
-    // 否则 removeChild 找不到子节点——顺带说明 AgentNode.removeChild
-    // 对 index === -1 没有保护（见下方遗留问题说明）。
+    // 先把 nodes[1] 挂到 nodes[0] 下，否则 removeChild 找不到子节点
     nodes[0].appendChild(nodes[1]);
     propertyChange(lView as any);
     renderer.removeChild(nodes[0], nodes[1]);
@@ -244,16 +234,13 @@ describe('路径式 setData 快速通道', () => {
     renderer.appendChild(nodes[0], new AgentNode('element'));
     countToView(() => endRender());
     /**
-     * 全量重序列化本身已经覆盖了这个属性变更，所以：
-     *  - 只能有 **一次** setData（pending 已清空，不会再发一轮）
-     *  - 且该变更仍在全量结果里（不能丢）
+     * 全量重序列化本身已经覆盖了这个属性变更，所以只能有一次 setData，
+     * 且该变更仍在全量结果里（不能丢）。
      */
     expect(mp.calls.length).toBe(1);
     /**
-     * 注：旧 diff 在 `property` 的 key 数变化时会「整体送出」该对象
-     * （`{ 'nodeList[0].property': {x:999} }`），而快路径只发
-     * `'nodeList[0].property.x'` 一个叶子——这正好说明快路径的
-     * payload 严格小于旧管线。
+     * 全量管线在 `property` 的 key 数变化时会整体送出该对象，而快路径只发
+     * `'nodeList[0].property.x'` 一个叶子。
      */
     expect(mp.calls[0]['nodeList[0].property']).toEqual({ x: 999 });
   });
@@ -279,10 +266,7 @@ describe('路径式 setData 快速通道', () => {
     renderer.setProperty(nodes[0], 'x', 1);
     const calls = countToView(() => endRender());
     expect(calls, '关掉开关后必须走全量').toBeGreaterThan(0);
-    /**
-     * 旧管线在 `property` key 数变化时「整体送出」该对象；
-     * 开关打开后同一变更只发 `'nodeList[0].property.x'` 一个叶子。
-     */
+    /** 全量管线在 `property` key 数变化时整体送出该对象；开关打开后同一变更只发一个叶子。 */
     expect(mp.calls).toEqual([{ 'nodeList[0].property': { x: 1 } }]);
   });
 
@@ -308,13 +292,8 @@ describe('路径式 setData 快速通道', () => {
     parentLView[1] = { bindingStartIndex: LVIEW.HEADER_OFFSET + 2 };
     const container: any = [null, true];
     /**
-     * 真实 Angular 布局：嵌入的**裸 lView** 从 CONTAINER_HEADER_OFFSET 起。
-     *
-     * 旧写法是 `container[CONTAINER_VIEW_REFS] = [{ _lView: childLView }]`，
-     * 那只对应 `*ngIf` 这类走 `ViewContainerRef.createEmbeddedView()`
-     * 的路径；内建 `@if`/`@for`/`@switch` 根本不填 VIEW_REFS（恒为
-     * null），所以旧实现下内建控制流全部渲染为空——就是被修掉的那个 bug。
-     * 合成数据要跟真实布局一致，否则测试在验一个不存的结构。
+     * 真实 Angular 布局：嵌入的裸 lView 从 CONTAINER_HEADER_OFFSET 起。
+     * 合成数据要跟真实布局一致，否则测试在验一个不存在的结构。
      */
     container[LVIEW.CONTAINER_HEADER_OFFSET] = childLView;
     parentLView[LVIEW.HEADER_OFFSET + 0] = container;
@@ -346,7 +325,7 @@ describe('路径式 setData 快速通道', () => {
     const ITER = 200;
     const { lView, nodes, mp } = bootstrap(N);
 
-    /** 旧管线：全量序列化 + diffNodeData */
+    /** 全量管线：全量序列化 + diffNodeData */
     const t0 = process.hrtime.bigint();
     for (let i = 0; i < ITER; i++) {
       const ctx = getPageRefreshContext(lView as any, mp as any);
@@ -378,12 +357,9 @@ describe('路径式 setData 快速通道', () => {
 
   it('性能：视图从 100 涨到 1000，快路径成本几乎不变', () => {
     /**
-     * 取 best-of-5、单次 20_000 轮，而不是“一轮 200 次取均值”。
-     *
-     * 单次循环体只有一两微秒，200 轮总共不到半毫秒 —— 整个测量窗口都
-     * 淹没在 JIT 升档和 GC 里，均值根本不代表成本。实测那样写在本机
-     * 能碎一半（先跑的 100 节点把 JIT 预热吃了，比值能飘到 3.5）。
-     * best-of-N 是“纯计算成本”的稳健估计；实测比值稳定在 0.6~0.7。
+     * 取 best-of-5、单次 20_000 轮，而不是「一轮 200 次取均值」。
+     * 单次循环体只有一两微秒，整个测量窗口会淹没在 JIT 升档和 GC 里，
+     * 均值根本不代表成本。best-of-N 是纯计算成本的稳健估计。
      */
     const ITER = 20_000;
     const REPEAT = 5;

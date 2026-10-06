@@ -3,29 +3,16 @@ import * as path from 'path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * 路径写法的防回归扫描。
+ * 路径写法的防回归扫描。这类 bug 在本仓库修过好几轮，每一轮都是「又有人手写了一遍分隔符翻转」。
+ * 测试只能保证当前代码干净，挡不住下一次，所以这里直接把源码扫一遍。
  *
- * 这类 bug 在本仓库已经修过好几轮（`f36f671` 产物路径统一 posix、
- * `98a3f96` 分包归属统一盘符大小写、fileReplacements 在 Windows 上静默
- * 失配），每一轮都是「又有人手写了一遍分隔符翻转」。测试只能保证当前代码
- * 干净，挡不住下一次，所以这里直接把源码扫一遍。
+ * 规则一：不许在 `util/path.ts` 之外手写分隔符翻转。手写 `.replace(/\\/g, '/')` 的问题不是写不对，
+ * 是每个人写的都差一点：有的忘了盘符、有的忘了尾斜杠、有的把该保留的前导 `/` 也剥了。
  *
- * ## 规则一：不许在 `util/path.ts` 之外手写分隔符翻转
- *
- * 手写 `.replace(/\\/g, '/')` 的问题不是写不对，是**每个人写的都差一点**：
- * 有的忘了盘符、有的忘了尾斜杠、有的把该保留的前导 `/` 也剥了。仓库里曾经
- * 同时存在 6 份 `toPosix`，行为两两不同。统一走 `util/path` 之后，要改语义
- * 只有一处可改。
- *
- * ## 规则二：`pathKey` 的产物不许直接进 `fs` / node `path`
- *
- * `pathKey` 返回的是 devkit 的**身份形态**（Windows 上 `/C:/a/b`，开头多一个
- * 斜杠）。它只能用来比、当 key；交给 `fs` 或 `path.resolve` 会被当成
- * 「C 盘下的 `\C\a\b`」，Windows 上直接 ENOENT（posix 下反倒看不出来）。
- * 要变回可用路径用 `toNativePath` / `toAbsolutePosix`。
- *
- * 这条只能抓到**直接嵌套**的写法（`fs.readFileSync(pathKey(x))`）；先存进
- * 变量再传出去的抓不到，那种靠 review 和 Windows 上跑全量测试兜底。
+ * 规则二：`pathKey` 的产物不许直接进 `fs` / node `path`。`pathKey` 返回的是 devkit 的身份形态
+ * （Windows 上 `/C:/a/b`，开头多一个斜杠），只能用来比、当 key；交给 `fs` 或 `path.resolve`
+ * 会被当成「C 盘下的 `\C\a\b`」，Windows 上直接 ENOENT。要变回可用路径用 `toNativePath` /
+ * `toAbsolutePosix`。这条只能抓到直接嵌套的写法。
  */
 
 const BUILDER_ROOT = path.resolve(__dirname, '..');

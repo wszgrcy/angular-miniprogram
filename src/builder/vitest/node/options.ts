@@ -5,8 +5,8 @@ import {
 
 export interface MiniProgramVitestPluginOptions {
   /**
-   * WebSocket 监听端口。必须和编译期 `define` 进产物的 `MP_VITEST_PORT`
-   * 是同一个来源，否则小程序去连 A、宿主在 B，表现为永远连不上。
+   * WebSocket 监听端口。必须和编译期 `define` 进产物的 `MP_VITEST_PORT` 是同一个来源，
+   * 否则小程序去连 A、宿主在 B，表现为永远连不上。
    */
   port?: number;
   /** 监听地址，默认 127.0.0.1。开发者工具在同机，不需要对外。 */

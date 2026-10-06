@@ -10,9 +10,8 @@ import { hookWritePackage } from './remove-publish-only';
 import { CustomStyleSheetProcessor } from './stylesheet-processor';
 
 /**
- * 从 ng-package.json 解析库产物根目录（`dest`）。
- *
- * 传进来的可能是 ng-package.json 本身，也可能是包含它的目录，两种都接。
+ * 从 ng-package.json 解析库产物根目录（`dest`）。传进来的可能是 ng-package.json 本身，
+ * 也可能是包含它的目录，两种都接。
  */
 export function resolveLibraryDistRoot(
   ngPackagePath: string,
@@ -36,14 +35,8 @@ export function resolveLibraryDistRoot(
 }
 
 /**
- * 构建收尾时的兵底刷盘。
- *
- * 正常情况下 `compile-ngc.transform` 已经在每个 entry 编译完后落过盘，
- * 这里只是再确认一次：万一某个 entry 走了缓存、没进 transform，
- * 至少 build 路径上还能补一次。
- *
- * 旧实现是「把被扁平化抖掉的标记补写回 d.ts」，那个问题现在不存在了：
- * 元数据不在 d.ts 里，扁平化碰不到它。详见 `library-meta-schema.ts`。
+ * 构建收尾时的兜底刷盘。正常情况下 `compile-ngc.transform` 已经在每个 entry 编译完后落过盘，
+ * 这里只是再确认一次：万一某个 entry 走了缓存、没进 transform，至少 build 路径上还能补一次。
  */
 function flushLibraryMetaSidecar(ngPackagePath: string): void {
   const distRoot = resolveLibraryDistRoot(ngPackagePath);
@@ -74,10 +67,8 @@ export async function ngPackagrFactory(
   packager.withProviders([COMPILE_NGC_TRANSFORM, hookWritePackage()]);
 
   /**
-   * 包一层 `build` / `watch`，在原有流程走完后补写标记。
-   *
-   * 放在这里而不是 `builder.ts`，是因为 `npm run build:library` 直接调本工厂，
-   * 不经过 architect builder；在这里包一次两条路径都能覆盖。
+   * 包一层 `build` / `watch`，在原有流程走完后刷一次盘。放在这里而不是 `builder.ts`，
+   * 是因为 `npm run build:library` 直接调本工厂，不经过 architect builder；在这里包一次两条路径都能覆盖。
    */
   const rawBuild = packager.build.bind(packager);
   packager.build = ((options?: NgPackagrOptions) => {

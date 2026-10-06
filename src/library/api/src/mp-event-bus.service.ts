@@ -6,9 +6,7 @@ import { Observable } from 'rxjs';
 type Handler = (payload: any) => void;
 
 /**
- * 全局事件总线（root 单例），对标 uni 的 `uni.$on/$off/$emit`。
- *
- * 与 rxjs Subject 的区别：为了 `off(event, handler)` 的精确移除语义，
+ * 全局事件总线（root 单例）。与 rxjs Subject 的区别：为了 `off(event, handler)` 的精确移除语义，
  * 用 handler 集合手工派发；`on` 同时返回退订函数，两种用法都支持。
  * 监听方改状态走 signal，写入时 Angular 自己标脏，无需手动调度。
  */

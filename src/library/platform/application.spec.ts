@@ -16,16 +16,10 @@ import { PageService } from './page.service';
 import { initMiniProgramTestEnv } from './test-util/init-env';
 
 /**
- * `provideMiniProgramApp` —— 取代 `MiniProgramModule` 的 provider 集合。
- *
- * 这里盯住的是「原 NgModule 提供的东西一个都没丢」。原
- * `MiniProgramModule` 的 providers 是：
- *   ɵINJECTOR_SCOPE: 'root' / ErrorHandler / MiniProgramRendererFactory /
- *   RendererFactory2→useExisting / PageService / ComponentFinderService
- * imports 是 ApplicationModule + HttpClientModule。
- *
- * ApplicationModule 经查 `ɵinj = __defineInjector({})`，一个 provider
- * 都没有，纯历史空壳，所以不需要它——本 spec 顺带把这条钉住。
+ * `provideMiniProgramApp` —— 取代 `MiniProgramModule` 的 provider 集合。这里盯住的是
+ * 「原 NgModule 提供的东西一个都没丢」：ɵINJECTOR_SCOPE / ErrorHandler / MiniProgramRendererFactory /
+ * RendererFactory2→useExisting / PageService / ComponentFinderService，imports 是 ApplicationModule + HttpClientModule。
+ * ApplicationModule 经查 `ɵinj = __defineInjector({})`，一个 provider 都没有，所以不需要它——本 spec 顺带钉住这条。
  */
 describe('provideMiniProgramApp（取代 MiniProgramModule）', () => {
   beforeEach(() => {
@@ -46,13 +40,10 @@ describe('provideMiniProgramApp（取代 MiniProgramModule）', () => {
   });
 
   it('PageService 已注册（JIT 下不可实例化，见注释）', () => {
-    // PageService 构造依赖 Injector / EnvironmentInjector / ApplicationRef /
-    // @Inject(APP_TOKEN)。本仓库 emitDecoratorMetadata 是关的，
-    // ts-node JIT 拿不到前三个的类型，所以真实构造会报 NG0202。
-    // 真实应用走 ng-packagr AOT，类型从 AST 解析，没这个问题。
-    //
-    // 这里能验证的是「provider 存在」：未注册会报
-    // NullInjectorError（NG201），而不是 NG0202。
+    // PageService 构造依赖 Injector / EnvironmentInjector / ApplicationRef / @Inject(APP_TOKEN)。
+    // 本仓库 emitDecoratorMetadata 是关的，ts-node JIT 拿不到前三个的类型，真实构造会报 NG0202；
+    // 真实应用走 AOT，类型从 AST 解析，没这个问题。这里能验证的是「provider 存在」：
+    // 未注册会报 NullInjectorError（NG201），而不是 NG0202。
     let code: number | null = null;
     try {
       TestBed.inject(PageService);
@@ -76,8 +67,7 @@ describe('provideMiniProgramApp（取代 MiniProgramModule）', () => {
   });
 
   it('ApplicationRef 可解析（证明不需要 ApplicationModule）', () => {
-    // ApplicationModule.ɵinj 是空的，ApplicationRef 由
-    // internalCreateApplication / core 自己装配，不依赖那个 NgModule。
+    // ApplicationModule.ɵinj 是空的，ApplicationRef 由 internalCreateApplication / core 自己装配。
     expect(TestBed.inject(ApplicationRef)).toBeTruthy();
   });
 });

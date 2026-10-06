@@ -7,11 +7,8 @@ import { ALIPAY_EVENT_NAMES, alipayEventName } from './zfb-event-name';
 import { ZfbTransform } from './zfb.transform';
 
 /**
- * 支付宝事件名映射。
- *
- * 编译期把微信事件名翻成支付宝驼峰名（`touchstart` → `onTouchStart`）。
- * 表内容与运行期那份（`src/library/platform/zfb/event-name.ts`）逐条比对，
- * 两边不一致就是「属性名对了、监听查不到」。
+ * 支付宝事件名映射。编译期把微信事件名翻成支付宝驼峰名（`touchstart` → `onTouchStart`）。
+ * 表内容与运行期那份（`src/library/platform/zfb/event-name.ts`）逐条比对，两边不一致就是「属性名对了、监听查不到」。
  */
 const transform = new ZfbTransform();
 

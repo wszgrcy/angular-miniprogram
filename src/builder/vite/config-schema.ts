@@ -1,20 +1,13 @@
 /**
- * 小程序配置文件的形状定义。
- *
- * 一份定义两个用途：
- *   1. 构建期形状校验（字段类型、必填、字面量），比手写 `if` 报得清楚，
- *      能给出 `tabBar.list[0].pagePath` 这种路径；
+ * 小程序配置文件的形状定义。一份定义两个用途：
+ *   1. 构建期形状校验（字段类型、必填、字面量），能给出 `tabBar.list[0].pagePath` 这种路径；
  *   2. 生成 JSON Schema 给编辑器做补全 / 悬浮文档（`script/gen-config-schema.ts`）。
  *
- * 全部用 `looseObject`：未知字段既不报错也不丢。各家小程序的字段一直在加
- * （`darkmode` / `resizable` / `useExtendedLib` / `renderer`…），一旦禁了未知字段，
- * 用户升级构建器就会突然一堆红波浪线，产物里还丢字段。
+ * 全部用 `looseObject`：各家小程序的字段一直在加（`darkmode` / `resizable` / `renderer`…），
+ * 一旦禁了未知字段，用户升级构建器就会突然一堆红波浪线，产物里还丢字段。
  *
- * 校验只管形状，页面是否真的产出、tabBar 指向的页面存不存在这类语义判断
- * 在 `app-config.ts`，顺序是先形状后语义。
- *
- * 字段说明统一写 `v.pipe(schema, v.description(...))`：描述挂在 pipe 上，
- * 转换器才会把它变成 JSON Schema 的 description。
+ * 校验只管形状，语义判断在 `app-config.ts`，顺序是先形状后语义。
+ * 字段说明统一写 `v.pipe(schema, v.description(...))`，转换器才会把它变成 JSON Schema 的 description。
  */
 
 import * as v from 'valibot';
@@ -39,7 +32,6 @@ export const mpSubPackageSchema = v.looseObject({
 
 /**
  * 按平台分段：`{ wx: { ... }, zfb: { ... } }`。
- *
  * key 必须是平台名，拼错会静默失效，所以平台名单独校验（`checkPlatformSection`）。
  */
 const platformSectionSchema = v.record(v.string(), v.looseObject({}));
@@ -218,10 +210,8 @@ export function validateProjectConfigShape(config: unknown): string[] {
 }
 
 /**
- * `_platform` 里出现不是平台名的 key → 报错。
- *
- * 平台名拼错只会让那一段静默失效，「我明明配了却没生效」是最难查的一类问题，
- * 必须在这里拦住。
+ * `_platform` 里出现不是平台名的 key → 报错。平台名拼错只会让那一段静默失效，
+ * 「我明明配了却没生效」是最难查的一类问题，必须在这里拦住。
  */
 export function checkPlatformSection(
   config: MpConfigObject,

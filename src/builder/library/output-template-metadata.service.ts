@@ -14,14 +14,8 @@ import {
 } from './token';
 
 /**
- * 把「全局模板」（自引用模板 + 跨组件共享模板）登记进 sidecar 暂存区。
- *
- * **不再改写 JS 产物。**
- *
- * 旧实现把 `let $self_Global_Template={...}` / `let library_Global_Template={...}`
- * 拼进库的 flat module 产物，主构建再用 CSS-selector 从 JS 里把这两个变量
- * 捞回来。现在直接进 `mp-library-meta.json` 的 `selfTemplate` / `scopeTemplates`，
- * 库 JS 一个字都不改。
+ * 把「全局模板」（自引用模板 + 跨组件共享模板）登记进 sidecar 暂存区。不改写 JS 产物，
+ * 直接进 `mp-library-meta.json` 的 `selfTemplate` / `scopeTemplates`，库 JS 一个字都不改。
  */
 export class OutputTemplateMetadataService {
   private entryFile = inject(ENTRY_FILE_TOKEN);

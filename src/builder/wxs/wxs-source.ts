@@ -3,15 +3,14 @@ import ts from 'typescript';
 /**
  * wxs 源解析。
  *
- * 渲染层代码（wxs）与逻辑层是**单向**的：
+ * 渲染层代码（wxs）与逻辑层是单向的：
  *   逻辑层 → 渲染层：通过 nodeList 物化数据（编译期改写绑定表达式）
  *   渲染层 → 逻辑层：只有 `ownerInstance.callMethod(name, args)`，异步
  *
  * 所以编译期必须从 wxs 源里提前知道两件事：
  *   1. 对外暴露了哪些成员（模板里 `wxs.mod.fn` 能否解析）
  *   2. 会回调哪些逻辑层方法（用于注册 MP methods 转发）
- *
- * 两者都是**静态可判定**的，不依赖运行时发现。
+ * 两者都是静态可判定的，不依赖运行时发现。
  */
 export interface WxsModuleMeta {
   /** 模块名，模板里 `wxs.<name>.<fn>` 的中间段 */

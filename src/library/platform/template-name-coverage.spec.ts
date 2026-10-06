@@ -1,15 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * 覆盖测试：common 的 AST patch 已全部移除（packages/common 不再 sync），
- * 原本由 patch 提供的 `__templateName` 改由 fork 自己的
- * `lViewToWXView` 从 `tView.declTNode.localNames[0]` 推导。
+ * `__templateName` 由 `lViewToWXView` 从 `tView.declTNode.localNames[0]` 推导。
+ * 本文件用官方 @angular/common 的 CommonModule 驱动真实 TestBed 组件，断言
+ * `getPageRefreshContext()` 产出的 nodeList 里每个容器项的 `__templateName` 正确。
  *
- * 本文件用**官方 @angular/common 的 CommonModule（完全未 patch）**
- * 驱动真实 TestBed 组件，断言 `getPageRefreshContext()` 产出的
- * nodeList 里每个容器项的 `__templateName` 正确。
- *
- * 覆盖原先 4 个指令 patch 各自的场景：
- *   ng_if（then / else）、ng_for_of、ng_switch、ng_template_outlet
+ * 覆盖场景：ng_if（then / else）、ng_for_of、ng_switch、ng_template_outlet，
  * 外加自定义结构指令显式传值的优先级，以及反向对照。
  */
 import {
@@ -115,8 +110,8 @@ function componentLView(fixture: any): any[] {
 }
 
 /**
- * 收集 getPageRefreshContext 产出里所有「容器项」。
- * 容器在 nodeList 里表现为数组，每项含 __templateName / nodeList。
+ * 收集 getPageRefreshContext 产出里所有「容器项」。容器在 nodeList 里表现为数组，
+ * 每项含 __templateName / nodeList。
  */
 function collectContainerNames(
   nodeList: any[],
@@ -154,9 +149,8 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
       containers.length,
       '没找到容器，说明 ngIf 没建出嵌入视图',
     ).toBeGreaterThan(0);
-    // 每个容器项都应有 __templateName 字段，且**不得为 `undefined`**。
-    // 微信 `setData` 对路径式 key 上的 `undefined` 直接拒掉整个调用，
-    // 无名时用 `null`（wxml 的 `item.__templateName||'X'` 仍走兼底）。
+    // 每个容器项都应有 __templateName 字段，且不得为 `undefined`：微信 `setData` 对路径式 key
+    // 上的 `undefined` 直接拒掉整个调用。无名时用 `null`（wxml 的 `item.__templateName||'X'` 仍走兼底）。
     containers.forEach((c) =>
       c.names.forEach((n) =>
         expect(
@@ -214,16 +208,9 @@ describe('__templateName 覆盖：patch 移除后由 declTNode 推导顶上', ()
   });
 
   /**
-   * 自定义结构指令显式传 __templateName 的优先级。
-   *
-   * 注：本仓库 TestBed 下，同文件内声明的 standalone 结构指令会报
-   * NG0303（与 __templateName 逻辑无关，是本地 standalone 指令在
-   * 该 JIT 环境的解析问题）。真实用例见测试应用
-   * `__pages/custom-structural-directive`，它用同样的
-   * `createEmbeddedView(tpl, {__templateName: name})` 模式且构建通过。
-   *
-   * 这里直接对真实 TemplateRef 建视图并覆盖 context，验证
-   * lViewToWXView 里那两级表达式「context 优先于 declTNode」成立。
+   * 自定义结构指令显式传 __templateName 的优先级。本仓库 TestBed 下同文件内声明的
+   * standalone 结构指令会报 NG0303（与 __templateName 逻辑无关）。这里直接对真实
+   * TemplateRef 建视图并覆盖 context，验证「context 优先于 declTNode」成立。
    */
   it('context.__templateName 优先于 declTNode 推导', () => {
     const fixture = TestBed.createComponent(CovOutletStaticComponent);

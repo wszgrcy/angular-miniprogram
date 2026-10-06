@@ -10,9 +10,7 @@ export type MpCustomCall = (
 ) => any;
 
 /**
- * 单个 API 在某个平台上的差异协议（声明式）。
- * args / returnValue 共用 key 级引擎（protocol-engine），
- * 表格内容可对照 uni 的 protocols 逐条搬运。
+ * 单个 API 在某个平台上的差异协议（声明式）。args / returnValue 共用 key 级引擎（protocol-engine）。
  */
 export interface MpApiProtocol {
   /** 目标平台 API 名，默认为统一名本身 */

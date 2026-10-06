@@ -2,12 +2,9 @@ import { InjectionToken } from '@angular/core';
 import { MpPlatform } from './types';
 
 /**
- * 运行时平台探测。
- *
- * 构建期 vite define 会把 `miniProgramPlatform` 替换成平台全局对象名的
- * 字符串字面量（见 builder/vite/index.ts buildPlatformDefine），
- * 所以正常情况下零成本拿到平台。define 缺席时（单测 / 非常规环境）
- * 退化为对 globalThis 的特征嗅探。
+ * 运行时平台探测。构建期 vite define 会把 `miniProgramPlatform` 替换成平台全局对象名的字符串字面量
+ * （见 builder/vite/index.ts buildPlatformDefine），所以正常情况下零成本拿到平台。
+ * define 缺席时（单测 / 非常规环境）退化为对 globalThis 的特征嗅探。
  */
 declare const miniProgramPlatform: MpPlatform | undefined;
 

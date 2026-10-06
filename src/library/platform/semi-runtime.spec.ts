@@ -18,15 +18,10 @@ class SemiComponent {}
 
 /**
  * 半运行时测试：TestBed 真实创建组件 → 真实 lView → 真实 nodeList。
- *
- * ## 关键：要取「组件自己的视图」，不是宿主视图
- *
- * `componentRef.hostView._lView` 是**宿主视图**，它只有 1 个节点槽
- * （`bindingStartIndex - HEADER_OFFSET === 1`），组件真正的模板视图
- * 嵌在 `hostView._lView[HEADER_OFFSET]` 里，那里才有 decls 个节点。
- *
- * 取错视图会得到 nodeList.length === 1，看起来像「运行时少建节点」，
- * 其实只是取错了对象。
+ * 关键：要取「组件自己的视图」，不是宿主视图。`componentRef.hostView._lView` 是宿主视图，
+ * 它只有 1 个节点槽（`bindingStartIndex - HEADER_OFFSET === 1`），组件真正的模板视图嵌在
+ * `hostView._lView[HEADER_OFFSET]` 里，那里才有 decls 个节点。取错视图会得到
+ * nodeList.length === 1，看起来像「运行时少建节点」，其实只是取错了对象。
  */
 describe('半运行时（TestBed）', () => {
   beforeEach(() => {

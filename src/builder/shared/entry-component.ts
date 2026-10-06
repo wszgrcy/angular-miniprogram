@@ -4,15 +4,13 @@ import * as ts from 'typescript';
 import { isPathIn } from '../util/path';
 
 /**
- * 入口文件里「这个入口绑定哪个组件类」的唯一标记：**default export**。
+ * 入口文件里「这个入口绑定哪个组件类」的唯一标记：default export。
  *
  * ```ts
  * export { RootPage as default } from './root.component';
  * ```
  *
- * 小程序侧的注册调用（`bootstrapPage` / `componentRegistry` /
- * `bootstrapCustomTabbar`）由构建器生成，用户代码里不出现框架 API。
- * 入口类型来自配置来源（pages / customTabbar / 其余），见 `entry-patterns.ts`。
+ * 小程序侧的注册调用由构建器生成，用户代码里不出现框架 API。
  */
 export const MP_ENTRY_TYPES = ['page', 'component', 'tabbar'] as const;
 export type MpEntryType = (typeof MP_ENTRY_TYPES)[number];
@@ -30,9 +28,7 @@ export const MP_ENTRY_BOOTSTRAP: Record<MpEntryType, MpBootstrapFunction> = {
 };
 
 /**
- * 产物路径是不是自定义 tabBar（posix、不含扩展名）。
- *
- * 目录名是平台事实（`BuildPlatform.customTabbar.dir`），调用方传进来。
+ * 产物路径是不是自定义 tabBar（posix、不含扩展名）。目录名是平台事实，由调用方传进来；
  * 不传即当前平台没有自定义 tabBar，一律判否。
  */
 export function isCustomTabbarOutput(
@@ -47,9 +43,7 @@ export function isCustomTabbarOutput(
 
 /**
  * 取 `export default X` / `export { X as default } from './y'` 里的 X。
- *
- * `export { default } from './y'` 没有 propertyName，此时 `name` 那个
- * `default` 标识符本身就是指向 y 的 default 的别名，交给 typeChecker 解。
+ * `export { default } from './y'` 没有 propertyName，此时 `default` 标识符本身就是别名。
  */
 function findDefaultExport(
   sourceFile: ts.SourceFile,
@@ -82,10 +76,8 @@ export function detectEntryComponent(
 }
 
 /**
- * 无 ts.Program 的轻量版：直接读文件文本判定。
- *
- * 给 vite 的入口生成插件用——它只需要「有没有 default export」这个结论，
- * 不需要 symbol，犯不着为它建 program。
+ * 无 ts.Program 的轻量版：直接读文件文本判定。只需要「有没有 default export」这个结论，
+ * 犯不着建 program。
  */
 export function detectEntryComponentFromSource(
   code: string,
@@ -104,9 +96,7 @@ export function detectEntryComponentFromSource(
 
 /**
  * 从 default 导出表达式往上找到携带 moduleSpecifier 的那层声明。
- *
- * `export { X as default } from './y'` 里表达式到声明之间隔着 NamedExports，
- * `export default X` 则根本没有这层，所以逐层往上找而不是数固定层数。
+ * 表达式到声明之间的层数不固定，所以逐层往上找。
  */
 function findModuleBearingDeclaration(
   expression: ts.Expression,
@@ -127,15 +117,9 @@ function resolveRelativeModule(fromFile: string, specifier: string): string {
 }
 
 /**
- * 解析入口的 default 导出**实际指向哪个文件的哪个类**。
- *
- * 纯语法解析，不建 program：入口的 default 只有三种写法（见本文件顶部注释），
- * 全部能在不做类型检查的前提下解开。
- *
- * `className` 为 undefined 表示「知道文件、不知道类」（`export { default } from`
- * 这种二道贩子写法），调用方按「整个文件都被认领」处理。
- *
- * 解析不出来（default 绑的是表达式、或说明符不是相对路径）返回 undefined。
+ * 解析入口的 default 导出实际指向哪个文件的哪个类。纯语法解析，不建 program。
+ * `className` 为 undefined 表示「知道文件、不知道类」，调用方按整个文件被认领处理。
+ * 解析不出来返回 undefined。
  */
 export function resolveEntryComponentBinding(
   entrySrc: string,
@@ -152,8 +136,8 @@ export function resolveEntryComponentBinding(
     if (!specifier.startsWith('.')) {
       return undefined;
     }
-    // `export { X as default } from './y'`：propertyName 才是 y 里的原名。
-    // `export { default } from './y'` 没有 propertyName，类名未知。
+    // `export { X as default } from './y'`：propertyName 才是 y 里的原名；
+    // `export { default } from './y'` 没有 propertyName，类名未知
     let className: string | undefined;
     if (ts.isExportSpecifier(expression)) {
       const original = expression.propertyName?.text ?? expression.name.text;
@@ -234,10 +218,8 @@ function isComponentClass(node: ts.ClassDeclaration): boolean {
 }
 
 /**
- * 列出一个文件里所有 `@Component` 类的类名。
- *
- * 纯语法，不做类型检查：组件发现发生在 vite 配置之前（产物路径要进 rollup
- * input），那会儿还没有 Angular program，只能靠 AST。
+ * 列出一个文件里所有 `@Component` 类的类名。纯语法，不做类型检查：
+ * 组件发现发生在 vite 配置之前，那会儿还没有 Angular program，只能靠 AST。
  */
 export function findComponentClassNames(sourceFile: ts.SourceFile): string[] {
   return sourceFile.statements

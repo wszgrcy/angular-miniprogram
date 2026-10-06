@@ -20,10 +20,7 @@ import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
 /**
- * Vite 构建链路验证（第一阶段：入口 + Angular AOT + propertyChange 注入）。
- *
- * 资产产出（wxml/json/wxss）在后续步骤接入，这里先保证
- * JS 侧的编译与注入是对的。
+ * Vite 构建链路验证（入口 + Angular AOT + propertyChange 注入）。
  */
 
 /** 两个 describe 块共用的 harness 形状（sandbox 内容必须一致才能复用构建） */
@@ -55,8 +52,7 @@ async function setupBase(harness: BuildHarness) {
 }
 
 /**
- * 写一个真的 import environment 的 page entry。
- * 值要绑到组件属性上，否则会被 tree-shake 掉。
+ * 写一个真的 import environment 的 page entry。值要绑到组件属性上，否则会被 tree-shake 掉。
  */
 async function writeEnvProbe(harness: BuildHarness) {
   await harness.writeFile(
@@ -81,11 +77,9 @@ export default EnvProbeComponent;
 describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('vite: 构建链路', () => {
     /**
-     * 三条用例看的是同一次构建的不同侧面（JS 侧注入 / 资产产出 / fileReplacements
-     * 的对照组），构建参数与 fixture 完全一致，所以合成一次构建。
-     *
-     * 这里也写上 env-probe entry：它对本组断言无影响，但能让下面「不替换时保持 dev
-     * 值」的对照组命中同一份缓存——对照组与本次构建的差别只在 fileReplacements 参数。
+     * 三条用例看的是同一次构建的不同侧面（JS 侧注入 / 资产产出 / fileReplacements 的对照组），
+     * 构建参数与 fixture 完全一致，所以合成一次构建。env-probe entry 对本组断言无影响，
+     * 但能让「不替换时保持 dev 值」的对照组命中同一份缓存。
      */
     const load = memoize(async () => {
       const root = harness.host.root();
@@ -145,7 +139,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
         [...js.values()].filter((c) => c.includes('propertyChange')),
       ).not.toHaveLength(0);
 
-      // 入口输出路径要带目录，和 webpack 时代 outputFiles.logic 对齐
+      // 入口输出路径要带目录
       const paths = [...js.keys()];
       expect(paths.some((p) => /pages\/[\w./-]+\.js$/.test(p))).toBe(true);
       expect(paths.some((p) => /components\/[\w./-]+\.js$/.test(p))).toBe(true);
@@ -179,8 +173,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
 describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('vite: fileReplacements 端到端', () => {
     /**
-     * 之前说「验不了」是错的——environment 不在 bundle 里只是因为
-     * 现有 fixture 没有 page import 它，那是 fixture 的属性，
+     * environment 不在 bundle 里只是因为现有 fixture 没有 page import 它，那是 fixture 的属性，
      * 不是 builder 的限制。自己写一个 entry 就能造出条件。
      */
     const setup = async () => {

@@ -19,16 +19,13 @@ export abstract class TemplateTransformBase {
   abstract eventListConvert: (list: string[]) => string;
 
   /**
-   * `tag-name-*` 标记的输出策略，由构建选项写入。
-   *
-   * 放在基类上是因为 `BuildPlatform.templateTransform` 的静态类型就是
-   * `TemplateTransformBase`，构建器得能不分平台地把它设进去。
+   * `tag-name-*` 标记的输出策略，由构建选项写入。放在基类上是因为
+   * `BuildPlatform.templateTransform` 的静态类型就是 `TemplateTransformBase`，构建器得能不分平台地设进去。
    */
   tagNameClass: TagNameClassMode = 'mapped';
 
   /**
-   * 共享渲染层脚本的输出目录（相对产物根）。
-   * 不支持渲染层脚本的平台可不管。
+   * 共享渲染层脚本的输出目录（相对产物根）。不支持渲染层脚本的平台可不管。
    */
   wxsSharedDir = 'common';
 }

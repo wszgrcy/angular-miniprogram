@@ -17,8 +17,8 @@ import { MiniProgramWorker } from './worker';
 
 export interface StartupMiniProgramTestOptions {
   /**
-   * spec 模块表：key 是构建期给的相对短名（`spec/foo/bar.spec.ts`），value 是
-   * 懒加载函数。宿主下发的是宿主机上的绝对路径，这里按后缀匹配。
+   * spec 模块表：key 是构建期给的相对短名（`spec/foo/bar.spec.ts`），value 是懒加载函数。
+   * 宿主下发的是宿主机上的绝对路径，这里按后缀匹配。
    */
   modules: TestModuleMap;
   host?: string;
@@ -38,29 +38,20 @@ export interface MiniProgramTestSession {
 }
 
 /**
- * 在小程序运行时里起一个 vitest worker。
- *
- * 由测试工程的引导入口（`test.ts`）调用，**必须在 app 启动之后**：
- * spec 里 `import` 的组件要能拿到已初始化的 Angular 运行时。
- *
- * 典型用法（spec 清单由构建期 define 注入，见 `shared/spec-modules.ts`）：
+ * 在小程序运行时里起一个 vitest worker。由测试工程的引导入口（`test.ts`）调用，
+ * 必须在 app 启动之后：spec 里 `import` 的组件要能拿到已初始化的 Angular 运行时。
  *
  * ```ts
  * declare const __MP_SPEC_MODULES__: TestModuleMap;
- *
- * bootstrapApplication().then(() =>
- *   startupMiniProgramTest({ modules: __MP_SPEC_MODULES__ }),
- * );
+ * bootstrapApplication().then(() => startupMiniProgramTest({ modules: __MP_SPEC_MODULES__ }));
  * ```
  *
- * 不能在这里 `import.meta.glob`：spec 走的是 Angular 自己的编译，vite 的
- * transform 不作用于它，glob 不会被展开。
+ * 不能在这里 `import.meta.glob`：spec 走的是 Angular 自己的编译，vite 的 transform 不作用于它。
  */
 export function startupMiniProgramTest(
   options: StartupMiniProgramTestOptions,
 ): MiniProgramTestSession {
-  // 先补全局：后面 `config.globals` 动态拉进来的 chunk 在**加载时**就要求
-  // EventTarget 存在，等不到第一个 spec。
+  // 先补全局：后面 `config.globals` 动态拉进来的 chunk 在加载时就要求 EventTarget 存在，等不到第一个 spec。
   installMiniProgramGlobals();
 
   const log =
@@ -105,10 +96,7 @@ export function startupMiniProgramTest(
 
   /**
    * worker 的一帧（WorkerRequest / WorkerResponse / RPC）必须套信封。
-   *
-   * 宿主那边 `session.onMessage` 是先 JSON.parse 看 `kind` 分流的，
-   * 裸帧没有 `kind`，不套信封会被整条丢掉 —— 表现是小程序里
-   * spec 明明跑了、宿主 reporter 一条结果都收不到。
+   * 宿主那边是先 JSON.parse 看 `kind` 分流的，裸帧没有 `kind`，不套信封会被整条丢掉。
    */
   function sendFrame(payload: unknown): void {
     send({
@@ -178,13 +166,9 @@ function platformName(): string {
 }
 
 /**
- * builder 用 vite `define` 注进来的编译期常量。
- *
- * 只能拿裸标识符：`globalThis['MP_VITEST_PORT']` 不会被 define 替换，而
- * `globalThis` 在小程序产物里又指向 app.js 自建的普通对象——两条都落空，
- * 最后就是静默用掉写死的默认值，改 angular.json 里的 port 根本不生效。
- * `typeof` 包一层是为了让没带 define 的场合（比如本仓自己的 runtime 产物）
- * 不致于抛 ReferenceError。
+ * builder 用 vite `define` 注进来的编译期常量。只能拿裸标识符：`globalThis['MP_VITEST_PORT']`
+ * 不会被 define 替换，而 `globalThis` 在小程序产物里又指向 app.js 自建的普通对象，
+ * 最后就是静默用掉写死的默认值。`typeof` 包一层是为了让没带 define 的场合不抛 ReferenceError。
  */
 declare const MP_VITEST_HOST: string | undefined;
 declare const MP_VITEST_PORT: number | undefined;

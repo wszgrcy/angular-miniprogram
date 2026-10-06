@@ -21,18 +21,14 @@ export interface NativeComponentsPluginOptions {
 }
 
 /**
- * 原生小程序自定义组件接入（对应 uni-app 的 wxcomponents 能力）。
- *
- * 目录约定：`<nativeComponentsDir>/<dirName>/` 内含一个与目录同名的
- * `.json`（组件配置）即视为一个原生自定义组件，标签名默认取目录名。
- *
- * 两件事：
+ * 原生小程序自定义组件接入。目录约定：`<nativeComponentsDir>/<dirName>/` 内含一个与目录同名的
+ * `.json`（组件配置）即视为一个原生自定义组件，标签名默认取目录名。两件事：
  *  1. 把整个原生组件目录原样拷进产物（路径不变，供 usingComponents 指过去）。
- *  2. generateBundle（post，晚于 assets 插件）扫描已产出的 wxml，命中
- *     原生标签时，往同级 `.json` 注入 usingComponents 指向原生组件主文件。
+ *  2. generateBundle（post，晚于 assets 插件）扫描已产出的 wxml，命中原生标签时，
+ *     往同级 `.json` 注入 usingComponents 指向原生组件主文件。
  *
- * 这样 Angular 组件模板里直接写 `<van-button>`（配 NO_ERRORS_SCHEMA 规避
- * Angular 校验），构建后自动接上原生组件，无需手写相对路径。
+ * 这样 Angular 组件模板里直接写 `<van-button>`（配 NO_ERRORS_SCHEMA 规避 Angular 校验），
+ * 构建后自动接上原生组件，无需手写相对路径。
  */
 export function nativeComponentsPlugin(
   options: NativeComponentsPluginOptions,
@@ -41,8 +37,7 @@ export function nativeComponentsPlugin(
     options.workspaceRoot,
     options.nativeComponentsDir,
   );
-  // 产物里的基路径取目录基名：src/wxcomponents -> wxcomponents，
-  // 避免把源码 src/ 前缀带进产物（对齐 uni-app wxcomponents 落产物根）
+  // 产物里的基路径取目录基名：src/wxcomponents -> wxcomponents，避免把源码 src/ 前缀带进产物
   const outputBase = toPosix(path.basename(options.nativeComponentsDir));
   const contentExt = options.fileExtname.content; // .wxml
   const configExt = options.fileExtname.config; // .json

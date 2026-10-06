@@ -68,87 +68,46 @@ export interface ViteMiniProgramBuildOptions {
   outputPath: string;
   pages: AssetPattern[];
   /**
-   * 分包入口：写法与 `pages` 一样，`output` 就是分包 root。
-   *
-   * 配了就不用在 app 配置里写 `subpackages`：root 取 `output`，分包页由扫出来的
-   * 入口算，`independent: true` 标独立分包。自己在 app 配置里写了同一个 root
-   * 就以自己那份为准，构建器只补漏写的子字段。
-   *
-   * 约定 root 同时是源码目录与产物目录（`src/packageA` → `packageA`），
-   * 分包专属 chunk 靠它归位。
+   * 分包入口，写法与 `pages` 一样，`output` 就是分包 root。
+   * 配了就不用在 app 配置里写 `subpackages`；app 配置里写了同一个 root 以其为准。
    */
   subpackages?: MpSubPackagePattern[];
   /**
-   * 自定义 tabBar 入口的**源文件位置**。
-   *
-   * 产物目录由平台定（`BuildPlatform.customTabbar.dir`：微信系 `custom-tab-bar`，
-   * 支付宝 `customize-tab-bar`），这里配了 `output` 也会被覆盖；
-   * 平台不支持自定义 tabBar 时扫到入口直接报错。
-   *
-   * 不配则默认取 `<sourceRoot>/custom-tab-bar` 下的 `*.entry.ts`。
+   * 自定义 tabBar 入口的源文件位置，产物目录由平台定，不配默认取
+   * `<sourceRoot>/custom-tab-bar` 下的 `*.entry.ts`。
    */
   customTabbar?: AssetPattern[];
   platform: PlatformType;
   assets?: AssetPattern[];
   styles?: (string | { input: string })[];
   sourceMap?: SourceMapOption;
-  /**
-   * 与 angular.json `build.options.polyfills` 同名同义：每条都会被 import 进
-   * polyfills 入口，包名和本地文件都收，语义跟 `@angular/build` 的 browser
-   * 路径一致（见 `polyfillEntryContents`）。
-   *
-   * 与 schema 一样允许单个串（`"polyfills": "src/polyfills.ts"` 这种写法很常见）。
-   */
+  /** 与 angular.json `build.options.polyfills` 同名同义，每条都会被 import 进 polyfills 入口，包名和本地文件都收。 */
   polyfills?: string | string[];
   optimization?: OptimizationOption;
-  /** 监听模式：对应小程序的开发方式（微信开发者工具盯着 dist 目录） */
+  /** 监听模式：微信开发者工具盯着 dist 目录 */
   watch?: boolean;
   /**
-   * 强制单例的包，直接透传给 Vite 的 `resolve.dedupe`。
-   *
-   * 默认空。只有 `file:` / `npm link` 接入本库时才需要：link 的
-   * 那份副本自带 node_modules，里面还有一份 @angular/core，不去重
-   * 就会被打成两份，运行时表现为 `No provider for xxx`。
+   * 强制单例的包，透传给 Vite 的 `resolve.dedupe`。默认空，
+   * 只有 `file:` / `npm link` 接入本库时才需要，否则 @angular/core 会被打成两份。
    */
   dedupe?: string[];
   /**
    * 结构化 app 配置源文件（相对 workspaceRoot，如 src/app.config.json）。
-   *
-   * 与 assets 里的静态 app.json **不是二选一**：静态那份是底稿，这个文件只写
-   * 要补的字段，已经写过的 key 一律不动，`pages` 是追加。环境不同就换这个文件
-   * （configurations 里改 `appJson`），平台不同用文件里的 `_platform` 段。
+   * 与 assets 里的静态 app.json 不是二选一：静态那份是底稿，这个文件只写要补的字段。
    */
   appJson?: string;
-  /**
-   * 结构化 project 配置源文件（相对 workspaceRoot）。
-   *
-   * 与 `appJson` 各管一个输出文件，字段不互通：两个文件的字段名有重叠风险，
-   * 混在一份里写错了不报错只是「改了没效果」。
-   */
+  /** 结构化 project 配置源文件（相对 workspaceRoot），与 `appJson` 各管一个输出文件，字段不互通。 */
   projectConfig?: string;
-  /**
-   * app 配置校验严格度，默认 `error`。
-   *
-   * 只作用于 `appJson` 通道；只有静态 app.json 的工程固定 `warn`（那是从别的
-   * 项目搬过来的，合规与否我们控制不了）。`off` 用于先绕过校验把工程跑起来。
-   */
+  /** app 配置校验严格度，默认 `error`，只作用于 `appJson` 通道。 */
   appJsonValidate?: MpConfigValidateLevel;
-  /**
-   * 自动生成 project 配置的调试启动项（`condition`）。默认关，只是方便一下。
-   *
-   * 开了之后开发者工具的「编译模式」会列出全部页面；需要精确控制启动参数
-   * 还是自己在 `projectConfig` 里写。
-   */
+  /** 自动生成 project 配置的调试启动项（`condition`），默认关。 */
   deriveCondition?: boolean;
   /**
    * 原生小程序自定义组件目录（相对 workspaceRoot，如 wxcomponents）。
    * 配置后整个目录拷进产物，模板里命中原生标签自动注入 usingComponents。
    */
   nativeComponentsDir?: string;
-  /**
-   * 文件替换，CLI 标准形状：[{ replace: 'src/environments/environment.ts',
-   * with: 'src/environments/environment.prod.ts' }]
-   */
+  /** 文件替换，CLI 标准形状：[{ replace, with }] */
   fileReplacements?: {
     replace: string;
     with: string;
@@ -158,38 +117,11 @@ export interface ViteMiniProgramBuildOptions {
     includePaths?: string[];
     sass?: Record<string, unknown>;
   };
-  /**
-   * `@Component.styles` 内联样式的语言，默认 'css'。
-   *
-   * schema 早就声明了这个字段，但之前没人读：内联样式一律被当 css，
-   * 写 scss 嵌套的组件静默产出一份空 wxss。
-   */
+  /** `@Component.styles` 内联样式的语言，默认 'css'。 */
   inlineStyleLanguage?: string;
-  /**
-   * app 引导入口（src/main.ts），现在是
-   * `bootstrapApplication({ providers: [...] })`。
-   *
-   * （早期是 `platformMiniProgram().bootstrapModule(MainModule)`，
-   * 已随启动 provider 化改造换掉，见 `platform/application.ts`。
-   * 入口这个字段本身的作用没变。）
-   *
-   * 之前漏了这个字段（在「schema 接受但 builder 不读」那批里），
-   * 导致产物里没有 app 引导，app.js 只能把所有 chunk 全 require 一遍
-   * 来凑，结果在 app 上下文里调了 Page()/Component()，微信直接报
-   * "Please do not call Page constructor..." /
-   * "Component constructors should be called while initialization"。
-   */
+  /** app 引导入口（src/main.ts），内容是 `bootstrapApplication({ providers: [...] })`。 */
   main?: string;
-  /**
-   * 产物模块格式。默认 'cjs'。
-   *
-   * 小程序的 JS 运行时是 CommonJS（require / module.exports），
-   * 不原生支持 ESM 的 import / export。之前 Vite 默认吐 'es'，
-   * 能跑起来是靠微信开发者工具「增强编译」在兜，属于隐式依赖：
-   * 真机 / 关掉增强编译 / CI 里直接跑就可能挂。
-   *
-   * 这里显式出 cjs，不再依赖工具链兜底。
-   */
+  /** 产物模块格式，默认 'cjs'。小程序运行时是 CommonJS，不原生支持 ESM。 */
   format?: 'cjs' | 'es';
   /** 产物文件名的 hash 策略，见 `resolveOutputNames` */
   outputHashing?: OutputHashing;
@@ -204,12 +136,8 @@ export interface ViteMiniProgramBuildOptions {
   /** 不打包、运行时依赖外部提供的包名 */
   externalDependencies?: string[];
   /**
-   * 自定义 vite 配置的钩子文件（相对 workspaceRoot）。
-   *
-   * 文件默认导出 `(config, ctx) => config`：`config` 是构建器组装完的最终
-   * vite 配置，随便改，返回新对象或就地改都行。构建器不校验钩子的改动 ——
-   * 默认配置是对的，钩子改坏了由钩子负责。
-   *
+   * 自定义 vite 配置的钩子文件（相对 workspaceRoot）。文件默认导出
+   * `(config, ctx) => config`，`config` 是构建器组装完的最终 vite 配置。
    * `.ts` / `.mts` / `.cts` 由 jiti 加载，`.js` / `.mjs` / `.cjs` 走原生 import。
    */
   viteConfig?: string;
@@ -219,18 +147,12 @@ export interface ViteMiniProgramBuildOptions {
   statsJson?: boolean;
   /**
    * `tag-name-<原标签>` 标记的输出策略，默认 `mapped`。
-   *
    * 这个标记是给「模板写 `div`、wxml 里已经是 `view`」补的选中把手。
-   * 没改写过标签的元素带着它纯属多一个 class token，所以上下文里
-   * 只有 `mapped` 才输出。详见 `tagNameClassOf()`。
    */
   tagNameClass?: TagNameClassMode;
 }
 
-/**
- * 由 BuildPlatform 推出来的 define，替代 webpack 的 DefinePlugin。
- * 映射关系与 webpack-configuration-change.service.ts 的 globalVariableChange 一致。
- */
+/** 由 BuildPlatform 推出来的 define，把全局对象 / 平台变量编译期重定向。 */
 export function buildPlatformDefine(
   buildPlatform: BuildPlatform,
   isProduction: boolean,
@@ -247,35 +169,17 @@ export function buildPlatformDefine(
     wx: g,
     miniProgramPlatform: `"${g}"`,
     queueMicrotask: `${p}.queueMicrotask`,
-    // AbortController / AbortSignal 微信没有。源码里的裸引用全部重定向到
-    // 全局能力表，表里的值由 polyfill-entry.js 手动导出。
-    // 两侧必须配套，见 polyfill-entry.ts 顶部说明。
+    // 微信没有 AbortController / AbortSignal，裸引用重定向到全局能力表，
+    // 表里的值由 polyfill-entry.js 导出，两侧必须配套
     AbortController: `${p}.AbortController`,
     AbortSignal: `${p}.AbortSignal`,
     /**
-     * `Node` 同理，而且更彻底：小程序里根本没有 `Node`，也不需要有个
-     * 全局叫这个名字，所以**编译期直接把它换掉**，运行时压根不存在 `Node`
-     * 这个标识符（实测微信小程序全局上没有 Node）。
-     *
-     * Angular 里两类用法都要它：
-     *  - `walkIcuTree` / `applyCreateOpCodes` 读 `Node.TEXT_NODE` /
-     *    `Node.COMMENT_NODE`，**不在 ngDevMode 守卫里**，生产也要；
-     *  - `assertDomNode` 的 `node instanceof Node`，仅 ngDevMode。
-     *
-     * `instanceof` 要有真的构造器，所以只能指向运行期挂在能力表上的
-     * `AgentNode`（由 `agent-node.ts` 挂，和 AbortController 一样是
-     * 「define 重定向 + 表里得有值」两步，缺一步就 undefined）。
+     * 小程序里没有 `Node`，编译期直接换掉。Angular 的 `walkIcuTree` 等要读
+     * `Node.TEXT_NODE`，`assertDomNode` 又要 `instanceof Node`，所以只能指向
+     * 运行期挂在能力表上的 `AgentNode`。
      */
     Node: `${p}.AgentNode`,
-    /**
-     * `$localize` 同理：Angular 编译产物里的 i18n 常量是裸 `$localize` 调用
-     * （`i18n_0 = $localize(...)`），小程序里没有这个全局，第一次读 consts
-     * 就 `ReferenceError`。重定向到能力表后，没装 `@angular/localize/init`
-     * 也只是 `undefined`（不会抛），装了则由它自己往上挂。
-     *
-     * 本项目自己的 ICU 求值也读这个名字，见
-     * `src/library/platform/default/icu.ts`。
-     */
+    /** Angular 产物里的 i18n 常量是裸 `$localize` 调用，小程序里没有这个全局，重定向到能力表。 */
     $localize: `${p}.$localize`,
   };
   if (!isProduction) {
@@ -285,28 +189,17 @@ export function buildPlatformDefine(
 }
 
 /**
- * polyfills 入口的虚拟模块 id。
- *
- * 我们自己的 `polyfill-entry.js` 是固定要装的（小程序模板是纯文本内联、不过
- * bundler，全局能力表只能走入口），用户 `polyfills` 里声明的条目跟在后面。
+ * polyfills 入口的虚拟模块 id。我们自己的 `polyfill-entry.js` 固定要装，
+ * 用户 `polyfills` 里声明的条目跟在后面。
  */
 export const POLYFILL_ENTRY_ID = 'angular-miniprogram:polyfills';
 
-/**
- * 条目是不是本地文件：以 `.` 开头、或带 js/ts 扩展名。
- *
- * 上游 `isLocalFile`（`tools/esbuild/application-code-bundle.ts`）还有一条
- * 「`zone.js` 及其子路径一律按包算」，那是给它自己 import zone 用的，本包
- * 照抄不过来。
- */
+/** 条目是不是本地文件：以 `.` 开头、或带 js/ts 扩展名。 */
 export function isLocalPolyfill(entry: string): boolean {
   return entry.startsWith('.') || /\.[cm]?[jt]sx?$/.test(entry);
 }
 
-/**
- * angular.json 的 `polyfills` → 条目数组。就是上游 `application/options.ts:478`
- * 那条归一（串也收），除此之外不做任何过滤：声明什么就 import 什么。
- */
+/** angular.json 的 `polyfills` → 条目数组，不做任何过滤。 */
 export function normalizePolyfills(
   polyfills: string | string[] | undefined,
 ): string[] {
@@ -315,16 +208,7 @@ export function normalizePolyfills(
 
 /**
  * 单条 `polyfills` 声明 → 能交给解析器的模块标识。
- *
- * 包名原样交给 Vite（exports map / conditions / alias 与应用里其余依赖同一套，
- * 自己 require.resolve 在 monorepo 提升、`file:` 链接下会分叉）；本地文件拼成
- * 绝对路径（上游用 esbuild 的 `build.resolve('./x')` 试探，rolldown 在配置期
- * 没等价 API，判定口径与 `isLocalPolyfill` 一致）。
- *
- * 不做 `@angular/localize` → `/init` 的归一：那是上游 SSR 路径的事
- * （`createServerPolyfillBundleOptions`），小程序不是 SSR，按 browser 语义
- * 声明什么就 import 什么，`/init` 必须写全（`ng add @angular/localize`
- * 写的就是全路径；裸写法的后果见 `localize-polyfill.spec.ts`）。
+ * 包名原样交给 Vite，本地文件拼成绝对路径。
  */
 export function toPolyfillSpecifier(
   entry: string,
@@ -333,26 +217,15 @@ export function toPolyfillSpecifier(
   return isLocalPolyfill(entry) ? path.resolve(workspaceRoot, entry) : entry;
 }
 
-/**
- * 把 angular.json 的 `polyfills` 翻成 polyfills 入口的模块内容。
- *
- * 结构对齐 `@angular/build` 的 `getEsBuildCommonPolyfillsOptions`：那边也是
- * 造一个虚拟模块，内容就是每条 polyfill 一个 `import`（上游
- * `application-code-bundle.ts:750`）。上游改了照着同步即可。
- *
- * 与上游只有一处结构差异：我们那份 `polyfill-entry.js` 固定在最前，所以上游
- * 「polyfills 为空就不产出 polyfills bundle」那条早退在这里不成立。
- */
+/** 把 angular.json 的 `polyfills` 翻成 polyfills 入口的模块内容。 */
 export function polyfillEntryContents(
   selfEntry: string,
   polyfills: readonly string[],
   workspaceRoot: string,
 ): string {
   const lines = [
-    // 必须把命名空间接住再引用一次：polyfill-entry 是 CJS 产物，只往
-    // globalThis 上挂东西、不导出任何有用值，裸 `import "x"` 会被
-    // rolldown 判成无副作用整块摇掉。构建绿、产物里没有 AbortController，
-    // 跑到才炸 `wx.__window.AbortController is not a constructor`。
+    // polyfill-entry 只往 globalThis 上挂东西、不导出有用值，裸 `import "x"`
+    // 会被 rolldown 判成无副作用整块摇掉，所以接住命名空间再引用一次
     `import * as __mpPolyfills from ${JSON.stringify(selfEntry)};`,
     `globalThis.__mpPolyfills = __mpPolyfills;`,
   ];
@@ -386,10 +259,7 @@ export function polyfillEntryPlugin(
 
 /**
  * 平台包替换：`angular-miniprogram/platform/wx` -> 实际平台包。
- * 替代 webpack 的 NormalModuleReplacementPlugin。
- *
- * 必须用 RegExp 带边界：Vite 的字符串 alias 走的是「精确 或 startsWith」，
- * 写 `.../wx$` 会被当字面量处，根本匹不上。
+ * 必须用 RegExp 带边界：Vite 的字符串 alias 走的是「精确 或 startsWith」。
  */
 export function platformReplacementAlias(
   buildPlatform: BuildPlatform,
@@ -403,10 +273,8 @@ export function platformReplacementAlias(
 }
 
 /**
- * Vite 侧的完整 alias：tsconfig paths + 平台包替换。
- *
- * 平台替换必须排在 tsconfig paths 之前生效，否则 `angular-miniprogram/platform`
- * 这种前缀 alias 会把 `angular-miniprogram/platform/wx` 抢走。
+ * Vite 侧的完整 alias：平台包替换 + tsconfig paths。
+ * 平台替换必须排在前面，否则 `angular-miniprogram/platform` 这种前缀 alias 会把它抢走。
  */
 /** Vite alias 数组形式（可展开、顺序可控） */
 export type ViteAliasEntry = {
@@ -430,11 +298,8 @@ export function buildViteAlias(
 }
 
 /**
- * 组装 Vite 配置。
- *
- * 插件顺序很关键：
- *  1. @analogjs/vite-plugin-angular 负责 Angular AOT
- *  2. miniProgramComponentTransformPlugin（enforce: 'post'）拿到 AOT 产物注入 propertyChange
+ * 组装 Vite 配置。插件顺序很关键：analog 插件负责 Angular AOT，
+ * componentTransform 插件（enforce: 'post'）拿 AOT 产物注入 propertyChange。
  */
 export async function createMiniProgramViteConfig(options: {
   viteOptions: ViteMiniProgramBuildOptions;
@@ -485,9 +350,7 @@ export async function createMiniProgramViteConfig(options: {
   // 前者读后者注册的 useComponents / templateList
   const templateScope = new LibraryTemplateScopeService();
 
-  // 配置文件：静态那份 + 结构化那份 + 构建器补的，在这里算一次，之后所有消费方
-  // 读同一份结果。分包插件以前自己现读 appJson 文件，静态 app.json 里写的分包
-  // 它完全看不见，于是「写了分包但没拆」只能靠猜。
+  // 配置文件：静态那份 + 结构化那份 + 构建器补的，在这里算一次，之后所有消费方读同一份结果
   const builtPagePaths = [
     ...entryPatterns.pageList,
     ...entryPatterns.subPackageList,
@@ -546,12 +409,8 @@ export async function createMiniProgramViteConfig(options: {
   ) as (opts: unknown) => import('vite').Plugin[];
 
   /**
-   * 与 analog 共享的 fileReplacements 数组实例。
-   *
-   * analog 存的是引用（`options?.fileReplacements ?? []`）、读得晚
-   * （`initialize()` 时才转成 host 的 record），所以我们只要**持有自己
-   * 这个数组**，在 `enforce: 'pre'` 的 buildStart 里 push，analog 到点
-   * 自然看得到 —— 不用 patch 它一行代码。
+   * 与 analog 共享的 fileReplacements 数组实例。analog 存的是引用、读得晚，
+   * 我们只需在 `enforce: 'pre'` 的 buildStart 里往这个数组 push。
    */
   /** 分析层结果共享引用：assets 插件填，wxs-strip 插件读 */
   const wxsAnalysisRef: {
@@ -610,9 +469,8 @@ export async function createMiniProgramViteConfig(options: {
       // 其他 resolver 前，故放数组首位
       platformFileResolvePlugin({ platform: viteOptions.platform }),
       /**
-       * 必须排在 wxsStrip 之前：分析层产出的模板 AST 是剥离的唯一真相源，
-       * 剥离要在 analog 建 program 前就位，所以分析只能跟着往前挪。
-       * 它自己只读磁盘（自建 program + tsconfig），不依赖模块图，往前挪安全。
+       * 必须排在 wxsStrip 之前：分析层产出的模板 AST 是剥离的唯一真相源。
+       * 它自己只读磁盘，不依赖模块图。
        */
       miniProgramAssetsPlugin({
         tsConfig: viteOptions.tsConfig,
@@ -643,12 +501,10 @@ export async function createMiniProgramViteConfig(options: {
         workspaceRoot: context.workspaceRoot,
         fastCompile: false,
         experimental: { useAngularCompilationAPI: true },
-        // `@Component.styles` 内联样式的语言。不传的话 analog 一律当 css，
-        // 写 scss 嵌套的组件会静默产出一份缺样式的 wxss。
+        // `@Component.styles` 内联样式的语言，不传的话 analog 一律当 css
         inlineStylesExtension: viteOptions.inlineStyleLanguage,
         // fileReplacements 是 Angular 切环境的标准机制（environment.prod.ts），
-        // 不接的话「生产构建」会静默用着 dev 配置——这是会直接上线出事的坑。
-        // 传我们自己的数组实例，wxs 剥离的替换项由上面的插件就地 push。
+        // 传我们自己的数组实例，wxs 剥离的替换项由上面的插件就地 push
         fileReplacements: sharedFileReplacements,
       }),
       polyfillEntryPlugin(
@@ -696,15 +552,12 @@ export async function createMiniProgramViteConfig(options: {
               isExternalSpecifier(id, viteOptions.externalDependencies ?? [])
           : undefined,
         input: {
-          // 全局 polyfill 入口。必须排在 require 列表最前面，
-          // 保证 AbortController 等在任何业务 chunk 之前装好。
-          // 模板是纯文本内联、不过 bundler，所以 polyfill 只能走入口。
-          // 入口本身是个虚拟模块：我们那份固定装，`@angular/localize/init`
-          // 只在 angular.json 声明了才拼进来。
+          // 全局 polyfill 入口，必须排在 require 列表最前面，
+          // 保证 AbortController 等在任何业务 chunk 之前装好
+          // 入口是个虚拟模块：我们那份固定装，`@angular/localize/init` 只在声明了才拼进来
           polyfills: POLYFILL_ENTRY_ID,
           ...toRollupInput(allEntries),
-          // app 引导入口。key 固定叫 main，产物 main.js，
-          // 和 webpack 时代结构一致。
+          // app 引导入口，key 固定叫 main，产物 main.js
           ...(viteOptions.main
             ? {
                 main: path.resolve(context.workspaceRoot, viteOptions.main),
@@ -713,13 +566,11 @@ export async function createMiniProgramViteConfig(options: {
         },
         output: {
           // key 里带目录，Rollup 的 [name] 会把整段展开进来，
-          // 于是能产出 `pages/index/index-entry.js` 这种和 webpack 时代
-          // outputFiles.logic 对齐的路径
+          // 于是能产出 `pages/index/index-entry.js` 这种路径
           entryFileNames: '[name].js',
           chunkFileNames: outputNames.chunkFileNames,
           assetFileNames: outputNames.assetFileNames,
-          // 小程序运行时是 CommonJS，默认出 cjs。
-          // 注意扩展名仍然要 .js（不是 .cjs）——小程序只认 .js。
+          // 小程序运行时是 CommonJS，默认出 cjs；扩展名仍然要 .js，小程序只认 .js
           format: viteOptions.format ?? 'cjs',
           // 多入口 + cjs 时，named / default 混用会让 Rollup 犹豫，
           // auto 让它按实际导出形态决定，避免额外包一层 default
@@ -754,7 +605,7 @@ export function getBuildPlatform(platform: PlatformType): BuildPlatform {
 
 /**
  * vite / rollup 的 PluginError 把插件名、出错文件、代码帧都挂在 error 对象上，
- * `String(error.message)` 只剩第一行——恰好把定位需要的那几行丢了。
+ * `String(error.message)` 只剩第一行。
  */
 function formatBuildError(error: unknown): string {
   const e = error as {
@@ -783,10 +634,8 @@ function formatBuildError(error: unknown): string {
 }
 
 /**
- * 结构化配置选项指向的文件，watch 要显式盯上。
- *
- * 静态那份（assets 里的 app.json）通常在 sourceRoot 下，目录监听已经盖到；
- * 这几个选项可以指到 sourceRoot 外面，不显式加进来就是「改了没反应」。
+ * 结构化配置选项指向的文件，watch 要显式盯上。这些选项可以指到 sourceRoot 外面，
+ * 不显式加进来就是「改了没反应」。
  */
 export function mpConfigWatchFiles(
   options: ViteMiniProgramBuildOptions,
@@ -813,7 +662,7 @@ export function runViteBuilder(
       if (!closed) {
         observer.next({
           success: true,
-          // 和 webpack browser builder 的输出契约对齐，spec 里靠这个定位产物
+          // 输出契约，spec 里靠这个定位产物
           baseOutputPath,
         } as BuilderOutput);
       }
@@ -822,8 +671,8 @@ export function runViteBuilder(
     void (async () => {
       try {
         const buildPlatform = getBuildPlatform(options.platform);
-        // 选项得在 init() 之后补一次：BuildPlatform 构造时就把 transform
-        // 装配进了 WxContainer 全局配置，重跑一次 init 才能把选项带进去。
+        // BuildPlatform 构造时就把 transform 装配进了 WxContainer 全局配置，
+        // 重跑一次 init 才能把选项带进去
         buildPlatform.templateTransform.tagNameClass =
           options.tagNameClass ?? 'mapped';
         buildPlatform.templateTransform.init();
@@ -845,8 +694,7 @@ export function runViteBuilder(
           context.logger.info('[小程序构建] vite build 开始…');
           await vite.build(config);
           context.logger.info(`[小程序构建] 完成，耗时 ${elapsed()}`);
-          // 把「哪些指令没拿到库元数据」显式报出来。
-          // 旧行为是静默返回空 listeners，wxml 丢事件绑定且零报错。
+          // 把没拿到库元数据的指令显式报出来，避免静默丢事件绑定
           const metaSummary = formatLibraryMetaSummary();
           if (metaSummary) {
             context.logger.warn(`[library-meta] ${metaSummary}`);
@@ -861,8 +709,7 @@ export function runViteBuilder(
           return;
         }
 
-        // watch：发现变动就重算入口 + 重跑一次 vite.build。
-        // 不用 Vite 原生 watch，因为 Rolldown watch 不支持动态加 input。
+        // 不用 Vite 原生 watch，因为 Rolldown watch 不支持动态加 input
         const entryPatterns = await generateEntryPatterns({
           pages: options.pages || [],
           subpackages: options.subpackages,
@@ -928,9 +775,8 @@ export function runViteBuilder(
           onChange: () => void rebuild(),
         });
 
-        // 注意顺序：watcher 必须先注册好，再推第一次成功输出。
-        // 否则消费方（包括测试）在收到第一轮结果后立刻改文件，
-        // 那个改动会发生在 watcher 注册之前，直接丢掉。
+        // 顺序：watcher 先注册好，再推第一次成功输出，
+        // 否则消费方收到第一轮结果后立刻改文件会丢在注册之前
         emitSuccess();
       } catch (error) {
         context.logger.error(formatBuildError(error));

@@ -32,23 +32,13 @@ import {
 /**
  * `@angular/localize/init` 的接入方式。
  *
- * ## 为什么是构建期 polyfill，不是运行时兜底
+ * Angular 官方把它当 polyfill：构建期把 `polyfills` 数组逐条 import 进一个虚拟模块。
+ * 三条路都是构建期决定，运行时没有任何探测或兜底，CLI 甚至对源码里直接
+ * `import '@angular/localize/init'` 发警告。所以本项目也不在库里装 `$localize` 占位——
+ * 没做 i18n 的项目不该为它付体积，更不该被要求装那个包。
  *
- * Angular 官方就把 `@angular/localize/init` 当 **polyfill**：
- * - `@angular/build` 把 `polyfills` 数组逐条 `import` 进一个虚拟模块
- *   （`application-code-bundle.ts` 的 `getEsBuildCommonPolyfillsOptions`）
- * - webpack 时代看 tsconfig `types`，有就把 `@angular/localize/init` 作为
- *   `main` 的第一个 entry（`configs/common.js`）
- * - AOT 内联翻译时干脆 `alias['@angular/localize/init'] = false` 整个摘掉
- *
- * 三条路都是**构建期决定**，运行时没有任何探测或兜底。CLI 甚至专门做了个
- * 插件对源码里直接 `import '@angular/localize/init'` 发警告。
- * 所以本项目也不在库里装 `$localize` 占位——没做 i18n 的项目不该为它付体积，
- * 更不该被要求装那个包。
- *
- * 本项目走第一条（与上游 browser 路径同名同义）：`polyfills` 里声明什么就
- * import 什么，包名和本地文件都走普通解析，没有任何特判。所以 `/init` 必须
- * 写全（`ng add @angular/localize` 写的就是全路径），下面钉了裸写法的后果。
+ * `polyfills` 里声明什么就 import 什么，包名和本地文件都走普通解析，没有特判。
+ * 所以 `/init` 必须写全（`ng add @angular/localize` 写的就是全路径）。
  */
 describe('@angular/localize/init 注入', () => {
   describe('polyfills 条目（单元）', () => {

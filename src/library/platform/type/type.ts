@@ -43,10 +43,8 @@ export interface MiniProgramComponentMethod {
 export interface MPView {
   nodeList: (MPView[] | MPElementData | MPTextData)[];
   /**
-   * 运行时模板名。无名字时用 `null`，**不能用 `undefined`**
-   * —— 微信 `setData` 对路径式 key 上的 `undefined` 直接拒绝，
-   * 会让整个 setData 调用失败、界面冻结。
-   * 详见 `component-template-hook.factory.ts` 里的推导注释。
+   * 运行时模板名。无名字时用 `null`，不能用 `undefined`：微信 `setData` 对路径式 key
+   * 上的 `undefined` 直接拒绝，会让整个 setData 调用失败。
    */
   __templateName: string | null;
   nodePath: NodePath;
@@ -57,23 +55,17 @@ export interface MPElementData {
   /** 空串不发，见 `AgentNode.toView()` */
   class?: string;
   /**
-   * 可查询 class，仅模板上带 `#` 的元素才有。
-   *
-   * 取值是 `__pathPrefix` 的下标序列（`nodeList[4][1].nodeList[0]` →
-   * `__ar-4-1-0`），由 `AgentNode.find()` 拿去 `select('.__ar-4-1-0')`。
-   *
-   * 与 `class` 分开存：`class` 是用户语义的 class（`addClass` 增量通道发的
-   * 就是它），框架的查询标识不该混进去。
+   * 可查询 class，仅模板上带 `#` 的元素才有。取值是 `__pathPrefix` 的下标序列
+   * （`nodeList[4][1].nodeList[0]` → `__ar-4-1-0`）。
+   * 与 `class` 分开存：`class` 是用户语义的 class，框架的查询标识不该混进去。
    */
   refClass?: string;
   /** 空串不发，与 `class` 同理 */
   style?: string;
   property: Record<string, any>;
   /**
-   * `setAttribute` 那侧的静态属性，剔掉 class / style（已由上面两个字段承载）。
-   *
-   * 只为静态 `i18n-<attr>` 存在：那条属性的译文由 Angular 建元素时
-   * setAttribute 写进来，wxml 得能从数据里读到它。
+   * `setAttribute` 那侧的静态属性，剔掉 class / style。
+   * 只为静态 `i18n-<attr>` 存在：那条属性的译文由 Angular 建元素时写进来，wxml 得能读到。
    */
   attribute: Record<string, any>;
 }
@@ -95,9 +87,8 @@ export type MiniProgramComponentInstance<NG_COMPONENT_INSTANCE = unknown> =
     MiniProgramComponentOptions;
 
 /**
- * `static mpPageOptions` 里真正会交给微信的定义段：页面生命周期全部保留
- * （除 `onLoad` 在 Angular 实例起来之后调，其余都是用户那份先跑），
- * 只有 `data` 被框架占用。
+ * `static mpPageOptions` 里真正交给微信的定义段：页面生命周期全部保留
+ * （除 `onLoad` 在 Angular 实例起来之后调），只有 `data` 被框架占用。
  */
 export type MpPageOptions = Omit<
   WechatMiniprogram.Page.Options<{}, {}>,
@@ -110,34 +101,19 @@ export interface MiniProgramPageOptions {
 }
 
 /**
- * `static mpComponentOptions` 里真正会交给微信的定义段。
+ * `static mpComponentOptions` 里真正交给微信的定义段，只列框架原样透传的那几段。
+ * `data` / `properties` / `methods` 不在契约里，因为这三段在本架构里没有生产者：
+ * 渲染数据全部由 Angular 侧 `setData` 下来，`properties` 被框架占用为 lView 回连通道。
  *
- * 只列框架原样透传的那几段。`data` / `properties` / `methods` 不在契约里，
- * 因为这三段在本架构里没有生产者：
- *
- * - 渲染数据全部由 Angular 侧 `setData` 下来（`nodeList` / `hasLoad`），
- *   模板又是 HTML 转换出来的，没有任何一行 wxml 会去读用户声明的字段；
- * - `properties` 那一段被框架占用为 lView 回连通道（`nodePath` /
- *   `nodeIndex`），而组件脱离 Angular 页面就没有 nodePath，`hasLoad`
- *   恒为 `false`，也就无法被原生页面当普通小程序组件用。
- *
- * `TIsPage` 为 `true`（组件即页面）时开放 `methods`：那条路上页面钩子
- * （`onShow` / `onHide` / `onUnload`）就落在 `methods` 里，框架会把用户
- * 写的那份排在前面。
+ * `TIsPage` 为 `true`（组件即页面）时开放 `methods`：页面钩子就落在那里，
+ * 框架会把用户写的那份排在前面。
  */
 export type MpComponentOptions<TIsPage extends boolean = false> = Pick<
   MpComponentConfig<TIsPage>,
   MpOptionKey<TIsPage>
 > &
   ThisType<
-    WechatMiniprogram.Component.Instance<
-      {},
-      {},
-      {},
-      MpBehaviorIds,
-      {},
-      TIsPage
-    >
+    WechatMiniprogram.Component.Instance<{}, {}, {}, MpBehaviorIds, {}, TIsPage>
   >;
 
 /**
@@ -147,7 +123,7 @@ export type MpComponentOptions<TIsPage extends boolean = false> = Pick<
 export type MpComponentConfig<TIsPage extends boolean = false> =
   WechatMiniprogram.Component.Options<{}, {}, {}, MpBehaviorIds, {}, TIsPage>;
 
-/** 框架不碰、原样交给微信的那几段 */
+/** 框架不碰、原样交给微信的那几段。 */
 type MpOptionKey<TIsPage extends boolean> =
   | 'lifetimes'
   | 'pageLifetimes'
@@ -158,8 +134,8 @@ type MpOptionKey<TIsPage extends boolean> =
   | (TIsPage extends true ? 'methods' : never);
 
 /**
- * `Options` 的 `TBehavior` 默认是 `[]`，直接拿默认值会让 `behaviors`
- * 只能写空数组；这里换成标识符数组，用户才能真的挂 behavior。
+ * `Options` 的 `TBehavior` 默认是 `[]`，直接拿默认值会让 `behaviors` 只能写空数组；
+ * 这里换成标识符数组，用户才能真的挂 behavior。
  */
 type MpBehaviorIds = WechatMiniprogram.Behavior.Identifier[];
 

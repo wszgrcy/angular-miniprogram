@@ -1,20 +1,13 @@
 import { template } from 'es-toolkit/compat';
 
 /**
- * 库模板渲染：把库构建产出的 **`${}` 插值模板串** 渲染成目标平台文本。
+ * 库模板渲染：把库构建产出的 `${}` 插值模板串渲染成目标平台文本。
+ * 渲染引擎是 `es-toolkit/compat` 的 `template`，分隔符自定义成 `${x}`。
  *
- * 渲染引擎是 `es-toolkit/compat` 的 `template`，只是把分隔符自定义成 `${x}`。
+ * 选 `${}` 而不是 `{{}}`：wxml 自己就用 `{{ }}`，拿它当分隔符会把 `{{hasLoad}}`
+ * 这类文本当待填变量吃掉。`${}` 与 wxml 互不干扰，一个转义都不需要。
  *
- * ## 为什么是 `${}`
- *
- * 库构建期不知道目标平台（wx / zfb / bd / qq…），凡平台相关的地方都得留成
- * 「待填」。这就是插值问题 —— 插值有现成实现，不该自己造。
- *
- * 选 `${}` 而不是 `{{}}`：**wxml 自己就用 `{{ }}`**。若拿 `{{}}` 当我们的
- * 分隔符，库模板里那些 `{{hasLoad}}` / `{{nodeList[0].class}}` 会被当成待填
- * 变量吃掉，只能靠转义绕。`${}` 和 wxml 井水不犯河水，**一个转义都不需要**。
- *
- * ## 语法
+ * 语法：
  *
  * ```
  * ${directivePrefix}                → wx / a / …
@@ -22,20 +15,8 @@ import { template } from 'es-toolkit/compat';
  * ${fileExtname.contentTemplate}    → .wxml / .axml
  * ```
  *
- * wxml 自己的插值 `{{hasLoad}}` 是**静态文本**，原样进出。
- *
- * ## 分隔符配置里必须知道的坑（均实测）
- *
- * 我们只要「插值」这一个能力，lodash 的另外两个分隔符必须盖掉：
- *
- *   - `<%- x %>` → HTML 转义，把 wxml 属性里的 `<` `&` 改成实体
- *   - `<% x %>`  → **构建期执行任意 JS**
- *
- * 但盖掉它们有个陷阱：**替换正则必须恰好带 1 个捕获组**。
- * lodash 把三个正则并成一个交替式，靠「第几个捕获组命中」区分三者；
- * 写成 `/(?!)/g`（0 组）会让组号整体左移，`interpolate` 的捕获落到
- * `escape` 位上，于是我们的插值被 `_.escape` 转义。
- * 见下面 `NEVER` 的注释。
+ * lodash 的另外两个分隔符必须盖掉：`<%- x %>` 会 HTML 转义，`<% x %>` 会在构建期
+ * 执行任意 JS。盖掉它们有个陷阱，见 `NEVER`。
  */
 
 /** 平台可提供的文件扩展名键。 */
@@ -53,15 +34,9 @@ export interface LibraryTemplateValues {
 }
 
 /**
- * 永不匹配，但**带 1 个捕获组**。
- *
- * 为什么不能写成 `/(?!)/g`：lodash 会把 escape / interpolate / evaluate
- * 三个正则**并成一个交替式**，靠「第几个捕获组命中」来区分三者。
- * `/(?!)/g` 捕获组是 0 个，组号会整体左移，`interpolate` 的捕获就落到
- * `escape` 位上 —— 于是我们的插值被 `_.escape` 做了 HTML 转义。
- *
- * 所以约束是：**恰好 1 个捕获组，且永不匹配**。开头的空组 `()` 就是为了
- * 凑这个组，它永远捕获到空串。
+ * 永不匹配，但带 1 个捕获组。lodash 把 escape / interpolate / evaluate 三个正则并成
+ * 一个交替式，靠「第几个捕获组命中」区分三者；写成 `/(?!)/g`（0 组）会让组号整体左移，
+ * `interpolate` 的捕获落到 `escape` 位上。
  */
 const NEVER: RegExp = /()(?!)/g;
 
@@ -79,19 +54,15 @@ const TEMPLATE_OPTIONS = {
 };
 
 /**
- * 我们允许的插值形状（封闭集），与 `LibraryTransform` /
- * `LibraryBuildPlatform` 的产出严格一一对应。
+ * 我们允许的插值形状（封闭集），与 `LibraryTransform` / `LibraryBuildPlatform` 的产出一一对应。
  */
 const KNOWN_PLACEHOLDER =
   /\$\{(?:directivePrefix|fileExtname\.(?:style|logic|content|contentTemplate)|eventListConvert\(\s*\[[^\]]*\]\s*\))\}/g;
 
 /**
  * 渲染前预检：源码里每一个 `${` 都必须属于已知形状。
- *
- * 为什么不能只靠「未定义变量会 ReferenceError」：
- *   - `${Math.random()}` 之类能逃到全局，**静默**渲染出一个数
- *   - `${100}` 是合法表达式，用户 wxml 里的字面 `${100}` 会被**静默**求值
- * 这两种都不响。所以先把已知占位符摘掉，残留的 `${` 一律视为不同步，直接抛。
+ * 只靠「未定义变量会 ReferenceError」挡不住 `${Math.random()}` 和 `${100}` 这种静默求值。
+ * 先把已知占位符摘掉，残留的 `${` 一律视为不同步，直接抛。
  */
 function assertKnownPlaceholders(source: string): void {
   const residue = source.replace(KNOWN_PLACEHOLDER, '');

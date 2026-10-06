@@ -3,9 +3,7 @@ import { Injectable, InjectionToken, inject } from '@angular/core';
 import { Observable, OperatorFunction, throwError } from 'rxjs';
 import { MpApiNameInput, MpCallbackOptions } from './types';
 
-/**
- * 动态数组应用管道（rxjs pipe 只有 0..9 固定重载，不支持 spread 数组）。
- */
+/** 动态数组应用管道（rxjs pipe 只有 0..9 固定重载，不支持 spread 数组）。 */
 export function pipeThrough(
   source: Observable<any>,
   ops: OperatorFunction<any, any>[],
@@ -21,12 +19,10 @@ export interface MpInvokeContext {
 
 /**
  * rxjs 管道注册单元。
- *
  * - `pre`：调用发生前，作用于 `MpInvokeContext`——改写参数、阻断
  * - `post`：调用发生后，作用于结果——改写结果、埋点、catchError
  *
- * 阻断用 `blockWith(reason)`（落定为 MpBlockedError），
- * 不要用裸 `filter`（会空 complete → EmptyError）。
+ * 阻断用 `blockWith(reason)`（落定为 MpBlockedError），不要用裸 `filter`（会空 complete → EmptyError）。
  */
 export interface MpPipeSet {
   pre?: OperatorFunction<MpInvokeContext, MpInvokeContext>[];
@@ -81,7 +77,7 @@ export interface MpPipeContribution {
 }
 
 /**
- * 多 provider token，声明式注册管道（同 HTTP_INTERCEPTORS 用法）。
+ * 多 provider token，声明式注册管道。
  *
  * ```ts
  * providers: [

@@ -12,8 +12,8 @@ import type { ResolvedMiniProgramVitestPluginOptions } from './options';
 type MessageListener = (message: unknown) => void;
 
 /**
- * 小程序 worker 的「已就绪」信号。设备端 worker 起来后发 `worker-ready`，
- * 在那之前宿主下发的 `WorkerRequest` 必须排队，否则第一帧 `start` 会丢。
+ * 小程序 worker 的「已就绪」信号。设备端 worker 起来后发 `worker-ready`，在那之前宿主下发的
+ * `WorkerRequest` 必须排队，否则第一帧 `start` 会丢。
  */
 interface ReadyDeferred {
   promise: Promise<void>;
@@ -39,14 +39,9 @@ function rawToString(data: RawData): string {
 }
 
 /**
- * 宿主侧的 WebSocket 会话。
- *
- * **只有一个 worker、只有一条连接。**小程序一个 appservice 进程就一个
- * 常驻运行环境，`onConnection` 还是「后来者顶掉前一个」，所以上面不需要
- * 任何分流／编号，帧就是「下一帧」。
- *
- * 引用计数：每个 pool worker 引用一次，全部 stop 后才关服务，
- * 否则先结束的会把还在跑的同事的连接掐了。
+ * 宿主侧的 WebSocket 会话。只有一个 worker、只有一条连接：小程序一个 appservice 进程就一个常驻
+ * 运行环境，`onConnection` 还是「后来者顶掉前一个」，所以上面不需要任何分流／编号。
+ * 引用计数：每个 pool worker 引用一次，全部 stop 后才关服务，否则先结束的会把还在跑的同事的连接掐了。
  */
 export class MiniProgramVitestSession {
   private server: WebSocketServer | undefined;
@@ -83,9 +78,8 @@ export class MiniProgramVitestSession {
     return new Promise((resolve, reject) => {
       /**
        * HTTP 和 WS 共用同一个端口：upgrade 请求走 WS，普通请求走 fixture。
-       *
-       * http spec 要的是真 `wx.request`，得有个真 HTTP 端点；另起一个端口
-       * 就得再维护一份常量，两边飘了就是「连得上但请求 404」这种难查的坑。
+       * http spec 要的是真 `wx.request`，得有个真 HTTP 端点；另起一个端口就得再维护一份常量，
+       * 两边飘了就是「连得上但请求 404」这种难查的坑。
        */
       const httpServer = createServer((req, res) => {
         if (tryServeFixture(req, res)) {
@@ -106,8 +100,7 @@ export class MiniProgramVitestSession {
         );
       });
       httpServer.once('listening', () => {
-        // 给外部启动器当 ready 信号用（见 script/wechat-vitest.cjs）。
-        // 没这行的话脚本只能 sleep 一个固定时长去赌服务已绑上。
+        // 给外部启动器当 ready 信号用（见 script/wechat-vitest.cjs）。没这行的话脚本只能 sleep 一个固定时长去赌服务已绑上。
         process.stdout.write(
           `[mp-vitest] 已监听 ws://${host}:${port}，等设备连入\n`,
         );
@@ -119,8 +112,7 @@ export class MiniProgramVitestSession {
   }
 
   private onConnection(socket: WebSocket): void {
-    // 小程序一个进程只有一条连接；后来者顶掉前一个，
-    // 免得开发者工具重编译后新旧两条并存、结果串台。
+    // 小程序一个进程只有一条连接；后来者顶掉前一个，免得开发者工具重编译后新旧两条并存、结果串台。
     this.socket?.close();
     this.socket = socket;
     socket.on('message', (data) => this.onMessage(rawToString(data)));
@@ -144,8 +136,7 @@ export class MiniProgramVitestSession {
     } catch {
       return;
     }
-    // 协议对不上要当场说清楚：否则 hello 会被下面的校验静默丢掉，
-    // 表现是「设备根本没连上」，而真原因只是产物是旧版编的。
+    // 协议对不上要当场说清楚：否则 hello 会被下面的校验静默丢掉，表现是「设备根本没连上」，而真原因只是产物是旧版编的。
     const hello = parsed as { kind?: string; protocol?: unknown } | null;
     if (
       hello?.kind === 'hello' &&
@@ -162,9 +153,8 @@ export class MiniProgramVitestSession {
     }
     switch (parsed.kind) {
       case 'hello':
-        // 给外部启动器当「设备真连上了」的信号（见 script/wechat-vitest.cjs）。
-        // 没这行的话脚本只能区分「已监听」和「跑完了」，中间那段黑盒只能
-        // 拿长超时去赌——小程序根本没连上来时，表现是「一直等」。
+        // 给外部启动器当「设备真连上了」的信号（见 script/wechat-vitest.cjs）。没这行脚本只能区分「已监听」和「跑完了」，
+        // 中间那段黑盒只能拿长超时去赌。
         process.stdout.write('[mp-vitest] 设备已连接\n');
         break;
       case 'worker-ready': {
@@ -175,8 +165,7 @@ export class MiniProgramVitestSession {
       case 'worker-message': {
         let frame: unknown;
         try {
-          // frame 是 flatted 字符串，外层再套一层 JSON，
-          // 这样控制帧能用最朴素的 JSON.parse 分流。
+          // frame 是 flatted 字符串，外层再套一层 JSON，这样控制帧能用最朴素的 JSON.parse 分流。
           frame = flatParse(parsed.frame);
         } catch {
           break;

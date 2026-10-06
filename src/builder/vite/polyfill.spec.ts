@@ -21,26 +21,17 @@ import { buildPlatformDefine, getBuildPlatform, runViteBuilder } from './index';
 /**
  * AbortController polyfill 的接入验证。
  *
- * ## 背景
- *
- * 微信没有 `AbortController`，而 `abortcontroller-polyfill` 的默认入口
- * 靠给 `self` / `global` 赋值挂载——这两个标识符在小程序里都不存在，
- * 装了也不生效。
- *
- * 方案是两步配套：
- *   1. **手动导出**：`polyfill-entry.ts` 用纯 ponyfill
- *      `dist/abortcontroller`（只 exports 不碰全局），把类塞进
- *      app-template 建出的全局能力表 `obj`。
- *   2. **define 重定向**：`buildPlatformDefine` 把源码里的裸
- *      `AbortController` / `AbortSignal` 换成 `<平台>.__window.AbortController`。
- *
+ * 微信没有 `AbortController`，而 `abortcontroller-polyfill` 的默认入口靠给 `self` / `global`
+ * 赋值挂载——这两个标识符在小程序里都不存在，装了也不生效。方案是两步配套：
+ *   1. 手动导出：`polyfill-entry.ts` 用纯 ponyfill `dist/abortcontroller`，把类塞进全局能力表 `obj`。
+ *   2. define 重定向：`buildPlatformDefine` 把源码里的裸 `AbortController` / `AbortSignal`
+ *      换成 `<平台>.__window.AbortController`。
  * 两步缺一不可，所以这里两侧都要盯住。
  */
 describe('AbortController polyfill 接入', () => {
   describe('define 重定向（单元）', () => {
     const define = buildPlatformDefine(
-      // static-injector 7 下 BuildPlatform.templateTransform 靠 inject() 解析，
-      // 不能再 `new WxBuildPlatform(new WxTransform())`，走真实的 provider 配置。
+      // static-injector 下 BuildPlatform.templateTransform 靠 inject() 解析，走真实的 provider 配置
       getBuildPlatform(PlatformType.wx),
       false,
     );
@@ -54,9 +45,7 @@ describe('AbortController polyfill 接入', () => {
     });
 
     it('重定向目标与模板建出的表一致（__window 与 __global 同一对象）', () => {
-      // 模板里是 `wx.__global = wx.__window = obj`，两者指向同一个 obj。
-      // define 里 global 走 __global、window/globalThis 走 __window，
-      // 所以 polyfill 挂哪儿都能被取到。
+      // 模板里是 `wx.__global = wx.__window = obj`，两者指向同一个 obj，所以 polyfill 挂哪儿都能被取到
       expect(define['global']).toBe('wx.__global');
       expect(define['globalThis']).toBe('wx.__window');
     });
@@ -117,17 +106,14 @@ describe('AbortController polyfill 接入', () => {
       expect(polyfillPath).toBeTruthy();
 
       /**
-       * define 生效的直接证据：入口里的 `globalThis` 已被换成
-       * `wx.__window`，ponyfill 的类挂到了全局能力表上。
+       * define 生效的直接证据：入口里的 `globalThis` 已被换成 `wx.__window`，ponyfill 的类挂到了全局能力表上。
        */
       const polyfillJs = virtualFs.fileBufferToString(
         await harness.host.read(normalize(polyfillPath!)).toPromise(),
       );
       expect(polyfillJs).toContain('wx.__window');
       expect(polyfillJs).toContain('AbortController');
-      // 盯实际赋值语句（注释里本来就含 globalThis 字样，不能直接
-      // 用 not.toContain）。编译后的入口应该是 `var globalTable = wx.__window`，
-      // 而不是 `globalThis`。
+      // 盯实际赋值语句（注释里本来就含 globalThis 字样，不能直接用 not.toContain）
       expect(polyfillJs).toMatch(/var globalTable\s*=\s*wx\.__window/);
       expect(polyfillJs).not.toMatch(/var globalTable\s*=\s*globalThis/);
 
@@ -154,11 +140,7 @@ describe('AbortController polyfill 接入', () => {
 
   describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     /**
-     * `polyfills` 里声明的本地文件要真的进产物。
-     *
-     * 对齐 `@angular/build` 的 `getEsBuildCommonPolyfillsOptions`：数组每条
-     * 一个 `import`，包名和本地文件都走普通解析。以前本包只从数组里挑
-     * localize 那一条，写 `polyfills: ["src/polyfills.ts"]` 是配了不生效。
+     * `polyfills` 里声明的本地文件要真的进产物。数组每条一个 `import`，包名和本地文件都走普通解析。
      */
     it(
       'polyfills 声明的本地文件被打进 polyfills.js',

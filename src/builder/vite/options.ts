@@ -8,10 +8,7 @@ import { toPosix } from '../util/path';
 
 /**
  * 把 angular.json 里「一个选项多种写法」的字段归一成 builder 内部好用的形状。
- *
- * 单独成模块是为了可测：这些函数全是纯函数，跑一次几毫秒，
- * 不用起整条 vite 构建链路。归一规则本身尽量直接复用 @angular/build
- * 的实现（见 util/angular-build-compat），避免「同名不同义」。
+ * 单独成模块是为了可测；归一规则尽量复用 @angular/build 的实现，避免同名不同义。
  */
 
 /** `optimization` 支持布尔和对象两种写法（上游 schema 就是 oneOf）。 */
@@ -34,13 +31,8 @@ export interface OptimizationFlags {
 }
 
 /**
- * `optimization` → 三个开关。
- *
- * 以前是 `!!options.optimization`，于是 `{ scripts: false }` 这种**对象写法
- * 恒为真** —— 想关压缩反而开了压缩。归一之后对象形态按子项取值。
- *
- * 未配置按 false 处理：本包 schema 里 optimization 默认就是 false
- * （上游默认 true，这里刻意不同，理由见 script/gen-builder-schema.ts）。
+ * `optimization` → 三个开关。对象形态按子项取值。
+ * 未配置按 false 处理：本包 schema 里 optimization 默认就是 false。
  */
 export function resolveOptimization(
   optimization: OptimizationOption | undefined,
@@ -59,10 +51,8 @@ export function resolveOptimization(
 }
 
 /**
- * `sourceMap` → vite 的 `build.sourcemap`。
- *
- * vite 只有一个总开关（boolean | 'hidden'），Angular 那边是 scripts / styles /
- * hidden / vendor 四项，取并集：任一要 map 就出 map，`hidden` 优先。
+ * `sourceMap` → vite 的 `build.sourcemap`。vite 只有一个总开关，Angular 那边是四项，
+ * 取并集：任一要 map 就出 map，`hidden` 优先。
  */
 export function resolveSourcemap(
   sourceMap: SourceMapOption | undefined,
@@ -82,11 +72,8 @@ export interface OutputNames {
 }
 
 /**
- * `outputHashing` → rollup 的文件名模板。
- *
- * 以前 `chunkFileNames` 写死 `[name]-[hash].js`，schema 里那句
- * `"outputHashing": "none"` 是假的。小程序产物没有 HTTP 缓存，hash 本来
- * 就没意义（还让路径变长），所以默认（none）就是不带 hash。
+ * `outputHashing` → rollup 的文件名模板。小程序产物没有 HTTP 缓存，hash 本来就没意义，
+ * 所以默认（none）就是不带 hash。
  */
 export function resolveOutputNames(outputHashing?: OutputHashing): OutputNames {
   const hashChunks = outputHashing === 'all' || outputHashing === 'bundles';

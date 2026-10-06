@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * sidecar 写侧 / 读侧的纯单元测试（不跑构建器）。
- *
  * 端到端那部分在 `library-meta-sidecar.spec.ts`，这里只钉住单元行为：
  * key 形态、包边界判定、schema 校验、缓存失效、冲突告警。
  */
@@ -148,8 +147,7 @@ describe('library-meta-reader（读侧）', () => {
   let tmp: string;
   let dtsPath: string;
 
-  // 递增量：保证**每次写 mtime 严格变大**，不依赖两次写之间真的隔了一毫秒
-  // （`Date.now()` 只到 ms，相邻两次调用常常是 0ms，那样 mtime 相同、缓存不失效）
+  // 递增量：保证每次写 mtime 严格变大，不依赖两次写之间真的隔了一毫秒
   let mtimeTick = 0;
   const writeSidecar = (file: unknown) => {
     fs.writeFileSync(
@@ -298,10 +296,7 @@ describe('library-meta-reader（读侧）', () => {
 
 describe('注入与包边界加固（schemaVersion 2）', () => {
   /**
-   * 旧库（v1，载荷在 JS 里）必须**显式炸**。
-   *
-   * 这条是本次重构最重要的安全网：静默出空 wxml = 页面白屏零报错，
-   * 这个仓库已经栽过好几次。宁可构建失败。
+   * 旧库（v1，载荷在 JS 里）必须显式炸。静默出空 wxml = 页面白屏零报错，宁可构建失败。
    */
   describe('assertLibraryTemplatePayload（旧库显式报错）', () => {
     const base = {
@@ -369,11 +364,9 @@ describe('注入与包边界加固（schemaVersion 2）', () => {
   });
 
   /**
-   * 包边界：只有带 sidecar 的包才归本工具链管。
-   *
-   * 这是「不给第三方库注 propertyChange」的唯一闸门。`@angular/common` 的
-   * fesm 里同样有 `ɵɵdefineComponent`（NgIf / NgFor），一旦误判，等于给每个
-   * `*ngIf` 加一次 setData，而且没人会发现。
+   * 包边界：只有带 sidecar 的包才归本工具链管。这是「不给第三方库注 propertyChange」
+   * 的唯一闸门。`@angular/common` 的 fesm 里同样有 `ɵɵdefineComponent`，一旦误判，
+   * 等于给每个 `*ngIf` 加一次 setData。
    */
   describe('isMpLibraryFile（第三方库不被误处理）', () => {
     let tmp: string;
@@ -450,7 +443,7 @@ describe('键的选择：组件名，不是文件路径', () => {
     fs.outputJsonSync(path.join(root, 'package.json'), { name: 'mp-lib' });
     declaredFesm = path.join(root, 'fesm2022', 'mp-lib.mjs');
     fs.outputFileSync(declaredFesm, componentCode);
-    // 同一个包里一个**不是任何 entry fesm** 的文件（worker / schematics / 测试 bundle）
+    // 同一个包里一个不是任何 entry fesm 的文件（worker / schematics / 测试 bundle）
     strayFile = path.join(root, 'fesm2022', 'worker.mjs');
     fs.outputFileSync(strayFile, 'export const y = 2;');
     fs.outputJsonSync(path.join(root, LIBRARY_META_FILE_NAME), {
@@ -494,12 +487,8 @@ describe('键的选择：组件名，不是文件路径', () => {
   });
 
   /**
-   * 修好之后，决定「要不要处理这个文件」的没有是文件路径，而是
-   * **这个文件里到底有没有组件**。
-   *
-   * `isMpLibraryFile` 退回到它该干的事：只做生态判定（这个包归不归本
-   * 工具链管）。它不再决定 emit 范围 —— 以前就是在这里越界，才导致
-   * 碰一个无关文件就整包 emit。
+   * 决定「要不要处理这个文件」的不是文件路径，而是这个文件里到底有没有组件。
+   * `isMpLibraryFile` 只做生态判定（这个包归不归本工具链管），不决定 emit 范围。
    */
   it('无组件的文件 detectComponentNames 返回空 → 不处理', () => {
     expect(detectComponentNames(strayCode)).toEqual([]);
@@ -544,10 +533,9 @@ describe('键的选择：组件名，不是文件路径', () => {
 });
 /**
  * 库模板渲染：`es-toolkit/compat` 的 `template`，分隔符自定义成 `${x}`。
- *
  * 这里钉住六件事：
  *   ✅ 三种插槽都能按目标平台的值正确渲染
- *   ✅ wxml 自己的 `{{}}` 插值原样透传（`${}` 与它不撞，无需转义）
+ *   ✅ wxml 自己的 `{{}}` 插值原样透传
  *   ✅ 同一份模板串渲染成两个平台（库里不烘平台信息）
  *   ✅ 未登记的插值大声抛错，绝不静默求值
  *   ✅ 不做 HTML 转义（否则 wxml 属性会被 `&lt;` 之类污染）
@@ -663,12 +651,9 @@ describe('mp-template（es-toolkit template + ${} 分隔符 + 白名单预检）
   });
 
   /**
-   * 上面那条「不做 HTML 转义」就是这条不变式的守门人。
-   *
-   * lodash 把 escape / interpolate / evaluate 并成一个交替式，靠捕获组
-   * 序号区分三者。把 `NEVER` 从 `/()(?!)/g` 「简化」成 `/(?!)/g`（0 组），
-   * 组号会整体左移，`interpolate` 的捕获落到 `escape` 位，上面那条
-   * 立刻变红。改之前先读懂 `mp-template.ts` 里 `NEVER` 的注释。
+   * 上面那条「不做 HTML 转义」就是这条不变式的守门人。lodash 把 escape / interpolate /
+   * evaluate 并成一个交替式，靠捕获组序号区分三者。把 `NEVER` 的捕获组去掉会让组号整体
+   * 左移，`interpolate` 的捕获落到 `escape` 位，上面那条立刻变红。
    */
   it('NEVER 必须恰好 1 个捕获组（少了会被当成 escape 路径）', () => {
     const never = /()(?!)/g;

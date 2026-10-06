@@ -21,10 +21,9 @@ function definitionName(builder: string) {
 }
 
 /**
- * 发布包里的 `lib/config/schema.json` 由 script/build-cli-schema.ts 生成：
- * 基底直读 `@angular/cli/lib/config/schema.json`，再挂上本包三个 builder。
- * 这里钉死「结构没被改坏」——尤其是 target.oneOf 与兜底分支的互斥关系，
- * 一旦漏改 not.enum，oneOf 会同时命中两条导致 angular.json 校验失败。
+ * 发布包里的 `lib/config/schema.json` 由 script/build-cli-schema.ts 生成：基底直读
+ * `@angular/cli/lib/config/schema.json`，再挂上本包三个 builder。这里钉死「结构没被改坏」——
+ * 尤其是 target.oneOf 与兜底分支的互斥关系，一旦漏改 not.enum，oneOf 会同时命中两条导致校验失败。
  */
 describe('cli workspace schema：本包 builder 注入', () => {
   const schema = buildSchema();
@@ -59,8 +58,7 @@ describe('cli workspace schema：本包 builder 注入', () => {
       expect(inlined.$schema).toBeUndefined();
       expect(inlined.required).toBeUndefined();
       const json = JSON.stringify(inlined);
-      // 内联后所有内部 $ref 必须命名空间化到自身 definitions 下，
-      // 否则多个 builder 的同名 definition（assetPattern 等）会串在一起
+      // 内联后所有内部 $ref 必须命名空间化到自身 definitions 下，否则多个 builder 的同名 definition 会串在一起
       expect(json).not.toMatch(/"#\/definitions\/(?!AngularMiniprogram)/);
       for (const local of Object.keys(inlined.definitions ?? {})) {
         expect(json).toContain(

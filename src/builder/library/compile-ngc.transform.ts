@@ -69,7 +69,7 @@ export const myCompileNgcTransformFactory = (
         basePath,
         cssUrl,
         styleIncludePaths,
-        // ng-packagr 19 在 cacheDirectory 之前新增了 `sass` 参数
+        // ng-packagr 在 cacheDirectory 之前新增了 `sass` 参数
         undefined,
         options.cacheEnabled && options.cacheDirectory,
         options.watch,
@@ -77,13 +77,9 @@ export const myCompileNgcTransformFactory = (
 
       /**
        * 先把本 entry 的「扁平化 d.ts 路径 / fesm 产物路径」登记进 sidecar 暂存区。
-       *
-       * 用 ng-packagr 自己的 `declarationsBundled`（= `dist/types/<flat>.d.ts`），
-       * 也就是最终 `package.json#typings` 指的那个文件。读取侧拿类的
-       * `getSourceFile()` 相对库根一算就能命中，不用反推 exports map。
-       *
-       * fesm 路径同样直接拿：主构建要把「正在 transform 的那个 .mjs」对上
-       * 具体 entry，多 entry point 的包才不会误伤。
+       * 用 ng-packagr 自己的 `declarationsBundled`，也就是最终 `package.json#typings` 指的那个文件，
+       * 读取侧拿类的 `getSourceFile()` 相对库根一算就能命中，不用反推 exports map。
+       * fesm 路径同样直接拿：主构建要把正在 transform 的那个 .mjs 对上具体 entry。
        */
       registerLibraryMetaEntry(
         entryPoint.data.entryPoint.moduleId,
@@ -107,10 +103,8 @@ export const myCompileNgcTransformFactory = (
       );
 
       /**
-       * 每个 entry 编译完就落一次盘（全量重写，幂等）。
-       *
-       * 放在这里而不是 build 结束后的钩子上，是因为 watch 模式下
-       * 「build 结束」根本不会发生；挂在 entry 编译尾部两条路径都能覆盖。
+       * 每个 entry 编译完就落一次盘（全量重写，幂等）。放在这里而不是 build 结束后的钩子上，
+       * 是因为 watch 模式下「build 结束」根本不会发生。
        */
       writeLibraryMetaFile(distRoot);
     } catch (error) {

@@ -32,9 +32,8 @@ class MiniProgramCoreFactory extends BaseFactory {
     ];
   }
   /**
-   * 支付宝的 `e.type` 是驼峰名（`touchStart`），而模板写的是微信名
-   * （`(touchstart)` → 监听键 `touchstart`）。先把 `e.type` 反查回微信名，
-   * 两套候选一起铺：两种写法都接得住，普通事件（`tap`）候选一个不多。
+   * 支付宝的 `e.type` 是驼峰名（`touchStart`），而模板写的是微信名（`(touchstart)` → 监听键 `touchstart`）。
+   * 先把 `e.type` 反查回微信名，两套候选一起铺：两种写法都接得住，普通事件（`tap`）候选一个不多。
    */
   override getListenerEventMapping(prefix: string, name: string) {
     const keys = new Set(this.eventKeys(prefix, name));
@@ -95,18 +94,11 @@ class MiniProgramCoreFactory extends BaseFactory {
 export const MiniProgramCore = new MiniProgramCoreFactory();
 
 /**
- * 平台包必须能被当成 `platform/wx` 的**替身**：构建时 `platformReplacementAlias()`
- * 把 `angular-miniprogram/platform/wx` 整个换成 `angular-miniprogram/platform/<平台>`，
- * 换完之后主包那句 `export { AgentNode, ... } from 'angular-miniprogram/platform/wx'`
- * 就得由这里来兑现。
- *
- * 所以这里必须 `export *`，不能手写名单。之前这里是一份手抄的
- * `{ PAGE_TOKEN, MiniProgramRenderer, MiniProgramRendererFactory,
- * ComponentFinderService, propertyChange }`，`default` 新增 `AgentNode`
- * （viewchild query）时没同步，zfb/bd/qq 三家构建当场
- * `[MISSING_EXPORT] "AgentNode" is not exported by ...platform-zfb.mjs`。
- *
- * 本地那份 `MiniProgramCore` 会盖掉 star 导出里的同名项（ES 规范：显式导出优先于
- * `export *`），这正是我们要的——平台替换要换的就是它。
+ * 平台包必须能被当成 `platform/wx` 的替身：构建时 `platformReplacementAlias()` 把
+ * `angular-miniprogram/platform/wx` 整个换成 `angular-miniprogram/platform/<平台>`，换完之后
+ * 主包那句 `export { AgentNode, ... } from 'angular-miniprogram/platform/wx'` 就得由这里来兑现。
+ * 所以这里必须 `export *`，不能手写名单——手抄名单漏一个名字，该平台构建当场 `[MISSING_EXPORT]`。
+ * 本地那份 `MiniProgramCore` 会盖掉 star 导出里的同名项（ES 规范：显式导出优先于 `export *`），
+ * 这正是我们要的——平台替换要换的就是它。
  */
 export * from 'angular-miniprogram/platform/default';

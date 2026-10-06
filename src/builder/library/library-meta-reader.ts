@@ -16,7 +16,7 @@ import {
 /**
  * 应用构建侧读取库元数据 sidecar。
  *
- * 定位链路（全部基于「TS 实际解析到的文件路径」，不依赖任何配置约定）：
+ * 定位链路全部基于「TS 实际解析到的文件路径」，不依赖配置约定：
  *
  *   classDeclaration.getSourceFile().fileName
  *     → 向上找最近的 package.json（带 name 的，即真正的包边界）
@@ -24,12 +24,8 @@ import {
  *     → entries[ relative(包根, d.ts) ]
  *     → directives[类名] / components[类名]
  *
- * 这条链路对以下场景都成立，不需要额外适配：
- *   - node_modules 正常安装
- *   - pnpm 的 `.pnpm/<pkg>/node_modules/<pkg>` 布局（包边界仍是它自己）
- *   - `npm link` / symlink（TS 默认 resolve 到 realpath，包根跟着 realpath 走）
- *   - tsconfig `paths` 把 `angular-miniprogram/forms` 指到 `../../dist/forms`
- *     （解析到的 d.ts 在 `dist/types/`，最近 package.json 就是 `dist/package.json`）
+ * 对 node_modules 正常安装、pnpm 布局、`npm link` / symlink、tsconfig `paths`
+ * 指向 dist 这些场景都成立。
  */
 
 /** 命中结果。`record` 存在即代表拿到了元数据。 */
@@ -57,11 +53,8 @@ const sidecarCache = new Map<string, SidecarCacheEntry>();
 const packageRootCache = new Map<string, string | undefined>();
 
 /**
- * 从某个文件向上找它所属的**包根**。
- *
- * 判定标准：目录里有 `package.json` 且带非空 `name`。
- * 找到就停 —— 哪怕它没有 sidecar 也不再往上走，
- * 否则会误命中上层无关包（比如应用自己的 dist）的元数据。
+ * 从某个文件向上找它所属的包根。判定标准：目录里有 `package.json` 且带非空 `name`。
+ * 找到就停——哪怕它没有 sidecar 也不再往上走，否则会误命中上层无关包的元数据。
  */
 export function findLibraryPackageRoot(fromFile: string): string | undefined {
   const cached = packageRootCache.get(fromFile);
@@ -132,10 +125,8 @@ export function readLibraryMetaFile(
 }
 
 /**
- * 在 entry 的 `directives` / `components` 里按类名查记录。
- *
- * 先精确匹配；不中再做一次大小写无关匹配（Windows 盘符 / 大小写不敏感
- * 文件系统的兜底），只在精确匹配失败时才走，不影响正常路径性能。
+ * 在 entry 的 `directives` / `components` 里按类名查记录。先精确匹配；
+ * 不中再做一次大小写无关匹配（Windows 盘符 / 大小写不敏感文件系统的兜底）。
  */
 function pickFromMap<T>(
   map: Record<string, T> | undefined,
@@ -224,10 +215,8 @@ export function lookupLibraryMeta(
 }
 
 /**
- * 某个模块文件对应的 mp 库元数据。
- *
- * `entry` 是按 fesm 路径精确匹配上的那一个（多 entry point 包靠它避免误伤）；
- * 匹配不上时 `entry` 为 undefined，调用方可退化成处理 `entries` 全部。
+ * 某个模块文件对应的 mp 库元数据。`entry` 是按 fesm 路径精确匹配上的那一个
+ * （多 entry point 包靠它避免误伤）；匹配不上时为 undefined。
  */
 export function readLibraryMetaForModule(fromFile: string):
   | {
@@ -261,14 +250,9 @@ export function clearLibraryMetaReaderCache(): void {
 }
 
 /**
- * 某个文件所属包是不是「本工具链构建的库」。
- *
- * 判据就一个：包根有合法的 `mp-library-meta.json`。
- *
- * 这个判据在主构建里**非常重要**：`@angular/common` 的 fesm 里同样有
- * `ɵɵdefineComponent`（NgIf / NgFor），用「所有 node_modules」这种粗筛会把
- * 注入打进第三方库，等于给每个 `*ngIf` 加一次 setData。只有带 sidecar 的
- * 包才进我们的处理范围。
+ * 某个文件所属包是不是本工具链构建的库。判据就一个：包根有合法的 `mp-library-meta.json`。
+ * 这个判据很重要：`@angular/common` 的 fesm 里同样有 `ɵɵdefineComponent`，
+ * 用「所有 node_modules」这种粗筛会把注入打进第三方库。
  */
 export function isMpLibraryFile(fromFile: string): boolean {
   const pkgRoot = findLibraryPackageRoot(fromFile);

@@ -2,9 +2,8 @@ import { subpackageChunkPlugin } from './subpackage-chunk.plugin';
 
 /**
  * 分包校验插件的单元级验证（不走真实构建，直接喂 bundle）。
- *
- * 集成用例见 `src/builder/vite/subpackage.build.spec.ts`，这里补的是
- * 「路径归一化」这类只有直接控制 moduleIds 才能覆盖的分支。
+ * 集成用例见 `src/builder/vite/subpackage.build.spec.ts`，这里补的是「路径归一化」这类
+ * 只有直接控制 moduleIds 才能覆盖的分支。
  */
 interface FakeChunk {
   type: 'chunk';
@@ -97,8 +96,7 @@ describe('subpackageChunkPlugin: 跨分包校验', () => {
   });
 
   it('moduleIds 盘符大小写与 sourceRoot 不一致时，仍能拦截', () => {
-    // Windows 下 getSystemPath 给大写盘符，bundler 回传可能是小写。
-    // 归一化前这里会静默放行（分包白拆 + 校验漏报）。
+    // Windows 下 getSystemPath 给大写盘符，bundler 回传可能是小写。归一化前这里会静默放行。
     const msg = runGenerateBundle(SOURCE_ROOT_WIN, withDrive('c'));
     expect(msg).toContain('跨分包静态依赖');
   });

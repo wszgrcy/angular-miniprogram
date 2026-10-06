@@ -4,12 +4,9 @@ import { MiniProgramRenderer } from './mini-program.renderer';
 import { MiniProgramCoreFactory } from './platform-core';
 
 /**
- * 事件名归一化：模板写法 → `listener` 表的键。
- *
- * 编译期把 `(tap.stop)` 写成 `catch:tap="catchEvent"`，事件打进来时
- * `catchEvent` 只会拿 `event.type` 去查键。所以真正的验收标准不是
- * 「键长什么样」，而是「查得到查不到」——下面每条都拿真实的
- * `getListenerEventMapping` 对一遍。
+ * 事件名归一化：模板写法 → `listener` 表的键。编译期把 `(tap.stop)` 写成 `catch:tap="catchEvent"`，
+ * 事件打进来时 `catchEvent` 只会拿 `event.type` 去查键。所以验收标准不是「键长什么样」，
+ * 而是「查得到查不到」——下面每条都拿真实的 `getListenerEventMapping` 对一遍。
  */
 
 /** 暴露 protected 的映射，断言用的就是运行时那份实现 */

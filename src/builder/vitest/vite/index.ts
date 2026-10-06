@@ -66,10 +66,8 @@ export interface VitestViteBuilderOptions {
   clientHost?: string;
   dedupe?: string[];
   /**
-   * 语义与 application builder 的同名选项一致：声明 `@angular/localize`
-   * （或 `/init`）才会注入 `@angular/localize/init`。不注入的话
-   * `$localize` 就是 core 的恒等实现，ICU 分支不会被解析，
-   * i18n 相关的 spec 会看到 `{VAR_SELECT, select, ...}` 原文。
+   * 语义与 application builder 的同名选项一致：声明 `@angular/localize`（或 `/init`）才会注入它。
+   * 不注入的话 `$localize` 就是 core 的恒等实现，ICU 分支不会被解析。
    */
   polyfills?: string | string[];
   /**
@@ -82,8 +80,7 @@ export interface VitestViteBuilderOptions {
   deriveCondition?: boolean;
   /**
    * 与 application builder 同名同义：自定义 vite 配置的钩子文件（相对 workspaceRoot）。
-   *
-   * 测试产物也是一个完整小程序工程，要加插件 / 加 alias 两条链路应当是同一个入口。
+   * 要加插件 / 加 alias 两条链路应当是同一个入口。
    */
   viteConfig?: string;
 }
@@ -131,8 +128,7 @@ export async function createVitestViteConfig(options: {
       context,
     });
 
-  // `ng test` 会塞一个空数组进来，`?? 默认值` 不生效，
-  // 结果是「0 个 spec、全绿」。空数组一律当没传。
+  // `ng test` 会塞一个空数组进来，`?? 默认值` 不生效，结果是「0 个 spec、全绿」。空数组一律当没传。
   const specInclude = vitestOptions.include?.length
     ? vitestOptions.include
     : ['**/*.spec.ts', '**/*.test.ts'];
@@ -156,8 +152,7 @@ export async function createVitestViteConfig(options: {
       : (angularPluginModule as { default: unknown }).default
   ) as (opts: unknown) => import('vite').Plugin[];
 
-  // 配置文件：与 application 链路同一套解析（静态 app.json + appJson 选项 +
-  // 构建器补的），测试产物也是一个完整小程序工程，两条链路不能各算一份
+  // 配置文件：与 application 链路同一套解析，测试产物也是一个完整小程序工程，两条链路不能各算一份
   const mpConfigs = await prepareMpConfigs({
     workspaceRoot: context.workspaceRoot,
     platform: buildPlatform,
@@ -192,8 +187,7 @@ export async function createVitestViteConfig(options: {
     workspaceRoot: context.workspaceRoot,
     context,
     // devkit 在 Windows 下给的是 /C:/... 这种 posix 化绝对路径，先归一。
-    // 类型库不在这里动手：`types` 由工程自己的 tsconfig 声明（或 spec
-    // 旁边放个 d.ts），构建器不替用户找类型。
+    // 类型库不在这里动手：`types` 由工程自己的 tsconfig 声明，构建器不替用户找类型。
     tsConfig: resolveNative(context.workspaceRoot, vitestOptions.tsConfig),
     pages: vitestOptions.pages || [],
     assets: vitestOptions.assets,
@@ -216,18 +210,16 @@ export async function createVitestViteConfig(options: {
       ...buildPlatformDefine(buildPlatform, false),
       ...platformConditionDefine(vitestOptions.platform),
       ...miniProgramVitestDefine(resolvedPlugin),
-      // spec 里的裸 describe / it / expect 要能指到 registerApiGlobally
-      // 挂的那张表，否则每个 spec 都是 `describe is not defined`。
+      // spec 里的裸 describe / it / expect 要能指到 registerApiGlobally 挂的那张表
       ...miniProgramVitestGlobalDefine(buildPlatform),
-      // tinybench 顶层就 `class extends EventTarget`，runner 的 failTask 又
-      // 直接 `instanceof AggregateError`，小程序这三样都没有。
+      // tinybench 顶层就 `class extends EventTarget`，runner 的 failTask 又直接 `instanceof AggregateError`，
+      // 小程序这三样都没有。
       ...miniProgramBuiltinDefine(buildPlatform),
     },
     resolve: {
       alias: [
-        // spec 里有 `src/spec-component/...` 这种从项目根算起的写法，
-        // 靠 tsconfig baseUrl 解析；Rolldown 不读 baseUrl，补一条 alias。
-        // 必须排在 tsconfig paths 之前。
+        // spec 里有 `src/spec-component/...` 这种从项目根算起的写法，靠 tsconfig baseUrl 解析；
+        // Rolldown 不读 baseUrl，补一条 alias。必须排在 tsconfig paths 之前。
         {
           find: /^src\//,
           replacement: path.resolve(context.workspaceRoot, 'src') + '/',

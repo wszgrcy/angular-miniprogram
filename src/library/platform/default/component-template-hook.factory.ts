@@ -11,12 +11,7 @@ import { AgentNode } from './agent-node';
 import { diffNodeData } from './diff-node-data';
 import { LVIEW } from './lview-layout';
 
-// 这些下标统一由 util/lview-layout 提供（单一真源），
-// 不在本文件重复定义——它们会随 Angular 版本变化，
-// 集中一处才配得上配套的交叉校验。
-//
-// 历史上本文件曾 re-export LVIEW_CONTEXT / INJECTOR 两个裸常量，
-// 现已收归 LVIEW.CONTEXT / LVIEW.INJECTOR。
+// 这些下标统一由 util/lview-layout 提供（单一真源），它们会随 Angular 版本变化
 
 const linkMap = new Map<LView, any>();
 const nodePathMap = new Map<LView, NodePath>();
@@ -26,10 +21,8 @@ const lViewLastDataMap = new Map<LView, Record<string, any>>();
 let waitingRefreshLViewList: (() => void)[] = [];
 
 /**
- * 路径式 setData 总开关。
- *
- * 关掉后 `endRender()` 完全退回旧的「全量序列化 + diffNodeData」行为，
- * 用于灰度 / 排障 / 回退。运行时可用 {@link setPathDataEnabled} 切。
+ * 路径式 setData 总开关。关掉后 `endRender()` 退回全量序列化 + diffNodeData，
+ * 用于灰度 / 排障 / 回退。
  */
 let pathDataEnabled = true;
 /** 本周期内是否发生过结构性变更（增 / 删 / 移动节点） */
@@ -51,25 +44,16 @@ export function isPathDataEnabled(): boolean {
 }
 
 /**
- * 标记「本周期发生过结构性变更」。
- *
- * 结构性变更（`appendChild` / `insertBefore` / `removeChild`）会让
- * 容器内 view 序号漂移，进而让**其他节点**的路径前缀整体失效。
- * 所以只要出现过一次，本周期就放弃路径式，走全量序列化 + diff。
- *
- * 注意：节点创建必然伴随 `appendChild`，所以「新节点」天然会触发这里，
- * 不存在「叶子写入打到一个还没被 stamp 的新节点上」的窗口。
+ * 标记「本周期发生过结构性变更」。增 / 删 / 移动节点会让容器内 view 序号漂移，
+ * 其他节点的路径前缀整体失效，所以只要出现过一次就改走全量序列化 + diff。
  */
 export function markStructuralChange(): void {
   structuralChange = true;
 }
 
 /**
- * 记一条路径式变更。
- *
- * 同一 key 本周期内多次写 → 后写覆盖前写（与 setData 语义一致）。
- * `undefined` 统一转 `null`：微信对**路径式 key** 上的 `undefined`
- * 是整次 `setData` 拒绝，不是只丢那一个字段。
+ * 记一条路径式变更。同一 key 本周期内多次写，后写覆盖前写。
+ * `undefined` 统一转 `null`：微信对路径式 key 上的 `undefined` 是整次 setData 拒绝。
  */
 export function pushPathData(
   mpRef: unknown,
@@ -101,14 +85,8 @@ export function resetCycleState(): void {
 
 /**
  * 模板更新钩子回调：把本轮变更批量 `setData` 下去。
- *
- * 只能算「框架内部」——构建器给每个组件注入的 `amp.propertyChange(...)` 调的就是
- * 它——但**不能打 internal 标记**：它被 `platform/default` → `platform/wx` →
- * 主入口逐级**具名**再导出，而 `stripInternal` 只剔声明不剔 re-export，
- * ng-packagr 打 d.ts 时会报「propertyChange is not exported by ...」。
- *
- * （注：这段注释里不能出现那个以 at 号开头的词，JSDoc 会把它当标签，
- * `stripInternal` 就又作用到本函数上了。）
+ * 构建器给每个组件注入的 `amp.propertyChange(...)` 调的就是它。
+ * 不能打 internal 标记：它被逐级具名再导出，`stripInternal` 只剔声明不剔 re-export。
  */
 export function propertyChange(lView: LView) {
   if (linkMap.has(lView)) {
@@ -126,8 +104,7 @@ export function propertyChange(lView: LView) {
   }
 }
 export function endRender() {
-  // 快速通道不可用（开关关闭 / 本周期有结构性变更）：
-  // 完全走旧的全量序列化 + diff 管线，行为与改造前逐字一致。
+  // 快速通道不可用（开关关闭 / 本周期有结构性变更）：走全量序列化 + diff 管线
   if (!pathDataEnabled || structuralChange) {
     pendingPathData.clear();
     structuralChange = false;
@@ -139,7 +116,7 @@ export function endRender() {
     return;
   }
 
-  // 纯叶子变更：直接发路径式 key，跳过整树序列化与深 diff。
+  // 纯叶子变更：直接发路径式 key，跳过整树序列化与深 diff
   if (pendingPathData.size) {
     const buckets = pendingPathData;
     pendingPathData = new Map();
@@ -152,9 +129,7 @@ export function endRender() {
     return;
   }
 
-  // 无结构变更、也无叶子写入 → 本周期无需 setData。
-  // 这是相对旧实现最大的那笔节省：view 被 check 过但什么都没变，
-  // 旧管线仍会整棵序列化 + 深 diff，这里直接跳过。
+  // 无结构变更、也无叶子写入 → 本周期无需 setData
   waitingRefreshLViewList = [];
 }
 
@@ -182,23 +157,12 @@ export function getPageRefreshContext(lView: LView, mpRef?: unknown) {
  *   组件自身节点   `nodeList[<M>].<field>`
  *   嵌套模板节点   `nodeList[<cIdx>][<viewIdx>].nodeList[<M>].<field>`
  *
- * 数组下标统一用**方括号**，与 `diffNodeData` 已经跑通的 key 形式逐字一致，
- * 不赌「点号下标」在微信上的兼容性。
- *
- * 依据：`<template is="..." data="{{...nodeList[N][index]}}">` 把容器项
- * 展开成子模板的作用域，子模板里的 `nodeList` 就是 `item.nodeList`。
+ * 数组下标统一用方括号，与 `diffNodeData` 已跑通的 key 形式一致。
  */
 /**
- * 取出容器里已嵌入的子 lView。
- *
- * 为什么不能读 `LVIEW.CONTAINER_VIEW_REFS`：见
- * {@link LVIEW.CONTAINER_HEADER_OFFSET} 的详细说明——一句话版：
- * `VIEW_REFS` 只存惰创建的 ViewRef 包装，内建控制流
- * `@if`/`@for`/`@switch` 不创建它，恒为 `null`。
- *
- * 识别「是 lView」用 Angular 自己的判据
- * （`isLView`：`Array` 且 `value[TYPE=1]` 是 tView 对象），
- * 不自己发明条件。
+ * 取出容器里已嵌入的子 lView。不能读 `LVIEW.CONTAINER_VIEW_REFS`：那里只存惰创建的
+ * ViewRef 包装，内建控制流 `@if`/`@for`/`@switch` 不创建它，恒为 `null`。
+ * 识别「是 lView」用 Angular 自己的 `isLView` 判据。
  */
 function readEmbeddedLViews(container: unknown[]): unknown[] {
   const views: unknown[] = [];
@@ -216,9 +180,7 @@ function readEmbeddedLViews(container: unknown[]): unknown[] {
 }
 
 /**
- * `TView.data[i]` 上挂的 `TI18n`（`i18n` 属性 / ICU 的静态侧）。
- *
- * 形状由 `@angular/core` 的 `interfaces/i18n.ts` 定，未对外导出，只能按形状认。
+ * `TView.data[i]` 上挂的 `TI18n`（`i18n` 属性 / ICU 的静态侧），未对外导出，只能按形状认。
  */
 function asT18n(data: any): { ast: any[] } | null {
   return data && typeof data === 'object' && Array.isArray(data.ast)
@@ -232,11 +194,8 @@ const I18N_ELEMENT = 1;
 const I18N_ICU = 3;
 
 /**
- * 解 ICU 的当前分支下标。
- *
- * 编码是 Angular 自己的：`select` 存 `~caseIndex`（必为负），`plural` 存
- * 原始 `caseIndex`。照抄 `getCurrentICUCaseIndex`，别自己猜——实测两种
- * ICU 存法不同，只按 `~x` 解会让 plural 全错。
+ * 解 ICU 的当前分支下标。Angular 的编码：`select` 存 `~caseIndex`（必为负），
+ * `plural` 存原始 `caseIndex`。
  */
 function readCaseIndex(lView: LView, lviewIndex: number): number | null {
   const stored = lView[lviewIndex];
@@ -251,22 +210,9 @@ function readCaseIndex(lView: LView, lviewIndex: number): number | null {
 /**
  * 把 i18n 块（含 ICU）当前渲染出来的文本拼成一个串。
  *
- * ## 为什么需要
- *
- * `ɵɵi18n` 不往自己的槽位写值：译文节点是 `applyCreateOpCodes` 建在 **expando**
- * 下标上的，而下面的循环只走到 `bindingStartIndex`。于是 wxml 在那个位置
- * 读到的永远是空对象。这里把散在 expando 上的节点收回来，填进槽自己的位置。
- *
- * ## 为什么必须按分支下标取
- *
- * 换分支时 Angular 只把新分支的节点建出来，**旧分支的节点仍留在 lView 里**
- * （只是脱离了渲染树）。所以「收集所有非 null 节点」在首次渲染碰巧对，
- * 一旦切分支就变成 `他TA` 这种拼接结果。必须只走当前分支。
- *
- * ## 局限
- *
- * 只能拼文本。分支里带标签时元素节点会被跳过、其子文本被拼平，渲染出来
- * 丢标签——wxml 的一个 `{{value}}` 带不动结构。
+ * `ɵɵi18n` 不往自己的槽位写值，译文节点建在 expando 下标上，这里把它们收回来填进槽自己的位置。
+ * 必须只走当前分支：换分支时旧分支的节点仍留在 lView 里。
+ * 只能拼文本，分支里带标签时元素会被跳过、其子文本被拼平。
  */
 function readI18nText(lView: LView, ast: any[], parts: string[]): void {
   for (const node of ast) {
@@ -295,16 +241,10 @@ function readI18nText(lView: LView, ast: any[], parts: string[]): void {
 }
 
 /**
- * 算出本节点的可查询 class，非可查询节点返回空串。
+ * 算出本节点的可查询 class，非可查询节点返回空串。判据是 `TNode.localNames` 非空，
+ * 即模板上写了 `#xxx`，与编译期 `ParsedNgElement.hasRef` 同一个条件。
  *
- * 「可查询」的判据是 `TNode.localNames` 非空，即模板上写了 `#xxx`。
- * 编译期（`ParsedNgElement.hasRef`）用的是同一个条件的模板 AST 侧，
- * 两边同进同退：wxml 只在带 `#` 的元素上拼 `nodeList[i].refClass`，
- * 数据侧也只在那种节点上发这个字段。
- *
- * ⚠️ `localNames` 是 `[name, index]` 扁平对，`<div #x>` 存的是
- * `['x', -1]`（`-1` = 就是这个元素自己，由 `saveResolvedLocalsInData`
- * 运行时现取）。这里**只取「有没有」**，绝不读 `localNames[i + 1]`：
+ * `localNames` 是 `[name, index]` 扁平对，这里只取「有没有」，不读下标：
  * 那个下标对 `#x="dir"` 指的是指令实例槽，不是元素下标。
  */
 function refClassOf(tNode: unknown, pathPrefix: string): string {
@@ -331,20 +271,11 @@ function lViewToWXView(
     const rel = index - LVIEW.HEADER_OFFSET;
     const item = lView[index];
     /**
-     * `#x` 的**影子槽**：`saveResolvedLocalsInData` 把 local ref 的值写进
-     * `lView[tNode.index + 1]`，那个槽里是**同一个 AgentNode**。
+     * `#x` 的影子槽：`saveResolvedLocalsInData` 把 local ref 的值写进 `lView[tNode.index + 1]`，
+     * 那个槽里是同一个 AgentNode，不对应任何 wxml 元素。判据：与它自己的元素槽是同一个对象。
      *
-     * 它不对应任何 wxml 元素（编译期 `prepareRefsArray` 同样为它占一个空槽
-     * 并跳过），所以两件事都不能做：
-     *
-     * - **不能重新打前缀**——后打的影子会把真前缀盖掉，于是节点自报的位置
-     *   比渲染位置大 1：可查询 class 与路径式 setData 一起落到没人读的那个
-     *   槽上，`find()` 永远查不到。
-     * - **不能写 nodeList**——写进去就是把同一个节点的视图数据原样复制一份，
-     *   白占 setData 体积，还会让 diff 多比一份。
-     *
-     * 判据就一句：影子槽与它自己的元素槽**是同一个对象**，且紧贴在后面
-     * （`localIndex = tNode.index + 1`）。不依赖 `tView.data` 的形状。
+     * 影子槽既不能重新打前缀（会把真前缀盖掉，`find()` 永远查不到），
+     * 也不能写 nodeList（白占 setData 体积）。
      */
     const isRefShadow = item instanceof AgentNode && item === lView[index - 1];
     if (item instanceof AgentNode && !isRefShadow) {
@@ -360,46 +291,18 @@ function lViewToWXView(
       nodeList[rel] = item.toView();
     } else if (item && item[1] === true) {
       const lContainerList: MPView[] = [];
-      // 读 CONTAINER_HEADER_OFFSET 起的裸 lView，不读 VIEW_REFS。
-      // 后者对 `*ngIf` 有值、对内建 `@if` 恒为 null，
-      // 用它会导致内建控制流整块渲染为空。
+      // 读 CONTAINER_HEADER_OFFSET 起的裸 lView，不读 VIEW_REFS：后者对内建 `@if` 恒为 null
       const childLViews = readEmbeddedLViews(item);
       childLViews.forEach((childLView, itemIndex) => {
         const nodePath = [...parentNodePath, 'directive', rel, itemIndex];
         lContainerList.push({
           /**
-           * wxml 的 `<template is="{{item.__templateName || 'xxxBlock_N'}}">`
-           * 需要运行时模板名。两条来源，按优先级：
+           * 运行时模板名，两条来源按优先级：
+           * 1. context.__templateName —— 自定义结构指令显式传的
+           * 2. tView.declTNode.localNames[0] —— 模板声明名（`<ng-template #alpha>` → "alpha"）
            *
-           * 1. **context.__templateName** —— 自定义结构指令显式传的
-           *    （如 `createEmbeddedView(tpl, {__templateName: name})`）。
-           *    保留它才能不改变现有自定义指令的行为。
-           * 2. **tView.declTNode.localNames[0]** —— 模板声明名
-           *    （`<ng-template #alpha>` → `"alpha"`）。
-           *
-           * 第 2 条是 `ng_if` / `ng_for_of` / `ng_switch` /
-           * `ng_template_outlet` 上那套 AST patch 的**等价替代**：
-           * 实测 `tView.declTNode === TemplateRef._declarationTContainer`
-           * （同一个 TNode），所以 `declTNode.localNames[0]` 与 patch 里
-           * `_declarationTContainer.localNames[0]` 取值必然相同。
-           *
-           * 区别只是：patch 要改 Angular 源码，这里在 fork 自己的
-           * 代码里拿（viewRef 已经握在手上）。
-           */
-          /**
-           * 兼底用 `null` 而不是 `undefined`。
-           *
-           * 微信 `setData` 对 **路径式 key** 的 `undefined` 值直接拒绝：
-           *   Setting data field "nodeList.11.0.__templateName" to
-           *   undefined is invalid.
-           *
-           * 首次渲染走整体 setData，对象里的 `undefined` 会被 JSON
-           * 序列化丢掉，所以看不出问题；一旦走 diff（路径式），
-           * `else`（有名）→ `if`（无名）就会送出 `undefined`，
-           * **整个 setData 被拒**，界面从此不再更新。
-           *
-           * `null` 是合法 setData 值，且在 wxml 里仍为 falsy，
-           * `{{item.__templateName || 'xxxBlock_N'}}` 行为不变。
+           * 兜底用 `null` 而不是 `undefined`：微信 `setData` 对路径式 key 的 `undefined` 直接拒绝。
+           * `null` 是合法值且在 wxml 里仍为 falsy，`{{item.__templateName || 'xxxBlock_N'}}` 行为不变。
            */
           __templateName:
             ((childLView as any[])[LVIEW.CONTEXT] &&
@@ -418,17 +321,13 @@ function lViewToWXView(
       });
       nodeList[rel] = lContainerList;
     } else {
-      /**
-       * i18n / ICU 的槽位：`lView[i]` 是 `null`，译文在 expando 上。
-       * 收回来填到本槽，wxml 那边就是一个普通 `{{nodeList[k].value}}`。
-       */
+      // i18n / ICU 的槽位：`lView[i]` 是 `null`，译文在 expando 上，收回来填到本槽
       const t18n = asT18n(tView.data?.[index]);
       if (t18n) {
         const parts: string[] = [];
         readI18nText(lView, t18n.ast, parts);
         nodeList[rel] = { value: parts.join('') } as any;
       } else {
-        // todo
         nodeList[rel] = {} as any;
       }
     }

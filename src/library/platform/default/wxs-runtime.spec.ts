@@ -9,11 +9,9 @@ import {
 } from './wxs-runtime';
 
 /**
- * 新架构下运行时只剩两件事：模块元数据注册表 + callMethod 转发。
- *
- * marker / proxy / token 那一层已经删除 —— 它们是为了让逻辑层
- * 「参与」渲染层计算而存在的，与「wxs 在渲染层、ng 看不到它」
- * 这条隔离原则相悖。
+ * 运行时只剩两件事：模块元数据注册表 + callMethod 转发。
+ * marker / proxy / token 那一层已删除——它们是为了让逻辑层「参与」渲染层计算而存在的，
+ * 与「wxs 在渲染层、ng 看不到它」这条隔离原则相悖。
  */
 describe('wxs 运行时: 模块注册表', () => {
   beforeEach(() => clearWxsModuleRegistry());

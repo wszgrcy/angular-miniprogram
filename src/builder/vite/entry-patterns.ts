@@ -40,12 +40,7 @@ export interface ResolvedProjectRoots {
   absoluteProjectSourceRoot: Path;
 }
 
-/**
- * 解析项目根目录 / 源码根目录。
- *
- * 从 DynamicWatchEntryPlugin 里抽出来的，逻辑没变，只是不再依赖 webpack 的
- * Compiler，Vite 侧和 webpack 侧共用一份。
- */
+/** 解析项目根目录 / 源码根目录。 */
 export async function resolveProjectRoots(options: {
   workspaceRoot: string;
   context: BuilderContext;
@@ -77,11 +72,8 @@ export async function resolveProjectRoots(options: {
 
 /**
  * 入口源文件名 → 产物文件名（还带着占位的 `.ts`，由调用方换成平台后缀）。
- *
- * 常规入口：`foo.entry.ts` → `foo-entry.ts`（和 webpack 时代保持一致）。
- * 自定义 tabBar：平台把产物文件名写死成 `index`（微信 `custom-tab-bar/index`、
- * 支付宝 `customize-tab-bar/index`），所以下面的 `.entry` 后缀在这里让位：
- * `index.entry.ts` → `index.ts`。
+ * 常规入口：`foo.entry.ts` → `foo-entry.ts`；自定义 tabBar 的产物文件名由平台写死成
+ * `index`，所以 `.entry` 后缀在这里让位。
  */
 function toOutputFileName(fileName: string, type: MpEntryType): string {
   const base =
@@ -91,12 +83,7 @@ function toOutputFileName(fileName: string, type: MpEntryType): string {
 
 /**
  * 把一个来源（pages / customTabbar / 组件兜底）的 AssetPattern 展开成 PagePattern 列表。
- *
- * 每个 PagePattern 带 entryName 和 outputFiles（logic / style / content / config），
- * Vite 侧直接用它拼 rollupOptions.input 和产物路径。
- *
- * 入口类型以配置来源为准，但产物落在平台的 tabBar 目录里的一律改判 tabbar：
- * 那个路径是平台写死的（`BuildPlatform.customTabbar.dir`），产物位置就是身份。
+ * 产物落在平台 tabBar 目录里的一律改判 tabbar：那个路径由平台写死，产物位置就是身份。
  */
 export async function generateModuleInfo(
   list: AssetPattern[],
@@ -108,10 +95,7 @@ export async function generateModuleInfo(
   },
   buildPlatform: BuildPlatform,
   /**
-   * 覆盖 pattern 里的 output。
-   *
-   * tabBar 的产物目录是平台写死的，让用户说了算只会把入口产到平台不读的位置，
-   * 所以这个字段只用来指定「源文件在哪」，产物目录在这里强制。
+   * 覆盖 pattern 里的 output。tabBar 的产物目录由平台写死，这里强制，不让用户改。
    */
   forceOutput?: string,
 ): Promise<PagePattern[]> {
@@ -151,8 +135,7 @@ export async function generateModuleInfo(
           /\.ts$/,
           buildPlatform.fileExtname.config!,
         );
-        // 产物落在平台约定的 tabBar 目录里就一律按 tabBar 处理：这个路径是
-        // 平台写死的，产物位置就是身份，不需要用户再声明一次入口类型
+        // 产物落在平台约定的 tabBar 目录里就一律按 tabBar 处理
         const output = forceOutput ?? pattern.output;
         const entryType: MpEntryType = isCustomTabbarOutput(
           output,
@@ -198,10 +181,7 @@ function relativeSourceRoot(
 
 /**
  * `customTabbar` 不配时的默认 pattern：源文件取 `<sourceRoot>/custom-tab-bar`。
- *
- * 源目录名故意不用平台的产物目录名：用户书写习惯统一在 `src/custom-tab-bar/`，
- * 产物落哪个目录（微信系 `custom-tab-bar`、支付宝 `customize-tab-bar`）
- * 是构建器按平台决定的，不该让用户改目录名去适配平台。
+ * 源目录名统一，产物落哪个目录由构建器按平台决定。
  */
 export function defaultCustomTabbarPatterns(
   workspaceRoot: string,
@@ -219,11 +199,7 @@ export function defaultCustomTabbarPatterns(
 
 /**
  * 组件入口的 glob：sourceRoot 下所有 `*.entry.ts`，产物路径按 sourceRoot 镜像。
- *
- * 小程序里只有两种身份：页面（在 app 配置的 pages 里）和组件，所以被
- * pages / customTabbar 认领掉的文件除外，剩下的入口全部按组件处理，
- * 不需要再声明一个 `components` 范围——uni-app 就是这么做的（pages.json
- * 是页面名单，组件产物路径 = 源文件相对 inputDir 的路径）。
+ * 被 pages / customTabbar 认领掉的文件除外，剩下的入口全部按组件处理。
  */
 export function componentEntryPatterns(
   workspaceRoot: string,
@@ -239,12 +215,8 @@ export function componentEntryPatterns(
 }
 
 /**
- * tsconfig 真正编译的文件集。
- *
- * 组件入口没有配置范围，就靠这个集合判定「哪些文件算数」：入口必须在这个
- * 集合里（分析层要拿它做组件元数据），不在就说明这个文件不属于本次构建——
- * 同目录下其他工程的 `*.entry.ts`（测试工程的 spec 入口等）就是这样挡掉的。
- * 走 `getParsedCommandLineOfConfigFile` 而不是自己拼 glob，extends 才能被解析。
+ * tsconfig 真正编译的文件集。组件入口没有配置范围，靠这个集合判定哪些文件算数，
+ * 同目录下其他工程的 `*.entry.ts` 就是这样挡掉的。
  */
 export function tsConfigFileNames(tsconfigPath: string): Set<string> {
   const host: ts.ParseConfigFileHost = {
@@ -265,17 +237,10 @@ export function tsConfigFileNames(tsconfigPath: string): Set<string> {
 
 /**
  * 自动组件：没有 `*.entry.ts` 的普通 `@Component`。
- *
- * 入口要 `export default` 的理由是「路径是对外契约」：页面路径写进 app.json、
- * 写进 navigateTo 的 url，必须固定解析。组件没有这个约束：它只被父级 json 里
- * 的 `usingComponents` 引用，而那个路径是构建器自己写进去的，自洽就行。
- * 所以普通组件不需要入口文件，产物路径直接按「源目录 = 产物目录」从源文件镜像。
- *
- * 已经被入口认领的组件类不在这里（页面自己的组件、写了入口的组件），认领
- * 关系见 `resolveEntryComponentBinding`。
- *
- * 只能做语法级发现：产物路径要进 rollup input，而那时还没有 Angular program，
- * 等 program 建好了再发现就晚了。
+ * 页面路径是对外契约必须固定，组件只被构建器自己写进 `usingComponents` 的路径引用，
+ * 所以不需要入口文件，产物路径直接按「源目录 = 产物目录」从源文件镜像。
+ * 已经被入口认领的组件类不在这里。
+ * 只能做语法级发现：产物路径要进 rollup input，那时还没有 Angular program。
  */
 function discoverAutoComponents(options: {
   /** tsconfig 真正编译的文件集（pathKey 形态） */
@@ -467,7 +432,7 @@ export async function generateEntryPatterns(options: {
  *
  * key 用 outputFiles.path（含目录），Rollup 的 `[name]` 会把整个 key 展开进去，
  * 所以 entryFileNames: '[name].js' 就能产出 `pages/index/index-entry.js`
- * 这种带目录的路径，和 webpack 时代的 outputFiles.logic 对齐。
+ * 这种带目录的路径。
  *
  * value 是虚拟入口模块（见 `entry-bootstrap.plugin`）：用户入口只需
  * `export default Component`，`bootstrapPage` / `componentRegistry` /

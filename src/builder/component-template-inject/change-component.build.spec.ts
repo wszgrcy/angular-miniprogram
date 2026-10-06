@@ -16,12 +16,9 @@ import { PlatformType } from '../platform/platform';
 import { runViteBuilder as runBuilder } from '../vite';
 
 /**
- * 端到端校验 changeComponent 在真实构建产物里对组件 template 函数的改写。
- *
- * 全部走 AST（见 test/util/template-inject-ast.ts）。不用字符串/正则匹配：
- * webpack 在不同 chunk 里对同一份注入代码排版不同（entry 是 `}if(rf & 2){`，
- * vendor 会排成 `} if (rf & 2) {`，`;;` 会变成 `; ;`），字面量匹配会漏，
- * 放宽空白又容易误判。
+ * 端到端校验 changeComponent 在真实构建产物里对组件 template 函数的改写。全部走 AST
+ * （见 test/util/template-inject-ast.ts）。不用字符串/正则匹配：bundler 在不同 chunk 里对同一份
+ * 注入代码排版不同，字面量匹配会漏，放宽空白又容易误判。
  */
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('component-template-inject: 构建产物 AST 校验', () => {
@@ -106,9 +103,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         }
       }
 
-      // 核心不变式：凡是有 rf & 1 的组件模板，都必须被注入。
-      // 之前 OutsideTemplateComponent 就是因为选择器把 template 解析成了
-      // StringLiteral 而被静默跳过，这条断言就是用来兜住这类漏注入的。
+      // 核心不变式：凡是有 rf & 1 的组件模板，都必须被注入。这条断言用来兜住静默漏注入这类问题。
       expect({ missed, malformed }).toEqual({
         missed: [],
         malformed: [],

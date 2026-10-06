@@ -8,10 +8,7 @@ const RESOLVABLE_EXTS = ['.ts', '.tsx', '.js', '.mts', '.mjs'];
 
 /**
  * 文件级条件编译：`foo.ts` + `foo.<platform>.ts` → 平台构建优先取变体。
- *
- * 与 define 布尔常量互补：小分支用 `__MP_WX__`，整文件差异用后缀
- * （等价 uni-app 的 `index.mp-weixin.vue`，但走标准 resolve 钩子，
- * 不碰源码文本）。
+ * 与 define 布尔常量互补：小分支用 `__MP_WX__`，整文件差异用后缀（走标准 resolve 钩子，不碰源码文本）。
  *
  * 规则：
  *  - 只处理相对路径 / 绝对路径 import（bare specifier 属包解析，不动）

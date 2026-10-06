@@ -10,22 +10,14 @@ import { lookupStrippedByContent } from '../../wxs/wxs-angular-strip';
 import { rewriteComponentForWxs } from '../../wxs/wxs-component-rewrite';
 
 /**
- * 把「改写后的组件」喂给 Angular。
+ * 把改写后的组件喂给 Angular。
  *
- * 触发条件有两个清单：带 wxs 的组件（表达式被改成了枝叶数组）与带 ICU 的组件
- * （整段 `{x, plural, ...}` 被替成了普通插值）。两者产出的都是「Angular 可见
- * 模板」，走的是同一条 fileReplacements 通道，所以共用一套生成逻辑。
+ * 触发条件有两个清单：带 wxs 的组件（表达式被改成枝叶数组）与带 ICU 的组件
+ * （整段被替成普通插值）。两者产出的都是「Angular 可见模板」，走同一条 fileReplacements 通道。
  *
- * Angular 编译发生在 analog 插件里，而 `fileReplacements` 必须在它建
- * program **之前**就位（`initialize()` 之后就改不动了）。所以本插件
- * 必须 `enforce: 'pre'`，抢在 analog 的 buildStart 前面把替换项 push
- * 进那个**共享数组**里。
- *
- * 组件清单来自分析层（`analysisRef.current`），本插件不扫盘：
- * 分析层第一步就已经把所有组件、它们的模板和改写结果都解析完了，
- * 再走一遍全盘纯属重复劳动，还得自己处理 node_modules / dist 这些排除项。
- *
- * 只处理被改写过的组件，其余组件不进替换表，零影响。
+ * `fileReplacements` 必须在 analog 建 program 之前就位，所以本插件 `enforce: 'pre'`，
+ * 抢在 analog 的 buildStart 前面把替换项 push 进共享数组。
+ * 组件清单来自分析层，本插件不扫盘。只处理被改写过的组件，其余零影响。
  */
 export interface WxsStripPluginOptions {
   workspaceRoot: string;
@@ -82,11 +74,11 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
   const userReplacements = [...options.fileReplacements];
   /** 原组件绝对路径 -> cache 绝对路径，供 resolveId 查表 */
   const redirect = new Map<string, string>();
+  /** redirect 的值集合（cache 绝对路径），给 resolveId 认「已被别的插件改到 cache 上」的结果用。 */
   /**
-   * redirect 的值集合（cache 绝对路径）。
-   *
-   * 给 resolveId 认「已经被别的插件改到 cache 上」的解析结果用，
-   * 理由见 resolveId 里的注释。
+   * `pathKey(cache 绝对路径)` -> `toPosix(cache 绝对路径)`。
+   * 查表用 pathKey（盘符大小写不敏感），但返回的是自己拼的 `toPosix(cached)`：
+   * 返回归一后的 key 会让同一个文件以两种盘符大小写进入模块图，被当成两个模块。
    */
   /**
    * `pathKey(cache 绝对路径)` -> `toPosix(cache 绝对路径)`。
@@ -116,9 +108,8 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
     const components = [
       ...new Map(
         [...touched].map((key) => {
-          // key 里的 sourceFile 是 pathKey 形态（身份令牌），要变回可用路径
-          // 必须走 toAbsolutePosix，不能 path.resolve —— 后者在 Windows 上会
-          // 把 `/C/a/b.ts` 当成「C 盘下的 \C\a\b.ts」。
+          // key 里的 sourceFile 是 pathKey 形态，要变回可用路径必须走 toAbsolutePosix，
+          // path.resolve 在 Windows 上会把 `/C/a/b.ts` 当成「C 盘下的 \C\a\b.ts」
           const file = toAbsolutePosix(splitComponentKey(key).sourceFile);
           return [pathKey(file), file] as const;
         }),
@@ -154,9 +145,8 @@ export function wxsStripPlugin(options: WxsStripPluginOptions): Plugin {
       }
       writeIfChanged(cached, rewritten.code);
       ours.push({ replace: component, with: toPosix(cached) });
-      // redirect 是我们自己的查表，用 pathKey；上面 push 给 analog 的
-      // replace/with 用 toPosix——那边是第三方插件拿 endsWith 去和 vite 的
-      // id 比，跟着我们降盘符反而对不上。
+      // redirect 是我们自己的查表，用 pathKey；push 给 analog 的 replace/with 用 toPosix，
+      // 那边是第三方插件拿 endsWith 去和 vite 的 id 比
       redirect.set(pathKey(component), toPosix(cached));
       redirectedTargets.set(pathKey(cached), toPosix(cached));
     }

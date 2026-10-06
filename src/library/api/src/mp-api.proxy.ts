@@ -8,18 +8,12 @@ import { MpApiReturn } from './promisify';
 import { MpApiName, MpApiNameInput, MpCallbackOptions } from './types';
 
 /**
- * uni 式 Proxy 兜底：任意原生 API 直接 `proxy.xxx(options)` 调用，
- * 自动走 MpApiService 的 promisify / 协议归一 / 管道拦截全套管线。
- *
- * 与 uni 的 `uni.xxx` 语义对齐：
+ * Proxy 兜底：任意原生 API 直接 `proxy.xxx(options)` 调用，自动走 MpApiService 的
+ * promisify / 协议归一 / 管道拦截全套管线。语义：
  * - 平台（含协议映射后）不存在该 API 时属性返回 `undefined`
  * - 普通异步 API 返回 Promise，task 类返回 task，`*Sync` 直接返回值
- *
- * Angular 特色保留：
- * - `on*` 名字：不传参返回 Observable（订阅即注册，退订即移除）；
- *   传回调则返回 Subscription（uni 肌肉记忆兼容）
- * - 拦截：管道照常可用（`api.setPipe('navigateTo', ...)`），
- *   因为 Proxy 只是 MpApiService 的门面，管线完全复用
+ * - `on*` 名字：不传参返回 Observable（订阅即注册，退订即移除）；传回调则返回 Subscription
+ * - 拦截：管道照常可用（`api.setPipe('navigateTo', ...)`），Proxy 只是 MpApiService 的门面
  */
 export interface MpApiEventCall<T = any> {
   (): Observable<T>;

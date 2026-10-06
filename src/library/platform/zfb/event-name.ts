@@ -1,13 +1,12 @@
 /**
  * 支付宝事件名映射（运行期那一半）。
  *
- * 编译期把 `(touchstart)` 写成 `onTouchStart`，事件打过来时 `e.type` 是支付宝
- * 驼峰名（`touchStart`），而监听键是按模板原文登记的（`touchstart`）。
- * 所以派发时要先把 `e.type` 反查回微信名，否则就是「属性名对了、监听查不到」。
+ * 编译期把 `(touchstart)` 写成 `onTouchStart`，事件打过来时 `e.type` 是支付宝驼峰名（`touchStart`），
+ * 而监听键是按模板原文登记的（`touchstart`）。所以派发时要先把 `e.type` 反查回微信名，
+ * 否则就是「属性名对了、监听查不到」。
  *
- * 表内容与 `src/builder/platform/zfb/zfb-event-name.ts` 逐条相同 ——
- * builder 与 library 是两个包，互相 import 不了，只能各存一份；
- * 漂移由 `src/builder/platform/zfb/zfb-event-name.spec.ts` 逐条比对挡住。
+ * 表内容与 `src/builder/platform/zfb/zfb-event-name.ts` 逐条相同——builder 与 library 是两个包，
+ * 互相 import 不了，只能各存一份；漂移由 `zfb-event-name.spec.ts` 逐条比对挡住。
  */
 export const ALIPAY_EVENT_NAMES: Record<string, string> = {
   touchstart: 'touchStart',
@@ -53,10 +52,8 @@ Object.entries(ALIPAY_EVENT_NAMES).forEach(([wxName, alipayName]) => {
 });
 
 /**
- * `e.type` 反查回来的微信事件名。
- *
- * 查不到就是普通事件（`tap` / `input` 这些两边同名的），返回空数组，
- * 派发候选一个都不多铺。
+ * `e.type` 反查回来的微信事件名。查不到就是普通事件（`tap` / `input` 这些两边同名的），
+ * 返回空数组，派发候选一个都不多铺。
  */
 export function wxEventNamesOf(alipayName: string): string[] {
   return WX_EVENT_NAMES[alipayName] ?? [];

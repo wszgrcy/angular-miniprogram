@@ -76,10 +76,8 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
   /**
    * 有用户文件的一族：默认值打底 / 静态优先于 projectConfig 选项 / private 原样拷，
-   * 三条都是同一次构建的不同侧面，互不干扰。
-   *
-   * 静态那份的 appid 与 jsonc 里的不一样，所以「产物里是静态那份的 appid」这一个
-   * 断言同时钉住了「用户文件盖默认值」和「静态盖选项」两条优先级。
+   * 三条都是同一次构建的不同侧面。静态那份的 appid 与 jsonc 里的不一样，所以
+   * 「产物里是静态那份的 appid」这一个断言同时钉住了两条优先级。
    */
   const privateConfig = { compileHotReLoad: true, miniprogramRoot: 'x/' };
   const loadWithUserFile = memoize(async () => {
@@ -123,9 +121,8 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
   });
 
   /**
-   * 没用户文件的一族：appid 缺省值与 deriveCondition。deriveCondition 只是往产物里
-   * 多写一个 condition，不影响 appid / compileType；而「不开关时不生成 condition」
-   * 由 mp-config.spec 在单元层面钉住。
+   * 没用户文件的一族：appid 缺省值与 deriveCondition。deriveCondition 只是往产物里多写一个
+   * condition，不影响 appid / compileType；「不开关时不生成 condition」由 mp-config.spec 在单元层面钉住。
    */
   const loadWithoutUserFile = memoize(async () => {
     await setupFixture();

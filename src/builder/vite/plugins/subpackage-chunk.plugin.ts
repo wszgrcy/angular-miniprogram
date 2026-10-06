@@ -9,16 +9,9 @@ const SOURCE_EXT = /\.(t|j)sx?$/;
 
 /**
  * 归属判定用 `pathKey`（posix 分隔符 + 小写盘符），全仓同一把尺。
- *
- * Windows 下 `sourceRoot` 走 `getSystemPath()` 拿到的是 `C:\...`（大写盘符），
- * 而 bundler 回传的 moduleIds 盘符大小写并不保证一致（取决于解析入口是谁给的）。
- * 归属判定是 `startsWith` 前缀匹配，**大小写敏感**，一旦两侧盘符大小写不同就
- * 全线失配，而且失配是静默的：
- *  - `chunkFileNames` 不再把分包 chunk 归进分包目录（分包代码全落主包，白拆）；
- *  - 跨分包 / 独立分包校验全部漏报（该拦的拦不住）。
- *
- * 见 `98a3f96`：本文件以前自带一份 toPosix + normalizeId、各修各的那一处，
- * 现在归到 util/path。
+ * Windows 下 `sourceRoot` 拿到的是 `C:\...`（大写盘符），而 bundler 回传的 moduleIds 盘符大小写
+ * 并不保证一致。归属判定是大小写敏感的 `startsWith` 前缀匹配，一旦两侧盘符大小写不同就全线失配，
+ * 而且失配是静默的：分包代码全落主包（白拆），跨分包校验全部漏报。
  */
 const normalizeId = pathKey;
 
@@ -29,7 +22,7 @@ export interface SubpackageChunkPluginOptions {
   sourceRoot: string;
   /**
    * 主包 chunk 的文件名模板，分包在它前面拼上分包目录。
-   * 跟 `outputHashing` 归一出来的值保持一致，不传维持旧的带 hash 行为。
+   * 跟 `outputHashing` 归一出来的值保持一致。
    */
   chunkFileNames?: string;
 }

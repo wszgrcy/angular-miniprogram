@@ -14,7 +14,6 @@ import {
   ALL_PAGE_NAME_LIST,
 } from '../../test/util/file';
 import { executeOnceShared } from '../../test/util/shared-build';
-// 主测试链路已切到 Vite builder（webpack 链路待删除）
 import { PlatformType } from './platform/platform';
 import { runViteBuilder as runBuilder } from './vite';
 

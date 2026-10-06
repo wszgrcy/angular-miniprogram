@@ -9,10 +9,7 @@ export interface TsPathAlias {
 
 /**
  * 把 tsconfig 的 `baseUrl` + `paths` 翻译成 Vite 的 resolve.alias。
- *
- * webpack 那边由 @ngtools/webpack 直接吃 tsconfig paths，Vite/Rolldown 不读
- * tsconfig，所以必须自己转一遍，否则 `angular-miniprogram` 这类映射解析不到。
- *
+ * Vite/Rolldown 不读 tsconfig，必须自己转一遍，否则 `angular-miniprogram` 这类映射解析不到。
  * 会沿 `extends` 链往上收集，子配置的 paths 覆盖父配置的。
  */
 export function tsConfigPathsToAliases(
@@ -68,9 +65,8 @@ export function tsConfigPathsToAliases(
     merged.set(alias.find, alias.replacement);
   }
 
-  // Vite 的 alias 对字符串 find 走「精确 或 startsWith(find + '/')」，
-  // 所以长的必须排在前面，否则 `angular-miniprogram` 会把
-  // `angular-miniprogram/platform/wx` 一起抢走。
+  // Vite 的 alias 对字符串 find 走「精确 或 startsWith(find + '/')」，所以长的必须排在前面，
+  // 否则 `angular-miniprogram` 会把 `angular-miniprogram/platform/wx` 一起抢走。
   return Array.from(merged.entries())
     .map(([find, replacement]) => ({ find, replacement }))
     .sort((a, b) => b.find.length - a.find.length);

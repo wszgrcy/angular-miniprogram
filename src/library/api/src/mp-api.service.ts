@@ -50,38 +50,21 @@ import {
 const LOCALE_KEY = 'mp.locale';
 
 /**
- * 统一小程序 API 服务（root 单例），对标 uni-app 的 uni.xxx 层。
+ * 统一小程序 API 服务（root 单例）。
  *
- * ## 与 MP_API_PROXY 的分工（对齐 uni 的架构）
- *
- * uni 的运行时同样**不手写透传方法**：`uni` 是 Proxy，
- * 未显式实现的 API 自动落到 `platform[key]`；显式实现只存在于
- * 「有真实逻辑」的 API。类型则全部由独立的类型包声明。
- * AMP 采用同一分层：
- *
+ * 分层：
  * - `MpApiService`（本服务）：调用管线（promisify / 协议归一 / 管道拦截 /
- *   AbortSignal / 变更检测调度）+ 仅这里能实现的增强 API
+ *   AbortSignal / 变更检测调度）+ 只有这里能实现的增强 API
  *   （事件通道、系统信息增强、上下文包装、节点查询、`on*` 事件流等）。
- * - `MP_API_PROXY`：uni 式兜底门面，任意原生 API 直接调用，
- *   参数 / 返回类型由 `MpApiParamMap` / `MpApiResultMap` 类型表提供
- *   （等价 uni 的 @dcloudio/types 手写声明，但零运行时成本）。
+ * - `MP_API_PROXY`：兜底门面，任意原生 API 直接调用，类型由类型表提供。
  *
- * rxjs 冷流管线：
+ * rxjs 冷流管线：`invoke$` -> pre 管道（改写参数 / 阻断）-> 真正调用 ->
+ * post 管道（改写结果 / 埋点 / catchError），平台协议归一在调用层内完成。
  *
- *   invoke$(name, options)
- *     -> of(ctx) -> pre pipes（改写参数 / blockWith 阻断）
- *     -> switchMap(真正调用)   <- 订阅才发生
- *     -> post pipes（改写结果 / 埋点 / catchError）
- *     -> 平台协议归一化（API 名 / 参数 / 结果）在调用层内完成
+ * 返回形态：`invoke$` 是可订阅冷流；`invoke` 返回 Promise；task 类同步返回 task；
+ * 同步 API 直接返回原始值。
  *
- * 返回形态：
- * - `invoke$` 可订阅冷流；`invoke` 返回 Promise（急切订阅）
- * - task 类同步返回 task（异步 pre 管道不适用，物理限制）
- * - 同步 API（*Sync / create* / on* 等）直接返回原始值
- * - AbortSignal：未发起即取消 / in-flight 取消（task 类自动 abort）
- *
- * 回调不再手动调度变更检测：状态统一走 signal，写入 signal 时 Angular
- * 自己会把关联视图标脏并调度一次 tick，不依赖 zone。
+ * 回调不手动调度变更检测：状态走 signal，写入时 Angular 自己标脏并调度 tick。
  */
 @Injectable({ providedIn: 'root' })
 export class MpApiService {
@@ -101,8 +84,7 @@ export class MpApiService {
     );
 
   constructor() {
-    // 守卫必须内联写：包成 `isMpDevMode()` 后打包器无法证明分支已死，
-    // schema 会跟整进生产包（实测 15KB vs 147B）。
+    // 守卫必须内联写：包成函数后打包器无法证明分支已死，schema 会跟整进生产包
     if (typeof ngDevMode !== 'undefined' && ngDevMode) {
       const raw = inject(MP_API_SCHEMAS, { optional: true });
       const contributions: Record<string, MpApiSchema>[] = Array.isArray(raw)
@@ -142,9 +124,7 @@ export class MpApiService {
   // ---------------------------------------------------------------- 通用调用
 
   /**
-   * 冷流入口：订阅才发起调用，全程可管道干预。
-   * 用户回调（若传）作为旁路观察者在 post 管道之后触发，
-   * 看到的同样是归一/改写后的结果。
+   * 冷流入口：订阅才发起调用。用户回调（若传）作为旁路观察者在 post 管道之后触发。
    */
   invoke$<N extends MpApiNameInput, T = MpStreamOf<N>>(
     name: N,
@@ -208,10 +188,7 @@ export class MpApiService {
     return typeof fn === 'function' ? fn : undefined;
   }
 
-  /**
-   * 统一名在当前平台是否可用（协议映射后的目标名存在即算可用）。
-   * uni 式 Proxy 兜底用它决定属性是否返回 `undefined`。
-   */
+  /** 统一名在当前平台是否可用（协议映射后的目标名存在即算可用）。 */
   hasApi(name: MpApiNameInput): boolean {
     const protocol: MpApiProtocol | undefined =
       this.protocols[this.platform]?.[name];
@@ -224,10 +201,7 @@ export class MpApiService {
   // ---------------------------------------------------------------- 导航（带事件通道）
 
   /**
-   * 导航并建立事件通道：url 自动拼 `__id__`，
-   * 目标页从 query 取 id 调 `getEventChannel(id)` 消费同一通道。
-   * 其余导航类 API（redirectTo/switchTab/reLaunch/navigateBack）
-   * 无附加逻辑，走 `invoke` 或 Proxy。
+   * 导航并建立事件通道：url 自动拼 `__id__`，目标页从 query 取 id 调 `getEventChannel(id)`。
    */
   navigateTo(options: MpNavigateOptions) {
     const opts: MpCallbackOptions = { ...options };
@@ -295,8 +269,7 @@ export class MpApiService {
   }
 
   /**
-   * 能力探测。不能直接拿统一名去问平台：协议表里改过名的 API
-   * （如 setNavigationBarTitle -> setNavigationBar）会被误报为不支持。
+   * 能力探测。不能直接拿统一名去问平台：协议表里改过名的 API 会被误报为不支持。
    */
   canIUse(schema: string) {
     const protocol = this.protocols[this.platform]?.[schema];

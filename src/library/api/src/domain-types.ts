@@ -1,11 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
- * 各业务域的参数 / 结果类型。
- *
- * 只声明跨家共用的字段；各家私有差异由协议表处理，不在此体现。
- * 所有 Options 均继承 `MpCallbackOptions`，保留逃生舱（可直接传 success/fail），
- * 但推荐一律走 Promise / Observable 面。
+ * 各业务域的参数 / 结果类型。只声明跨家共用的字段；各家私有差异由协议表处理，不在此体现。
+ * 所有 Options 均继承 `MpCallbackOptions`，保留逃生舱（可直接传 success/fail），但推荐一律走 Promise / Observable 面。
  */
 
 import {
@@ -86,8 +83,7 @@ export interface MpAnimationConfig {
 }
 
 /**
- * createAnimation 返回的链式动画对象：`step()` 累积关键帧，
- * `export()` 导出给组件。各家附加字段不一，故保留索引签名。
+ * createAnimation 返回的链式动画对象：`step()` 累积关键帧，`export()` 导出给组件。各家附加字段不一，故保留索引签名。
  */
 export interface MpAnimation {
   step(config?: MpAnimationConfig): MpAnimation;
@@ -605,8 +601,7 @@ export interface MpCreateInnerAudioContextOptions extends MpCallbackOptions {
 }
 
 /**
- * API 名 -> success 结果类型。
- * 未列出的按 `any` 处理。有了这张表，`invoke` 及所有包装方法的
+ * API 名 -> success 结果类型。未列出的按 `any` 处理。有了这张表，`invoke` 及所有包装方法的
  * 返回类型都能自动推导，无需逐个声明。
  */
 /** 安全区矩形（平台原始字段） */
@@ -676,8 +671,7 @@ export interface MpWindowInfo {
 }
 
 /**
- * getSystemInfo / getSystemInfoSync 增强口径：
- * 原始结果整体透传 + 归一字段。各家原始字段差异大，故保留索引签名。
+ * getSystemInfo / getSystemInfoSync 增强口径：原始结果整体透传 + 归一字段。各家原始字段差异大，故保留索引签名。
  */
 export interface MpEnhancedSystemInfo
   extends MpDeviceInfo,

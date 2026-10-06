@@ -64,43 +64,7 @@ import { ParsedNgTemplate } from './template';
 import { ParsedNgText } from './text';
 import { MatchedComponent, MatchedDirective } from './type';
 
-/**
- * 把 Angular 的模板 AST 走一遍，产出本 fork 自己的节点树（`ParsedNode`），
- * 同时**精确模拟 Angular 的声明槽位（decl slot）分配**。
- *
- * 为什么要自己算槽位：wxml 里每个节点靠 `nodeList[i]` 定位，这个 `i`
- * 必须和 Angular 编译产物里的 `ɵɵelementStart(i, ...)` 完全一致。我们不在
- * Angular 的编译管线内，只能照着它的规则自己推。少算一个槽位，后面所有
- * 节点整体错位一位 —— 渲染错乱但**不抛错**，是最难查的一类 bug。
- *
- * 结构对齐两份参照实现：
- *   - 模板侧：`RecursiveVisitor`
- *     （packages/compiler/src/render3/r3_ast.ts）
- *   - 表达式侧：`RecursiveAstVisitor`
- *     （packages/compiler/src/expression_parser/ast.ts）
- *
- * 方法顺序刻意照抄 Angular，升级时可以直接 diff 出「Angular 新增了哪种
- * 节点」，避免漏掉。
- */
-/**
- * 元素开始标签上的 `i18n-<attr>`，连同它是否带插值。
- *
- * ## 为什么只能从原文看
- *
- * i18n pass 在分析侧拿到 AST 之前就把 `i18n-alt="照片 {{x}}"` 消费了：属性名
- * 消失，`alt` 变成一个普通插值绑定。实测「带 i18n 的插值属性」与「普通插值
- * 属性」的 AST 逐字相同，AST 里没有任何残留标记。而 emit 侧的行为两者不同
- * （见下），猜不到就是整体错位且不报错。
- *
- * 元素的 `startSourceSpan` 是解析原文里的偏移，切出开始标签直接看最准。
- *
- * ## dynamic 决定两件完全不同的事
- *
- * - **dynamic（值含 `{{`）**：发 `ɵɵi18nAttributes`，**多占一个声明槽**；
- *   译文经 `setProperty` 落在 `property` 上，wxml 的绑定已经指着它。
- * - **静态**：不发那条指令、不占槽；译文在建元素时 `setAttribute`，落在
- *   `attribute` 上。wxml 若照旧内联源文案，就永远翻不了——所以必须改成绑定。
- */
+/** 从原文切出元素的开始标签。i18n pass 会吃掉 i18n 属性，AST 上不留痕迹。 */
 function startTagOf(
   element: t.Element,
   templateText?: string,
@@ -115,6 +79,12 @@ function startTagOf(
   return templateText.slice(span.start.offset, span.end.offset);
 }
 
+/**
+ * 元素开始标签上的 `i18n-<attr>`，连同是否带插值。
+ *
+ * 带插值的会发 `ɵɵi18nAttributes` 并多占一个声明槽，译文落在 `property` 上；
+ * 静态的不占槽，译文在建元素时 `setAttribute` 落在 `attribute` 上。
+ */
 function i18nAttributesOf(
   element: t.Element,
   templateText?: string,
@@ -132,29 +102,13 @@ function i18nAttributesOf(
   return out;
 }
 
-/**
- * 元素开始标签上是否带了裸 `i18n`（消息 id / 描述那个，不是 `i18n-<attr>`）。
- *
- * 同样只能切原文：i18n pass 会把 `i18n` 从 AST 上吃掉，换成节点上的
- * `I18nMeta`，分析侧再也看不到它。`i18n-` 前缀不会误命中——`i18n` 后面
- * 紧跟的是 `-`，被 `[^\s=]` 卡住了。
- */
+/** 元素开始标签上是否带了裸 `i18n`（不是 `i18n-<attr>`）。 */
 function hasBareI18n(element: t.Element, templateText?: string): boolean {
   const tag = startTagOf(element, templateText);
   return tag !== undefined && /(^|\s)i18n\s*=/.test(tag);
 }
 
-/**
- * 这堆子节点能不能算兜底内容。
- *
- * Angular 的判据在 `ingest.ts`：注释与**纯空白文本**都不算，只有剩下的
- * 节点存在才建兜底视图。默认（`preserveWhitespaces: false`）下解析器
- * 已经把空白洗掉了，但组件显式开了 `preserveWhitespaces` 时
- * `<ng-content> </ng-content>` 仍会带一个空白 Text 进来 ——
- * 这里多占一格，后面所有节点整体错位一位且不报错。
- *
- * 注释到不了 r3 AST（`parseTemplate` 就洗掉了），所以只需防空白文本。
- */
+/** 子节点能否算作投影兜底内容：纯空白文本不算。 */
 function hasProjectionFallback(children: t.Node[] | undefined): boolean {
   return (
     !!children?.length &&
@@ -164,20 +118,18 @@ function hasProjectionFallback(children: t.Node[] | undefined): boolean {
   );
 }
 
+/**
+ * 遍历 Angular 模板 AST，产出 `ParsedNode` 节点树，并同步计算声明槽位（decl slot）。
+ *
+ * wxml 用 `nodeList[i]` 定位节点，`i` 必须与 Angular 编译产物的 `ɵɵelementStart(i, ...)`
+ * 一致，因此槽位需要按 Angular 的规则自行推导。
+ */
 export class TemplateDefinition implements TmplAstRecursiveVisitor {
   private parentNode: ParsedNgElement | ParsedNgTemplate | undefined;
   list: ParsedNode<NgNodeMeta>[] = [];
   private declIndex = 0;
 
-  /**
-   * 表达式访问器：表达式里每出现一个管道就多占一个声明槽，
-   * 所以回调里直接把 `declIndex` 顶上去。
-   *
-   * ```html
-   * <div>{{title | uppercase}}</div>
-   *        └─ ①div ②pipe，div 的兄弟节点要从 3 开始
-   * ```
-   */
+  /** 表达式里每出现一个管道就多占一个声明槽。 */
   astVisitor = new CustomAstVisitor(() => {
     this.declIndex++;
   });
@@ -185,42 +137,18 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   constructor(
     private nodes: t.Node[],
     private componentContext: ComponentContext,
-    /**
-     * 当前视图在组件模板中的路径前缀，用于保证生成的模板名在
-     * 同一个 wxml 里全局唯一（否则嵌套的匿名模板会互相覆盖）。
-     */
+    /** 当前视图在模板中的路径前缀，保证生成的模板名全局唯一。 */
     private namePrefix = '',
   ) {}
 
   /**
-   * 普通元素。
-   *
-   * ```html
-   * <div id="a" [title]="v | number" (click)="go()">
-   *   <span>child</span>
-   * </div>
-   * ```
-   *
-   * 槽位：元素本身 1 个；`inputs` 里的管道另占（见 `astVisitor`）；
-   * `references`（`#ref`）每个 1 个；子节点在**同一视图**里继续排。
-   *
-   * 不访问 `outputs`：Angular 语法层面就禁止事件表达式带管道
-   * （`(click)="a|b"` 直接报 "Cannot have a pipe in an action
-   * expression"），所以没有槽位要算。
-   *
-   * 不访问 `attributes`：`TextAttribute` 是纯字面量，没有表达式 AST。
+   * 普通元素。槽位：元素本身 1 个，`inputs` 里的管道另占，`#ref` 每个 1 个，
+   * 子节点在同一视图里继续排。`outputs` 不允许管道，`attributes` 是纯字面量，
+   * 都不需要访问。
    */
   visitElement(element: t.Element) {
     const nodeIndex = this.declIndex++;
-    /**
-     * 带插值的 `i18n-<attr>` 会让 emit 侧多出一条 `ɵɵi18nAttributes(i+1, n)`，
-     * **紧跟在本元素后面**再占一个声明槽（实测：`domElementStart(15,"img",15)`
-     * → `i18nAttributes(16, 6)` → 下一个元素从 17 起）。
-     *
-     * 一个元素只占一个，不管带几个 i18n 属性（exprCount 变大，槽不变）。
-     * 纯静态的 `i18n-title="标题"` 不发这条指令（译文被烘进 consts attrs，
-     * 建元素时直接 setAttribute），所以不能数。
-     */
+    // 带插值的 i18n 属性整体只多占一个声明槽，紧跟本元素之后
     const i18nAttrs = i18nAttributesOf(
       element,
       this.componentContext?.templateText,
@@ -254,9 +182,8 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
       nodeIndex,
       directiveMeta,
       this.componentContext?.declaredWxsModules,
-      // 静态那半要改成绑定（译文在 `attribute` 上），见 `NgElementMeta.i18nAttrs`
       i18nAttrs.filter((item) => !item.dynamic).map((item) => item.name),
-      // 裸 `i18n` 让子级静态文本也变成运行时文本，见 `NgTextMeta.i18n`
+      // 裸 `i18n` 会让子级静态文本变成运行时文本
       hasBareI18n(element, this.componentContext?.templateText),
     );
     if (this.parentNode) {
@@ -279,27 +206,12 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   /**
    * `<ng-template>`，以及结构性指令（`*ngIf` / `*ngFor` 等）脱糖后的容器。
    *
-   * ```html
-   * <ng-template #tpl let-row="item" let-i="index">
-   *   <p>{{row}}</p>
-   * </ng-template>
-   * ```
-   *
-   * 槽位规则（对照 `local_refs.ts` 的
-   * `op.numSlotsUsed += op.localRefs.length`）：
-   *
-   * - `#tpl`（`references`）→ **占槽**，走 `prepareRefsArray`
-   * - `let-row` / `let-i`（`variables`）→ **不占槽**。它们在
-   *   `ingest.ts` 里进的是 `childView.contextVariables`，是子视图的
-   *   上下文变量，不是父视图的声明槽
-   * - `inputs` 里的管道 → 占槽，走 `astVisitor`
-   *
-   * 子节点是独立的 embedded view，有自己的 0 起始索引空间，
-   * 所以另起一个 `TemplateDefinition` 去走。
+   * 占槽：`#tpl` 引用、`inputs` 里的管道；`let-` 变量是子视图上下文变量，不占槽。
+   * 子节点属于独立的 embedded view，有自己的索引空间，另起一个 `TemplateDefinition`。
    */
   visitTemplate(template: t.Template) {
     const nodeIndex = this.declIndex++;
-    // 有引用名就用引用名，否则用带路径前缀的默认名，保证全局唯一
+    // 无引用名时用带路径前缀的默认名，保证全局唯一
     const templateName =
       template.references && template.references.length
         ? undefined
@@ -336,24 +248,10 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   }
 
   /**
-   * `<ng-content>` 内容投影，含兜底内容。
+   * `<ng-content>` 内容投影。
    *
-   * ```html
-   * <ng-content select="[slot='head']"></ng-content>  ← 一个槽
-   * <ng-content>默认内容</ng-content>                 ← 两个槽
-   * ```
-   *
-   * 兜底内容在 Angular 里不是投影节点的子节点，而是**紧贴在它后面**的
-   * 一个 embedded view（`createProjectionOp` 的
-   * `numSlotsUsed: fallbackView === null ? 1 : 2`，运行时对应
-   * `ɵɵprojection(i, …, fallbackFn)` 里 `fallbackIndex = i + 1`）。
-   * 于是这里也要占两格，并另起一个 `TemplateDefinition` 走子节点 ——
-   * 兜底内容自己有一套从 0 开始的索引空间。
-   *
-   * 小程序的 `<slot>` 没有兜底能力，wxml 侧靠「兜底容器有没有视图」
-   * 二选一，见 `WxContainer.ngContentTransform`。Angular 那边
-   * `ɵɵprojection` 正是这么判的：插槽空着才 `insertFallbackContent`，
-   * 否则走 `applyProjection`，两者互斥。
+   * 有兜底内容时占两个槽：兜底视图紧贴在投影节点后面，自己有一套从 0 开始的索引空间。
+   * 小程序的 `<slot>` 没有兜底能力，wxml 侧靠「兜底容器有没有视图」二选一。
    */
   visitContent(content: t.Content) {
     const nodeIndex = this.declIndex++;
@@ -383,24 +281,12 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     fallbackView.run();
   }
 
-  /**
-   * `<ng-template let-foo="bar">` 里的 `let-` 声明。
-   *
-   * 不占声明槽：`ingest.ts` 把它塞进 `childView.contextVariables`，
-   * 属于子视图上下文而非父视图声明。这里保留空实现只为访问器完整。
-   */
+  /** `let-` 声明属于子视图上下文，不占声明槽。 */
   visitVariable(variable: t.Variable) {}
 
   /**
    * 统计若干表达式中管道占用的声明槽位。
-   *
-   * 内建控制流的条件表达式在 Angular 里会被编译成宿主视图的 `ɵɵpipe`，
-   * 每个管道占一个声明索引，必须跟着一起算，否则后面的节点全错位。
-   *
-   * ```html
-   * @switch (v | number) { @case (1) {a} @default {b} }
-   *           └── 这个管道落在 @switch 的宿主视图，不是分支视图
-   * ```
+   * 控制流的条件表达式编译后落在宿主视图的 `ɵɵpipe` 上，必须跟着一起算。
    */
   private countPipeSlots(
     ...asts: Array<{ visit: (v: AstVisitor) => unknown } | null | undefined>
@@ -414,10 +300,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   }
 
   /**
-   * 为控制流分支建立一个模板节点。
-   *
-   * 分支内容是一个独立的 embedded view，拥有自己的声明索引空间，
-   * 所以这里用新的 `TemplateDefinition` 访问子节点，
+   * 为控制流分支建立一个模板节点。分支内容是独立的 embedded view，有自己的声明索引空间，
    * 不影响当前视图的 `declIndex`。
    */
   private createControlFlowTemplate(
@@ -448,18 +331,15 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   }
 
   /**
-   * `@if` / `@else if` / `@else`。
-   *
-   * Angular 的槽位分配（见 `slot_allocation` + `pipe_creation` 两个 phase）：
+   * `@if` / `@else if` / `@else` 的槽位分配：
    *
    * ```text
-   * i        : 第一个分支的模板锚点（ɵɵconditionalCreate）
-   * i+1..P   : 所有分支条件表达式里的管道（统一插到第一个 create 之后）
-   * i+P+1..  : 其余分支的模板锚点（ɵɵconditionalBranchCreate）
+   * i        : 第一个分支的模板锚点
+   * i+1..P   : 所有分支条件表达式里的管道
+   * i+P+1..  : 其余分支的模板锚点
    * ```
    *
-   * `@if (cond; as alias)` 的 `alias` **不占槽**：`ingest.ts` 里走的是
-   * `cView.contextVariables.set(name, CTX_REF)`，是分支视图的上下文变量。
+   * `@if (cond; as alias)` 的 `alias` 是分支视图的上下文变量，不占槽。
    */
   visitIfBlock(block: TmplAstIfBlock): void {
     const branches = block.branches;
@@ -478,32 +358,12 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     }
   }
 
-  /**
-   * `@if` 的单个分支。
-   *
-   * 分支的槽位（含 `expressionAlias`）由 `visitIfBlock` 统一按
-   * 「锚点 + 管道」的规则排，这里不单独占位。
-   */
-  visitIfBlockBranch(branch: TmplAstIfBlockBranch): void {
-    // 分支由 visitIfBlock 统一处理，这里不单独占位
-  }
+  /** `@if` 的单个分支，槽位由 `visitIfBlock` 统一排。 */
+  visitIfBlockBranch(branch: TmplAstIfBlockBranch): void {}
 
   /**
-   * `@switch` / `@case` / `@default`，槽位规则与 `@if` 一致，
-   * 只是管道来自 `@switch` 主表达式和各 `@case` 表达式。
-   *
-   * ```html
-   * @switch (v | number) {
-   *   @case (1) {<a></a>}
-   *   @case (2) {<b></b>}
-   *   @default  {<c></c>}
-   * }
-   * ```
-   *
-   * Angular 21 重构了 `@switch` 的 AST：children 不再挂在 `@case` 上，
-   * 而是把「共享同一份子节点的连续 case」合并成 `SwitchBlockCaseGroup`。
-   * 一个 group 对应一份可渲染模板，所以占位按 group 走，
-   * `@case` 只提供判断表达式。
+   * `@switch` / `@case` / `@default`，槽位规则与 `@if` 一致，管道来自 `@switch` 主表达式和各 `@case` 表达式。
+   * 共享同一份子节点的连续 `@case` 合并成一个 group，一个 group 一份模板，占位按 group 走。
    */
   visitSwitchBlock(block: TmplAstSwitchBlock): void {
     const groups = block.groups;
@@ -527,55 +387,30 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     }
   }
 
-  /**
-   * `@case (expr)`。只提供判断表达式（其管道已由 `visitSwitchBlock`
-   * 统一计入宿主视图），本身不产生渲染节点。
-   */
-  visitSwitchBlockCase(block: TmplAstSwitchBlockCase): void {
-    // case 由 visitSwitchBlock 统一处理
-  }
+  /** `@case (expr)` 只提供判断表达式，本身不产生渲染节点。 */
+  visitSwitchBlockCase(block: TmplAstSwitchBlockCase): void {}
+
+  /** 一组共享同一份子节点的连续 `@case`，模板由 `visitSwitchBlock` 建立。 */
+  visitSwitchBlockCaseGroup(group: TmplAstSwitchBlockCaseGroup): void {}
+
+  /** `@default` 的穷尽性检查，纯编译期产物，不占槽。 */
+  visitSwitchExhaustiveCheck(check: TmplAstSwitchExhaustiveCheck): void {}
 
   /**
-   * 一组共享同一份子节点的连续 `@case`。
-   * 对应的模板由 `visitSwitchBlock` 按 group 建立，这里不重复处理。
-   */
-  visitSwitchBlockCaseGroup(group: TmplAstSwitchBlockCaseGroup): void {
-    // group 由 visitSwitchBlock 统一处理
-  }
-
-  /**
-   * `@default` 的穷尽性检查（`@switch ... @default` 的类型收窄标记）。
-   * 纯编译期产物，不产生渲染节点、不占槽。
-   */
-  visitSwitchExhaustiveCheck(check: TmplAstSwitchExhaustiveCheck): void {
-    // `@default` 的穷尽检查，不产生渲染节点
-  }
-
-  /**
-   * `@for` / `@empty`（`ɵɵrepeaterCreate`）。
-   *
-   * ```html
-   * @for (item of items | async; track item.id) {
-   *   <p>{{item}}</p>
-   * } @empty {
-   *   <span>none</span>
-   * }
-   * ```
+   * `@for` / `@empty`。
    *
    * ```text
-   * i        : RepeaterMetadata 槽位（不是 TNode，不可渲染，但必须占位）
+   * i        : RepeaterMetadata 槽位（不可渲染，但必须占位）
    * i+1      : 主模板锚点
    * i+2      : @empty 模板锚点（若有）
-   * 之后      : 被遍历表达式里的管道（上例的 `async`）
+   * 之后      : 被遍历表达式里的管道
    * ```
    *
-   * `track` 表达式 Angular 禁止使用管道，故不用考虑。
-   * `item` / `let-` 上下文变量走 `contextVariables`，不占槽。
+   * `track` 禁止使用管道；`item` 等上下文变量走 `contextVariables`，不占槽。
    */
   visitForLoopBlock(block: TmplAstForLoopBlock): void {
     const pipeCount = this.countPipeSlots(block.expression);
-    // RepeaterMetadata 占位，不产生渲染节点
-    this.declIndex++;
+    this.declIndex++; // RepeaterMetadata
     const mainIndex = this.declIndex++;
     this.createControlFlowTemplate(block.children, mainIndex, 'forBlock');
     if (block.empty) {
@@ -589,24 +424,12 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     this.declIndex += pipeCount;
   }
 
-  /**
-   * `@empty` 块。它作为 `@for` 的 `empty` 属性被 `visitForLoopBlock`
-   * 处理，不会作为兄弟节点单独出现，所以这里不占位。
-   */
-  visitForLoopBlockEmpty(block: TmplAstForLoopBlockEmpty): void {
-    // @empty 作为 @for 的属性被处理，不会作为兄弟节点出现
-  }
+  /** `@empty` 作为 `@for` 的属性处理，不会单独出现，所以不占位。 */
+  visitForLoopBlockEmpty(block: TmplAstForLoopBlockEmpty): void {}
 
   /**
-   * `@defer` 延迟加载块。
-   *
-   * 依赖运行时的依赖图调度与异步 chunk 加载，与小程序的静态模板机制
-   * 对不上，目前不支持。静默渲染成空白比直接报错更难排查，所以显式抛错。
-   *
-   * ```html
-   * @defer (on viewport) { <heavy-cmp></heavy-cmp> }
-   * @placeholder { <div>loading…</div> }
-   * ```
+   * `@defer` 依赖运行时异步 chunk 加载，与小程序的静态模板机制对不上，不支持。
+   * 静默渲染成空白比报错更难排查，所以显式抛错。
    */
   visitDeferredBlock(deferred: TmplAstDeferredBlock): void {
     throw new Error(
@@ -629,126 +452,56 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     this.visitDeferredBlock(null as unknown as TmplAstDeferredBlock);
   }
 
-  /**
-   * `@defer` 的触发器（`on viewport` / `on idle` / `on timer(...)` 等）。
-   * 随 `@defer` 一起不支持；这里留空是因为触发器只有在 `@defer` 内部
-   * 才会出现，而那条路已经在 `visitDeferredBlock` 抛错了。
-   */
+  /** 触发器只在 `@defer` 内部出现，那条路已经抛错了。 */
   visitDeferredTrigger(trigger: TmplAstDeferredTrigger): void {}
 
-  /**
-   * `@content` 内容查询块（Angular 22 新增）。
-   *
-   * ```html
-   * @content { @case (foo) { <p>has foo</p> } }
-   * ```
-   *
-   * 依赖 Angular 的 content query 在运行时观察投影内容并**重新渲染**，
-   * 小程序的 slot / self 模板是静态的，没有对应能力。
-   * 同 `@defer` 一样显式抛错，避免静默渲染成空白。
-   */
+  /** `@content` 内容查询块依赖运行时重渲染，小程序的静态 slot 没有对应能力，不支持。 */
   visitContentBlock(block: TmplAstContentBlock): void {
     throw new Error('暂不支持 @content 语法');
   }
 
-  /**
-   * 无法识别的控制流块（`@foo { ... }`）。
-   * 通常是比当前 fork 支持范围更新的语法，显式报错好过静默丢弃。
-   */
+  /** 无法识别的控制流块（`@foo { ... }`），显式报错好过静默丢弃。 */
   visitUnknownBlock(block: TmplAstUnknownBlock): void {
     throw new Error(`无法识别的控制流块：@${block.name}`);
   }
 
-  /**
-   * 组件节点。
-   *
-   * 注意：本 fork 走的 `parseTemplate` 路径**不会产出这个节点** ——
-   * 实测普通标签、selectorless 模式下都只出 `Element`。
-   * `Component` / `Directive` 这类节点来自旧的 `r3_template_transform`
-   * 与类型检查路径。
-   *
-   * 之所以抛错而不是留空：留空意味着「万一哪天真的出现了，节点会被
-   * 静默丢掉」，槽位随之错位且不报错。抛错能把这种回归立刻暴露出来。
-   */
+  /** `parseTemplate` 路径不会产出组件/指令节点，出现即上游 AST 来源变了，抛错把回归暴露出来。 */
   visitComponent(component: TmplAstComponent): void {
     throw new Error(
       `不该出现的 Component AST 节点：${component.componentName}（本 fork 的模板解析路径不产出此节点）`,
     );
   }
 
-  /**
-   * 指令节点。同 `visitComponent`，正常解析路径不会产出，
-   * 出现即说明上游 AST 来源变了，抛错暴露。
-   */
+  /** 同 `visitComponent`。 */
   visitDirective(directive: TmplAstDirective): void {
     throw new Error(
       `不该出现的 Directive AST 节点：${directive.name}（本 fork 的模板解析路径不产出此节点）`,
     );
   }
 
-  /**
-   * `@let` 模板变量声明（Angular 18 新增）。
-   *
-   * ```html
-   * @let total = items.length | number;
-   * <p>{{total}}</p>
-   * ```
-   *
-   * 编译成视图内的常量 / 上下文变量，**不产生渲染节点、不占声明槽**，
-   * 所以这里是不占位的空实现（不是漏实现）。
-   */
+  /** `@let` 模板变量编译成视图内常量，不产生渲染节点、不占声明槽。 */
   visitLetDeclaration(declaration: TmplAstLetDeclaration) {}
 
-  /**
-   * `#ref` 模板引用。
-   *
-   * ```html
-   * <input #email />
-   * ```
-   *
-   * 槽位由父节点的 `prepareRefsArray` 统一计入（`local_refs.ts` 的
-   * `op.numSlotsUsed += op.localRefs.length`），所以这里不重复占位。
-   */
+  /** `#ref` 的槽位由父节点的 `prepareRefsArray` 统一计入，这里不重复占位。 */
   visitReference(reference: t.Reference) {}
 
-  /**
-   * 字面量属性 `id="a"`。纯字符串，没有表达式 AST，不占槽。
-   */
+  /** 字面量属性 `id="a"`：纯字符串，没有表达式 AST，不占槽。 */
   visitTextAttribute(attribute: t.TextAttribute) {}
 
-  /**
-   * 属性绑定 `[title]="v | number"`。
-   *
-   * 其表达式里的管道在 `visitElement` / `visitTemplate` 里已经通过
-   * `item.value.visit(this.astVisitor)` 计入，这里不重复处理。
-   */
+  /** 属性绑定 `[title]="v | number"`：表达式里的管道已在 `visitElement` / `visitTemplate` 计入。 */
   visitBoundAttribute(attribute: t.BoundAttribute) {}
 
-  /**
-   * 事件绑定 `(click)="go()"`。
-   *
-   * Angular 语法禁止 action 表达式带管道
-   * （`(click)="a|b"` → "Cannot have a pipe in an action expression"），
-   * 所以没有槽位要算。
-   */
+  /** 事件绑定 `(click)="go()"`：action 表达式禁止带管道，没有槽位要算。 */
   visitBoundEvent(attribute: t.BoundEvent) {}
 
-  /**
-   * 静态文本节点。
-   *
-   * ```html
-   * <div>hello</div>
-   *        └─ 占 1 个槽
-   * ```
-   */
+  /** 静态文本节点，占 1 个槽。 */
   visitText(text: t.Text) {
     const nodeIndex = this.declIndex++;
     const instance = new ParsedNgText(
       text,
       this.parentNode,
       nodeIndex,
-      // 宿主带 `i18n` 时，这段静态文本在运行时是 `$localize` 查出来的，
-      // 不能烘进 wxml，见 `NgTextMeta.i18n`
+      // 宿主带 `i18n` 时，这段文本在运行时由 `$localize` 查出，不能烘进 wxml
       this.parentNode instanceof ParsedNgElement && this.parentNode.i18nHost,
     );
     if (this.parentNode) {
@@ -758,12 +511,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     }
   }
 
-  /**
-   * 插值绑定 `{{a | number}}`。
-   *
-   * 先算表达式里的管道（每个占一个槽，且**排在插值节点之后**），
-   * 再建插值节点本身。
-   */
+  /** 插值绑定 `{{a | number}}`：先算表达式里的管道（排在插值节点之后），再建插值节点。 */
   visitBoundText(text: t.BoundText) {
     const nodeIndex = this.declIndex++;
     text.value.visit(this.astVisitor);
@@ -776,58 +524,19 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   }
 
   /**
-   * ICU 消息（复数 / 性别选择）。
+   * ICU 消息（复数 / 性别选择），如 `{count, plural, =1 {one item} other {…}}`。
    *
-   * ```html
-   * {count, plural, =1 {one item} other {{{count}} items}}
-   * ```
-   *
-   * Angular 会编译成 `ɵɵpipe` + `I18nSelect` 并动态切换子模板，
-   * 小程序没有对应的运行时能力。
-   *
-   * 这里必须抛错：实测该节点会真实出现在解析结果里
-   * （`Element, Icu`），留空等于**静默丢掉整段内容**，
-   * 且后续所有节点槽位错位。
-   */
-  /**
-   * ICU 消息（复数 / 性别选择）。
-   *
-   * ```html
-   * {count, plural, =1 {one item} other {{{count}} items}}
-   * ```
-   *
-   * Angular 把它编成 `ɵɵi18n(i, msgIdx)` —— **一个声明槽**，分支文本节点之后
-   * 由 `ɵɵi18nApply` 建在 expando 下标上。所以这里按一个文本节点记账即可，
-   * 与 `{{a}}` 的 `ɵɵtext` 逐字相同。
-   *
-   * 文案本身不在这里管：序列化层会从 lView 的 expando 上把当前分支的节点收回来
-   * （`component-template-hook.factory.ts` 的 `readI18nText`）。
+   * 编译成 `ɵɵi18n(i, msgIdx)`，只占一个声明槽，记账与 `{{a}}` 的文本节点相同。
+   * 文案由序列化层从 lView 的 expando 上收回（`readI18nText`）。
    */
   visitIcu(icu: t.Icu) {
     const nodeIndex = this.declIndex++;
-    /**
-     * ICU 由 Angular 原生的 `ɵɵi18n` 渲染，只占**一个**声明槽，与 `{{a}}`
-     * 的 `ɵɵtext` 记账逐字相同，所以这里就当一个文本节点记。
-     *
-     * wxml 这边只需要一个文本槽（`{{nodeList[i].value}}`）；真正的文案由序列化层
-     * 从 lView 的 expando 上收回来，见 `component-template-hook.factory.ts`
-     * 的 `readI18nText`。
-     */
     const instance = new ParsedNgBoundText(
       icu as unknown as t.BoundText,
       this.parentNode,
       nodeIndex,
     );
-    /**
-     * ICU 自带表达式里的管道各占一个声明槽。
-     *
-     * ```html
-     * {g, select, other {x{{count | number}}}}   ← emit 侧多出 ɵɵpipe(i, "number")
-     * ```
-     *
-     * 判断变量在 `vars`，分支里的插值在 `placeholders`，两边都得走：
-     * 漏一个就是 wxml 下标整体前移一位。
-     */
+    // ICU 表达式里的管道各占一个槽：判断变量在 `vars`，分支里的插值在 `placeholders`
     // `placeholders` 不在 `t.Icu` 的公开类型里，只能按形状取
     const asVariables = (value: unknown): unknown[] =>
       Array.isArray(value) ? value : Object.values((value ?? {}) as object);
@@ -857,15 +566,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
     return this.list;
   }
 
-  /**
-   * `#ref` 声明占槽。
-   *
-   * ```html
-   * <div #a #b></div>   ← 多占 2 个槽
-   * ```
-   *
-   * 对应 `local_refs.ts`：`op.numSlotsUsed += op.localRefs.length`。
-   */
+  /** `#ref` 声明占槽，每个引用占一个。 */
   prepareRefsArray(refs: t.Reference[]) {
     if (!refs || !refs.length) {
       return;
@@ -876,14 +577,7 @@ export class TemplateDefinition implements TmplAstRecursiveVisitor {
   }
 }
 
-/**
- * 遍历一组模板节点。
- *
- * 注意这里直接调 `node.visit(visitor)`，**不走** `visitor.visit`。
- * Angular 自己的 `visitAll` 是「若 `visitor.visit` 存在则用它拦截」，
- * 本 fork 不需要那层拦截，所以 `TemplateDefinition` 不实现 `visit()`
- * —— 一旦实现了，语义会和这里不一致，反而埋坑。
- */
+/** 遍历一组模板节点。这里直接调 `node.visit(visitor)`，不走 `visitor.visit` 拦截。 */
 export function visitAll(
   visitor: TemplateDefinition,
   nodes: TmplAstNode[],
@@ -894,283 +588,105 @@ export function visitAll(
 }
 
 /**
- * 表达式侧访问器：**只关心「这条表达式里有几个管道」**。
- *
- * 结构、方法顺序完全对齐 `@angular/compiler` 的 `RecursiveAstVisitor`
- * （packages/compiler/src/expression_parser/ast.ts），这样升级 Angular 时
- * 可以直接 diff 出「新增了哪种 AST 节点 / 某个节点的子节点变了」。
- *
- * 为什么只数管道：Angular 里每个 `| pipe` 会在**当前视图**编译成一条
- * `ɵɵpipe(...)`，占一个声明索引。本 fork 需要在没有 Angular 编译管线的
- * 情况下预知每个节点的槽位，所以必须自己算准。
- * 漏数一个 → 后面所有节点整体错位 → 渲染错乱但不报错。
+ * 表达式侧访问器，只统计表达式里管道的个数。每个 `| pipe` 会在当前视图编译成
+ * 一条 `ɵɵpipe(...)`，占一个声明索引。
  *
  * @internal 导出仅为测试可见，不属于公开 API。
  */
 export class CustomAstVisitor implements AstVisitor {
   constructor(private pipeCallback: () => void) {}
 
-  /**
-   * 一元运算符。
-   *
-   * ```html
-   * {{ -count }}   {{ +a }}   {{ !flag }}（! 走 PrefixNot）
-   * ```
-   */
   visitUnary(ast: Unary) {
     this.visit(ast.expr);
   }
 
-  /**
-   * 二元运算。两侧都可能是带管道的子表达式。
-   *
-   * ```html
-   * {{ (a | number) + (b | number) }}   → 2 个管道
-   * {{ a ?? b }}   {{ x && y }}   {{ s % 2 }}
-   * ```
-   */
   visitBinary(ast: Binary) {
     this.visit(ast.left);
     this.visit(ast.right);
   }
 
-  /**
-   * 分号分隔的多表达式。
-   *
-   * ```html
-   * {{ exprA; exprB }}
-   * ```
-   */
   visitChain(ast: Chain) {
     this.visitAll(ast.expressions);
   }
 
-  /**
-   * 三元条件。三个分支都要走。
-   *
-   * ```html
-   * {{ ok ? (a | number) : (b | number) }}   → 2 个管道
-   * ```
-   */
   visitConditional(ast: Conditional) {
     this.visit(ast.condition);
     this.visit(ast.trueExp);
     this.visit(ast.falseExp);
   }
 
-  /**
-   * 管道 —— 本访问器唯一真正关心的节点。
-   *
-   * ```html
-   * {{ title | uppercase }}            → 1 个
-   * {{ a | date:(b | number) }}       → 2 个（参数里还能再嵌管道）
-   * {{ a | foo | bar }}               → 2 个（接收者本身就是管道）
-   * ```
-   *
-   * **两个子树都得走**，对齐 `RecursiveAstVisitor.visitPipe`：
-   * - `exp`（接收者）—— 链式管道 `a | foo | bar` 在 AST 里是
-   *   `BindingPipe{ exp: BindingPipe{a, foo}, name: bar }`，漏掉就少算槽位
-   * - `args`（参数）—— 参数本身可以是另一条带管道的表达式
-   *
-   * 少算一个管道 = 少占一个槽 = 后续所有节点下标整体前移一位，
-   * wxml 的 `nodeList[i]` 就指到别的节点上了。
-   */
+  /** 接收者和参数都可能是嵌套管道，两个子树都得走，否则少算槽位。 */
   visitPipe(ast: BindingPipe) {
     this.pipeCallback();
     this.visit(ast.exp);
     this.visitAll(ast.args);
   }
 
-  /**
-   * 隐式接收者 —— 模板里「当前上下文对象」的抽象，没有具体源码。
-   *
-   * ```html
-   * {{ name }}        ← name 挂在隐式接收者上
-   * ```
-   *
-   * 叶子节点，无子节点。
-   */
   visitImplicitReceiver(ast: ImplicitReceiver) {}
 
-  /**
-   * `this` 接收者。
-   *
-   * ```html
-   * {{ this.user.name }}
-   * ```
-   *
-   * 叶子节点。必须显式实现：`ThisReceiver.visit()` 走的是
-   * `visitor.visitThisReceiver?.(...)` 的**可选调用**，方法不存在时
-   * 返回 `undefined` 而**不报错**，等于静默跳过整棵子树。
-   */
+  /** `ThisReceiver.visit()` 走的是可选调用，方法缺失时静默跳过整棵子树，所以必须显式实现。 */
   visitThisReceiver(ast: ThisReceiver) {}
 
-  /**
-   * 插值 `{{ }}`。
-   *
-   * ```html
-   * {{ a | number }} / {{ x }}-{{ y }}
-   * ```
-   */
   visitInterpolation(ast: Interpolation) {
     this.visitAll(ast.expressions);
   }
 
-  /**
-   * 下标读取 `a[0]` / `map[key]`。key 也可能是带管道的表达式。
-   *
-   * ```html
-   * {{ list[i | number] }}   → 1 个
-   * ```
-   */
   visitKeyedRead(ast: KeyedRead) {
     this.visit(ast.receiver);
     this.visit(ast.key);
   }
 
-  /**
-   * 数组字面量。
-   *
-   * ```html
-   * {{ [a | number, b] }}   → 1 个
-   * ```
-   */
   visitLiteralArray(ast: LiteralArray) {
     this.visitAll(ast.expressions);
   }
 
-  /**
-   * 对象字面量。只走 value，key 是字符串标识不是表达式。
-   *
-   * ```html
-   * {{ {a: x | number} }}   → 1 个
-   * ```
-   */
+  /** 只走 value，key 是字符串标识不是表达式。 */
   visitLiteralMap(ast: LiteralMap) {
     this.visitAll(ast.values);
   }
 
-  /**
-   * 原始字面量：`1` / `'str'` / `true` / `null`。叶子节点。
-   */
   visitLiteralPrimitive(ast: LiteralPrimitive) {}
 
-  /**
-   * 逻辑非 `!flag`。
-   *
-   * ```html
-   * {{ !a }}   {{ !(x | number) }}
-   * ```
-   */
   visitPrefixNot(ast: PrefixNot) {
     this.visit(ast.expression);
   }
 
-  /**
-   * `typeof x`。
-   *
-   * ```html
-   * {{ typeof v }}   {{ typeof (v | number) }}
-   * ```
-   */
   visitTypeofExpression(ast: TypeofExpression) {
     this.visit(ast.expression);
   }
 
-  /**
-   * `void x`（与 `typeof` 共用 AST 类型）。
-   *
-   * ```html
-   * {{ void v }}
-   * ```
-   */
   visitVoidExpression(ast: TypeofExpression) {
     this.visit(ast.expression);
   }
 
-  /**
-   * 非空断言 `x!`。
-   *
-   * ```html
-   * {{ a! | number }}   {{ (a | number)! }}
-   * ```
-   */
   visitNonNullAssert(ast: NonNullAssert) {
     this.visit(ast.expression);
   }
 
-  /**
-   * 属性读取 `a.b`。receiver 可能是带管道的子表达式。
-   *
-   * ```html
-   * {{ (a | number).toFixed }}   → 1 个
-   * ```
-   */
   visitPropertyRead(ast: PropertyRead) {
     this.visit(ast.receiver);
   }
 
-  /**
-   * 安全属性读取 `a?.b`。
-   *
-   * ```html
-   * {{ (a | number)?.b }}   → 1 个管道，藏在 receiver 里
-   * ```
-   *
-   * **必须访问 receiver**。此前这里是空实现，导致 receiver 内的管道
-   * 全部漏计，槽位整体错位。
-   */
   visitSafePropertyRead(ast: SafePropertyRead) {
     this.visit(ast.receiver);
   }
 
-  /**
-   * 安全下标读取 `a?.[k]`。receiver 和 key 都要走。
-   *
-   * ```html
-   * {{ a?.[(k | number)] }}   → 1 个
-   * ```
-   */
   visitSafeKeyedRead(ast: SafeKeyedRead) {
     this.visit(ast.receiver);
     this.visit(ast.key);
   }
 
-  /**
-   * 方法调用 `a.f(x)`。receiver 和全部实参都要走。
-   *
-   * ```html
-   * {{ obj.get(v | number) }}   → 1 个
-   * ```
-   */
   visitCall(ast: Call) {
     this.visit(ast.receiver);
     this.visitAll(ast.args);
   }
 
-  /**
-   * 安全方法调用 `a?.f(x)`。
-   *
-   * ```html
-   * {{ a?.f(b | number) }}   → 1 个
-   * ```
-   */
   visitSafeCall(ast: SafeCall) {
     this.visit(ast.receiver);
     this.visitAll(ast.args);
   }
 
-  /**
-   * 模板字符串 `` `a${x}b` ``。
-   *
-   * 与 Angular 一致地**按声明顺序**交替访问 element 与 expression：
-   * elements 比 expressions 多一个。
-   *
-   * ```html
-   * {{ `pre${a | number}mid${b}post` }}
-   *   访问序: "pre" → (a|number) → "mid" → b → "post"
-   * ```
-   */
+  /** elements 比 expressions 多一个，按声明顺序交替访问。 */
   visitTemplateLiteral(ast: TemplateLiteral) {
     for (let i = 0; i < ast.elements.length; i++) {
       this.visit(ast.elements[i]);
@@ -1182,103 +698,37 @@ export class CustomAstVisitor implements AstVisitor {
     }
   }
 
-  /**
-   * 模板字符串里的静态片段。叶子节点（其文本不参与表达式求值）。
-   *
-   * ```html
-   * {{ `static-part${x}` }}
-   *      ^^^^^^^^^^^ 就是这个
-   * ```
-   */
   visitTemplateLiteralElement(ast: TemplateLiteralElement) {}
 
-  /**
-   * 带标签的模板字符串 `` tag`a${x}` ``。
-   *
-   * 与 Angular 一致：先走 tag，再把整个 template 节点交回去
-   * （由 `visitTemplateLiteral` 负责内部顺序），而不是只挑 expressions。
-   *
-   * ```html
-   * {{ dedent`a${v | number}b` }}   → 1 个
-   * ```
-   */
+  /** 先走 tag，再把整个 template 节点交回 `visitTemplateLiteral`。 */
   visitTaggedTemplateLiteral(ast: TaggedTemplateLiteral) {
     this.visit(ast.tag);
     this.visit(ast.template);
   }
 
-  /**
-   * 括号表达式 `( ... )`。
-   *
-   * ```html
-   * {{ (a | number) }}
-   * ```
-   */
   visitParenthesizedExpression(ast: ParenthesizedExpression) {
     this.visit(ast.expression);
   }
 
-  /**
-   * 箭头函数（Angular 21 新增）。
-   *
-   * ```html
-   * <button (click)="() => doIt(v)">x</button>
-   * {{ items.map(() => a | number) }}
-   * ```
-   *
-   * 只走 body；参数列表是标识符声明，不是求值表达式。
-   */
+  /** 只走 body，参数列表是标识符声明不是求值表达式。 */
   visitArrowFunction(ast: ArrowFunction) {
     this.visit(ast.body);
   }
 
-  /**
-   * 正则字面量（Angular 21 新增）。叶子节点。
-   *
-   * ```html
-   * {{ /ab+c/.test(v) }}
-   * ```
-   */
   visitRegularExpressionLiteral(ast: RegularExpressionLiteral) {}
 
-  /**
-   * 展开元素 `...x`（Angular 21 新增）。
-   *
-   * ```html
-   * {{ [...a, b | number] }}
-   * ```
-   */
   visitSpreadElement(ast: SpreadElement) {
     this.visit(ast.expression);
   }
 
-  /**
-   * 空表达式。
-   *
-   * ```html
-   * <div [title]=""></div>
-   * <div>{{ }}</div>
-   * ```
-   *
-   * 叶子节点。必须显式实现：`EmptyExpr` 是独立 AST 类型，
-   * 缺方法会让子树遍历在此中断。
-   */
+  /** 缺方法会让子树遍历在此中断，所以必须显式实现。 */
   visitEmptyExpr(ast: EmptyExpr) {}
 
-  /**
-   * 通用入口：把节点重新派发回它自己的 `visit`，
-   * 从而落到上面某个具体方法（对齐 `RecursiveAstVisitor.visit`）。
-   *
-   * 之所以不是空实现：内部所有子节点遍历都走 `this.visit(child)`，
-   * 这里若为空，整条递归立刻断掉、什么都数不到。
-   */
+  /** 把节点重新派发回它自己的 `visit`，内部所有递归都走这里。 */
   visit(ast: AST) {
     ast.visit(this);
   }
 
-  /**
-   * 批量访问。对齐 `RecursiveAstVisitor.visitAll`。
-   */
   visitAll(asts: AST[]) {
     for (let i = 0; i < asts.length; ++i) {
       this.visit(asts[i]);

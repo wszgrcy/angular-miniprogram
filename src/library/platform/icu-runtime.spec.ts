@@ -7,24 +7,11 @@ import { LVIEW } from './default/lview-layout';
 import { initMiniProgramTestEnv } from './test-util/init-env';
 
 /**
- * ICU 的半运行时验收。
- *
- * ## 为什么必须走半运行时
- *
- * ICU 的文案不在构建产物里 —— `ɵɵi18n` 到运行时才把分支建成节点，挂在
- * expando 下标上。构建期测试（下标等价性）只能证明「槽位对得上」，
- * 证明不了「槽里填的是当前分支的文字」。只有真实 lView 能回答。
- *
- * ## 断言的对象
- *
- * 取 `getPageRefreshContext` 的产物，也就是真正喂给 `setData` 的那份
- * `nodeList`。wxml 在那个位置读的就是 `nodeList[i].value`。
- *
- * ## 改完属性必须标脏组件自己的视图
- *
- * 同 `renderer-class-style.spec.ts` 记的那个坑：`fixture.detectChanges()`
- * 只保证刷宿主视图，组件视图没标脏就整个跳过。必须从**组件 injector**
- * 取 `ChangeDetectorRef`。少了这步，「切分支不更新」会被误当成 ICU 的 bug。
+ * ICU 的半运行时验收。为什么必须走半运行时：ICU 的文案不在构建产物里——`ɵɵi18n` 到运行时才把分支
+ * 建成节点，挂在 expando 下标上。构建期测试只能证明「槽位对得上」，证明不了「槽里填的是当前分支的文字」。
+ * 断言的对象是 `getPageRefreshContext` 的产物，也就是真正喂给 `setData` 的那份 `nodeList`。
+ * 改完属性必须标脏组件自己的视图：`fixture.detectChanges()` 只保证刷宿主视图，组件视图没标脏就整个跳过，
+ * 必须从组件 injector 取 `ChangeDetectorRef`。少了这步，「切分支不更新」会被误当成 ICU 的 bug。
  */
 
 @Component({
@@ -104,10 +91,8 @@ describe('ICU 半运行时', () => {
   }
 
   /**
-   * 按 wxml 的口径把模板渲染结果拼出来。
-   *
-   * 元素槽带 `class`/`style`、文本槽带 `value`，wxml 就是逐槽内联的，
-   * 所以拼起来只看 `value` 即等价于页面上看到的文字。
+   * 按 wxml 的口径把模板渲染结果拼出来。元素槽带 `class`/`style`、文本槽带 `value`，
+   * wxml 就是逐槽内联的，所以拼起来只看 `value` 即等价于页面上看到的文字。
    */
   function renderedText(fixture: any): string {
     return render(fixture)
@@ -115,7 +100,7 @@ describe('ICU 半运行时', () => {
       .join('');
   }
 
-  /** 标脏**组件自己的**视图，否则第二次 detectChanges 是空转 */
+  /** 标脏组件自己的视图，否则第二次 detectChanges 是空转 */
   function refresh(fixture: any) {
     fixture.componentRef.injector.get(ChangeDetectorRef).markForCheck();
     fixture.detectChanges();
