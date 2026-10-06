@@ -19,6 +19,9 @@ async function compileHtml(html: string): Promise<string> {
   const def = new TemplateDefinition(r.nodes, ctx);
   const metas = def.run().map((n) => n.getNodeMeta());
   const transform = new WxTransform();
+  // 本文件只关 rich-text 承载；tag-name 标记与它无关，开着只会往
+  // class 属性前面插一段字面量，把断言撑得跟主题无关。
+  transform.tagNameClass = 'off';
   transform.init();
   return transform.compile(metas).content;
 }
@@ -35,7 +38,8 @@ function metasOf(html: string) {
 
 describe('innerHTML → rich-text', () => {
   it('绑定值由 rich-text 子节点承载，宿主标签上不再出现 innerHTML', async () => {
-    const w = await compileHtml(`<div [innerHTML]="html"></div>`);
+    const w = await compileHtml(`<div class="c" [innerHTML]="html"></div>`);
+    // 宿主标签自己该带的照带，只是不再挂 innerHTML
     expect(w).toContain(`<view  class="{{nodeList[0].class}}`);
     expect(w).toContain(
       `<rich-text nodes="{{nodeList[0].property.innerHTML}}"/>`,

@@ -12,6 +12,7 @@ import {
   clearLibraryMetaMisses,
   formatLibraryMetaSummary,
 } from '../library/library-meta-diagnostics';
+import type { TagNameClassMode } from '../mini-program-compiler/tag-mapping';
 import type { WxsAnalysisRef } from '../mini-program-compiler/type';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
@@ -216,6 +217,14 @@ export interface ViteMiniProgramBuildOptions {
   budgets?: BudgetEntry[];
   /** 产出 stats.json（各文件体积清单） */
   statsJson?: boolean;
+  /**
+   * `tag-name-<原标签>` 标记的输出策略，默认 `mapped`。
+   *
+   * 这个标记是给「模板写 `div`、wxml 里已经是 `view`」补的选中把手。
+   * 没改写过标签的元素带着它纯属多一个 class token，所以上下文里
+   * 只有 `mapped` 才输出。详见 `tagNameClassOf()`。
+   */
+  tagNameClass?: TagNameClassMode;
 }
 
 /**
@@ -813,6 +822,11 @@ export function runViteBuilder(
     void (async () => {
       try {
         const buildPlatform = getBuildPlatform(options.platform);
+        // 选项得在 init() 之后补一次：BuildPlatform 构造时就把 transform
+        // 装配进了 WxContainer 全局配置，重跑一次 init 才能把选项带进去。
+        buildPlatform.templateTransform.tagNameClass =
+          options.tagNameClass ?? 'mapped';
+        buildPlatform.templateTransform.init();
         const vite = await import('vite');
 
         const runOnce = async () => {

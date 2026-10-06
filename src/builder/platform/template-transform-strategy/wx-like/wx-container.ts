@@ -7,6 +7,8 @@ import type {
   NgTextMeta,
 } from '../../../mini-program-compiler';
 import { MetaCollection } from '../../../mini-program-compiler';
+import { tagNameClassOf } from '../../../mini-program-compiler/tag-mapping';
+import type { TagNameClassMode } from '../../../mini-program-compiler/tag-mapping';
 import { type WxsExprPlan, wxmlLiteral } from '../../../wxs/wxs-expr';
 import {
   isNgBoundTextMeta,
@@ -26,6 +28,8 @@ export interface WxContainerGlobalConfig {
    * wxs 事件旁路需要自己拼属性值，但属性名必须与普通事件一致。
    */
   eventAttrName: (name: string) => string;
+  /** `tag-name-*` 标记的输出策略，见 `tagNameClassOf()` */
+  tagNameClass: TagNameClassMode;
 }
 
 /**
@@ -300,7 +304,15 @@ export class WxContainer {
      * 只是容器原先把这两个 key 硬编码成了 AgentNode 的聚合串。
      *
      * 静态部分用字符串相加合并：class 用 `' '`，style 用 `';'`。
+     *
+     * 没用到这个通道的元素整个属性都不输出（`needsClass` / `needsStyle`），
+     * 数据侧也不会发这个字段。
      */
+    const tagClass = tagNameClassOf(
+      node.sourceTag,
+      node.tagName,
+      WxContainer.globalConfig.tagNameClass,
+    );
     const classPlan = node.wxsClass ?? wxsProps['class'];
     if (classPlan) {
       useWxsPlanModules(classPlan, (m) => this.useWxsModule(m));
@@ -314,7 +326,7 @@ export class WxContainer {
           ? `${expr} + ' ' + ${wxmlLiteral(node.staticClass)}`
           : expr,
       );
-    } else {
+    } else if (node.needsClass) {
       propertyMap.set('class', `nodeList[${index}].class`);
     }
 
@@ -326,11 +338,14 @@ export class WxContainer {
      *
      * 拼在末尾、单独一个 `|| ''` 兜底：万一某条路径上数据没送到，
      * 丢的只是一个查询能力，不会把 `undefined` 拼成一个假 class。
+     *
+     * class 那一半也得兜：空 class 现在不发（见 `AgentNode.toView()`），
+     * 而 `{{}}` 里的字符串拼接会把缺字段当 `undefined` 拼出字面量。
      */
     if (node.hasRef) {
       propertyMap.set(
         'class',
-        `(${propertyMap.get('class')}) + ' ' + (nodeList[${index}].refClass || '')`,
+        `(${propertyMap.get('class')} || '') + ' ' + (nodeList[${index}].refClass || '')`,
       );
     }
 
@@ -347,7 +362,7 @@ export class WxContainer {
           ? `${expr} + ';' + ${wxmlLiteral(node.staticStyle)}`
           : expr,
       );
-    } else {
+    } else if (node.needsStyle) {
       propertyMap.set('style', `nodeList[${index}].style`);
     }
     Object.entries(node.attributes)
@@ -395,6 +410,17 @@ export class WxContainer {
       .forEach((key) => {
         propertyMap.set(key, propExpr(key));
       });
+    /**
+     * `tag-name-*` 标记。
+     *
+     * 有 class 绑定时拼在绑定前面（字面量 + 插值），没绑定时直接就是一个
+     * 字面量 class——映射改写过的标签保得住「按原名字选中」，又不用为它
+     * 留一条数据通道。
+     */
+    if (tagClass && !propertyMap.has('class')) {
+      attributeMap.set('class', tagClass);
+    }
+
     const wxsEvents = node.wxsEvents || {};
     const eventList: string[] = [
       ...node.outputs.filter(
@@ -432,8 +458,10 @@ export class WxContainer {
       ...Array.from(attributeMap.entries()).map(
         ([key, value]) => `${key}="${value}"`,
       ),
-      ...Array.from(propertyMap.entries()).map(
-        ([key, value]) => `${key}="${this.interp(value)}"`,
+      ...Array.from(propertyMap.entries()).map(([key, value]) =>
+        key === 'class' && tagClass
+          ? `class="${tagClass} ${this.interp(value)}"`
+          : `${key}="${this.interp(value)}"`,
       ),
       result,
       wxsEventAttrs,

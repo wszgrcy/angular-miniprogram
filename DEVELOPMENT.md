@@ -3023,3 +3023,92 @@ vite / rolldown 那一层，加一层「不许改这个」只会把用户的合�
   钉的是「两个 builder 组装完的配置确实经过了钩子」——钩子本身上面一层已经
   验透了，这里只防「应用了但结果被丢掉」。夹具用 `test/hello-world-app`（只读），
   钩子写临时目录用绝对路径引用，不往夹具里落脏文件。
+
+## class / style 通道按需输出
+
+### 之前的样子
+
+`elementPropertyAndEvent()` 无条件给每个元素塞两条绑定：
+
+```html
+<view class="{{nodeList[i].class}}" style="{{nodeList[i].style}}">hi</view>
+```
+
+数据侧 `AgentNode.toView()` 也跟着无条件发 `class` / `style`。于是模板里
+一个 class 都没写的元素，也要在 wxml 里带 60 来字节、在首次 setData 里带
+一个 `"tag-name-view"` 和一个空串。实测这两条属性占掉测试工程 wxml 的三成。
+
+### 现在的判据
+
+编译期静态判定每个元素的 `needsClass` / `needsStyle`（`ParsedNgElement.usesChannel()`），
+判不出来就整条属性不输出。判据必须盖住 class 的**全部**来源——漏一条不是
+省字节，是「运行时改了 class 而 wxml 不读」的静默丢样式：
+
+| 写法                            | AST 形态                                                    |
+| ------------------------------- | ----------------------------------------------------------- |
+| `class="a"` / `style="a:b"`     | 静态 attribute                                              |
+| `[class]` / `[style]`           | Property，名字就是 class / style                            |
+| `class="a {{x}}"`               | 同上（编译器把整条当整体绑定）                              |
+| `[class.x]` / `[style.x]`       | Class / Style 类型，名字是那个 token / 属性                 |
+| `[attr.class]` / `[attr.style]` | Attribute 类型                                              |
+| `[class]="mod.f(x)"`            | 已被改写层换成合成 property，只能认 `wxsClass` / `wxsStyle` |
+| `#box`                          | 查询用 class 拼在 class 通道上                              |
+| 组件 / 指令宿主                 | host 元数据里的 class/style 编译期看不见，只能保守保留      |
+| `@slide` / `[@slide]="x"`       | 动画靠往元素上加 class 生效                                 |
+
+`[class.x]` 这类**不进** `this.inputs`（那里只收 `type === Property`），
+所以判据直接遍历 `node.inputs`，不看那个筛过的数组。
+
+### 为什么运行时不能自己判
+
+`refClass` 那套是运行时从 `TNode.localNames` 现推的，与编译期同一个条件、
+两边同进同退。class / style 推不了：Ivy 把 `[class.x]` / `[style.x]` /
+`[attr.class]` 记在模板函数的绑定槽里，**`TNode.inputs` 里根本没有它们**
+（实测恒为 `null`，只有指向指令的绑定才进）。所以数据侧换了个更简单也更
+稳的办法：`toView()` 只发非空的 class / style。真有人改到了，
+`emitClass` / `emitStyle` 会把 key 补上，不依赖首次就发。
+
+key 集合因此是「按节点稳定」的：同一节点要么一直有、要么从无到有，不会在
+两轮之间反复抖，`diffNodeData` 的「key 数不一致就整体送出子树」不会被误触发。
+
+### `tag-name-*` 挪到编译期
+
+标记的用途是「模板写 `div`、wxml 里已经是 `view`」时补一个选中把手。
+映射没改写的标签（`view`、自定义组件）本来就能直接选中，带着它只是每个元素
+多一个 class token。
+
+它现在由 `tagNameClassOf()` 在编译期算，烘成 wxml 里的**字面量**：
+
+```html
+<view class="tag-name-div">hi</view>
+<!-- 没别的 class 来源 -->
+<view class="tag-name-div {{nodeList[0].class}}">hi</view>
+<!-- 有 -->
+```
+
+必须烘成字面量而不是留在运行时：留在运行时就得给每个被改写的元素留一条
+`nodeList[i].class` 绑定，那正好是这次要省掉的东西。运行时也不再
+`classList.add('tag-name-...')`——它压根不知道映射表。
+
+构建选项 `tagNameClass`：`mapped`（默认）/ `all` / `off`。
+
+库构建（`LibraryTransform`）按它自己的默认值烘这个字面量，消费方改
+`tagNameClass` 不会回头改已经产出的库模板。只是标记在不在的差异，
+不影响任何数据链路。
+
+### 两个必须同进同退的点
+
+1. wxml 有绑定而数据不发 → 渲染成空；数据发了 wxml 不读 → 白占体积。
+   所以 `needsClass` 的判据只能比实际来源**更宽**，不能更窄。
+2. 空 class 不发之后，`refClass` 的拼接表达式必须给 class 那一半也兜
+   `|| ''`：`{{}}` 里的字符串拼接会把缺字段当 `undefined` 拼出字面量，
+   于是 class 里多出一个假的 `undefined` token。
+
+### 测试
+
+- `src/builder/class-style-wxml.spec.ts`：每种 class / style 写法逐个钉，
+  外加 `tag-name` 三种模式。
+- `src/library/platform/default/agent-node.spec.ts`：`toView()` 不发空串。
+- `ref-class-wxml.spec.ts` / `wxs-emit.spec.ts` / `rich-text.spec.ts` 里把
+  `tagNameClass` 设成 `off`：那几个文件测的不是 class 通道，让标记插进来
+  只会把断言撑得跟主题无关。

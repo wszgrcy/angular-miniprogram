@@ -64,6 +64,7 @@ class HostClsDirective {}
   standalone: true,
   imports: [HostClsDirective],
   template: `
+    <div id="plain"></div>
     <div id="static" class="a b">{{ on ? 'T' : 'F' }}</div>
     <div id="classBind" [class]="cls"></div>
     <div id="classProp" [class.c1]="on" [class.c2]="off"></div>
@@ -233,41 +234,40 @@ describe('Renderer2 的 class / style 写入（运行时实测）', () => {
       expect(writesOf(all, 'interp')).toEqual(['addClass:i2', 'addClass:x']);
     });
 
-    it('每个节点都带 tag-name-* 标记，且它不属于任何属性', () => {
+    it('建元素时不往 class 里插任何东西', () => {
       const { nodes } = create();
-      expect(nodes.get('static')!.classList.has('tag-name-div')).toBe(true);
+      // `tag-name-*` 标记已改由编译期烘进 wxml（运行时不知道标签映射表），
+      // classList 里因此只有用户语义的 token。
+      expect(nodes.get('static')!.classList.size).toBe(0);
+      expect(nodes.get('plain')!.classString()).toBe('');
     });
   });
 
   describe('两个来源合并成一份 class', () => {
     it('静态 class 与动态 class 同时存在 → 聚合串里都有且不重复', () => {
       const { nodes } = create();
-      expect(nodes.get('static')!.classString()).toBe('tag-name-div a b');
-      expect(nodes.get('interp')!.classString()).toBe('tag-name-div i2 x');
-      expect(nodes.get('host')!.classString()).toBe('tag-name-div from-host');
+      expect(nodes.get('static')!.classString()).toBe('a b');
+      expect(nodes.get('interp')!.classString()).toBe('i2 x');
+      expect(nodes.get('host')!.classString()).toBe('from-host');
     });
 
     it('已知取舍：静态与动态声明同名 class，各留各的', () => {
       const { nodes, fixture } = create();
       // off=false → removeClass('shared')，但 shared 是属性声明的，不归动态管
-      expect(nodes.get('clashClass')!.classString()).toBe(
-        'tag-name-div shared',
-      );
+      expect(nodes.get('clashClass')!.classString()).toBe('shared');
       fixture.componentInstance.off = true;
       markForCheck(fixture);
       fixture.detectChanges();
       // 动态也加了 shared → 串里出现两次，class 匹配不受影响
-      expect(nodes.get('clashClass')!.classString()).toBe(
-        'tag-name-div shared shared',
-      );
+      expect(nodes.get('clashClass')!.classString()).toBe('shared shared');
     });
 
-    it('[attr.class] 置空只撤属性那部分，tag-name 标记保留', () => {
+    it('[attr.class] 置空只撤属性那部分', () => {
       const { nodes, fixture } = create();
       fixture.componentInstance.attrCls = null;
       markForCheck(fixture);
       fixture.detectChanges();
-      expect(nodes.get('attrClass')!.classString()).toBe('tag-name-div');
+      expect(nodes.get('attrClass')!.classString()).toBe('');
     });
 
     it('class 属性每次整体重设，动态那半不受影响', () => {
@@ -368,12 +368,11 @@ describe('Renderer2 的 class / style 写入（运行时实测）', () => {
       raw.length = 0;
       markForCheck(fixture);
       fixture.detectChanges();
-      expect(nodes.get('classBind')!.classString()).toBe('tag-name-div dyn3');
+      expect(nodes.get('classBind')!.classString()).toBe('dyn3');
       // Set 的顺序跟着写入顺序走（i2 被摘掉、i3 追加在 x 之后），
       // class 顺序不参与匹配，按集合比。
       expect(nodes.get('interp')!.classString().split(' ').sort()).toEqual([
         'i3',
-        'tag-name-div',
         'x',
       ]);
     });

@@ -30,6 +30,9 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
    * 只有这种节点需要可查询 class，详见 `NgElementMeta.hasRef`。
    */
   hasRef = false;
+  /** class / style 通道是否被用到，见 `NgElementMeta.needsClass` */
+  needsClass = false;
+  needsStyle = false;
   kind = NgNodeKind.Element;
   inputs: string[] = [];
   outputs: string[] = [];
@@ -109,6 +112,10 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       this.collectWxsEvent(output, event.name);
     });
 
+    // 得排在 inputs 循环之后：wxs 下推计划是在那里登记上的
+    this.needsClass = this.usesChannel('class');
+    this.needsStyle = this.usesChannel('style');
+
     if (
       !this.node.endSourceSpan ||
       this.node.startSourceSpan.end.offset ===
@@ -143,6 +150,56 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     // 映射规则抽到 tag-mapping.ts 作为唯一真相源，
     // 等价性测试要用同一套规则交叉校验两端标签。
     this.tagName = mapAngularTagToWxml(this.node.name);
+  }
+
+  /**
+   * class / style 通道到底用没用。
+   *
+   * 判据必须盖住全部来源，漏一条就是「运行时改了 class，wxml 却不读」的
+   * 静默丢样式，而不是省下一字节：
+   *
+   * | 写法 | AST 形态 |
+   * | --- | --- |
+   * | `class="a"` / `style="a:b"` | 静态 attribute |
+   * | `[class]` / `[style]` | Property，名字就是 class / style |
+   * | `class="a {{x}}"` | 同上（编译器把整条当成整体绑定） |
+   * | `[class.x]` / `[style.x]` | Class / Style 类型，名字是那个 token / 属性 |
+   * | `[attr.class]` / `[attr.style]` | Attribute 类型 |
+   * | `[class]="mod.f(x)"` | 已被改写层换成合成 property，只能认 plan |
+   * | `#box` | 查询用 class 拼在 class 通道上 |
+   * | 组件 / 指令宿主 | host 元数据里的 class/style 编译期看不见，只能保守保留 |
+   *
+   * 动画触发器（`@slide` / `[@slide]="x"`）也算：动画靠往元素上加 class 生效。
+   */
+  private usesChannel(name: 'class' | 'style'): boolean {
+    if (this.componentMeta || this.directiveMeta) {
+      return true;
+    }
+    if (name === 'class') {
+      if (this.hasRef || this.staticClass || this.wxsClass) {
+        return true;
+      }
+    } else if (this.staticStyle || this.wxsStyle) {
+      return true;
+    }
+    const classLike = name === 'class';
+    const ownType = classLike ? BindingType.Class : BindingType.Style;
+    return this.node.inputs.some((input) => {
+      if (input.type === ownType) {
+        return true;
+      }
+      if (
+        input.type === BindingType.Property ||
+        input.type === BindingType.Attribute
+      ) {
+        return input.name === name;
+      }
+      return (
+        classLike &&
+        (input.type === BindingType.Animation ||
+          input.type === BindingType.LegacyAnimation)
+      );
+    });
   }
 
   /**
@@ -211,6 +268,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     return {
       kind: NgNodeKind.Element,
       tagName: this.tagName,
+      sourceTag: this.node.name,
       // 命中富文本时子节点整段丢弃：声明槽位已由 TemplateDefinition 计过，
       // 这里只是不再为它们产出 wxml，后续节点的下标不受影响。
       children: this.richText ? [] : this.children.map((c) => c.getNodeMeta()),
@@ -221,6 +279,8 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       staticClass: this.staticClass,
       staticStyle: this.staticStyle,
       hasRef: this.hasRef,
+      needsClass: this.needsClass,
+      needsStyle: this.needsStyle,
       singleClosedTag: this.richText ? false : this.singleClosedTag,
       richText: this.richText,
       componentMeta: this.componentMeta,

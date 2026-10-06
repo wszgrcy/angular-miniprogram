@@ -40,6 +40,9 @@ export class AgentNode {
    * 与 `attribute.class`（模板静态 class / 指令 host class / `[attr.class]`）
    * 各自存自己的：动态那半是逐个 token 增删，属性那半每次整体重设一个串，
    * 两边只在 {@link classString} 见一次面。
+   *
+   * 标签改写标记（`tag-name-div` 那种）不在这里：那是编译期烘进 wxml 的
+   * 字面量，运行时压根不知道映射表。
    */
   classList = new Set<string>();
   /** 动态 style（`setStyle` / `removeStyle`），与 {@link classList} 对称 */
@@ -203,14 +206,25 @@ export class AgentNode {
     if (this.type === 'text') {
       return { value: this.value };
     } else {
+      const cls = this.classString();
+      const style = this.styleString();
       return {
-        class: this.classString(),
+        /**
+         * 空串不发。
+         *
+         * 绝大多数元素从头到尾没碰过 class / style，发一个空串就是白占
+         * setData 体积（也是每轮全量 diff 白比一次）。真有人改到了，
+         * `emitClass` / `emitStyle` 会把这个 key 补上去，不依赖首次就发。
+         *
+         * key 集合因此是「按节点稳定」的：同一个节点要么一直有、要么
+         * 从无到有，不会在两轮之间反复抖，`diffNodeData` 的折叠判定不受影响。
+         */
+        ...(cls ? { class: cls } : null),
         // 没 `#` 的节点连这个 key 都不发，wxml 那侧读不到就渲染成空
         ...(this.__refClass ? { refClass: this.__refClass } : null),
-        style: this.styleString(),
+        ...(style ? { style: style } : null),
         property: { ...this.property },
-        // class / style 已由上面两个字段汇总（还含 addClass / 动态 style），
-        // 原样再塞一份纯属浪费 setData 体积
+        // class / style 已由上面两个字段汇总，原样再塞一份纯属浪费 setData 体积
         attribute: Object.fromEntries(
           Object.entries(this.attribute).filter(
             ([key]) => key !== 'class' && key !== 'style',

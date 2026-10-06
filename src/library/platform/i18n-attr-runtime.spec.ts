@@ -119,7 +119,8 @@ describe('i18n 属性半运行时', () => {
     expect(render(fixture)[0]?.attribute).toEqual({ title: 'Settings' });
     // 没有多余的 TI18n 槽：span 在 1，文本在 2
     const list = render(fixture);
-    expect(list[1]?.class).toBe('tag-name-span');
+    // span 自己没碰 class / style，空串不发，所以它就是一个空元素槽
+    expect(list[1]).toEqual({ property: {}, attribute: {} });
     expect(list[2]?.value).toBe('尾巴');
   });
 });

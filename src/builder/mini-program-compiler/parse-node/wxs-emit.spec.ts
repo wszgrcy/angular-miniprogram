@@ -30,6 +30,10 @@ async function compileHtml(html: string): Promise<string> {
   const def = new TemplateDefinition(r.nodes, ctx);
   const metas = def.run().map((n) => n.getNodeMeta());
   const transform = new WxTransform();
+  // 本文件只关 wxs 下推。`tag-name-*` 会往 class 属性前面插一段字面量，
+  // 开着它断言就变成同时钉两件事；class/style 通道本身由
+  // class-style-wxml.spec 专门钉。
+  transform.tagNameClass = 'off';
   transform.init();
   return transform.compile(metas).content;
 }
@@ -71,7 +75,9 @@ describe('wxs 端到端产出: 属性下推', () => {
   });
 
   it('class / style 仍走框架物化路径，不受影响', async () => {
-    const w = await compileHtml(`<div [foo]="mod.fn(a)"></div>`);
+    const w = await compileHtml(
+      `<div class="c" style="a:b" [foo]="mod.fn(a)"></div>`,
+    );
     expect(w).toContain(`class="{{nodeList[0].class}}"`);
     expect(w).toContain(`style="{{nodeList[0].style}}"`);
   });
@@ -214,7 +220,7 @@ describe('wxs 端到端产出: class / style 整体下推', () => {
   });
 
   it('未下推时 class / style 仍走 AgentNode 聚合串', async () => {
-    const w = await compileHtml(`<div [foo]="a"></div>`);
+    const w = await compileHtml(`<div class="c" style="a:b" [foo]="a"></div>`);
     expect(w).toContain(`class="{{nodeList[0].class}}"`);
     expect(w).toContain(`style="{{nodeList[0].style}}"`);
   });

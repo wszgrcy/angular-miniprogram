@@ -116,4 +116,44 @@ describe('AgentNode', () => {
     text.value = 'content';
     expect(text.toView()).toEqual({ value: 'content' });
   });
+
+  /**
+   * 空串不发。
+   *
+   * 绝大多数元素从头到尾没碰过 class / style，发一个空串就是白占 setData
+   * 体积，也是每轮全量 diff 白比一次。wxml 那边同样只在编译期判定
+   * 「用到了」才读这个 key，两边同进同退。
+   */
+  it('toView 不发空的 class / style', () => {
+    expect(new AgentNode('element').toView()).toEqual({
+      property: {},
+      attribute: {},
+    });
+  });
+
+  it('toView 只发用到的那半', () => {
+    const onlyClass = new AgentNode('element');
+    onlyClass.classList.add('a');
+    expect(onlyClass.toView()).toEqual({
+      class: 'a',
+      property: {},
+      attribute: {},
+    });
+
+    const onlyStyle = new AgentNode('element');
+    onlyStyle.style['color'] = 'red';
+    expect(onlyStyle.toView()).toEqual({
+      style: 'color:red',
+      property: {},
+      attribute: {},
+    });
+  });
+
+  it('只有尾分号的静态 style 不算用了 style 通道', () => {
+    const element = new AgentNode('element');
+    // Angular 递过来的空 style 属性会被规范化成一个分号
+    element.attribute.style = ';';
+    expect(element.styleString()).toBe('');
+    expect(element.toView()).not.toHaveProperty('style');
+  });
 });

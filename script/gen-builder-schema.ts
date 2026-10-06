@@ -295,6 +295,16 @@ const LOCAL: Record<string, unknown> = {
       '随便改，返回新对象或就地改都行；构建器不校验钩子的改动。' +
       '.ts / .mts / .cts 由 jiti 加载，.js / .mjs / .cjs 走原生 import。',
   },
+  tagNameClass: {
+    type: 'string',
+    enum: ['mapped', 'all', 'off'],
+    default: 'mapped',
+    description:
+      '给元素补 `tag-name-<原标签>` 标记的策略。模板写 `div` 而 wxml 里已经是 ' +
+      '`view`，`div` 选择器落空，这个 class 就是补回来的把手。' +
+      'mapped（默认）只在映射改写了标签时输出；all 每个元素都输出；' +
+      'off 一律不输出（标记会进 class，也就等于每个元素多一个 token）。',
+  },
 };
 
 function readUpstream(subpath: string): {

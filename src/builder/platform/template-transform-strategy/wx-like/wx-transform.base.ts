@@ -72,6 +72,7 @@ export abstract class WxTransformLike extends TemplateTransformBase {
       eventListConvert: this.eventListConvert,
       templateInterpolation: this.templateInterpolation,
       eventAttrName: (name: string) => this.eventNameConvert(name).name,
+      tagNameClass: this.tagNameClass,
     });
   }
   compile(nodes: NgNodeMeta[]) {

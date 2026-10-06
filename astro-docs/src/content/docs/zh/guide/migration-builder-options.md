@@ -57,7 +57,7 @@ title: "构建选项迁移"
 
 ## 3. 现在能用的选项
 
-**本包独有**：`platform` `pages` `customTabbar` `main`（上游叫 `browser`）`appJson` `nativeComponentsDir` `dedupe` `format` `viteConfig`
+**本包独有**：`platform` `pages` `customTabbar` `main`（上游叫 `browser`）`appJson` `nativeComponentsDir` `dedupe` `format` `viteConfig` `tagNameClass`
 
 **与 `@angular/build` 同名同义**：`outputPath` `tsConfig` `assets` `styles` `polyfills` `fileReplacements` `optimization` `sourceMap` `watch` `stylePreprocessorOptions` `inlineStyleLanguage` `define` `conditions` `externalDependencies` `outputHashing` `deleteOutputPath` `preserveSymlinks` `budgets` `statsJson`
 
@@ -68,6 +68,17 @@ title: "构建选项迁移"
 - `define` —— 用户常量。与平台内置 define（`wx` / `window` / `ngDevMode` / `__MP_WX__` 等）合并，**同名时平台优先**
 - `conditions` `preserveSymlinks` `externalDependencies` `deleteOutputPath` —— 分别透传 Vite 的 `resolve.conditions` / `resolve.preserveSymlinks` / rollup `external` / `build.emptyOutDir`
 - `viteConfig` —— 上面这些选项覆盖不到时的兜底：指一个文件，默认导出 `(config, ctx) => config`，把构建器组装完的 vite 配置接出来自己改（见「自定义 vite 配置」）
+- `tagNameClass` —— 控制要不要给元素补 `tag-name-<原标签>` 标记，默认 `mapped`。模板写 `div` 而 wxml 里已经是 `view`，`div` 选择器落空，这个 class 就是把原名字补回来的把手；映射没改写的标签（`view`、自定义组件）本来就能直接选中，带着它只是每个元素多一个 class token。`all` 恢复「每个元素都带」，`off` 一个都不带
+
+### `tagNameClass` 与 class / style 通道
+
+wxml 里每个元素的 class 都来自 `class="{{nodeList[i].class}}"` 这条绑定，数据侧跟着发一份。现在编译期会静态
+判定这个元素到底有没有 class / style 来源（静态属性、`[class]`、`[class.x]`、`[attr.class]`、带插值的
+`class="a {{x}}"`、`#ref` 的查询 class、组件/指令的 host 绑定），判定为没有就整条属性都不输出，数据侧也不发
+这个字段。实测能把 wxml 体积压掉一成多，首次 setData 里每个无关元素少两个字段。
+
+`tag-name-*` 因此改成编译期烘进 wxml 的字面量（运行时压根不知道标签映射表）：没有别的 class 来源的元素，
+最后就只剩一个 `class="tag-name-div"`，不占数据通道。
 
 `library` builder 另外补上了 `poll`（透传给 ng-packagr 的 watcher，网络盘 / WSL 挂载上有用）。
 

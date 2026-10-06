@@ -54,7 +54,8 @@ export interface MPView {
   hasLoad?: boolean;
 }
 export interface MPElementData {
-  class: string;
+  /** 空串不发，见 `AgentNode.toView()` */
+  class?: string;
   /**
    * 可查询 class，仅模板上带 `#` 的元素才有。
    *
@@ -65,7 +66,8 @@ export interface MPElementData {
    * 就是它），框架的查询标识不该混进去。
    */
   refClass?: string;
-  style: string;
+  /** 空串不发，与 `class` 同理 */
+  style?: string;
   property: Record<string, any>;
   /**
    * `setAttribute` 那侧的静态属性，剔掉 class / style（已由上面两个字段承载）。

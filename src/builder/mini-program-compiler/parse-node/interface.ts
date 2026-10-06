@@ -23,6 +23,12 @@ export interface NgNodeMeta {
 export interface NgElementMeta extends NgNodeMeta {
   kind: NgNodeKind.Element;
   tagName: string;
+  /**
+   * 模板上写的原标签名（`tagName` 是映射后的 wxml 标签）。
+   *
+   * `tag-name-*` 标记要用它判断映射有没有改写标签。
+   */
+  sourceTag: string;
   children: NgNodeMeta[];
   attributes: Record<string, string>;
   /**
@@ -42,6 +48,18 @@ export interface NgElementMeta extends NgNodeMeta {
    * `component-template-hook.factory.ts` 的 `refClassOf()`。
    */
   hasRef: boolean;
+  /**
+   * 本元素的 class 通道是否被用到。
+   *
+   * 没用到的元素不输出 `class="{{nodeList[i].class}}"`，数据侧也不发这个字段
+   * （两边同进同退，与 `refClass` 同一套规矩）。
+   *
+   * 判据必须盖住 class 的**全部**来源，漏一条就是「运行时改了 class 而 wxml
+   * 不读」的静默丢样式，见 `ParsedNgElement.usesChannel()`。
+   */
+  needsClass: boolean;
+  /** 同 {@link needsClass}，对应 style 通道 */
+  needsStyle: boolean;
   inputs: string[];
   outputs: string[];
   /**

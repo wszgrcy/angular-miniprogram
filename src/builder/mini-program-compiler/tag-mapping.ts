@@ -129,6 +129,40 @@ export function mapAngularTagToWxml(tag: string): string {
 }
 
 /**
+ * `tag-name-<原标签>` 标记的输出策略。
+ *
+ * 这个标记的唯一用途是「标签被换掉了，但仍要按原名字选中它」——
+ * 模板写 `div`，wxml 里已经是 `view`，`div` 选择器落空，靠这个 class 补回来。
+ * 映射前后一样的标签（`view`、自定义组件）本来就能直接选中，标记纯属噪声。
+ *
+ * - `mapped`（默认）：只在映射改写了标签时输出
+ * - `all`：每个元素都输出
+ * - `off`：一律不输出
+ */
+export type TagNameClassMode = 'mapped' | 'all' | 'off';
+
+/**
+ * 算出某个元素该带的 `tag-name-*` 标记，不需要则空串。
+ *
+ * 由编译期决定而不是运行时补：运行时只能给每个节点都挂一份（它不知道映射），
+ * 那份 class 就得靠 `nodeList[i].class` 的绑定运到渲染层。编译期直接烘成
+ * 字面量，没别的 class 来源的元素连 class 绑定都不用留。
+ */
+export function tagNameClassOf(
+  sourceTag: string,
+  wxmlTag: string,
+  mode: TagNameClassMode,
+): string {
+  if (mode === 'off') {
+    return '';
+  }
+  if (mode === 'mapped' && wxmlTag === sourceTag) {
+    return '';
+  }
+  return `tag-name-${sourceTag}`;
+}
+
+/**
  * 「只在 HTML 里存在、wxml 里被换掉了」的标签名单。
  *
  * 样式产物要用它判 `div{}` 这类标签选择器在小程序里必然落空

@@ -58,7 +58,6 @@ export class MiniProgramRenderer implements Renderer2 {
   createElement(name: string, namespace?: string | null) {
     const element = new AgentNode('element');
     element.name = name;
-    element.classList.add(`tag-name-${name}`);
     return element;
   }
   createComment(value: string) {

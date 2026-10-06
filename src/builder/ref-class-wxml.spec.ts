@@ -16,6 +16,9 @@ async function compile(html: string): Promise<string> {
   ctx.declaredWxsModules = declared;
   const def = new TemplateDefinition(r.nodes, ctx);
   const t = new WxTransform();
+  // 本文件只关 refClass。`tag-name-*` 会往 class 属性前面插一段字面量，
+  // 开着它断言就变成同时钉两件事，那部分单独立文件测。
+  t.tagNameClass = 'off';
   t.init();
   return t.compile(def.run().map((n) => n.getNodeMeta())).content;
 }
@@ -31,7 +34,7 @@ async function compile(html: string): Promise<string> {
  * 下推到渲染层的 class 全都保留，refClass 只是追加一个 token。
  */
 describe('wxml 可查询 class', () => {
-  const REF_EXPR = `(nodeList[0].class) + ' ' + (nodeList[0].refClass || '')`;
+  const REF_EXPR = `(nodeList[0].class || '') + ' ' + (nodeList[0].refClass || '')`;
 
   it('带 # 的元素把 refClass 追加到 class 末尾', async () => {
     expect(await compile(`<div #box></div>`)).toContain(
@@ -40,10 +43,9 @@ describe('wxml 可查询 class', () => {
   });
 
   it('没 # 的元素完全不碰 refClass', async () => {
-    const wxml = await compile(`<div><span></span></div>`);
-    expect(wxml).not.toContain('refClass');
-    expect(wxml).toContain(`class="{{nodeList[0].class}}"`);
-    expect(wxml).toContain(`class="{{nodeList[1].class}}"`);
+    const wxml = await compile(`<div #box></div><span></span>`);
+    expect(wxml.match(/refClass/g)?.length).toBe(1);
+    expect(wxml).toContain(`class="{{${REF_EXPR}}}"`);
   });
 
   it('静态 class 走的是 class 聚合串，不被 refClass 顶掉', async () => {
@@ -70,7 +72,7 @@ describe('wxml 可查询 class', () => {
   });
 
   it('兄弟节点各用自己的下标，只有带 # 的那个拼 refClass', async () => {
-    const wxml = await compile(`<div #box></div><div></div>`);
+    const wxml = await compile(`<div #box></div><div class="x"></div>`);
     expect(wxml.match(/refClass/g)?.length).toBe(1);
     expect(wxml).toContain(`nodeList[0].refClass`);
     expect(wxml).toContain(`class="{{nodeList[2].class}}"`);
