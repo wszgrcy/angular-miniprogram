@@ -71,22 +71,13 @@ export class MiniProgramRenderer implements Renderer2 {
     markStructuralChange();
     parent.appendChild(newChild);
   }
-  insertBefore(
-    parent: AgentNode,
-    newChild: AgentNode,
-    refChild: AgentNode,
-    isMove?: boolean,
-  ) {
-    if (isMove) {
-    }
+  insertBefore(parent: AgentNode, newChild: AgentNode, refChild: AgentNode) {
     markStructuralChange();
     if (parent) {
       parent.insertBefore(newChild, refChild);
     }
   }
-  removeChild(parent: AgentNode, oldChild: AgentNode, isHostElement?: boolean) {
-    if (isHostElement) {
-    }
+  removeChild(parent: AgentNode, oldChild: AgentNode) {
     markStructuralChange();
     if (parent) {
       parent.removeChild(oldChild);
