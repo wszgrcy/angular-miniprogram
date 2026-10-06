@@ -11,6 +11,7 @@ import {
   LibraryGlobalTemplateRecord,
   LibraryMetaEntry,
   LibraryMetaFile,
+  assertLibraryMetaFileShape,
   normalizeMetaKey,
 } from './library-meta-schema';
 
@@ -263,6 +264,8 @@ export function writeLibraryMetaFile(
     return undefined;
   }
   const file = buildLibraryMetaFile(readLibVersion(distRoot));
+  // 写盘前过一次形状：工具链自己写坏了就当场炸，别产出一个没有 wxml 的库
+  assertLibraryMetaFileShape(file);
   const keys = Object.keys(file.entries);
   if (keys.length === 0) {
     return undefined;

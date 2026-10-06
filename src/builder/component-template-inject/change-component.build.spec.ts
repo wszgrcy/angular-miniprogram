@@ -25,7 +25,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     it('每个有 rf & 1 的组件模板都被注入且只注入一次', async () => {
       const angularConfig = {
         ...DEFAULT_ANGULAR_CONFIG,
-        platform: PlatformType.wx,
+        platform: PlatformType.wx as const,
         sourceMap: false,
       };
       const root = harness.host.root();

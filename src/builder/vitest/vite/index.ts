@@ -43,47 +43,18 @@ import {
   miniProgramBuiltinDefine,
   miniProgramVitestGlobalDefine,
 } from './globals-define';
+import {
+  type MpVitestBuilderOptions,
+  type ParsedVitestBuilderOptions,
+  parseVitestBuilderOptions,
+} from './options-schema';
 
-export interface VitestViteBuilderOptions {
-  /** 测试引导入口（test.ts），里面调 startupMiniProgramTest() */
-  main: string;
-  tsConfig: string;
-  outputPath?: string;
-  pages?: AssetPattern[];
-  /** 分包入口，语义与 application builder 的同名字段一致 */
-  subpackages?: MpSubPackagePattern[];
-  /** 自定义 tabBar 入口，语义与 application builder 的同名字段一致 */
-  customTabbar?: AssetPattern[];
-  platform: import('../../platform/platform').PlatformType;
-  assets?: AssetPattern[];
-  styles?: (string | { input: string })[];
-  sourceMap?: boolean;
-  watch?: boolean;
-  include?: string[];
-  exclude?: string[];
-  /** 回连宿主的端口，必须和 vitest.config 里 miniProgramVitest({port}) 一致 */
-  port?: number;
-  clientHost?: string;
-  dedupe?: string[];
-  /**
-   * 语义与 application builder 的同名选项一致：声明 `@angular/localize`（或 `/init`）才会注入它。
-   * 不注入的话 `$localize` 就是 core 的恒等实现，ICU 分支不会被解析。
-   */
-  polyfills?: string | string[];
-  /**
-   * 与 application builder 同名同义：测试产物也是一个完整小程序工程，
-   * 两条链路读同一份配置必须得到同一个 app.json。
-   */
-  appJson?: string;
-  projectConfig?: string;
-  appJsonValidate?: MpConfigValidateLevel;
-  deriveCondition?: boolean;
-  /**
-   * 与 application builder 同名同义：自定义 vite 配置的钩子文件（相对 workspaceRoot）。
-   * 要加插件 / 加 alias 两条链路应当是同一个入口。
-   */
-  viteConfig?: string;
-}
+/**
+ * `vitest` builder 的选项形状，定义在 `options-schema.ts`（valibot）：
+ * 同一份形状负责生成 `schema.json`、入口解析与 TS 类型。
+ * 默认值由 `parseVitestBuilderOptions` 在入口补齐。
+ */
+export type VitestViteBuilderOptions = MpVitestBuilderOptions;
 
 /**
  * 测试产物目录。绝不落到裸 `dist`：那里是应用/library 产物目录，
@@ -98,11 +69,11 @@ function resolveOutputPath(
     'vitest',
     context.target?.project || 'project',
   );
-  return path.resolve(context.workspaceRoot, options.outputPath || fallback);
+  return path.resolve(context.workspaceRoot, options.outputPath ?? fallback);
 }
 
 export async function createVitestViteConfig(options: {
-  vitestOptions: VitestViteBuilderOptions;
+  vitestOptions: ParsedVitestBuilderOptions;
   context: BuilderContext;
 }): Promise<InlineConfig> {
   const { vitestOptions, context } = options;
@@ -113,7 +84,7 @@ export async function createVitestViteConfig(options: {
   });
 
   const entryPatterns = await generateEntryPatterns({
-    pages: vitestOptions.pages || [],
+    pages: vitestOptions.pages,
     subpackages: vitestOptions.subpackages,
     customTabbar: vitestOptions.customTabbar,
     workspaceRoot: context.workspaceRoot,
@@ -135,7 +106,7 @@ export async function createVitestViteConfig(options: {
   const specFiles = await globSpecFiles({
     cwd: getSystemPath(absoluteProjectSourceRoot),
     include: specInclude,
-    exclude: vitestOptions.exclude ?? [],
+    exclude: vitestOptions.exclude,
   });
   context.logger.info(
     `vitest: 在 ${getSystemPath(absoluteProjectSourceRoot)} 发现 ${
@@ -189,12 +160,12 @@ export async function createVitestViteConfig(options: {
     // devkit 在 Windows 下给的是 /C:/... 这种 posix 化绝对路径，先归一。
     // 类型库不在这里动手：`types` 由工程自己的 tsconfig 声明，构建器不替用户找类型。
     tsConfig: resolveNative(context.workspaceRoot, vitestOptions.tsConfig),
-    pages: vitestOptions.pages || [],
+    pages: vitestOptions.pages,
     assets: vitestOptions.assets,
     copiedAssets: mpConfigs.assets,
     mpConfigs,
     styles: vitestOptions.styles,
-    watch: !!vitestOptions.watch,
+    watch: vitestOptions.watch,
     bootstrapChunk: 'test.js',
     absoluteProjectRoot,
     absoluteProjectSourceRoot,
@@ -230,7 +201,7 @@ export async function createVitestViteConfig(options: {
           context.workspaceRoot,
         ),
       ],
-      dedupe: vitestOptions.dedupe ?? [],
+      dedupe: vitestOptions.dedupe,
     },
     plugins: [
       ...stack.preAnalogPlugins,
@@ -252,7 +223,7 @@ export async function createVitestViteConfig(options: {
     build: {
       outDir: resolveOutputPath(vitestOptions, context),
       emptyOutDir: true,
-      sourcemap: !!vitestOptions.sourceMap,
+      sourcemap: vitestOptions.sourceMap,
       minify: false,
       assetsInlineLimit: 0,
       rollupOptions: {
@@ -308,12 +279,14 @@ export async function createVitestViteConfig(options: {
  *   3. npx vitest run                  → 起 WS、等小程序连上、驱动并收集结果
  */
 export function runVitestViteBuilder(
-  options: VitestViteBuilderOptions,
+  rawOptions: VitestViteBuilderOptions,
   context: BuilderContext,
 ): Observable<BuilderOutput> {
   return new Observable<BuilderOutput>((observer) => {
     void (async () => {
       try {
+        // 选项过一次 schema：默认值在这儿补齐，形状问题当场报出
+        const options = parseVitestBuilderOptions(rawOptions);
         const vite = await import('vite');
         const config = await createVitestViteConfig({
           vitestOptions: options,

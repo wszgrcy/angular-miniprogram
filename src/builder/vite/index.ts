@@ -1,6 +1,5 @@
 import type { BuilderContext, BuilderOutput } from '@angular-devkit/architect';
 import { createBuilder } from '@angular-devkit/architect';
-import type { AssetPattern } from '@angular-devkit/build-angular';
 import { getSystemPath } from '@angular-devkit/core';
 import * as path from 'path';
 import { Observable } from 'rxjs';
@@ -12,13 +11,10 @@ import {
   clearLibraryMetaMisses,
   formatLibraryMetaSummary,
 } from '../library/library-meta-diagnostics';
-import type { TagNameClassMode } from '../mini-program-compiler/tag-mapping';
 import type { WxsAnalysisRef } from '../mini-program-compiler/type';
 import { BuildPlatform, PlatformType } from '../platform/platform';
 import { getBuildPlatformInjectConfig } from '../platform/platform-inject-config';
 import { LibraryTemplateScopeService } from '../shared/library-template-scope.service';
-import type { MpSubPackagePattern } from '../shared/type';
-import type { BudgetEntry } from '../util/angular-build-compat';
 import { toPosixPath } from '../util/path';
 import { type MpAppConfig, getSubPackages } from './app-config';
 import { applyMpViteConfig } from './config-hook';
@@ -27,16 +23,12 @@ import {
   resolveProjectRoots,
   toRollupInput,
 } from './entry-patterns';
-import type { MpConfigValidateLevel } from './mp-config';
 import {
   groupSubPackages,
   prepareMpConfigs,
   reportMpConfigDiagnostics,
 } from './mp-config';
 import {
-  type OptimizationOption,
-  type OutputHashing,
-  type SourceMapOption,
   isExternalSpecifier,
   mergeDefine,
   resolveCssPreprocessorOptions,
@@ -45,6 +37,11 @@ import {
   resolveSourcemap,
   toAbsoluteFileReplacements,
 } from './options';
+import {
+  type MpApplicationOptions,
+  type ParsedApplicationOptions,
+  parseApplicationOptions,
+} from './options-schema';
 import { platformConditionDefine } from './platform-flags';
 import { budgetsPlugin } from './plugins/budgets.plugin';
 import { miniProgramComponentTransformPlugin } from './plugins/component-transform.plugin';
@@ -63,94 +60,12 @@ import {
   watchSources,
 } from './watch-sources';
 
-export interface ViteMiniProgramBuildOptions {
-  tsConfig: string;
-  outputPath: string;
-  pages: AssetPattern[];
-  /**
-   * 分包入口，写法与 `pages` 一样，`output` 就是分包 root。
-   * 配了就不用在 app 配置里写 `subpackages`；app 配置里写了同一个 root 以其为准。
-   */
-  subpackages?: MpSubPackagePattern[];
-  /**
-   * 自定义 tabBar 入口的源文件位置，产物目录由平台定，不配默认取
-   * `<sourceRoot>/custom-tab-bar` 下的 `*.entry.ts`。
-   */
-  customTabbar?: AssetPattern[];
-  platform: PlatformType;
-  assets?: AssetPattern[];
-  styles?: (string | { input: string })[];
-  sourceMap?: SourceMapOption;
-  /** 与 angular.json `build.options.polyfills` 同名同义，每条都会被 import 进 polyfills 入口，包名和本地文件都收。 */
-  polyfills?: string | string[];
-  optimization?: OptimizationOption;
-  /** 监听模式：微信开发者工具盯着 dist 目录 */
-  watch?: boolean;
-  /**
-   * 强制单例的包，透传给 Vite 的 `resolve.dedupe`。默认空，
-   * 只有 `file:` / `npm link` 接入本库时才需要，否则 @angular/core 会被打成两份。
-   */
-  dedupe?: string[];
-  /**
-   * 结构化 app 配置源文件（相对 workspaceRoot，如 src/app.config.json）。
-   * 与 assets 里的静态 app.json 不是二选一：静态那份是底稿，这个文件只写要补的字段。
-   */
-  appJson?: string;
-  /** 结构化 project 配置源文件（相对 workspaceRoot），与 `appJson` 各管一个输出文件，字段不互通。 */
-  projectConfig?: string;
-  /** app 配置校验严格度，默认 `error`，只作用于 `appJson` 通道。 */
-  appJsonValidate?: MpConfigValidateLevel;
-  /** 自动生成 project 配置的调试启动项（`condition`），默认关。 */
-  deriveCondition?: boolean;
-  /**
-   * 原生小程序自定义组件目录（相对 workspaceRoot，如 wxcomponents）。
-   * 配置后整个目录拷进产物，模板里命中原生标签自动注入 usingComponents。
-   */
-  nativeComponentsDir?: string;
-  /** 文件替换，CLI 标准形状：[{ replace, with }] */
-  fileReplacements?: {
-    replace: string;
-    with: string;
-  }[];
-  /** scss / sass 的 includePaths 与 sass 编译器选项 */
-  stylePreprocessorOptions?: {
-    includePaths?: string[];
-    sass?: Record<string, unknown>;
-  };
-  /** `@Component.styles` 内联样式的语言，默认 'css'。 */
-  inlineStyleLanguage?: string;
-  /** app 引导入口（src/main.ts），内容是 `bootstrapApplication({ providers: [...] })`。 */
-  main?: string;
-  /** 产物模块格式，默认 'cjs'。小程序运行时是 CommonJS，不原生支持 ESM。 */
-  format?: 'cjs' | 'es';
-  /** 产物文件名的 hash 策略，见 `resolveOutputNames` */
-  outputHashing?: OutputHashing;
-  /** 构建前是否清空 outputPath，对应 vite 的 `build.emptyOutDir` */
-  deleteOutputPath?: boolean;
-  /** 模块解析是否还原软链接，透传 vite `resolve.preserveSymlinks` */
-  preserveSymlinks?: boolean;
-  /** 用户侧 define，与平台 define 合并（平台优先），见 `mergeDefine` */
-  define?: Record<string, string>;
-  /** 条件导出解析条件，透传 vite `resolve.conditions` */
-  conditions?: string[];
-  /** 不打包、运行时依赖外部提供的包名 */
-  externalDependencies?: string[];
-  /**
-   * 自定义 vite 配置的钩子文件（相对 workspaceRoot）。文件默认导出
-   * `(config, ctx) => config`，`config` 是构建器组装完的最终 vite 配置。
-   * `.ts` / `.mts` / `.cts` 由 jiti 加载，`.js` / `.mjs` / `.cjs` 走原生 import。
-   */
-  viteConfig?: string;
-  /** 产物体积预算，判定逻辑复用 @angular/build，见 budgets.plugin */
-  budgets?: BudgetEntry[];
-  /** 产出 stats.json（各文件体积清单） */
-  statsJson?: boolean;
-  /**
-   * `tag-name-<原标签>` 标记的输出策略，默认 `mapped`。
-   * 这个标记是给「模板写 `div`、wxml 里已经是 `view`」补的选中把手。
-   */
-  tagNameClass?: TagNameClassMode;
-}
+/**
+ * angular.json 里 `options` 的形状，定义在 `options-schema.ts`（valibot）：
+ * 同一份形状还负责生成 `schema.json` 与补默认值，这里只是转发给 builder 内部用。
+ * 默认值由 `parseApplicationOptions` 在入口补齐，往下读不用再判空。
+ */
+export type ViteMiniProgramBuildOptions = MpApplicationOptions;
 
 /** 由 BuildPlatform 推出来的 define，把全局对象 / 平台变量编译期重定向。 */
 export function buildPlatformDefine(
@@ -302,7 +217,7 @@ export function buildViteAlias(
  * componentTransform 插件（enforce: 'post'）拿 AOT 产物注入 propertyChange。
  */
 export async function createMiniProgramViteConfig(options: {
-  viteOptions: ViteMiniProgramBuildOptions;
+  viteOptions: ParsedApplicationOptions;
   context: BuilderContext;
   buildPlatform: BuildPlatform;
   extraPlugins?: import('vite').Plugin[];
@@ -647,34 +562,36 @@ export function mpConfigWatchFiles(
 }
 
 export function runViteBuilder(
-  options: ViteMiniProgramBuildOptions,
+  rawOptions: ViteMiniProgramBuildOptions,
   context: BuilderContext,
 ): Observable<BuilderOutput> {
   return new Observable<BuilderOutput>((observer) => {
     let watcher: SourceWatcher | undefined;
     let closed = false;
 
-    const baseOutputPath = path.resolve(
-      context.workspaceRoot,
-      options.outputPath,
-    );
-    const emitSuccess = () => {
-      if (!closed) {
-        observer.next({
-          success: true,
-          // 输出契约，spec 里靠这个定位产物
-          baseOutputPath,
-        } as BuilderOutput);
-      }
-    };
-
     void (async () => {
       try {
+        // 选项过一次 schema：默认值在这儿补齐，形状问题当场报出，
+        // 下面所有读取点拿到的都是补齐过的值，不用再 `?? 默认值`
+        const options = parseApplicationOptions(rawOptions);
+        const baseOutputPath = path.resolve(
+          context.workspaceRoot,
+          options.outputPath,
+        );
+        const emitSuccess = () => {
+          if (!closed) {
+            observer.next({
+              success: true,
+              // 输出契约，spec 里靠这个定位产物
+              baseOutputPath,
+            } as BuilderOutput);
+          }
+        };
+
         const buildPlatform = getBuildPlatform(options.platform);
         // BuildPlatform 构造时就把 transform 装配进了 WxContainer 全局配置，
         // 重跑一次 init 才能把选项带进去
-        buildPlatform.templateTransform.tagNameClass =
-          options.tagNameClass ?? 'mapped';
+        buildPlatform.templateTransform.tagNameClass = options.tagNameClass;
         buildPlatform.templateTransform.init();
         const vite = await import('vite');
 

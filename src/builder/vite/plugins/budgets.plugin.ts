@@ -2,6 +2,7 @@ import type { BuilderContext } from '@angular-devkit/architect';
 import type { OutputAsset, OutputBundle, OutputChunk, Plugin } from 'rollup';
 import type { BudgetEntry, BudgetStats } from '../../util/angular-build-compat';
 import { loadBudgetChecker } from '../../util/angular-build-compat';
+import type { MpBudgetEntry } from '../options-schema';
 
 /**
  * `budgets` / `statsJson`：产物体积核算。阈值换算、口径、报错文案全部复用 @angular/build 的实现，
@@ -15,7 +16,7 @@ import { loadBudgetChecker } from '../../util/angular-build-compat';
  * `statsJson` 出的是 `{chunks, assets}`（每项带 size）。
  */
 export function budgetsPlugin(options: {
-  budgets?: BudgetEntry[];
+  budgets?: MpBudgetEntry[];
   statsJson?: boolean;
   logger: BuilderContext['logger'];
 }): Plugin {
@@ -36,7 +37,12 @@ export function budgetsPlugin(options: {
       }
       const { checkBudgets, ThresholdSeverity } = await loadBudgetChecker();
       const errors: string[] = [];
-      for (const result of checkBudgets(options.budgets, stats)) {
+      // schema 里 budget.type 是字面量，@angular/build 那边是同名 string enum：
+      // 值一模一样但类型互不相认，只在交给它的实现时转一次
+      for (const result of checkBudgets(
+        options.budgets as BudgetEntry[],
+        stats,
+      )) {
         if (result.severity === ThresholdSeverity.Error) {
           errors.push(result.message);
         } else {

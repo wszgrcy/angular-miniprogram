@@ -1,53 +1,47 @@
+import { toJsonSchema } from '@valibot/to-json-schema';
+import type { ConversionConfig } from '@valibot/to-json-schema';
 import * as fs from 'fs';
 import * as path from 'path';
-import { PlatformType } from '../src/builder/platform/platform';
+import { libraryOptionsSchema } from '../src/builder/library/options-schema';
+import {
+  applicationOptionsSchema,
+  applicationSchemaDefinitions,
+  assetPatternSchema,
+} from '../src/builder/vite/options-schema';
+import { vitestOptionsSchema } from '../src/builder/vitest/vite/options-schema';
 
 const nodeRequire = require as unknown as NodeRequire;
 
 /**
- * 生成 `src/builder/vite/schema.json`（application builder 的选项 schema）。
+ * 生成三个 builder 的选项 schema：`src/builder/vite/schema.json`（application）、
+ * `src/builder/library/schema.json`、`src/builder/vitest/vite/schema.json`。
  *
- * ## 为什么是生成物
+ * ## 形状只写一份
  *
- * 本构建器是 `@angular/build:application` 的小程序对应物，选项名和语义都应当
- * 跟它对齐。以前 schema 是手抄的（而且抄的是 webpack 时代 `build-angular:browser`
- * 那一版），结果两头都漂：上游删掉的化石字段留在这儿变成了「配了没反应」，
- * 上游新增的字段我们又一个没接。
+ * 选项形状写在 valibot 里（`src/builder/vite/options-schema.ts`、
+ * `src/builder/library/options-schema.ts`、`src/builder/vitest/vite/options-schema.ts`），
+ * 这里只负责转换：`@valibot/to-json-schema` 转成 JSON Schema，再补 title /
+ * description / 来源版本。同一份形状还负责 builder 入口的选项解析（默认值在那儿补）
+ * 和选项的 TS 类型，三者不可能各说各话。两条链路同名同义的字段走
+ * `sharedMpOptionFields`，不在两个文件里各写一遍。
  *
- * 现在改成**白名单生成**：基底直接读 devDependencies 里
- * `@angular/build/src/builders/application/schema.json`（版本由 package.json
- * 钉住，升版本即同步），只挑 `INHERIT` / `OVERRIDE` 里点过名的字段，
- * 再拼上本包独有的 `LOCAL`。
+ * ## 和上游的关系
  *
- * 上游新增字段不会自动进来 —— 想支持就得往表里加一行，加的时候顺手把语义
- * 落到 `createMiniProgramViteConfig` 里。这样 schema 里出现的每一个字段，
- * 都必然在 builder 里有读取点。
+ * application 构建器是 `@angular/build:application` 的小程序对应物，选项名和语义都跟它
+ * 对齐；library 对应 `@angular/build:ng-packagr`。上游在这里不再是形状来源，而是
+ * **对账对象**（版本由 package.json 钉住）：
  *
- * ## 丢弃清单（配了会直接校验失败，而不是静默无效）
+ *  - `UPSTREAM_FIELDS` 点过名的字段上游删了 → 当场报错，提醒同步；
+ *  - 上游新增字段既没进 `UPSTREAM_FIELDS` 也没进 `DISCARDED` → 报出来，逼一次表态；
+ *  - `DISCARDED` 是丢弃清单：这些字段本包不接，配了会直接校验失败，而不是静默无效。
  *
- * 小程序没有 HTML / HTTP / SW / SSR / Web Worker 这些概念，下列上游字段整体不要：
- *
- * - 入口与 HTML：`browser`（本包叫 `main`）、`index`、`appShell`、`baseHref`
- * - 服务端渲染：`server`、`ssr`、`prerender`、`outputMode`
- * - HTTP 部署：`deployUrl`、`security`、`crossOrigin`、`subresourceIntegrity`
- * - Service Worker：`serviceWorker`
- * - Web Worker：`webWorkerTsConfig`
- * - 与打包器绑定、Vite 侧无对应物：`loader`、`extractLicenses`、`clearScreen`
- * - webpack 化石：`vendorChunk`、`commonChunk`、`buildOptimizer`、`extractCss`、
- *   `showCircularDependencies`、`namedChunks`（rollup 的 chunk 本来就带名字）、
- *   `resourcesOutputPath`、`poll`（本包 watch 走 fs.watch，无轮询）
- * - 未实现：`scripts`（全局脚本入口）、`allowedCommonJsDependencies`
- *   （Vite 没有对应的告警可关）、`verbose`（logLevel 固定 info，见 index.ts 注释）
- * - i18n 构建期内联：`localize`、`i18nMissingTranslation`、`i18nDuplicateTranslation`
- *   （本包走 `polyfills` 里声明 `@angular/localize` 那条运行时路径）
- * - `aot`：恒 AOT，没有 jit 路径
+ * 上游新增字段不会自动进来 —— 想支持就往 options-schema 加字段并登记进
+ * `UPSTREAM_FIELDS`，加的时候顺手把语义落到 `createMiniProgramViteConfig` 里。
+ * 这样 schema 里出现的每一个字段，都必然在 builder 里有读取点。
+ * `vitest` builder 是本包独有的，没有上游可对账，生成物也不带来源版本戳。
  *
  * 用法：`npm run gen:schema` 重新生成，`npm run check:schema` 只校验不写盘
  * （CI 用，防止有人手改 schema.json 或升了 @angular/build 却没同步）。
- *
- * `library` builder 走同一套：基底是 `@angular/build` 的 ng-packagr schema
- * （project / tsConfig / watch / poll 四个，本包无独有项），产物是
- * `src/builder/library/schema.json`。
  */
 
 const UPSTREAM_PACKAGE = '@angular/build';
@@ -61,17 +55,13 @@ const LIBRARY_OUTPUT = path.resolve(
   __dirname,
   '../src/builder/library/schema.json',
 );
-
-/**
- * `platform` 的合法值直接取自平台注册表，不在 schema 里手抄一遍（手拄了就会漏）。
- * `library` 是构建器内部给 library 产物用的伪平台，不是用户能配的目标。
- */
-const PLATFORM_ENUM = Object.values(PlatformType).filter(
-  (value) => value !== PlatformType.library,
+const VITEST_OUTPUT = path.resolve(
+  __dirname,
+  '../src/builder/vitest/vite/schema.json',
 );
 
-/** 上游定义原样继承的字段（描述、类型、默认值全部跟上游） */
-const INHERIT = [
+/** 名字与语义取自上游的字段。上游删掉任何一个都会在这里报错，而不是静默少字段。 */
+const APPLICATION_UPSTREAM_FIELDS = [
   'assets',
   'styles',
   'stylePreprocessorOptions',
@@ -87,228 +77,76 @@ const INHERIT = [
   'externalDependencies',
   'budgets',
   'statsJson',
+  'tsConfig',
+  'outputPath',
+  'polyfills',
+  'optimization',
 ] as const;
 
-/** 继承上游、但本包改了定义或默认值的字段。reason 说明为什么要改。 */
-const OVERRIDE: Record<string, { def: unknown; reason: string }> = {
-  tsConfig: {
-    def: {
-      type: 'string',
-      description:
-        'The full path for the TypeScript configuration file, relative to the current workspace.',
-    },
-    reason: '本包 tsconfig 必填（入口范围靠它的 fileNames 判定），上游是可选。',
-  },
-  outputPath: {
-    def: {
-      type: 'string',
-      description:
-        'The full path for the new output directory, relative to the current workspace.',
-    },
-    reason:
-      '上游的 {base,browser,server,media} 对象形态是给 web 产物分目录用的，' +
-      '小程序产物目录由平台固定，只收字符串。',
-  },
-  polyfills: {
-    def: {
-      description: 'Polyfills to be included in the build.',
-      oneOf: [
-        {
-          type: 'array',
-          description: 'Polyfills to be included in the build.',
-          items: { type: 'string' },
-        },
-        {
-          type: 'string',
-          description: 'The polyfills to be included in the build.',
-        },
-      ],
-    },
-    reason:
-      '比上游放宽（上游只收数组）：串 / 数组两种写法照旧都收，减少心智。' +
-      '上游自己也在 options.ts 里把串归一成数组，所以放宽不会和上游分叉。' +
-      'localize 的判定见 vite/index.ts resolveLocalizeInit。',
-  },
-  optimization: {
-    def: {
-      description:
-        'Enables optimization of the build output: minification of scripts and ' +
-        'styles, tree-shaking and dead-code elimination. `styles.inlineCritical` ' +
-        'and `fonts` are web-only and have no effect here.',
-      default: false,
-      oneOf: [
-        {
-          type: 'object',
-          properties: {
-            scripts: {
-              type: 'boolean',
-              description: 'Enables optimization of the scripts output.',
-              default: true,
-            },
-            styles: {
-              description: 'Enables optimization of the styles output.',
-              default: true,
-              oneOf: [
-                {
-                  type: 'object',
-                  properties: {
-                    minify: {
-                      type: 'boolean',
-                      description:
-                        'Minify CSS definitions by removing extraneous whitespace and comments.',
-                      default: true,
-                    },
-                  },
-                  additionalProperties: false,
-                },
-                { type: 'boolean' },
-              ],
-            },
-          },
-          additionalProperties: false,
-        },
-        { type: 'boolean' },
-      ],
-    },
-    reason:
-      '上游默认 true（web 产物默认压缩）。本包默认 false：小程序的 dev 流程是' +
-      '微信开发者工具盯着产物目录，默认出未压缩代码才可读；需要压缩请显式打开' +
-      '或走 production configuration。同时只保留 scripts / styles.minify ' +
-      '两个真有对应物的子项。',
-  },
+const LIBRARY_UPSTREAM_FIELDS = [
+  'project',
+  'tsConfig',
+  'watch',
+  'poll',
+] as const;
+
+/**
+ * 上游有、本包不要的字段 → 为什么不要。空话别写：这一栏是给「升上游版本时纠结要不要接」的人看的。
+ */
+const APPLICATION_DISCARDED: Record<string, string> = {
+  // 入口与 HTML：小程序没有 HTML 入口
+  browser: '入口在本包叫 main',
+  index: '没有 HTML 入口',
+  appShell: '没有 HTML',
+  baseHref: '没有 HTML',
+  // 服务端渲染
+  server: '没有服务端产物',
+  ssr: '没有服务端渲染',
+  prerender: '没有预渲染',
+  outputMode: '产物目录由平台固定，没有 browser/server 之分',
+  // HTTP 部署
+  deployUrl: '没有 HTTP 部署路径',
+  security: '没有 HTTP 响应头',
+  crossOrigin: '没有 HTTP',
+  subresourceIntegrity: '没有 HTTP',
+  // Service Worker
+  serviceWorker: '没有 Service Worker',
+  ngswConfigPath: '没有 Service Worker',
+  // Web Worker
+  webWorkerTsConfig: '没有 Web Worker',
+  // 与打包器绑定，Vite / rollup 侧无对应物
+  loader: 'esbuild 的 loader 由 tsconfig 决定，不接受手配',
+  extractLicenses: '没有单独的许可证抽取',
+  clearScreen: '日志由 builderContext 出，不清屏',
+  // webpack 化石
+  vendorChunk: 'rollup 没有 vendor chunk 这个概念',
+  commonChunk: 'rollup 自动做公共 chunk',
+  buildOptimizer: '没有对应的优化阶段',
+  extractCss: '样式本来就不在 JS 里',
+  showCircularDependencies: 'rollup 自己会报循环依赖',
+  namedChunks: 'rollup 的 chunk 本来就带名字',
+  resourcesOutputPath: '媒体产物路径由平台固定',
+  poll: '本包 watch 走 fs.watch，无轮询',
+  progress: '没有进度条可关',
+  // 未实现
+  scripts: '全局脚本入口未实现',
+  allowedCommonJsDependencies: 'Vite 没有对应的告警可关',
+  verbose: 'logLevel 固定 info，见 vite/index.ts',
+  // i18n 构建期内联：本包走 polyfills 里声明 @angular/localize 那条运行时路径
+  localize: 'i18n 走运行时 @angular/localize',
+  i18nFile: '同上',
+  i18nFormat: '同上',
+  i18nLocale: '同上',
+  i18nMissingTranslation: '同上',
+  i18nDuplicateTranslation: '同上',
+  // 恒 AOT，没有 jit 路径
+  aot: '恒 AOT',
 };
 
-/** 本包独有字段（上游没有）。 */
-const LOCAL: Record<string, unknown> = {
-  platform: {
-    type: 'string',
-    // 枚举值直接取自 PlatformType，不在这里手抄一遗
-    enum: PLATFORM_ENUM,
-    description: '小程序平台',
-    default: 'wx',
-  },
-  pages: {
-    type: 'array',
-    description: '页面配置',
-    default: [],
-    items: { $ref: '#/definitions/assetPattern' },
-  },
-  subpackages: {
-    type: 'array',
-    description:
-      '分包入口：写法与 pages 一样，output 就是分包 root（约定 root 同时是源码目录' +
-      '与产物目录）。配了就不用在 app 配置里写 subpackages：root 取 output，' +
-      '分包页由扫出来的入口算；自己写了同一个 root 就以自己那份为准',
-    items: {
-      type: 'object',
-      properties: {
-        glob: { type: 'string', description: '匹配入口文件的 glob' },
-        input: { type: 'string', description: '源目录' },
-        output: {
-          type: 'string',
-          description: '分包 root（同时是产物目录）',
-        },
-        ignore: {
-          description: 'An array of globs to ignore.',
-          type: 'array',
-          items: { type: 'string' },
-        },
-        independent: {
-          type: 'boolean',
-          description: '独立分包：不依赖主包即可运行',
-        },
-      },
-      required: ['glob', 'input', 'output'],
-      additionalProperties: false,
-    },
-  },
-  customTabbar: {
-    type: 'array',
-    description:
-      '自定义 tabBar 入口的源文件位置。产物目录由平台决定（微信系 custom-tab-bar，' +
-      '支付宝 customize-tab-bar），output 字段会被覆盖；' +
-      '不配则默认取 <sourceRoot>/custom-tab-bar 下的 *.entry.ts',
-    items: { $ref: '#/definitions/assetPattern' },
-  },
-  main: {
-    type: 'string',
-    description:
-      'The full path for the main entry point to the app, relative to the current workspace.',
-  },
-  appJson: {
-    type: 'string',
-    description:
-      '结构化 app 配置源文件（相对 workspaceRoot）。与 assets 里的静态 app.json ' +
-      '不是二选一：静态那份是底稿，本文件只写要补的字段，已写过的 key 不动，' +
-      'pages 追加。环境不同就换这个文件，平台不同用文件里的 _platform 段。',
-  },
-  projectConfig: {
-    type: 'string',
-    description:
-      '结构化 project 配置源文件（相对 workspaceRoot），只影响 project 配置文件。' +
-      '与 appJson 各管一个输出文件，字段不互通；没写的字段由内置默认值打底。',
-  },
-  appJsonValidate: {
-    type: 'string',
-    enum: ['error', 'warn', 'off'],
-    default: 'error',
-    description:
-      'app 配置校验严格度。只作用于 appJson 通道；只有静态 app.json 的工程固定 warn' +
-      '（那是从别的项目搬过来的，合规与否不由我们负责）。off 用于先绕过校验把工程跑起来。',
-  },
-  deriveCondition: {
-    type: 'boolean',
-    default: false,
-    description:
-      '自动生成 project 配置的调试启动项（condition），开发者工具的「编译模式」' +
-      '会列出全部页面。只是方便一下，需要精确控制启动参数仍在 projectConfig 里写。',
-  },
-  nativeComponentsDir: {
-    type: 'string',
-    description:
-      '原生小程序自定义组件目录（相对 workspaceRoot，如 wxcomponents）。' +
-      '配置后整个目录拷进产物，模板命中原生标签自动注入 usingComponents。',
-  },
-  dedupe: {
-    type: 'array',
-    items: { type: 'string' },
-    default: [],
-    description:
-      'Forced single-instance packages, passed straight to Vite `resolve.dedupe`. ' +
-      'Empty by default: nothing is injected into your module resolution. Only ' +
-      'needed when the library is consumed via `file:` / `npm link`, where the ' +
-      'linked copy own node_modules holds a second @angular/core.',
-  },
-  format: {
-    type: 'string',
-    enum: ['cjs', 'es'],
-    default: 'cjs',
-    description:
-      '产物模块格式。小程序 JS 运行时是 CommonJS，默认 cjs；' +
-      '只有在宿主侧确认支持 ESM 时才改成 es。',
-  },
-  viteConfig: {
-    type: 'string',
-    description:
-      '自定义 vite 配置的钩子文件（相对 workspaceRoot）。文件默认导出一个 ' +
-      '(config, ctx) => config 的函数：config 是构建器组装完的最终 vite 配置，' +
-      '随便改，返回新对象或就地改都行；构建器不校验钩子的改动。' +
-      '.ts / .mts / .cts 由 jiti 加载，.js / .mjs / .cjs 走原生 import。',
-  },
-  tagNameClass: {
-    type: 'string',
-    enum: ['mapped', 'all', 'off'],
-    default: 'mapped',
-    description:
-      '给元素补 `tag-name-<原标签>` 标记的策略。模板写 `div` 而 wxml 里已经是 ' +
-      '`view`，`div` 选择器落空，这个 class 就是补回来的把手。' +
-      'mapped（默认）只在映射改写了标签时输出；all 每个元素都输出；' +
-      'off 一律不输出（标记会进 class，也就等于每个元素多一个 token）。',
-  },
-};
+const LIBRARY_DISCARDED: Record<string, string> = {};
 
 function readUpstream(subpath: string): {
-  schema: Record<string, any>;
+  properties: Record<string, any>;
   version: string;
 } {
   // 只能先解析 package.json 再手工拼：@angular/build 的 exports 只开了
@@ -326,151 +164,208 @@ function readUpstream(subpath: string): {
   const version = JSON.parse(
     fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf-8'),
   ).version;
-  return {
-    schema: JSON.parse(fs.readFileSync(path.join(pkgDir, subpath), 'utf-8')),
-    version,
-  };
+  const schema = JSON.parse(
+    fs.readFileSync(path.join(pkgDir, subpath), 'utf-8'),
+  );
+  return { properties: schema.properties ?? {}, version };
 }
 
 /**
- * 上游字段 → 生成物字段：没被点名的一个不进，删掉的 / 未继承的都算丢弃。
- * 两个 builder 共用这套检查，上游删字段时当场报错而不是静默少字段。
+ * 与上游对账：删了的字段必须同步，新增的字段必须表态（接进 UPSTREAM_FIELDS
+ * 或写进 DISCARDED），两边都不做就报出来。
  */
-function pickUpstream(
+function assertUpstream(
+  label: string,
   upstreamProperties: Record<string, any>,
   version: string,
-  inherit: readonly string[],
-  override: Record<string, { def: unknown; reason: string }>,
-  local: Record<string, unknown> = {},
-): Record<string, unknown> {
-  const missing = [...inherit, ...Object.keys(override)].filter(
-    (key) => !(key in upstreamProperties),
-  );
+  fields: readonly string[],
+  discarded: Record<string, string>,
+): void {
+  const missing = fields.filter((key) => !(key in upstreamProperties));
   if (missing.length) {
     throw new Error(
       `${UPSTREAM_PACKAGE}@${version} 里找不到这些字段：${missing.join(', ')}。` +
-        `上游删字段了，请同步本脚本的 INHERIT / OVERRIDE 表。`,
+        `上游删字段了，请同步 options-schema 与 UPSTREAM_FIELDS。`,
     );
   }
-  const overlap = Object.keys(override).filter((key) => inherit.includes(key));
-  if (overlap.length) {
-    throw new Error(
-      `字段同时出现在 INHERIT 和 OVERRIDE：${overlap.join(', ')}`,
-    );
-  }
-
-  const properties: Record<string, unknown> = {};
-  for (const key of inherit) {
-    const { 'x-user-analytics': _analytics, ...rest } = upstreamProperties[key];
-    properties[key] = rest;
-  }
-  for (const [key, { def }] of Object.entries(override)) {
-    properties[key] = def;
-  }
-  return Object.assign(properties, local);
-}
-
-/** `library` builder 直接全量继承 ng-packagr 的四个字段，本包无独有项。 */
-const LIBRARY_INHERIT = ['project', 'tsConfig', 'watch', 'poll'] as const;
-
-interface Generated {
-  schema: Record<string, unknown>;
-  version: string;
-}
-
-function buildApplicationSchema(): Generated {
-  const { schema: upstream, version } = readUpstream(
-    APPLICATION_SCHEMA_SUBPATH,
+  const undeclared = Object.keys(upstreamProperties).filter(
+    (key) => !fields.includes(key) && !(key in discarded),
   );
-  return {
-    version,
-    schema: {
-      $schema: 'http://json-schema.org/draft-07/schema',
-      title: 'Mini-program Vite build schema',
-      description:
-        '小程序构建 builder（Vite / esbuild 版，替代 webpack 链路）。' +
-        `本文件由 script/gen-builder-schema.ts 从 ${UPSTREAM_PACKAGE}@${version} 生成，勿手改。`,
-      type: 'object',
-      properties: pickUpstream(
-        upstream.properties ?? {},
-        version,
-        INHERIT,
-        OVERRIDE,
-        LOCAL,
-      ),
-      additionalProperties: false,
-      required: ['outputPath', 'main', 'tsConfig'],
-      definitions: upstream.definitions,
-    },
-  };
+  if (undeclared.length) {
+    console.warn(
+      `[${label}] ${UPSTREAM_PACKAGE}@${version} 有 ${undeclared.length} 个字段` +
+        `本包既没接也没登记：${undeclared.join(', ')}。` +
+        `接就加进 UPSTREAM_FIELDS，不接就写进 DISCARDED。`,
+    );
+  }
 }
 
-function buildLibrarySchema(): Generated {
-  const { schema: upstream, version } = readUpstream(LIBRARY_SCHEMA_SUBPATH);
-  return {
-    version,
-    schema: {
-      $schema: 'http://json-schema.org/draft-07/schema',
-      title: 'Mini-program library (ng-packagr) schema',
-      description:
-        '小程序 library builder（ng-packagr 链路）。' +
-        `本文件由 script/gen-builder-schema.ts 从 ${UPSTREAM_PACKAGE}@${version} 生成，勿手改。`,
-      type: 'object',
-      properties: pickUpstream(
-        upstream.properties ?? {},
-        version,
-        LIBRARY_INHERIT,
-        {},
-      ),
-      additionalProperties: false,
-      required: ['project'],
-    },
-  };
+/**
+ * 转换器出的是 draft-2020 风格的 `$defs`，本包的 schema 一直是 draft-07 的
+ * `definitions`（`build-cli-schema.ts` 内联进 workspace schema 时按这个前缀改写 $ref）。
+ * 顺手去掉空 `required: []`，那是 valibot 对全可选项对象的写法，JSON Schema 里是噪音。
+ */
+function toDraft7(node: unknown): unknown {
+  if (Array.isArray(node)) {
+    return node.map(toDraft7);
+  }
+  if (!node || typeof node !== 'object') {
+    return node;
+  }
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (key === '$defs') {
+      result['definitions'] = toDraft7(value);
+      continue;
+    }
+    if (key === 'required' && Array.isArray(value) && !value.length) {
+      continue;
+    }
+    if (key === '$ref' && typeof value === 'string') {
+      result[key] = value.replace('#/$defs/', '#/definitions/');
+      continue;
+    }
+    result[key] = toDraft7(value);
+  }
+  return result;
 }
 
-/** 生成物里带上来源版本，排查「schema 和依赖版本对不上」时不用猜。 */
-function withSourceVersion(
-  schema: Record<string, unknown>,
-  version: string,
+function convert(
+  schema: Parameters<typeof toJsonSchema>[0],
+  definitions?: ConversionConfig['definitions'],
 ): Record<string, unknown> {
-  return { ...schema, 'x-generated-from': `${UPSTREAM_PACKAGE}@${version}` };
+  return toDraft7(
+    toJsonSchema(schema, {
+      target: 'draft-07',
+      errorMode: 'throw',
+      definitions,
+    }),
+  ) as Record<string, unknown>;
 }
 
-const TARGETS: { output: string; build: () => Generated }[] = [
-  { output: APPLICATION_OUTPUT, build: buildApplicationSchema },
-  { output: LIBRARY_OUTPUT, build: buildLibrarySchema },
+/** metadata 里手写的 required 必须真有其字段，否则 CLI 侧会要求一个不存在的选项。 */
+function assertRequiredResolvable(schema: Record<string, unknown>): void {
+  const properties = (schema.properties ?? {}) as Record<string, unknown>;
+  const required = (schema.required ?? []) as string[];
+  const missing = required.filter((key) => !(key in properties));
+  if (missing.length) {
+    throw new Error(`required 里有未声明的字段：${missing.join(', ')}`);
+  }
+}
+
+interface Target {
+  /** builders.json 里的名字，只用于日志与报错 */
+  name: string;
+  output: string;
+  title: string;
+  /** 生成物 description 的第一句 */
+  summary: string;
+  schema: Parameters<typeof toJsonSchema>[0];
+  definitions?: ConversionConfig['definitions'];
+  /** 上游对账；本包独有的 builder（vitest）没有上游 */
+  upstream?: {
+    subpath: string;
+    fields: readonly string[];
+    discarded: Record<string, string>;
+  };
+}
+
+const TARGETS: Target[] = [
+  {
+    name: 'application',
+    output: APPLICATION_OUTPUT,
+    title: 'Mini-program Vite build schema',
+    summary: '小程序构建 builder（Vite / esbuild 版，替代 webpack 链路）。',
+    schema: applicationOptionsSchema,
+    definitions: applicationSchemaDefinitions,
+    upstream: {
+      subpath: APPLICATION_SCHEMA_SUBPATH,
+      fields: APPLICATION_UPSTREAM_FIELDS,
+      discarded: APPLICATION_DISCARDED,
+    },
+  },
+  {
+    name: 'library',
+    output: LIBRARY_OUTPUT,
+    title: 'Mini-program library (ng-packagr) schema',
+    summary: '小程序 library builder（ng-packagr 链路）。',
+    schema: libraryOptionsSchema,
+    upstream: {
+      subpath: LIBRARY_SCHEMA_SUBPATH,
+      fields: LIBRARY_UPSTREAM_FIELDS,
+      discarded: LIBRARY_DISCARDED,
+    },
+  },
+  {
+    name: 'vitest',
+    output: VITEST_OUTPUT,
+    title: 'MiniProgram Vitest Target',
+    summary: '把 spec 编进小程序产物，由 vitest 通过 WebSocket 驱动执行。',
+    schema: vitestOptionsSchema,
+    // 只登记真被引用到的子形状，否则 $defs 里会多出没人引用的定义
+    definitions: { assetPattern: assetPatternSchema },
+  },
 ];
+
+function render(target: Target): {
+  text: string;
+  source: string;
+  fields: number;
+} {
+  const upstream = target.upstream
+    ? readUpstream(target.upstream.subpath)
+    : undefined;
+  if (target.upstream && upstream) {
+    assertUpstream(
+      target.name,
+      upstream.properties,
+      upstream.version,
+      target.upstream.fields,
+      target.upstream.discarded,
+    );
+  }
+  const source = upstream
+    ? `${UPSTREAM_PACKAGE}@${upstream.version}`
+    : 'src/builder/vitest/vite/options-schema.ts';
+  const schema: Record<string, unknown> = {
+    $schema: 'http://json-schema.org/draft-07/schema',
+    title: target.title,
+    description: `${target.summary}本文件由 script/gen-builder-schema.ts 从 ${source} 生成，勿手改。`,
+    ...convert(target.schema, target.definitions),
+    ...(upstream ? { 'x-generated-from': source } : {}),
+  };
+  assertRequiredResolvable(schema);
+  return {
+    text: `${JSON.stringify(schema, null, 2)}\n`,
+    source,
+    fields: Object.keys((schema.properties ?? {}) as object).length,
+  };
+}
 
 function main(): void {
   const check = process.argv.includes('--check');
   for (const target of TARGETS) {
-    const { schema, version } = target.build();
-    const output = `${JSON.stringify(withSourceVersion(schema, version), null, 2)}\n`;
+    const { text, source, fields } = render(target);
     const name = path.relative(path.resolve(__dirname, '..'), target.output);
     if (check) {
       const current = fs.existsSync(target.output)
         ? fs.readFileSync(target.output, 'utf-8')
         : '';
-      if (current !== output) {
+      if (current !== text) {
         console.error(
-          `${name} 与 ${UPSTREAM_PACKAGE}@${version} 不同步，` +
+          `${name} 与 ${source} 不同步，` +
             `请跑 npm run gen:schema 并把结果一起提交`,
         );
         process.exit(1);
       }
-      console.log(`${name} 与 ${UPSTREAM_PACKAGE}@${version} 一致`);
+      console.log(`${name} 与 ${source} 一致`);
       continue;
     }
-    fs.writeFileSync(target.output, output);
-    console.log(
-      `已生成 ${name}（基底 ${UPSTREAM_PACKAGE}@${version}，` +
-        `${Object.keys(schema.properties as object).length} 个字段）`,
-    );
+    fs.writeFileSync(target.output, text);
+    console.log(`已生成 ${name}（对账 ${source}，${fields} 个字段）`);
   }
 }
 
 if (require.main === module) {
   main();
 }
-
-export { buildApplicationSchema as buildSchema, buildLibrarySchema };

@@ -56,7 +56,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     it('两个组件各自产出独立模板，且不会互相串', async () => {
       const angularConfig = {
         ...DEFAULT_ANGULAR_CONFIG,
-        platform: PlatformType.wx,
+        platform: PlatformType.wx as const,
         sourceMap: false,
       };
       const root = harness.host.root();

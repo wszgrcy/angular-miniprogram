@@ -12,6 +12,7 @@
 
 import * as v from 'valibot';
 import { PlatformType } from '../platform/platform';
+import { formatIssuePath } from '../util/valibot-issue';
 
 /** 页面条目：字符串，或带 path 的对象（各家小程序均支持） */
 const pageSchema = v.union([v.string(), v.looseObject({ path: v.string() })]);
@@ -167,21 +168,6 @@ export type MpPreloadRuleEntry = NonNullable<
 const PLATFORM_NAMES: string[] = Object.values(PlatformType).filter(
   (value) => value !== PlatformType.library,
 );
-
-/** 校验器报的路径转成 `tabBar.list[0].pagePath` 这种可读形式 */
-function formatIssuePath(path: readonly unknown[] | undefined): string {
-  let result = '';
-  for (const raw of path ?? []) {
-    const part = raw as { type: string; key?: unknown; index?: number };
-    const key = part.key ?? part.index;
-    if (typeof key === 'number') {
-      result += `[${key}]`;
-    } else {
-      result += `${result ? '.' : ''}${typeof key === 'string' ? key : '?'}`;
-    }
-  }
-  return result;
-}
 
 function shapeErrors(
   schema: v.BaseSchema<unknown, unknown, v.BaseIssue<unknown>>,

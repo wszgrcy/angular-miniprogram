@@ -19,7 +19,7 @@ import { runViteBuilder as runBuilder } from './vite';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,
-  platform: PlatformType.wx,
+  platform: PlatformType.wx as const,
   buildOptimizer: true,
   optimization: true,
   extractLicenses: true,

@@ -77,7 +77,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     // 关键：库不重新构建，只是主构建换了平台。库产物（含 sidecar）与 wx 那次用的是同一份。
     const angularConfig = {
       ...DEFAULT_ANGULAR_CONFIG,
-      platform: PlatformType.zfb,
+      platform: PlatformType.zfb as const,
       sourceMap: false,
     };
     harness.useTarget('build', angularConfig);

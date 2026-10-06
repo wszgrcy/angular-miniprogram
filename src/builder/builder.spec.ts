@@ -33,7 +33,7 @@ const angularConfig = {
  * 构建侧的平台差异另有 `vite/platform-flags.build.spec.ts` 覆盖。所以这里留两个代表：
  * wx 是基准，zfb 是差异最大的一家（全局对象 `my`、前缀 `a`、`.axml/.acss/.sjs`）。
  */
-const SMOKE_PLATFORMS = [PlatformType.wx, PlatformType.zfb];
+const SMOKE_PLATFORMS = [PlatformType.wx, PlatformType.zfb] as const;
 
 describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   describe('builder-dev', () => {

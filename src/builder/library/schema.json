@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Mini-program library (ng-packagr) schema",
   "description": "小程序 library builder（ng-packagr 链路）。本文件由 script/gen-builder-schema.ts 从 @angular/build@22.1.8 生成，勿手改。",
   "type": "object",
@@ -22,9 +22,9 @@
       "description": "Enable and define the file watching poll time period in milliseconds."
     }
   },
-  "additionalProperties": false,
   "required": [
     "project"
   ],
+  "additionalProperties": false,
   "x-generated-from": "@angular/build@22.1.8"
 }
