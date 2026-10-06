@@ -2,9 +2,9 @@
 title: '构建组件库'
 ---
 
-组件库用 `angular-miniprogram:library` 构建。它就是 ng-packagr 加上「把模板也
-编译成 wxml」这一层，所以库的写法跟普通 Angular 库**完全一样**：standalone 组件、
-`public-api.ts` 出口、`ng-package.json`、二级入口，全照旧。
+组件库通过 `angular-miniprogram:library` 构建。它在 ng-packagr 之上增加了一层模板到
+wxml 的编译，因此库的书写方式与普通 Angular 库**完全一致**：standalone 组件、
+`public-api.ts` 出口、`ng-package.json`、二级入口均沿用原有做法。
 
 ## 配置
 
@@ -28,7 +28,7 @@ title: '构建组件库'
 ```
 
 选项只有 `project`（必填）、`tsConfig`、`watch`、`poll`。`poll` 透传给 ng-packagr
-的 watcher，网络盘 / WSL 挂载上有用。
+的 watcher，在网络盘 / WSL 挂载场景下有用。
 
 ## 库的写法
 
@@ -44,7 +44,7 @@ projects/first/
    └─ index.ts
 ```
 
-组件里不需要任何框架 API，`@Input` / `@Output` / signal / 服务都照常用：
+组件内不需要任何框架 API，`@Input` / `@Output` / signal / 服务均可正常使用：
 
 ```ts
 @Component({
@@ -62,22 +62,22 @@ export class FirstComponent {
 
 ### 二级入口的目录位置
 
-二级入口目录要跟主 `ng-package.json` **同级**（`projects/first/secondary`），
-不要放进 `src/`。ng-packagr 按「主 `ng-package.json` 所在目录的相对路径」给
-entry 命名，放 `src/` 里会产成 `first/src/secondary` 这种名字。
+二级入口目录需要与主 `ng-package.json` **同级**（`projects/first/secondary`），
+不应放入 `src/`。ng-packagr 以主 `ng-package.json` 所在目录的相对路径为 entry
+命名，放入 `src/` 会产生 `first/src/secondary` 这样的名称。
 
 ## 使用侧
 
-库产物在 `dist/first`，应用通过 `tsconfig.base.json` 的 `paths` 指过去：
+库产物位于 `dist/first`，应用通过 `tsconfig.base.json` 的 `paths` 指向该目录：
 
 ```jsonc
 {
   "compilerOptions": {
     "paths": {
       "first": ["./dist/first"],
-      "first/secondary": ["./dist/secondary"]
-    }
-  }
+      "first/secondary": ["./dist/secondary"],
+    },
+  },
 }
 ```
 
@@ -89,10 +89,10 @@ import { SecondaryPanelComponent } from 'first/secondary';
 export class PageComponent { … }
 ```
 
-**先构建库，再构建应用。** 应用编译时读的是 `dist/first`，库没构建就找不到模块。
-把这条排进 CI / npm script：`"build": "npm run build:lib && ng build"`。
+**先构建库，再构建应用。** 应用编译时读取的是 `dist/first`，库未构建则找不到模块。
+建议将该顺序写入 CI / npm script：`"build": "npm run build:lib && ng build"`。
 
-发布到 npm 就把 `paths` 去掉，装包后 `import from 'first'` 走 node_modules，
+发布到 npm 时移除 `paths`，安装依赖后 `import from 'first'` 由 node_modules 解析，
 用法不变。
 
 ## 产物
@@ -103,19 +103,19 @@ export class PageComponent { … }
 dist/my-mp/
 ├─ library/first/first-component/first-component.{js,wxml,wxss,json}
 ├─ library/first/secondary/secondary-panel-component/secondary-panel-component.*
-└─ library-template/First.wxml     # 库的具名模板（跨库传模板时才用得到）
+└─ library-template/First.wxml     # 库的具名模板（跨库传递模板时使用）
 ```
 
-`usingComponents` 由构建器算，你不用写路径。
+`usingComponents` 由构建器计算，无需手写路径。
 
-## 库里传模板
+## 库内传递模板
 
-库组件接收外部 `TemplateRef` 时，模板名要带库作用域前缀 `$$mp$$<ScopeName>$$xxx`。
-`ScopeName` 由库名算：`test-library` → `TestLibrary`，`@my/library` → `MyLibrary`。
+库组件接收外部 `TemplateRef` 时，模板名需要带库作用域前缀 `$$mp$$<ScopeName>$$xxx`。
+`ScopeName` 由库名推导：`test-library` → `TestLibrary`，`@my/library` → `MyLibrary`。
 详见 [ng-template 与 TemplateRef](../../template/template-ref/)。
 
-## 库里的组件不能被原生页面引用
+## 库内组件不能被原生页面引用
 
-库编译出来的是 Angular 组件的小程序产物，回连 Angular 侧靠父模板传
-`nodePath` / `nodeIndex` 两个 property。脱离 Angular 页面就没有人传这两个值，
-组件会渲染成一个空盒子且不报错。**「把库里的组件给原生小程序页面用」这条路不成立。**
+库编译产出的是 Angular 组件的小程序产物，回连 Angular 侧依赖父模板传入
+`nodePath` / `nodeIndex` 两个 property。脱离 Angular 页面后没有来源传入这两个值，
+组件会渲染为空容器且不报错。**将库内组件提供给原生小程序页面使用的方式不成立。**

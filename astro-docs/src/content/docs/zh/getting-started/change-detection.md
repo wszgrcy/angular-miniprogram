@@ -2,22 +2,22 @@
 title: '变更检测与状态'
 ---
 
-小程序逻辑层没有 DOM 事件循环可以挂钩，本库也不注入 `zone.js`：跑的是 Angular 22 默认的
-zoneless 变更检测。这跟很多既有 Angular 代码的假设不一样，是迁移时最容易踩的一条，
-所以放在最前面。
+小程序逻辑层没有可挂钩的 DOM 事件循环，本库也不注入 `zone.js`：运行的是 Angular 22 默认的
+zoneless 变更检测。这与许多既有 Angular 代码的假设不同，是迁移中最常见的问题之一，
+因此放在最前面说明。
 
-## 什么时候会自动刷新
+## 自动刷新的范围
 
-Angular 在**模板事件**的包装里标脏视图，所以下面这些照常工作，普通字段也一样刷新：
+Angular 会在**模板事件**的包装中标脏视图，因此以下用法照常工作，普通字段同样会刷新：
 
-- 模板里的事件绑定：`(tap)`、`(input)`、`(bindchange)` …
+- 模板中的事件绑定：`(tap)`、`(input)`、`(bindchange)` …
 - 子组件的 `@Output`、`model()` 双向绑定
 - `async` 管道、`signal` 写入
 - `@if` / `@for` / `@switch` 控制流、`*ngIf` / `*ngFor`
 
-## 什么时候不会
+## 不会自动刷新的情况
 
-Angular 不知情的那一侧改状态，视图不会动：
+在 Angular 未感知的路径中修改状态，视图不会更新：
 
 ```ts
 export class OrderComponent {
@@ -38,7 +38,7 @@ export class OrderComponent {
 }
 ```
 
-两条出路，任选：
+两种处理方式，任选其一：
 
 **用 signal（推荐）**
 
@@ -50,7 +50,7 @@ ngOnInit() {
 }
 ```
 
-写入即标脏，模板里 `{{ status() }}` 取值。
+写入即标脏，模板中通过 `{{ status() }}` 取值。
 
 **显式标脏**
 
@@ -65,14 +65,14 @@ wx.getNetworkType({
 });
 ```
 
-`detectChanges()` 会立刻同步跑一次本视图，`markForCheck()` 只是标脏、等下一轮调度。
-回调密集的场景用后者。
+`detectChanges()` 会立即同步执行一次本视图的变更检测，`markForCheck()` 只标脏、
+等待下一轮调度。回调密集的场景应使用后者。
 
-## 组件内状态一律用 signal
+## 组件内状态建议使用 signal
 
-模板里 `{{ count() }}` 这种写法在小程序侧没有任何特殊之处——它就是一个普通的方法调用，
-由 Angular 求值后物化成 `setData` 的数据。用 signal 的收益不在渲染，而在**不用记哪些
-地方需要手动标脏**。
+模板中 `{{ count() }}` 这类写法在小程序侧没有特殊之处——它是普通的方法调用，
+由 Angular 求值后转换为 `setData` 的数据。使用 signal 的收益不在于渲染，而在于
+**无需记忆哪些位置需要手动标脏**。
 
 `computed` 照常可用：
 
@@ -87,5 +87,5 @@ readonly filtered = computed(() => {
 
 ## 表单
 
-`angular-miniprogram/forms` 里的值访问器在写回时会通知控件，`[(ngModel)]` /
-`formControlName` 不需要额外标脏。见 [表单](../../runtime/forms/)。
+`angular-miniprogram/forms` 中的值访问器在写回时会通知控件，`[(ngModel)]` /
+`formControlName` 无需额外标脏。见 [表单](../../runtime/forms/)。

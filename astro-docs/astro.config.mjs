@@ -128,7 +128,7 @@ export default defineConfig({
           translations: { en: 'Library & Testing' },
           items: [
             nav('构建组件库', 'Build a Library', '/advanced/library/'),
-            nav('在小程序里跑测试', 'Testing', '/advanced/testing/'),
+            nav('在小程序中运行测试', 'Testing', '/advanced/testing/'),
           ],
         },
       ],

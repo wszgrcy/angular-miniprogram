@@ -26,20 +26,20 @@ src/
    └─ pages/goods/goods.entry.ts
 ```
 
-三条约定值得记住：
+三条约定需要记住：
 
-- **页面必须有 `*.entry.ts`，普通组件不需要。** 页面路径是对外契约（进 `app.json` 的
-  `pages`、出现在 `navigateTo` 的 url 里），所以得有个固定解析的入口。
+- **页面必须提供 `*.entry.ts`，普通组件不需要。** 页面路径是对外契约（写入 `app.json` 的
+  `pages`、出现在 `navigateTo` 的 url 中），因此需要一个解析位置固定的入口。
 - **入口文件名决定产物名**：`home.entry.ts` → `home-entry`。
 - **分包的 root 既是源码目录也是产物目录**：`src/packageA/**` → `packageA/**`。
-  分包专属 chunk 靠这条归位。
+  分包专属 chunk 依赖该约定归位。
 
 完整规则见 [入口：页面 / 组件 / tabBar](../../guide/entry/)。
 
 ## main.ts
 
-小程序没有「启动组件」——每个页面、每个自定义组件都是小程序运行时自己创建的。
-所以 `bootstrapApplication()` **不接收组件参数**，只创建 `ApplicationRef`：
+小程序不存在启动组件——每个页面、每个自定义组件都由小程序运行时自行创建。
+因此 `bootstrapApplication()` **不接收组件参数**，只创建 `ApplicationRef`：
 
 ```ts
 import { bootstrapApplication } from 'angular-miniprogram';
@@ -47,12 +47,14 @@ import { bootstrapApplication } from 'angular-miniprogram';
 bootstrapApplication();
 ```
 
-页面 / 组件由各 `*.entry.ts` 的 `export default` 逐个挂进来。app 级 provider
-（拦截器、全局服务）走参数：
+页面 / 组件由各 `*.entry.ts` 的 `export default` 逐个挂载。应用级 provider
+（拦截器、全局服务）通过参数传入：
 
 ```ts
 bootstrapApplication({
-  providers: [{ provide: HTTP_INTERCEPTORS, multi: true, useClass: AuthInterceptor }],
+  providers: [
+    { provide: HTTP_INTERCEPTORS, multi: true, useClass: AuthInterceptor },
+  ],
 });
 ```
 
@@ -64,16 +66,16 @@ bootstrapApplication({
 其中 `tsConfig` 必须覆盖到所有入口文件。全部选项见
 [构建选项](../../guide/build-options/)。
 
-## 产物长什么样
+## 产物结构
 
-一次构建的输出就是一个可以直接被开发者工具打开的小程序工程：
+一次构建的输出即为可直接由开发者工具打开的小程序工程：
 
 ```tree
 dist/my-mp/
 ├─ app.js                       # 小程序 App()：装载全局对象 + require polyfills / main
 ├─ app.json                     # 由 app.config.json + 构建器算出的页面清单合并而成
 ├─ app.wxss                     # styles 选项的全局样式
-├─ main.js                      # 你的 main.ts
+├─ main.js                      # 编译后的 main.ts
 ├─ polyfills.js
 ├─ project.config.json
 ├─ angular-miniprogram.js       # 共享 chunk（框架运行时）
@@ -81,14 +83,14 @@ dist/my-mp/
 ├─ components/card/card.component.{js,wxml,wxss,json}
 ├─ custom-tab-bar/index.{js,wxml,wxss,json}
 ├─ packageA/pages/goods/goods-entry.{js,wxml,wxss,json}
-└─ common/format.wxs            # 模板里声明过的 wxs 模块
+└─ common/format.wxs            # 模板中声明的 wxs 模块
 ```
 
-每页四件套：`js` 是逻辑层，`wxml` 是渲染层模板，`wxss` 是组件样式，`json` 里是
-页面配置 + `usingComponents`。
+每个页面包含四个文件：`js` 是逻辑层，`wxml` 是渲染层模板，`wxss` 是组件样式，
+`json` 中是页面配置与 `usingComponents`。
 
-**产物是给人看的。**默认不压缩、不带 hash，因为开发流程就是开发者工具盯着这个目录；
-两个默认值都跟上游不一样，原因见 [构建选项](../../guide/build-options/)。
+**产物需要可读。** 默认不压缩、不带 hash，因为开发流程中开发者工具会直接查看该目录；
+这两个默认值与上游不同，原因见 [构建选项](../../guide/build-options/)。
 
 ## 构建报「页面 0 个」
 
@@ -98,5 +100,5 @@ dist/my-mp/
 [小程序构建] 平台 wx，页面 0 个、组件 0 个、自定义 tabBar 0 个
 ```
 
-而构建仍然「成功」，就是 `pages` 的 glob 没匹到任何东西。构建器不会替你报错——
-它不知道你到底想产几个页面。检查 `input` 路径和 `glob`，以及入口文件是否被 `tsConfig` 覆盖。
+而构建仍然「成功」，说明 `pages` 的 glob 未匹配到任何文件。构建器不会代为报错——
+它无法判断预期的页面数量。需要检查 `input` 路径和 `glob`，以及入口文件是否被 `tsConfig` 覆盖。

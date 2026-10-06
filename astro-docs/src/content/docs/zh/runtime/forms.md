@@ -2,12 +2,12 @@
 title: '表单'
 ---
 
-`@angular/forms` 不能直接用。它的值访问器监听 DOM 的 `input` / `change` 事件，
-而小程序组件发的是 `bindinput` / `bindchange`，值也不在 `event.target.value` 而在
+`@angular/forms` 不能直接使用。其值访问器监听 DOM 的 `input` / `change` 事件，
+而小程序组件触发的是 `bindinput` / `bindchange`，值也不在 `event.target.value` 而在
 `event.detail.value`。
 
-`angular-miniprogram/forms` 是同一套 forms 的小程序版，API 名字完全一致，
-**只需要换导入路径**：
+`angular-miniprogram/forms` 是同一套 forms 的小程序版本，API 名称完全一致，
+**只需替换导入路径**：
 
 ```ts
 // ✗ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -21,23 +21,23 @@ import { FormsModule, ReactiveFormsModule } from 'angular-miniprogram/forms';
 export class FormComponent {}
 ```
 
-`FormBuilder` `FormControl` `FormGroup` `FormArray` `Validators` 以及全部指令都从
+`FormBuilder` `FormControl` `FormGroup` `FormArray` `Validators` 以及全部指令均从
 同一路径导出。
 
-## 哪些组件有值访问器
+## 提供值访问器的组件
 
-| 组件 | 控件值 | 触发事件 |
-| --- | --- | --- |
-| `input` `textarea` | `string` | `bindinput`（`bindblur` 触发 `markAsTouched`） |
-| `input[type=number]` | `number \| null` | `bindinput` |
-| `switch` | `boolean` | `bindchange` |
-| `slider` | `number` | `bindchange` |
-| `radio-group` | 选中项的 `value` | `bindchange` |
-| `checkbox-group` | `string[]`（勾选项的 value 列表） | `bindchange` |
-| `picker` | 随 `mode`：`selector` 是下标、`time` 是 `hh:mm`、`date` 是 `YYYY-MM-DD`、`multiSelector` 是数组 | `bindchange` |
-| `picker-view` | `number[]` | `bindchange` |
+| 组件                 | 控件值                                                                                          | 触发事件                                       |
+| -------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `input` `textarea`   | `string`                                                                                        | `bindinput`（`bindblur` 触发 `markAsTouched`） |
+| `input[type=number]` | `number \| null`                                                                                | `bindinput`                                    |
+| `switch`             | `boolean`                                                                                       | `bindchange`                                   |
+| `slider`             | `number`                                                                                        | `bindchange`                                   |
+| `radio-group`        | 选中项的 `value`                                                                                | `bindchange`                                   |
+| `checkbox-group`     | `string[]`（勾选项的 value 列表）                                                               | `bindchange`                                   |
+| `picker`             | 随 `mode`：`selector` 是下标、`time` 是 `hh:mm`、`date` 是 `YYYY-MM-DD`、`multiSelector` 是数组 | `bindchange`                                   |
+| `picker-view`        | `number[]`                                                                                      | `bindchange`                                   |
 
-`checkbox` / `radio` 自己不发事件，必须包在 `checkbox-group` / `radio-group` 里。
+`checkbox` / `radio` 自身不触发事件，必须包裹在 `checkbox-group` / `radio-group` 中。
 
 ## 模板驱动
 
@@ -83,21 +83,25 @@ readonly form = new FormGroup({
 </checkbox-group>
 ```
 
-## 自定义组件当控件
+## 自定义组件作为表单控件
 
-自定义组件里做双向绑定，加 `ngDefaultControl`，然后按小程序的事件名接：
+自定义组件中实现双向绑定时，需要添加 `ngDefaultControl`，并按小程序的事件名接收：
 
 ```html
-<app-rating ngDefaultControl [(ngModel)]="score" (bindchange)="score = $event.detail.value"></app-rating>
+<app-rating
+  ngDefaultControl
+  [(ngModel)]="score"
+  (bindchange)="score = $event.detail.value"
+></app-rating>
 ```
 
-值写回走 `@Input`，`writeValue` 由访问器调 `setProperty('value', …)`，
-所以自定义组件要有一个 `value` 输入。
+值写回通过 `@Input` 完成，`writeValue` 由访问器调用 `setProperty('value', …)`，
+因此自定义组件需要提供一个 `value` 输入。
 
 ## 校验
 
-`Validators` 全套可用（`required` `min` `max` `minLength` `maxLength` `pattern` `email`
+`Validators` 全部可用（`required` `min` `max` `minLength` `maxLength` `pattern` `email`
 `requiredTrue` `email` 以及自定义 `ValidatorFn` / `AsyncValidatorFn`）。
 
-状态类名（`ng-valid` / `ng-invalid` / `ng-dirty` / `ng-touched`）会加到元素 class 上。
-小程序的样式隔离可能让它们不生效，用 `[class.xxx]="ctrl.invalid"` 显式绑更稳。
+状态类名（`ng-valid` / `ng-invalid` / `ng-dirty` / `ng-touched`）会追加到元素的 class 上。
+小程序的样式隔离可能使其不生效，使用 `[class.xxx]="ctrl.invalid"` 显式绑定更可靠。

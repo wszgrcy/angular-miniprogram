@@ -2,8 +2,8 @@
 title: '内容投影'
 ---
 
-`ng-content` 编译成小程序的 `<slot>`。因为渲染层是静态生成的，投影规则比浏览器版
-Angular 紧一些。
+`ng-content` 编译为小程序的 `<slot>`。由于渲染层在构建期静态生成，投影规则比浏览器环境的
+Angular 更严格。
 
 ## 默认插槽
 
@@ -16,13 +16,13 @@ Angular 紧一些。
 
 ```html
 <!-- 父组件 -->
-<app-card>随便放点什么</app-card>
+<app-card>任意内容</app-card>
 ```
 
-## 具名插槽：只认 `[slot="名字"]`
+## 具名插槽：仅支持 `[slot="名字"]`
 
-Angular 的 `select` 支持任意 CSS 选择器，这里**只支持 `[slot="名字"]` 一种形式**，
-其它写法构建期直接报错：
+Angular 的 `ng-content` 的 `select` 支持任意 CSS 选择器，本构建器**只支持
+`[slot="名字"]` 一种形式**，其它写法在构建期直接报错：
 
 ```
 ng-content未匹配到指定格式的select,value:.header,需要格式为[slot="xxxx"]
@@ -42,11 +42,11 @@ ng-content未匹配到指定格式的select,value:.header,需要格式为[slot="
 </app-panel>
 ```
 
-按属性、按 class 挑选内容这类需求，改成「一个属性一个插槽」来表达。
+需要按属性或 class 分流内容时，改为为每个插槽定义独立的名称。
 
 ## 兜底内容
 
-`ng-content` 里写的内容就是兜底，只在父级没往这个插槽投影时渲染：
+`ng-content` 标签内的内容即兜底内容，仅在父组件未向该插槽投影内容时渲染：
 
 ```html
 <ng-content select="[slot='head']">
@@ -54,7 +54,7 @@ ng-content未匹配到指定格式的select,value:.header,需要格式为[slot="
 </ng-content>
 ```
 
-产物是「兜底模板 + 二选一」：
+产物为「兜底模板 + 条件渲染」：
 
 ```html
 <block wx:if="{{nodeList[1].length}}">
@@ -63,22 +63,9 @@ ng-content未匹配到指定格式的select,value:.header,需要格式为[slot="
 <block wx:else><slot name="head"></slot></block>
 ```
 
-判据是兜底容器有没有视图——Angular 只在插槽空着时创建那一份，所以最多一份。
+判定依据是兜底容器是否存在视图。Angular 仅在插槽为空时创建兜底内容，因此产物中最多
+出现一份。
 
-**兜底内容写在子组件的模板里，样式也得在子组件的样式文件里。** 小程序自定义组件
-默认样式隔离，父级的样式选不中兜底那段；反过来，投影进来的那部分归宿主的样式管。
-
-## 一个文件里放多个组件
-
-投影 demo 常见的摆法是一个文件放「子组件 + 几个宿主」。产物按「文件名-组件名」拆，
-每个组件各出一份 wxml/wxss/js：
-
-```text
-src/pages/home/projection/projection.components.ts
-  → pages/home/projection/projection.components-ProjChildComponent.wxml
-  → pages/home/projection/projection.components-ProjDefaultComponent.wxml
-  …
-```
-
-入口名仍由文件名推导，`usingComponents` 里引的是宿主组件那一份。文件被入口认领时的
-边界见 [入口](../../guide/entry/)。
+**兜底内容定义在子组件的模板中，其样式也必须写在子组件的样式文件里。** 小程序自定义
+组件默认开启样式隔离，父组件的样式无法作用于兜底内容；反之，投影进来的内容由宿主组件
+的样式负责。

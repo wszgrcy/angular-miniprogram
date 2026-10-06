@@ -1,10 +1,10 @@
 ---
-title: "原生配置：mpComponentOptions / mpPageOptions"
+title: '原生配置：mpComponentOptions / mpPageOptions'
 ---
 
-模板、渲染数据、事件分发都由构建器和运行时接管了，但你偶尔还是得碰原生能力——
-挂个 behavior、声明组件间关系、在页面钩子里做点原生的事。口子只有一个：
-在 Angular 组件类上挂一个静态字段。
+模板、渲染数据、事件分发均由构建器和运行时接管。当需要访问原生能力（挂载 behavior、
+声明组件间关系、在页面钩子中执行原生逻辑）时，入口只有一个：在 Angular 组件类上
+声明一个静态字段。
 
 ```ts
 import { MpComponentOptions } from 'angular-miniprogram/platform/type';
@@ -25,26 +25,26 @@ export class FooComponent {
 
 页面用 `static mpPageOptions`，见下文。
 
-钩子跟 Angular 生命周期的相对顺序见 [生命周期](../lifecycle/)。
+钩子与 Angular 生命周期的相对顺序见 [生命周期](../lifecycle/)。
 
 ## 1. 生效范围
 
-`Component()` 那张配置单**不是整张都能写**。框架自己占用了几段，剩下的原样交给微信。
+`Component()` 的配置项**并非全部可用**。框架占用了其中几段，其余原样传递给小程序平台。
 
-| 定义段 | 生效 | 说明 |
-| --- | --- | --- |
-| `lifetimes` | ✅ | 框架包在外面：先完成启动 / 回连，再调你那份 |
-| `pageLifetimes` | ✅ | 组件即页面时 `show` / `hide` 被包装，你的那份先跑 |
-| `behaviors` | ✅ | behavior 自带的 `data` / `properties` / `methods` 由微信合并，不受下面的限制 |
-| `relations` | ✅ | |
-| `observers` | ✅ | 只能观察到框架自己的数据（`hasLoad` 等） |
-| `options` | ✅ | `multipleSlots` 由框架强制打开 |
-| `methods` | ⚠️ | 组件入口不收；**组件即页面**时页面钩子（`onShow` / `onHide` / `onUnload`）落在这里，收 |
-| `data` | ❌ | 这一格是框架 `setData` 的载体 |
-| `properties` | ❌ | 被框架占用为回连通道 |
-| `externalClasses` | ❌ | 外部样式类要父模板传，而父模板是生成的 |
+| 定义段            | 生效 | 说明                                                                                           |
+| ----------------- | ---- | ---------------------------------------------------------------------------------------------- |
+| `lifetimes`       | ✅   | 由框架包装：先完成启动 / 回连，再调用声明的钩子                                                |
+| `pageLifetimes`   | ✅   | 组件即页面时 `show` / `hide` 被包装，声明的钩子先执行                                          |
+| `behaviors`       | ✅   | behavior 自带的 `data` / `properties` / `methods` 由平台合并，不受下面的限制                   |
+| `relations`       | ✅   |                                                                                                |
+| `observers`       | ✅   | 只能观察框架自身的数据（`hasLoad` 等）                                                         |
+| `options`         | ✅   | `multipleSlots` 由框架强制开启                                                                 |
+| `methods`         | ⚠️   | 组件入口不接受该段；**组件即页面**时页面钩子（`onShow` / `onHide` / `onUnload`）位于此处，接受 |
+| `data`            | ❌   | 该段是框架 `setData` 的载体                                                                    |
+| `properties`      | ❌   | 被框架占用为回连通道                                                                           |
+| `externalClasses` | ❌   | 外部样式类需要父模板传入，而父模板由构建器生成                                                 |
 
-用 `MpComponentOptions` 标注，写到不收的那一段 TS 当场报错：
+使用 `MpComponentOptions` 标注后，写入不接受的段会直接产生类型错误：
 
 ```ts
 static mpComponentOptions: MpComponentOptions = {
@@ -52,28 +52,28 @@ static mpComponentOptions: MpComponentOptions = {
 };
 ```
 
-- **组件即页面**（`bootstrapPage` 走 `Component()` 那条）标 `MpComponentOptions<true>`，
-  额外开放 `methods`——那条路上页面钩子就落在 `methods` 里。
-- 页面侧标 `MpPageOptions`，只剔 `data`，其余全收。
+- **组件即页面**（`bootstrapPage` 走 `Component()` 分支）应标注 `MpComponentOptions<true>`，
+  额外开放 `methods`——该分支下页面钩子位于 `methods` 中。
+- 页面侧标注 `MpPageOptions`，仅排除 `data`，其余段均接受。
 
-## 2. 为什么那几段写了没用
+## 2. 被排除的配置段
 
-组件的 wxml 是 HTML 转换出来的，只读框架自己的数据（`nodeList` / `hasLoad` /
-`property.*`），不会有任何一行去引用你声明的字段。Angular 的 `@Input` 也不走小程序
-`properties`——值在 Angular 内部传，下发靠构建器注入的 `propertyChange`。
+组件的 wxml 由 HTML 转换而来，只读取框架自身的数据（`nodeList` / `hasLoad` /
+`property.*`），不会引用开发者声明的字段。Angular 的 `@Input` 也不经过小程序
+`properties`——值在 Angular 内部传递，下发依赖构建器注入的 `propertyChange`。
 
-`properties` 那一格同时是 Angular 实例与小程序实例的**回连通道**，`nodePath` /
-`nodeIndex` 两个 property 是框架的。自己声明同名 property 会把回连撞断，表现为整块
-空白且不报错，所以这几段干脆不收，而不是收了但不生效。
+`properties` 段同时承担 Angular 实例与小程序实例之间的**回连通道**，`nodePath` /
+`nodeIndex` 两个 property 属于框架。声明同名 property 会中断回连，表现为整块空白且
+不报错，因此这几段直接不接受，而不是接受后不生效。
 
-推论：Angular 产出的组件**不能被原生页面当普通小程序组件引用**。脱离 Angular 页面就
-没人传 `nodePath`，`hasLoad` 恒为 `false`，`<block wx:if="{{hasLoad}}">` 渲染出一个
-空盒子。
+推论：Angular 产出的组件**不能被原生页面作为普通小程序组件引用**。脱离 Angular 页面后
+没有来源传入 `nodePath`，`hasLoad` 恒为 `false`，`<block wx:if="{{hasLoad}}">` 只会
+渲染出一个空容器。
 
 ## 3. 页面：`mpPageOptions`
 
 `onLoad` / `onShow` / `onHide` / `onReady` / `onUnload` / 下拉刷新 / 触底 /
-分享这些全部保留，只剔 `data`。顺序上的差异见 [生命周期](../lifecycle/)。
+分享这些全部保留，仅排除 `data`。执行顺序上的差异见 [生命周期](../lifecycle/)。
 
 ```ts
 import { MpPageOptions } from 'angular-miniprogram/platform/type';

@@ -1,15 +1,15 @@
 ---
-title: '在小程序里跑测试'
+title: '在小程序中运行测试'
 ---
 
-单元测试跑在**真的小程序运行时里**，不是 jsdom。spec 文件被编译进一个测试小程序
-产物，由开发者工具执行；宿主机上的 vitest 只负责调度和收结果，两边用 WebSocket
+单元测试运行在**真实的小程序运行时**中，而非 jsdom。spec 文件被编译进测试小程序
+产物，由开发者工具执行；宿主机上的 vitest 只负责调度与收集结果，两侧通过 WebSocket
 通信。
 
-好处是测的就是真东西：`setData`、wxml 事件、`createSelectorQuery` 全都真的跑。
-代价是要开着开发者工具。
+收益在于测试对象是真实实现：`setData`、wxml 事件、`createSelectorQuery` 都会真实执行。
+代价是需要运行开发者工具。
 
-## 1. 加一个 test target
+## 1. 添加 test target
 
 ```jsonc
 // angular.json
@@ -38,20 +38,23 @@ title: '在小程序里跑测试'
 }
 ```
 
-`pages` 里放的是**测试页面的入口**——被测组件得先渲染在某个页面上，spec 才有东西可查。
-这些页面跟普通页面一样写 `*.entry.ts`。
+`pages` 中放置的是**测试页面的入口**——被测组件需要先渲染在某个页面上，spec 才有
+可查询的对象。这些页面与普通页面一样书写 `*.entry.ts`。
 
-测试产物是一个独立的小程序工程，自己的 `app.json` 也得用 `assets` 放进去（它不是
-`appJson` 选项生成的）。
+测试产物是独立的小程序工程，其 `app.json` 同样需要通过 `assets` 放入（不由
+`appJson` 选项生成）。
 
-`outputPath` 不要指向应用产物的根，`emptyOutDir` 会把应用产物一并删掉。
+`outputPath` 不应指向应用产物的根目录，`emptyOutDir` 会把应用产物一并删除。
 
 ## 2. 引导入口
 
 ```ts
 // projects/first/src/test.ts
 import { bootstrapApplication } from 'angular-miniprogram';
-import { startupMiniProgramTest, type TestModuleMap } from 'angular-miniprogram/vitest/runtime';
+import {
+  startupMiniProgramTest,
+  type TestModuleMap,
+} from 'angular-miniprogram/vitest/runtime';
 
 declare const __MP_SPEC_MODULES__: TestModuleMap;
 
@@ -63,11 +66,11 @@ async function main() {
 main().catch(console.error);
 ```
 
-顺序有要求：**先 `bootstrapApplication`，再起 worker**。spec 里 import 的组件要能
-拿到已初始化的 Angular 运行时；反过来会因为宿主下发 `run` 太快而拿到半初始化的
-injector。
+顺序有要求：**先 `bootstrapApplication`，再启动 worker**。spec 中 import 的组件需要能
+获取已初始化的 Angular 运行时；顺序颠倒时，宿主下发 `run` 过快会导致读取到未完全
+初始化的 injector。
 
-`__MP_SPEC_MODULES__` 是构建期就地替换的占位声明，源码里只是个 `declare`。
+`__MP_SPEC_MODULES__` 是构建期就地替换的占位声明，源码中仅有 `declare`。
 
 ## 3. vitest 配置
 
@@ -82,7 +85,7 @@ export default defineConfig({
   plugins: [miniProgramVitest({ port, connectTimeout: 20_000 })],
   test: {
     include: ['projects/first/src/spec/**/*.spec.ts'],
-    // 设备端是一个常驻运行环境，串行跑，别并发抢同一个 slot
+    // 设备端是一个常驻运行环境，串行执行，避免并发抢占同一个 slot
     maxWorkers: 1,
     isolate: false,
     testTimeout: 20_000,
@@ -91,22 +94,22 @@ export default defineConfig({
 });
 ```
 
-**端口两边必须一致**：`angular.json` 的 `port` 和 `miniProgramVitest({ port })`
-是同一个数，不一致的表现是「永远连不上」。
+**两侧端口必须一致**：`angular.json` 的 `port` 与 `miniProgramVitest({ port })`
+必须是同一个值，不一致时的表现是始终无法连接。
 
-`clientHost` 默认 `127.0.0.1`（微信模拟器解不了 `localhost`）。真机调试要改成
+`clientHost` 默认 `127.0.0.1`（微信模拟器无法解析 `localhost`）。真机调试时需要改成
 开发机的局域网 IP。
 
-## 4. 跑
+## 4. 执行
 
 ```bash
-ng run first:test     # 只把 spec 编成测试产物
-npx vitest run        # 起 WS，等设备连入
+ng run first:test     # 仅将 spec 编译为测试产物
+npx vitest run        # 启动 WS，等待设备接入
 ```
 
-然后用微信开发者工具打开 `dist/vitest/first`，小程序会连回 vitest 开始跑。
+随后用微信开发者工具打开 `dist/vitest/first`，小程序会连回 vitest 并开始执行。
 
-模板里带了一键脚本，把上面三步串起来（含开发者工具 CLI 预检、开项目、透传退出码）：
+模板提供了一键脚本，将上述三步串联（含开发者工具 CLI 预检、打开项目、透传退出码）：
 
 ```bash
 npm run test:wechat
@@ -114,9 +117,9 @@ npm run test:wechat
 
 前置条件：开发者工具已启动，且「设置 → 安全设置 → 服务端口」已开启。
 
-## 5. 写 spec
+## 5. 编写 spec
 
-spec 跑在小程序里，所以 `wx` / `getCurrentPages()` 这些全局直接可用，DOM 不可用。
+spec 运行在小程序中，因此 `wx` / `getCurrentPages()` 等全局对象直接可用，DOM 不可用。
 `describe` / `it` / `expect` 是全局的（插件默认 `registerApiGlobally`）。
 
 ```ts
@@ -127,7 +130,9 @@ const TARGET_PAGE = '/pages/first/first-test-component-entry';
 async function pageContext() {
   const page = getCurrentPages()[0];
   const vm = (page as any).__ngComponentInstance as FirstTestComponent;
-  const finder = (page as any).__ngComponentInjector.get(ComponentFinderService);
+  const finder = (page as any).__ngComponentInjector.get(
+    ComponentFinderService,
+  );
   return { vm, finder };
 }
 
@@ -141,13 +146,17 @@ describe('首页', () => {
 });
 ```
 
-几个反复要用的手法：
+以下几种常用手法：
 
-**等 Angular 实例挂上。** 页面实例是异步挂到小程序页面对象上的，「已经在目标页」
-不代表挂好了，直接读会拿到 `undefined`。轮询等：
+**等待 Angular 实例挂载。** 页面实例是异步挂载到小程序页面对象上的，已在目标页面
+不代表挂载完成，直接读取会得到 `undefined`。需要轮询等待：
 
 ```ts
-async function waitFor<T>(what: string, read: () => T | undefined, timeout = 8000) {
+async function waitFor<T>(
+  what: string,
+  read: () => T | undefined,
+  timeout = 8000,
+) {
   const started = Date.now();
   for (;;) {
     const v = read();
@@ -158,18 +167,25 @@ async function waitFor<T>(what: string, read: () => T | undefined, timeout = 800
 }
 ```
 
-**跳页面。** `wx.onAppRoute` 是事件流，不重发历史，**必须先订阅再跳转**，
-否则那个 `await` 会一直挂到 `hookTimeout`：
+**页面跳转。** `wx.onAppRoute` 是事件流，不会重发历史，**必须先订阅再跳转**，
+否则对应的 `await` 会一直挂起到 `hookTimeout`：
 
 ```ts
-const loaded = waitLoad().pipe(filter((r) => r.openType === 'reLaunch'), take(1)).toPromise();
-await new Promise((res, rej) => wx.reLaunch({ url: TARGET_PAGE, success: res, fail: rej }));
+const loaded = waitLoad()
+  .pipe(
+    filter((r) => r.openType === 'reLaunch'),
+    take(1),
+  )
+  .toPromise();
+await new Promise((res, rej) =>
+  wx.reLaunch({ url: TARGET_PAGE, success: res, fail: rej }),
+);
 await loaded;
 ```
 
-**派发事件。** wxml 上的 `bind:tap="bindEvent"` 就是页面实例的 `bindEvent`，
-它拿 `event.type` 去查 Angular 侧注册的监听名。所以读一次节点 dataset 再调它，
-能跑完「wxml 事件名 → bindEvent → Angular listener」整条链：
+**派发事件。** wxml 上的 `bind:tap="bindEvent"` 即页面实例的 `bindEvent`，
+它以 `event.type` 查找 Angular 侧注册的监听名。因此读取一次节点 dataset 再调用它，
+即可走完 wxml 事件名 → bindEvent → Angular listener 整条链路：
 
 ```ts
 async function dispatchTap(page: any, selector: string, type = 'tap') {
@@ -178,10 +194,10 @@ async function dispatchTap(page: any, selector: string, type = 'tap') {
 }
 ```
 
-**量节点。** 拿 Angular 实例对应的小程序组件实例，再 `createSelectorQuery`：
+**查询节点。** 获取 Angular 实例对应的小程序组件实例，再 `createSelectorQuery`：
 
 ```ts
-const wxComponent = await finder.get(vm.child);   // Promise，不是 Observable
+const wxComponent = await finder.get(vm.child); // Promise，不是 Observable
 const rect = await boundingRect(wxComponent, '.lib-first');
 expect(rect.height).toBeGreaterThan(0);
 ```
@@ -189,7 +205,7 @@ expect(rect.height).toBeGreaterThan(0);
 ## 6. 类型检查用的 tsconfig
 
 构建工程与检查工程必须分开。`tsc -b` 要求被引用的工程 `composite: true`，
-而构建插件对非 lib 构建强制 `declaration: false`，两者在同一个文件里摆不下。
-所以模板的做法是：构建配置（`tsconfig.spec.json`）保持干净，类型检查另开一个
-`tsconfig.spec.check.json`（带 `composite`），根 `tsconfig.json` 里 `references` 它。
-新加工程时记得在这里补一行，否则它不在任何类型检查范围内。
+而构建插件对非 lib 构建强制 `declaration: false`，两者无法共存于同一个文件。
+因此模板的做法是：构建配置（`tsconfig.spec.json`）保持简洁，类型检查另建
+`tsconfig.spec.check.json`（带 `composite`），并在根 `tsconfig.json` 中 `references` 它。
+新增工程时需要在此补充一行，否则该工程不在任何类型检查范围内。
