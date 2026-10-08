@@ -46,15 +46,9 @@ describe('diffNodeData', () => {
 });
 
 /**
- * 微信 `setData` 对**路径式 key** 上的 `undefined` 直接拒绝：
- *
- *   Setting data field "nodeList.11.0.__templateName" to undefined is invalid.
- *
- * 而且不是只丢那一个字段，是**整个 setData 调用失败** —— 界面从此
- * 不再更新。真实触发场景：`*ngIf="f; else tpl"` 从 else（有名）
- * 切回 if（脱糖模板无 #ref → 无名）时，diff 会送出
- * `nodeList.N.0.__templateName: undefined`。
- *
+ * 微信 `setData` 对路径式 key 上的 `undefined` 直接拒绝：
+ * `Setting data field "nodeList.11.0.__templateName" to undefined is invalid.`
+ * 而且不是只丢那一个字段，是整个 setData 调用失败——界面从此不再更新。
  * 本组用例钉住：diff 产出的任何值都不允许是 `undefined`。
  */
 describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）', () => {
@@ -109,8 +103,7 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
   });
 
   it('反向对照：不转换的话该场景确实会漏出 undefined', () => {
-    // 证明上面这些断言不是恒真：手工构造一个「不转换」的 diff，
-    // 断言它确实会漏出 undefined。
+    // 证明上面这些断言不是恒真：手工构造一个「不转换」的 diff，断言它确实会漏出 undefined。
     const naive: Record<string, unknown> = {};
     const from = { nodeList: [[{ __templateName: 'a' }]] } as any;
     const to = { nodeList: [[{ __templateName: undefined }]] } as any;
@@ -128,9 +121,7 @@ describe('diffNodeData: 绝不产出 undefined 值（微信 setData 会拒绝）
   });
 });
 
-/**
- * 本轮 diff 算法优化的正确性与性能。
- */
+/** diff 算法的正确性与性能。 */
 describe('diffNodeData: 优化后正确性与性能', () => {
   /** 构造一棵 depth 层、每层 width 个分支的嵌套对象 */
   function buildTree(depth: number, width: number, leaf: number): any {
@@ -204,10 +195,8 @@ describe('diffNodeData: 优化后正确性与性能', () => {
    *  - 正确性平价：两者输出必须逐字相等（确定性断言）
    *  - 加速比：在能触发旧算法 O(N^2) spread 的负载上，新算法应明显更快
    *
-   * 触发旧算法二次方的负载：同一层 N 个对象，每个只改一个字段（部分
-   * 变更）。旧实现每层每个变更都 `{...changeObject, ...result.object}`
-   * 拷贝不断变大的累加对象 → O(N^2)；新实现子累加器收集 + 一次
-   * Object.assign → O(N)。
+   * 触发旧算法二次方的负载：同一层 N 个对象，每个只改一个字段（部分变更）。
+   * 旧实现每层每个变更都拷贝不断变大的累加对象 → O(N^2)；新实现子累加器收集 + 一次合并。
    */
   it('新旧对比：结果逐字相等，且新算法在 O(N^2) 负载上更快', () => {
     // 旧实现是 O(N^2)，N 直接决定本用例耗时（N=3000 时单跑一次近 1s，

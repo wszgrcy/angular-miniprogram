@@ -39,11 +39,8 @@ describe('ng-content 兜底内容', () => {
   });
 
   /**
-   * 兜底容器里最多一份视图（Angular 只在插槽空着时创建一份），
-   * 所以直接取 `[0]`，不能走通用容器那套 `wx:for`。
-   *
-   * 模板名也写成字面量：兜底视图的 `__templateName` 恒为 `null`，
-   * `item.__templateName||` 那半截在这儿永远是废条件。
+   * 兜底容器里最多一份视图（Angular 只在插槽空着时创建一份），所以直接取 `[0]`，不能走通用容器那套 `wx:for`。
+   * 模板名也写成字面量：兜底视图的 `__templateName` 恒为 `null`，`item.__templateName||` 那半截在这儿永远是废条件。
    */
   it('兜底只有一份视图，直接取下标，不套 wx:for', () => {
     const wxml = compile(`<ng-content>兜底</ng-content>`);

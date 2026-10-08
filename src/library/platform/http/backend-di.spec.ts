@@ -10,17 +10,10 @@ import { withMiniProgramRequest } from './provider';
 /**
  * `MiniprogramHttpBackend` 的 DI 回归测试。
  *
- * ## 起因
- *
- * 真机报 `NG0204: Can't resolve all parameters for
- * MiniprogramHttpBackend: (?)`。根因是这个类被当类 provider 注册
- * （`providers: [MiniprogramHttpBackend]`），但类上**没有
- * `@Injectable()`**，于是 Angular 拿不到 `ɵprov`，退回反射；
- * 而本仓库 `emitDecoratorMetadata` 是关的，反射也拿不到构造参数
- * 类型，就报 `(?)`。
- *
- * 修法参照官方 `FetchBackend`：`@Injectable()` + 依赖用字段初始化器
- * 里的 `inject()` 声明，工厂 `deps` 为空，完全不依赖元数据反射。
+ * 真机可能报 `NG0204: Can't resolve all parameters for MiniprogramHttpBackend: (?)`。根因是这个类被当
+ * 类 provider 注册（`providers: [MiniprogramHttpBackend]`），但类上没有 `@Injectable()`，于是 Angular
+ * 拿不到 `ɵprov`，退回反射；而本仓库 `emitDecoratorMetadata` 是关的，反射也拿不到构造参数类型。
+ * 修法参照官方 `FetchBackend`：`@Injectable()` + 依赖用字段初始化器里的 `inject()` 声明，工厂 `deps` 为空。
  */
 describe('MiniprogramHttpBackend 依赖注入', () => {
   beforeEach(() => {
@@ -57,10 +50,7 @@ describe('MiniprogramHttpBackend 依赖注入', () => {
   });
 
   /**
-   * 反向对照：证明这套断言真的能抓住「缺装饰器」的回归。
-   *
-   * 若哪天有人把 `@Injectable()` 从 MiniprogramHttpBackend 上拿掉，
-   * 上面几个 spec 会失败；本 spec 则确认「无装饰器的类 provider」
+   * 反向对照：证明这套断言真的能抓住「缺装饰器」的回归。本 spec 确认「无装饰器的类 provider」
    * 确实会抛 NG0204，即这套检测不是空转。
    */
   it('反向对照：无 @Injectable() 的类 provider 会抛 NG0204', () => {

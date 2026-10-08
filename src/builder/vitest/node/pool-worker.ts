@@ -4,10 +4,8 @@ import type { MiniProgramVitestSession } from './session';
 type EventCallback = (argument: unknown) => void;
 
 /**
- * 设备端那个常驻运行环境的 PoolWorker 代理。
- *
- * vitest 只认「worker 是个能 send/on 的双向通道」，不关心对端是子进程还是
- * 微信开发者工具里的小程序运行时 —— 这里就是把这条通道接到 WebSocket 上。
+ * 设备端那个常驻运行环境的 PoolWorker 代理。vitest 只认「worker 是个能 send/on 的双向通道」，
+ * 不关心对端是子进程还是微信开发者工具里的小程序运行时——这里就是把这条通道接到 WebSocket 上。
  */
 export class MiniProgramPoolWorker implements PoolWorker {
   readonly name = 'miniprogram';
@@ -55,16 +53,14 @@ export class MiniProgramPoolWorker implements PoolWorker {
   }
 
   /**
-   * 小程序端是常驻运行环境，换文件不用重建，
-   * 复用可以省掉每次重开开发者工具的十几秒。
+   * 小程序端是常驻运行环境，换文件不用重建，复用可以省掉每次重开开发者工具的十几秒。
    */
   canReuse(_task: PoolTask): boolean {
     return true;
   }
 
   send(message: WorkerRequest): void {
-    // `start` 的对端没有真实的 worker 进程可以回 `started`，
-    // 这里就地补一个，否则 vitest 会一直等不到 worker 启动完成。
+    // `start` 的对端没有真实的 worker 进程可以回 `started`，这里就地补一个，否则 vitest 会一直等不到 worker 启动完成。
     if (message.type === 'start') {
       this.emit('message', {
         __vitest_worker_response__: true,

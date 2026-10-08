@@ -8,28 +8,16 @@ import {
 import { LVIEW } from './lview-layout';
 
 /**
- * B：运行时 `lView → nodeList` 下标算术的端到端验证。
+ * 运行时 `lView → nodeList` 下标算术的端到端验证。
  *
- * ## 为什么需要这条
- *
- * 构建侧已证明「wxml 引用下标 ⊆ Angular 指令槽号」。但 wxml 读的是
- * `nodeList[k]`，而 `nodeList` 由运行时
- * `lViewToWXView` 产出：
- *
- *   nodeList[index - HEADER_OFFSET] = lView[index].toView()
- *
- * 这条映射之前**只校验过 HEADER_OFFSET 常量的值**，没验证过
- * 「运行时真的在第 k 位产出正确节点」。本 spec 补上这一段。
- *
- * ## 做法
+ * 构建侧已证明「wxml 引用下标 ⊆ Angular 指令槽号」，但 `nodeList` 由运行时
+ * `lViewToWXView` 产出：`nodeList[index - HEADER_OFFSET] = lView[index].toView()`。
+ * 这里验证「运行时真的在第 k 位产出正确节点」。
  *
  * `lViewToWXView` 是 `lView` 的纯函数，所以可以构造合成 lView：
  *   lView[1]                  = { bindingStartIndex: HEADER_OFFSET + N }
  *   lView[HEADER_OFFSET + k]  = 第 k 个 AgentNode
- *
  * 然后断言 `nodeList[k]` 正是第 k 个节点 `toView()` 的结果。
- * 真实组件的 boot 依赖小程序运行时（getCurrentPages），本环境跑不了，
- * 但下标算术与节点来源在此已完全覆盖。
  */
 describe('运行时 lView → nodeList 下标算术', () => {
   const N = 6;
@@ -79,8 +67,7 @@ describe('运行时 lView → nodeList 下标算术', () => {
 
   it('反向对照：节点整体偏移一格时，身份校验必须失败', () => {
     /**
-     * 把节点写入位置整体 +1，模拟 HEADER_OFFSET 用错 / 漏算槽位。
-     * 若身份校验仍通过，说明本测试是摆设。
+     * 把节点写入位置整体 +1，模拟 HEADER_OFFSET 用错 / 漏算槽位。若身份校验仍通过，说明本测试是摆设。
      */
     const { lView } = makeLView(1);
     const ctx: any = getPageRefreshContext(lView as any);
@@ -121,22 +108,10 @@ describe('运行时 lView → nodeList 下标算术', () => {
 /**
  * 容器 → nodeList[N] 的嵌入视图来源。
  *
- * 这是一条真实 bug 的回归测试。
- *
- * `lViewToWXView` 原来读 `LContainer[VIEW_REFS]`（下标 8）。但
- * `VIEW_REFS` 存的是 **ViewRef / ComponentRef 包装对象**，惰性创建：
- * 只有 `*ngIf` / `*ngFor` 这类走 `ViewContainerRef.createEmbeddedView()`
- * 的结构指令才会填。内建控制流 `@if` / `@for` / `@switch` 由
- * `ɵɵif` / `ɵɵrepeater` 直接往 `CONTAINER_HEADER_OFFSET`（下标 10）
- * 塞裸 lView，全程不创建 ViewRef，`VIEW_REFS` 恒为 `null`。
- *
- * 后果：内建控制流的容器全部渲染成空数组——**节点全丢且不报错**。
- * 微信开发者工具实测（@angular/core 22.1.7）：
- *
- *   @for (item of ['x','y'])
- *     → container[10] = lView('x')
- *     → container[11] = lView('y')
- *     → container[8]  = null      ← 旧代码读这里，拿到 0 个
+ * `VIEW_REFS`（下标 8）存的是 ViewRef / ComponentRef 包装对象，惰性创建；内建控制流
+ * `@if` / `@for` / `@switch` 由 `ɵɵif` / `ɵɵrepeater` 直接往 `CONTAINER_HEADER_OFFSET`
+ * （下标 10）塞裸 lView，全程不创建 ViewRef，`VIEW_REFS` 恒为 `null`。
+ * 读错下标的后果是内建控制流的容器全部渲染成空数组——节点全丢且不报错。
  */
 describe('运行时容器 → nodeList：嵌入视图要从 CONTAINER_HEADER_OFFSET 取', () => {
   /** 造一个最小可用子 lView：lView[TYPE=1] 是 tView 对象，CONTEXT=8 带标记 */
@@ -195,9 +170,8 @@ describe('运行时容器 → nodeList：嵌入视图要从 CONTAINER_HEADER_OFF
 
   it('__templateName 缺失时兜底 null，不能是 undefined', () => {
     /**
-     * 微信 setData 对**路径式 key** 的 undefined 直接拒绝。一旦
-     * `else`（有名）→ `if`（无名）送出 undefined，整个 setData 被拒，
-     * 界面从此不再更新。
+     * 微信 setData 对路径式 key 的 undefined 直接拒绝。一旦送出 undefined，
+     * 整个 setData 被拒，界面从此不再更新。
      */
     const child = makeChildLView('anon');
     child[LVIEW.CONTEXT] = {};
@@ -209,8 +183,7 @@ describe('运行时容器 → nodeList：嵌入视图要从 CONTAINER_HEADER_OFF
 
   it('非 lView 的杂项不得被当成嵌入视图', () => {
     /**
-     * CONTAINER_HEADER_OFFSET 往后可能还有 TRANSPLANTED / 其他非 lView 项，
-     * 不能一律当视图，否则会把垃圾塞进 nodeList。
+     * CONTAINER_HEADER_OFFSET 往后可能还有非 lView 项，不能一律当视图，否则会把垃圾塞进 nodeList。
      */
     const c = makeContainer([makeChildLView('ok')]);
     c[LVIEW.CONTAINER_HEADER_OFFSET + 1] = { notALView: true };
@@ -223,17 +196,8 @@ describe('运行时容器 → nodeList：嵌入视图要从 CONTAINER_HEADER_OFF
 
 /**
  * 事件回解析：`data-node-path` 里的 `'directive'` 段。
- *
- * 上面那组保证「渲染时把嵌入视图铺进 nodeList」，这一组保证「点击时能沿
- * 同一条路径走回来」——两者必须用同一个取视图的口径，否则就是：
- * 界面看得到、点下去报错。
- *
- * 旧实现读 `LContainer[VIEW_REFS]`，而内建控制流不填它，微信实测：
- *   TypeError: Cannot read properties of null (reading '0')
- *       at findCurrentElement
- *       at pre.<computed> [as bindEvent]
- * 下标就是被点的子视图序号（0/1/2……）。凡 `@for` / `@if` 里的
- * `(tap)` 全部失效，自定义 tabBar 的 tab 按钮就是这种。
+ * 渲染时铺进 nodeList 与点击时沿路径走回来必须用同一个取视图的口径，
+ * 否则就是界面看得到、点下去报错（`Cannot read properties of null`）。
  */
 describe('事件路径回解析：directive 段要从 CONTAINER_HEADER_OFFSET 取视图', () => {
   const TAGS = ['a', 'b', 'c'];

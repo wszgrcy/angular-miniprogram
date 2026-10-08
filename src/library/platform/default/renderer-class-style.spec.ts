@@ -8,18 +8,13 @@ import { LVIEW } from './lview-layout';
 import { MiniProgramRenderer } from './mini-program.renderer';
 
 /**
- * Renderer2 的 class / style 到底写进 AgentNode 的哪个口袋——**运行时实测**。
+ * Renderer2 的 class / style 写进 AgentNode 的哪个口袋——运行时实测。
  *
- * ## 为什么要有这个文件
+ * 同一个 `[class]` 写法在不同版本里分别走 `setAttribute` / `addClass` / `classMap`，
+ * 静态 class 又会被编译器拆进 styling 管道，只能真的建组件、真的跑变更检测，
+ * 把 renderer 收到的每一次写入录下来。
  *
- * `AgentNode` 一度把 class 存成两个来源（`classList` 与 `attribute.class`），
- * `classString()` 再拼起来。到底是「两个都真在用」还是「其中一个早就没人写」，
- * 光读 Angular 源码猜不出来：同一个 `[class]` 写法在不同版本里分别走
- * `setAttribute` / `addClass` / `classMap`，静态 class 又会被编译器拆进
- * styling 管道。所以这里真的建组件、真的跑变更检测，把 renderer 收到的
- * 每一次写入录下来。
- *
- * ## 实测结论（@angular/core 22.1.7）
+ * 实测结论（@angular/core 22.1.7）：
  *
  * | 模板写法 | renderer 收到的调用 |
  * | --- | --- |
@@ -32,24 +27,17 @@ import { MiniProgramRenderer } from './mini-program.renderer';
  * | `style="a:b"`（静态） | `setAttribute('style', 'a: b;')`（Angular 会规范化） |
  * | `[style]` / `[style.x]` | `setStyle` / `removeStyle`（逐条） |
  *
- * 两个来源**都真的在用**，所以必须都留。模型就一句话：动态那半（`classList` /
- * `style`）逐个增删，属性那半（`attribute.class` / `attribute.style`）每次整体
- * 重设一个串，两边只在 `classString()` / `styleString()` 拼一次，存什么就显示
- * 什么。style 是属性在前、动态在后——CSS 里同一个声明块后写的赢，而 Angular
- * 正是先写静态 style 属性、后写动态绑定。
+ * 两个来源都真的在用，所以必须都留。模型就一句话：动态那半（`classList` / `style`）
+ * 逐个增删，属性那半（`attribute.class` / `attribute.style`）每次整体重设一个串，
+ * 两边只在 `classString()` / `styleString()` 拼一次。style 是属性在前、动态在后——
+ * CSS 里同一个声明块后写的赢，而 Angular 正是先写静态 style 属性、后写动态绑定。
  *
  * 已知取舍：静态与动态声明了同一个名字时（`class="shared" [class.shared]="off"`），
- * 动态摘不掉静态那半，两边都声明时串里还会出现两次。DOM 里两者是同一份集合，
- * 既摘得掉也不会重复；要复刻就得额外记一份「谁被明确摘过」的状态，而那种模板
- * 本身自相矛盾。下面 `已知取舍` 用例把这个行为钉住。
+ * 动态摘不掉静态那半，两边都声明时串里还会出现两次。要复刻 DOM 语义就得额外记一份
+ * 「谁被明确摘过」的状态，而那种模板本身自相矛盾。下面 `已知取舍` 用例把这个行为钉住。
  *
- * ## 测试环境的一个坑（写用例前必读）
- *
- * `fixture.detectChanges()` 刷的是**宿主视图**，组件视图只有在标脏之后才会
- * 被 `detectChangesInChildComponents` 带起来。直接改字段再 `detectChanges()`
- * 什么都不会发生（连文本插值都不更新），宿主上的 `markForCheck()` 也带不动
- * 组件视图。真实应用里事件监听会替我们标脏，测试里要拿**组件自己的**
- * `ChangeDetectorRef` 标，见 {@link markForCheck}。
+ * 测试环境的一个坑：`fixture.detectChanges()` 刷的是宿主视图，组件视图只有在标脏之后
+ * 才会被带起来，必须拿组件自己的 `ChangeDetectorRef` 标，见 {@link markForCheck}。
  */
 
 @Directive({
@@ -128,11 +116,9 @@ function deinstrument() {
 }
 
 /**
- * 标脏**组件自己的**视图。
- *
- * `fixture.detectChanges()` 只保证刷宿主视图；不标脏的话组件视图整个跳过，
- * 改了字段也像没生效。`componentRef.changeDetectorRef` 是宿主视图的 CDR，
- * 标它带不动组件视图，必须从组件 injector 里取。
+ * 标脏组件自己的视图。`fixture.detectChanges()` 只保证刷宿主视图；
+ * `componentRef.changeDetectorRef` 是宿主视图的 CDR，标它带不动组件视图，
+ * 必须从组件 injector 里取。
  */
 function markForCheck(fixture: any) {
   fixture.componentRef.injector.get(ChangeDetectorRef).markForCheck();
@@ -156,9 +142,7 @@ function nodesById(lView: any[]): Map<string, AgentNode> {
   return map;
 }
 
-/**
- * 建组件 + 首轮变更检测；`calls()` 是本轮 renderer 收到的全部写入。
- */
+/** 建组件 + 首轮变更检测；`calls()` 是本轮 renderer 收到的全部写入。 */
 function create() {
   raw.length = 0;
   const fixture = TestBed.createComponent(ProbeComponent);
@@ -182,9 +166,7 @@ function isPlain(a: unknown): a is string | number {
 
 /**
  * 某个节点上的 class / style 写入，形如 `['addClass:dyn1', ...]`。
- *
- * `setAttribute` 只留 class / style 那两条（`id` 之类的噪音不进断言）；
- * 没传的 `namespace` / `flags` 参数一律抹掉。
+ * `setAttribute` 只留 class / style 那两条；没传的 `namespace` / `flags` 参数一律抹掉。
  */
 function writesOf(calls: Call[], id: string) {
   return calls
@@ -236,8 +218,7 @@ describe('Renderer2 的 class / style 写入（运行时实测）', () => {
 
     it('建元素时不往 class 里插任何东西', () => {
       const { nodes } = create();
-      // `tag-name-*` 标记已改由编译期烘进 wxml（运行时不知道标签映射表），
-      // classList 里因此只有用户语义的 token。
+      // `tag-name-*` 标记由编译期烘进 wxml，classList 里因此只有用户语义的 token
       expect(nodes.get('static')!.classList.size).toBe(0);
       expect(nodes.get('plain')!.classString()).toBe('');
     });
@@ -369,8 +350,7 @@ describe('Renderer2 的 class / style 写入（运行时实测）', () => {
       markForCheck(fixture);
       fixture.detectChanges();
       expect(nodes.get('classBind')!.classString()).toBe('dyn3');
-      // Set 的顺序跟着写入顺序走（i2 被摘掉、i3 追加在 x 之后），
-      // class 顺序不参与匹配，按集合比。
+      // Set 的顺序跟着写入顺序走，class 顺序不参与匹配，按集合比
       expect(nodes.get('interp')!.classString().split(' ').sort()).toEqual([
         'i3',
         'x',

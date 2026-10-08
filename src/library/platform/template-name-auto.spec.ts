@@ -1,16 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * #5 模板名魔法字符串内部化 —— 自动推导来源验证。
- *
- * `lViewToWXView` 计算容器项 `__templateName` 的表达式是：
+ * 模板名魔法字符串内部化——自动推导来源验证。`lViewToWXView` 计算容器项 `__templateName` 的表达式是：
  *   context.__templateName || lView[1].declTNode.localNames[0] || null
- *
- * 本 spec 证明：`createEmbeddedView(tpl)` **不传 `__templateName`** 时，
- * 第一项（context）为空，名字必然来自第二项（模板声明名 `#autoTpl`）。
- * 即用户不再需要手写 `__templateName` 魔法字符串。
- *
- * 与 lview-to-node-list.spec（证明 lViewToWXView 读的就是这些槽）串起来，
- * 整条「声明名 → wxml template is」链路闭合。
+ * 本 spec 证明：`createEmbeddedView(tpl)` 不传 `__templateName` 时，第一项（context）为空，
+ * 名字必然来自第二项（模板声明名 `#autoTpl`），即用户不再需要手写 `__templateName` 魔法字符串。
+ * 与 lview-to-node-list.spec 串起来，整条「声明名 → wxml template is」链路闭合。
  */
 import { Component, TemplateRef, ViewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';

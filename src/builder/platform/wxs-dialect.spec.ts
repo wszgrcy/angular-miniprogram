@@ -24,12 +24,9 @@ import { ZjBuildPlatform } from './zjtd/zj-platform';
 import { ZjTransform } from './zjtd/zj.transform';
 
 /**
- * 各平台渲染层脚本方言。
- *
- * 扩展名在两处各写一次：`BuildPlatform.fileExtname.wxs` 决定产物落盘的
- * 文件名，`WxTransformLike.wxsExtname` 决定 wxml 头部引的文件名。
- * 两者必须逐字一致，否则头部引 `./a.wxs` 而产物叫 `a.sjs`，
- * 小程序要到运行时才报「找不到模块」——最难查的一类问题。
+ * 各平台渲染层脚本方言。扩展名在两处各写一次：`BuildPlatform.fileExtname.wxs` 决定产物落盘的
+ * 文件名，`WxTransformLike.wxsExtname` 决定 wxml 头部引的文件名。两者必须逐字一致，否则头部引
+ * `./a.wxs` 而产物叫 `a.sjs`，小程序要到运行时才报「找不到模块」。
  */
 const DIALECTS: Array<{ name: string; transform: any; extname: string }> = [
   { name: 'wx', transform: new WxTransform(), extname: '.wxs' },
@@ -54,10 +51,8 @@ describe('wxs 平台方言: transform 扩展名', () => {
 
 describe('wxs 平台方言: 与平台 fileExtname 一致', () => {
   /**
-   * `BuildPlatform` 的 transform 走基类字段注入
-   * （`templateTransform = inject(TemplateTransformBase)`），
-   * 所以必须在注入上下文里构造，不能 `new XxxBuildPlatform(transform)` 传参。
-   * 这里按真实生产配置（platform-inject-config）的最小等价形：
+   * `BuildPlatform` 的 transform 走基类字段注入（`templateTransform = inject(TemplateTransformBase)`），
+   * 所以必须在注入上下文里构造。这里按真实生产配置（platform-inject-config）的最小等价形：
    * 把当前 transform 实例绑到 `TemplateTransformBase` 上。
    */
   const platformClasses: Record<string, any> = {
@@ -89,9 +84,8 @@ describe('wxs 平台方言: 与平台 fileExtname 一致', () => {
 
 describe('wxs 平台方言: 头部转译', () => {
   /**
-   * 作者只写微信形态 `<wxs module="x" src="./x.wxs">`，
-   * 编译期按平台转译。各家差异不只在扩展名，
-   * **标签名和属性名也不同** —— 支付宝是 name/from。
+   * 作者只写微信形态 `<wxs module="x" src="./x.wxs">`，编译期按平台转译。
+   * 各家差异不只在扩展名，标签名和属性名也不同——支付宝是 name/from。
    */
   const EXPECTED_HEADER: Record<string, string> = {
     wx: '<wxs module="util" src="/common/util.wxs"/>',

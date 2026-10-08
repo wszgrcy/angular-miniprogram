@@ -82,11 +82,9 @@ export class MiniProgramCoreFactory {
     setLViewPath(lView, list);
     lViewLinkToMPComponentRef(mpComponentInstance, lView);
     mpComponentInstance.__waitLinkResolve();
-    // 链接完成，把首屏期间暂存的 callMethod 补发出去。
-    // 渲染层的 wxs 事件可能在链接前就触发，不补发就永久滞留。
+    // 链接完成，把首屏期间暂存的 callMethod 补发出去；渲染层的 wxs 事件可能在链接前就触发
     flushPendingCallMethods(mpComponentInstance);
-    // 传 mpComponentInstance：这次全量序列化会顺手给每个 AgentNode 打上
-    // 路径前缀 + setData 目标，之后的叶子变更就能直接发路径。
+    // 传 mpComponentInstance：这次全量序列化会顺手给每个 AgentNode 打上路径前缀和 setData 目标
     const initValue = getPageRefreshContext(lView, mpComponentInstance);
     const diffData = getDiffData(lView, initValue);
     if (Object.keys(diffData).length) {
@@ -134,14 +132,9 @@ export class MiniProgramCoreFactory {
     }, {});
   }
   /**
-   * 渲染层 `callMethod` 的转发器。
-   *
-   * 小程序要求 `ownerInstance.callMethod(name)` 的 `name` 必须已在
-   * `Component({methods})` 里存在，所以方法名必须在启动时就铺好 ——
-   * 这正是编译期要从 `.wxs` 源静态提取 callMethod 名单的原因。
-   *
-   * 全局铺（所有已注册模块的并集）而非按组件铺：组件与模块的对应关系
-   * 在运行时不可知，多铺几个只是占位，不影响行为。
+   * 渲染层 `callMethod` 的转发器。小程序要求 `callMethod(name)` 的 `name` 必须已在
+   * `Component({methods})` 里存在，所以方法名必须在启动时铺好（从 `.wxs` 源静态提取）。
+   * 全局铺而非按组件铺：组件与模块的对应关系运行时不可知，多铺几个只是占位。
    */
   protected wxsCallMethodEvent() {
     return createWxsCallMethodForwarders(collectWxsCallMethods());
@@ -212,9 +205,8 @@ export class MiniProgramCoreFactory {
       useComponent?: boolean;
       /**
        * `useComponent` 时页面钩子落在哪里：
-       * - `methods`（默认，「组件即页面」）：`methods.onShow / onHide / onUnload`
-       * - `pageLifetimes`（普通组件挂在页面上，如自定义 tabBar）：
-       *   `pageLifetimes.show / hide` + `lifetimes.detached`
+       * - `methods`（组件即页面）：`methods.onShow / onHide / onUnload`
+       * - `pageLifetimes`（普通组件挂在页面上，如自定义 tabBar）：`pageLifetimes.show / hide` + `lifetimes.detached`
        */
       pageHook?: 'methods' | 'pageLifetimes';
     },
@@ -223,9 +215,8 @@ export class MiniProgramCoreFactory {
     if (pageOptions?.useComponent) {
       const pageHook = pageOptions.pageHook || 'methods';
       const options = this.getComponentOptions<true>(component) || {};
-      // 先拷一份再包：`...options` 是浅拷贝，直接写 config.lifetimes.created
-      // 会污染组件上静态的 mpComponentOptions，同一个组件启动两次就变成
-      // 包装套娃（oldCreated 是上一轮的 created，Angular 实例起两遍）。
+      // 先拷一份再包：直接写 config.lifetimes.created 会污染组件上静态的
+      // mpComponentOptions，同一个组件启动两次就变成包装套娃
       const userLifetimes = { ...options.lifetimes };
       const userPageLifetimes = { ...options.pageLifetimes };
       let componentRef: ComponentRef<unknown>;
@@ -279,8 +270,7 @@ export class MiniProgramCoreFactory {
       const methods = config.methods!;
       const lifetimes = config.lifetimes!;
       if (pageHook === 'pageLifetimes') {
-        // 普通组件挂在页面上（自定义 tabBar）：页面显隐走 pageLifetimes，
-        // 组件被拆掉就是这一页的 tabbar 销毁，没有 onUnload 可用。
+        // 普通组件挂在页面上（自定义 tabBar）：页面显隐走 pageLifetimes，组件被拆掉就是 tabbar 销毁
         lifetimes.detached = wrapPageHook(
           userLifetimes.detached,
           _this.pageStatus.destroy,
@@ -372,11 +362,8 @@ export class MiniProgramCoreFactory {
    * export { FooComponent as default } from './foo.component';
    * ```
    *
-   * 构建器会替这一行生成 `bootstrapPage(FooComponent)`（见
-   * `builder/vite/plugins/entry-bootstrap.plugin.ts`），显式调用也仍然支持。
-   *
-   * `useComponent` 不传时按组件是否声明了 `mpComponentOptions` 推断：
-   * 那份配置只走 `Component()` 分支，声明了它却走 `Page()` 就是静默丢弃。
+   * 构建器会替这一行生成 `bootstrapPage(FooComponent)`，显式调用也仍然支持。
+   * `useComponent` 不传时按组件是否声明了 `mpComponentOptions` 推断。
    */
   public bootstrapPage = (
     component: Type<unknown>,
@@ -462,22 +449,11 @@ export class MiniProgramCoreFactory {
 
   /**
    * 自定义 tabBar（微信 `custom-tab-bar/index`）的启动入口。
-   *
-   * 为什么不能走 `componentRegistry`：那条路上 Angular 实例是**由父模板
-   * 创建、小程序组件靠 `nodePath` / `nodeIndex` 两个 property 回连**的。
-   * 而自定义 tabBar 的组件实例是微信框架自己创建的，没人给它传 nodePath，
-   * 于是永远连不上：`hasLoad` 恒为 `false`，
-   * `<block wx:if="{{hasLoad}}">` 渲染出一个空盒子——
-   * **底部 tab 栏位置一片空白，且不报任何错**。
-   *
-   * 所以这里按「页面」模型自举：自己起一个 Angular 组件实例（带 `PAGE_TOKEN`、
-   * 自己的 lView 与页面 id），`attached` 时完成链接 —— 和 `bootstrapPage`
-   * 走同一份 `createPageBootstrap`，只是页面钩子落在
-   * `pageLifetimes.show / hide` + `lifetimes.detached` 上：tabbar 是微信框架
-   * 挂在每个 tab 页上的普通组件，既没有 `Page()`，也就没有 `onLoad / onUnload`。
-   *
-   * 微信是「每个 tab 页各挂一个 tabbar 实例」，所以选中态必须放在 root
-   * provider 里共享，否则切页后高亮不同步。
+   * 不能走 `componentRegistry`：那条路上 Angular 实例由父模板创建、小程序组件靠
+   * `nodePath` / `nodeIndex` 回连，而 tabbar 的实例是微信框架自己创建的，没人传
+   * nodePath，`hasLoad` 会恒为 `false`，tab 栏位置渲染成空白且不报错。
+   * 所以按「页面」模型自举，页面钩子落在 `pageLifetimes` 上。
+   * 微信是每个 tab 页各挂一个 tabbar 实例，选中态必须放在 root provider 里共享。
    */
   public bootstrapCustomTabbar = (component: Type<unknown>) => {
     return this.createPageBootstrap(

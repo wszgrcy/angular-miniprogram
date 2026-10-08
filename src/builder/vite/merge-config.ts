@@ -1,14 +1,9 @@
 /**
- * 配置文件合并。
+ * 配置文件合并。规则只有一条：用户写过的不动，没写的才补。
+ * 唯一的例外是 `pages`，它是追加（用户写的在前，构建器扫出来的追加在后，按路径去重）。
  *
- * 规则只有一条：**用户写过的不动，没写的才补**。唯一的例外是 `pages`，
- * 它是追加（用户写的在前，构建器扫出来的追加在后，按路径去重）——
- * 构建器扫出来的入口页必须进 `pages`，否则小程序里没有这个页面，
- * 而用户完全可能自己写额外页面（原生页面、第三方页面）。
- *
- * 入参一律不改，返回全新对象：解析出来的配置对象会被分包插件、assets 插件、
- * 以后的多语言插件共用同一个引用，原地改会让前一处拿到被后一处改脏的数据，
- * watch 重跑时还会基于已经改脏的数据。
+ * 入参一律不改，返回全新对象：解析出来的配置对象会被多个插件共用同一个引用，
+ * 原地改会让前一处拿到被后一处改脏的数据。
  */
 
 import type { MpConfigObject } from './config-schema';
@@ -17,11 +12,8 @@ import type { MpConfigObject } from './config-schema';
 export type { MpConfigObject };
 
 /**
- * 数组追加型 key → 条目标识字段。
- *
- * `pages[0]` 是默认启动页，改顺序就是改行为，所以只能追加。
- * `subpackages` 按 root 认：构建器按入口目录派生出来的分包要能并进用户那份，
- * 而不是把用户写的整包顶掉；同一个 root 用户写了就以用户那份为准。
+ * 数组追加型 key → 条目标识字段。`pages[0]` 是默认启动页，改顺序就是改行为，只能追加。
+ * `subpackages` 按 root 认：派生出来的分包要能并进用户那份，而不是顶掉。
  */
 const APPEND_KEYS: Record<string, string> = {
   pages: 'path',
@@ -31,9 +23,7 @@ const APPEND_KEYS: Record<string, string> = {
 
 /**
  * 对象合并型 key：两边都是对象时逐子项合并，patch 的同名子项覆盖。
- *
- * `usingComponents` 必须这么处理：组件路径由分析层算出来，用户手写的同名条目
- * 十有八九是过期路径，留用户的只会得到一个「组件找不到」。
+ * `usingComponents` 必须这么处理：组件路径由分析层算出来，用户手写的同名条目多半是过期路径。
  */
 const MERGE_OBJECT_KEYS = new Set(['usingComponents']);
 
@@ -43,19 +33,13 @@ const SUB_PACKAGE_KEYS = ['subpackages', 'subPackages'] as const;
 export type MpSubPackageKey = (typeof SUB_PACKAGE_KEYS)[number];
 
 /**
- * 构建器内部字段：参与合并，但绝不进输出文件。
- *
- * `_platform` 是「按平台分段」的容器，输出里没有这个字段，
- * 各家小程序的 app.json 也不会多出这么一个 key。
- * `$schema` 是给编辑器指形状用的，只属于源文件，带进产物只是噪声。
+ * 构建器内部字段：参与合并，但绝不进输出文件。`_platform` 是按平台分段的容器，
+ * `$schema` 只属于源文件。
  */
 export const INTERNAL_KEYS = ['_platform', '$schema'];
 
 /**
- * 属于 project.config.json 的字段。
- *
- * 只用来提醒「你写错文件了」，不参与分流：app.json 里出现 `appid` 照样原样输出，
- * 只是日志里说一声。做成自动分流的话，写错的人永远看不到自己写错了。
+ * 属于 project.config.json 的字段。只用来提醒「你写错文件了」，不参与分流。
  */
 export const PROJECT_CONFIG_KEYS = [
   'appid',
@@ -99,10 +83,7 @@ function itemKeyOf(item: unknown, identity: string): unknown {
 }
 
 /**
- * base 在前、patch 在后，按标识去重。
- *
- * 标识已存在的条目：`deep` 时只往它里面补没写的子字段（用户只写了分包 root，
- * pages 由构建器填），不写就一个字不动。
+ * base 在前、patch 在后，按标识去重。标识已存在的条目：`deep` 时只往它里面补没写的子字段。
  */
 function appendUnique(
   base: unknown[],
@@ -167,9 +148,7 @@ function isWritten(merged: MpConfigObject, key: string): boolean {
 
 /**
  * 把 patch 里 base 没写过的 key 补进 base，返回新对象。
- *
- * base 里已经存在的 key 一律不动（标量、对象、数组都一样），所以
- * `window` / `tabBar` 这类字段只要用户写了，构建器就一个字都不改。
+ * base 里已经存在的 key 一律不动。
  */
 export function mergeConfig(
   base: MpConfigObject,
@@ -226,11 +205,8 @@ function applyKey(
 }
 
 /**
- * 构建器补字段专用的合并：比用户那份的合并多一条——允许往用户已经写过的对象里
- * 补缺失的**子字段**。
- *
- * 自定义 tabBar 的开关就得这么补：用户写了 `tabBar.list` 但没写开关，
- * 开关得能进去，`list` 一个字都不能动。用户写过的子字段依旧不动。
+ * 构建器补字段专用的合并：比用户那份的合并多一条——允许往用户已经写过的对象里补缺失的子字段。
+ * 自定义 tabBar 的开关就得这么补：用户写了 `tabBar.list` 但没写开关，`list` 一个字都不能动。
  */
 export function mergeDerived(
   base: MpConfigObject,
@@ -252,10 +228,8 @@ export function mergeChanged(before: MpConfigObject, after: MpConfigObject) {
 }
 
 /**
- * 把 `subpackages` / `subPackages` 统一成当前平台的写法。
- *
- * 两种写法混在一起会输出两份分包，所以合并完必须收敛成一个 key。
- * 两边都没有时不生成这个字段——构建器不替用户决定分包。
+ * 把 `subpackages` / `subPackages` 统一成当前平台的写法。两种写法混在一起会输出两份分包。
+ * 两边都没有时不生成这个字段。
  */
 export function unifySubPackageKey(
   config: MpConfigObject,

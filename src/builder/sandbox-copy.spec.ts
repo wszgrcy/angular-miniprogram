@@ -1,15 +1,11 @@
 /**
  * sandbox 拷贝策略的回归用例。
  *
- * 背景：`describeBuilder` 的 `beforeEach/afterEach` 会为**每个 spec** 建 / 拆一次
- * sandbox（`TestProjectHost`）。上游那份实现把模板目录整个搬进 sandbox，包括
- * 上一次构建留下的 `dist/`（真实模板里 5.7MB / 358 个文件），实测占了整个测试
- * 套件 ~31% 的时间。本文件钉住改完之后的两个方向：
- *
- *   ✅ 构建产物 / 缓存目录**不进** sandbox（省时间，且不让 toExist() 拿旧产物蒙对）
- *   ✅ 源码与 node_modules **必须进** sandbox（否则构建直接解析不到依赖）
- *
- * 两个方向都重要：只测第一条的话，把排除规则写宽一点也能过，但构建会直接崩。
+ * `describeBuilder` 的 `beforeEach/afterEach` 会为每个 spec 建 / 拆一次 sandbox。上游实现把模板目录
+ * 整个搬进 sandbox，包括上一次构建留下的 `dist/`（真实模板里 5.7MB / 358 个文件），占了整个测试
+ * 套件约 31% 的时间。本文件钉住两个方向：
+ *   ✅ 构建产物 / 缓存目录不进 sandbox（省时间，且不让 toExist() 拿旧产物蒙对）
+ *   ✅ 源码与 node_modules 必须进 sandbox（否则构建直接解析不到依赖）
  */
 import { getSystemPath, normalize } from '@angular-devkit/core';
 import * as fs from 'fs';
@@ -129,9 +125,8 @@ describe('sandbox 拷贝策略（性能回归）', () => {
   });
 
   it('真实模板：src / node_modules 齐全，dist 缺席', async () => {
-    // 用**自己**的 host 实例，去碰 `setWorkspaceRoot` / 共享的 `host`：
-    // describeBuilder 在注册时就把 host 抓进了 harness，中途换掉会让
-    // `harness.host` 和模块变量指向不同实例，后面的 spec 直接拿不到 root。
+    // 用自己的 host 实例，去碰 `setWorkspaceRoot` / 共享的 `host`：describeBuilder 在注册时就把
+    // host 抓进了 harness，中途换掉会让 `harness.host` 和模块变量指向不同实例。
     const h = new FastTestProjectHost(normalize(REAL_TEMPLATE));
     await h.initialize().toPromise();
     try {

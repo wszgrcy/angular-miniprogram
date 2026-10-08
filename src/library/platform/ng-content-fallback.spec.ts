@@ -46,8 +46,8 @@ class HostNamed {}
 
 /**
  * 子组件模板 `<ng-content>A</ng-content><ng-content select="[slot='a']">B</ng-content>`
- * 的槽位：0=默认投影 1=默认兜底容器 2=具名投影 3=具名兜底容器。
- * 下面用 `Array.isArray` 兜底校验，一旦槽位漂移会立刻炸在这里。
+ * 的槽位：0=默认投影 1=默认兜底容器 2=具名投影 3=具名兜底容器。下面用 `Array.isArray` 兜底校验，
+ * 一旦槽位漂移会立刻炸在这里。
  */
 const DEFAULT_FALLBACK = 1;
 const NAMED_FALLBACK = 3;
@@ -83,9 +83,7 @@ function nodeList(lView: any[]): any[] {
 }
 
 /**
- * 复刻 wxml 的分支判断。
- *
- * `wx-container.ts` 生成的是
+ * 复刻 wxml 的分支判断。`wx-container.ts` 生成的是
  * `<block wx:if="{{nodeList[i].length}}">兜底</block><block wx:else><slot/></block>`，
  * 所以「这一格有没有视图」就是走哪条分支的唯一依据。
  */
@@ -172,8 +170,7 @@ describe('ng-content 兜底内容', () => {
       expect(fallbackText(nodeList(child), DEFAULT_FALLBACK)).toBe('兜底CHILD');
 
       childInstance.title = 'CHANGED';
-      // 这个测试环境里组件视图不会自己标脏，得用组件自己的 CDR，
-      // 见 renderer-class-style.spec.ts 顶部那段说明
+      // 这个测试环境里组件视图不会自己标脏，得用组件自己的 CDR，见 renderer-class-style.spec.ts 顶部那段说明
       childInstance.cdr.markForCheck();
       fixture.detectChanges();
 

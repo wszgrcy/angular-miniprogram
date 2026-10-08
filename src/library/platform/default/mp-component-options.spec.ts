@@ -6,13 +6,10 @@ import type {
 import { MiniProgramCore } from './index';
 
 /**
- * `mpComponentOptions` / `mpPageOptions` 的生效范围。
- *
- * 框架在拼 `Component()` 配置单时会占用三段：`data`（setData 的载体）、
- * `properties`（`nodePath` / `nodeIndex` 这条 lView 回连通道）、
- * `methods`（事件分发 + wxs callMethod 转发）。用户在这三段里写的东西
- * 到不了微信，而本架构里它们本来也没有生产者，所以契约（`MpComponentOptions`）
- * 不收——本 spec 钉住「运行时行为」与「契约」两边一致，防止哪天漂开。
+ * `mpComponentOptions` / `mpPageOptions` 的生效范围。框架在拼 `Component()` 配置单时会占用三段：
+ * `data`（setData 的载体）、`properties`（`nodePath` / `nodeIndex` 这条 lView 回连通道）、
+ * `methods`（事件分发 + wxs callMethod 转发）。用户在这三段里写的东西到不了微信，所以契约
+ * （`MpComponentOptions`）不收——本 spec 钉住「运行时行为」与「契约」两边一致，防止哪天漂开。
  */
 const captured: any[] = [];
 const originalComponent = (globalThis as any).Component;

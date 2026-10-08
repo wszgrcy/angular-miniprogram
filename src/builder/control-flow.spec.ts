@@ -14,13 +14,12 @@ import {
   ALL_PAGE_NAME_LIST,
 } from '../../test/util/file';
 import { executeOnceShared } from '../../test/util/shared-build';
-// 主测试链路已切到 Vite builder（webpack 链路待删除）
 import { PlatformType } from './platform/platform';
 import { runViteBuilder as runBuilder } from './vite';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,
-  platform: PlatformType.wx,
+  platform: PlatformType.wx as const,
   sourceMap: false,
 };
 
@@ -112,8 +111,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
           parseInt(m[1], 10),
         ),
       );
-      // bundler 无关：webpack 产出 `["ɵɵrepeaterCreate"](11,`，
-      // Vite/Rolldown 产出 `ɵɵrepeaterCreate(11,`。
+      // bundler 无关：webpack 产出 `["ɵɵrepeaterCreate"](11,`，Vite/Rolldown 产出 `ɵɵrepeaterCreate(11,`。
       // `(?:"])?` 让中间那段 webpack 包装变成可选。
       const repeaters = [
         ...compiled.matchAll(/repeaterCreate(?:"])?\((\d+),/g),
@@ -137,13 +135,9 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const { wxml, compiled } = await load();
       const anchors = collectAnchorsFromWxml(wxml);
 
-      // 不能用 `repeaterCreate"]\((\d+),` 这种正则：那是 webpack 的格式化
-      // 产物。Vite/Rolldown 会把调用重命名成短别名（`At(10, ...)`），
-      // 按名字找不到，于是 repeaters 恒为空，断言退化成
-      // 「Set(11,14) 等于 Set()」而失败。
-      //
-      // 改用**模板名**推导——Angular 生成的模板函数名自带索引，
-      // 且不受 bundler 影响：
+      // 不能用 `repeaterCreate"]\((\d+),` 这种正则：那是 webpack 的格式化产物。Vite/Rolldown 会把调用
+      // 重命名成短别名，按名字找不到，于是 repeaters 恒为空，断言退化成「Set(11,14) 等于 Set()」而失败。
+      // 改用模板名推导——Angular 生成的模板函数名自带索引，且不受 bundler 影响：
       //   ControlFlowComponent_For_11_Template       主模板
       //   ControlFlowComponent_ForEmpty_12_Template  @empty 模板
       const expectedMain = new Set<number>(

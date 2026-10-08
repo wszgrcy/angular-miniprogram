@@ -34,12 +34,7 @@ import { mergeConfig } from '../merge-config';
 import type { MpConfigBundle } from '../mp-config';
 import { checkReferencedFiles } from '../mp-config';
 
-/**
- * 一个纯 node fs 的 ts.System。
- *
- * webpack 侧用的是 @ngtools/webpack 的 createWebpackSystem（走 compiler.inputFileSystem），
- * Vite 侧没有那层，直接拿 node fs 拼一个够用的实现。
- */
+/** 一个纯 node fs 的 ts.System。 */
 export function createNodeTsSystem(
   getCurrentDirectory: () => string,
 ): ts.System {
@@ -75,10 +70,7 @@ export function createNodeTsSystem(
 }
 
 /**
- * 读一份已有的 json 配置（页面 / 组件目录里用户自己写的那份）。
- *
- * 读不到就当空对象，构建器算出来的字段就是全部输出；不是对象直接报错，
- * 静默丢掉用户内容比报错难查得多。
+ * 读一份已有的 json 配置（用户自己写的那份）。读不到当空对象，不是对象直接报错。
  */
 function readJsonObject(file: string | undefined): Record<string, unknown> {
   if (!file || !fs.existsSync(file)) {
@@ -93,12 +85,7 @@ function readJsonObject(file: string | undefined): Record<string, unknown> {
 }
 
 /**
- * 顶替 webpack.Compiler。
- *
- * MiniProgramApplicationAnalysisService 实际只读两处：
- *   - compiler.watchMode
- *   - compiler.inputFileSystem?.purge?.()
- * 所以这里给一个最小实现就够，不用真的造一个 webpack。
+ * 顶替 webpack.Compiler，只提 `watchMode` 和 `inputFileSystem?.purge?.()` 两处需要的最小实现。
  */
 export function createStubWebpackCompiler(watchMode: boolean): {
   watchMode: boolean;
@@ -127,37 +114,23 @@ export interface MiniProgramAssetsPluginOptions {
   assets?: CopiedAsset[];
   /**
    * 解析好的配置文件（静态那份 + 结构化那份 + 构建器补的，已合并完）。
-   *
-   * 解析在 vite 配置组装前就做了，分包插件要用同一份结果；不传则配置文件
-   * 只能原样拷贝。
+   * 不传则配置文件只能原样拷贝。
    */
   mpConfigs?: MpConfigBundle;
   /** builder 配置里的全局样式，产出 app.wxss */
   styles?: (string | { input: string })[];
   /**
-   * `@Component.styles` 内联样式的语言，默认 'css'。
-   *
-   * 内联样式存的是原文，不指定语言就只能当 css 编译；写了 scss 嵌套的
-   * 组件会静默产出一份缺样式的 wxss。
+   * `@Component.styles` 内联样式的语言，默认 'css'。不指定就只能当 css 编译。
    */
   inlineStyleLanguage?: string;
   /**
-   * app.js 从哪个 chunk 出发做可达性分析。
-   *
-   * 测试链路的应用入口叫 `test.js`，
-   * 不把它说清楚的话 app.js 会认为「没有引导入口」，
-   * 退化成「除 entry 类 chunk 外全 require」，
-   * 引导 chunk 反而进不了 app.js，小程序启动时什公都不会发生。
+   * app.js 从哪个 chunk 出发做可达性分析。不指定时 app.js 会认为没有引导入口。
    */
   bootstrapChunk?: string;
   absoluteProjectRoot?: Path;
   absoluteProjectSourceRoot?: Path;
   /**
-   * 分析结果共享引用。
-   *
-   * wxs-strip 插件靠它拿「哪些组件声明了 wxs」，不再自己扫全盘。本插件
-   * buildStart 里就填（不是 generateBundle）—— 两个插件的 buildStart 顺序
-   * 是先 assets 后 strip，strip 要在那之前拿到。
+   * 分析结果共享引用。本插件 buildStart 里就填，wxs-strip 插件靠它拿「哪些组件声明了 wxs」。
    */
   analysisRef?: {
     current: WxsAnalysisRef;
@@ -165,23 +138,17 @@ export interface MiniProgramAssetsPluginOptions {
 }
 
 /**
- * 把 wxml / json / wxss 产出到 Vite 的 bundle。
- *
- * 对应 webpack 的 ExportMiniProgramAssetsPlugin，产出内容完全一致：
+ * 把 wxml / json / wxss 产出到 Vite 的 bundle：
  *   1. metaMap.outputContent  -> wxml
- *   2. metaMap.style          -> wxss（样式源文件编译后按组件拼接）
+ *   2. metaMap.style          -> wxss
  *   3. metaMap.config         -> json（合并已存在的配置文件）
  *   4. library 组件 config    -> json
- *   5. library 模板          -> 直接落盘（已在读 sidecar 时渲染完）
+ *   5. library 模板          -> 直接落盘
  *   6. metaMap.selfTemplate   -> self template
  */
 /**
- * 样式编译器。一轮构建里复用同一个实例，避免每个文件重建 sass 环境。
- *
- * `cssUrl: inline` 不是优化，是小程序的硬限制：wxss 拿不到本地文件，
- * `url()` 里写相对路径在真机上就是一张图都出不来，只剩网络图和 base64 两条路。
- * 交给 esbuild 的 dataurl loader 内联，比事后正则替 base64 可靠；
- * `/static/x.png` 这种绝对地址不受影响（小程序自己会去包里找）。
+ * 样式编译器，一轮构建里复用同一个实例。`cssUrl: inline` 是小程序的硬限制：
+ * wxss 拿不到本地文件，`url()` 里的相对路径必须内联成 dataurl。
  */
 function createStyleProcessor(
   options: MiniProgramAssetsPluginOptions,
@@ -197,9 +164,7 @@ function createStyleProcessor(
   );
 }
 
-/**
- * 样式告警的定位包装：把「哪个产物」拼到每条告警前面。
- */
+/** 样式告警的定位包装：把「哪个产物」拼到每条告警前面。 */
 function createStyleWarnOf(
   options: MiniProgramAssetsPluginOptions,
 ): (outPath: string) => (message: string) => void {
@@ -208,12 +173,8 @@ function createStyleWarnOf(
 }
 
 /**
- * wxs 落盘 + watch 登记。
- *
- * wxs 不是 ES module，没有任何 import 指向它，Vite 的模块图看不见。
- * 不显式 addWatchFile 的话，watch 模式下改 .wxs 根本不会触发重建。
- *
- * 语法已在分析阶段由 parseWxsSource 把关，这里原样落盘不转译。
+ * wxs 落盘 + watch 登记。wxs 不是 ES module，模块图看不见，不显式 addWatchFile
+ * 的话 watch 下改 .wxs 不会触发重建。语法已在分析阶段把关，这里原样落盘。
  */
 export function emitWxs(
   resolved: {
@@ -241,27 +202,20 @@ function fileStyleEntries(
   paths: Iterable<string>,
 ): StyleCompileEntry[] {
   return [...paths].map((p) => {
-    // 这里要的是**可用**路径（key 同时当 bundleFile 的入参，ng-packagr 拿它读盘），
-    // 所以用 toNativePath 而不是 pathKey：后者是身份令牌（`/C/a/b`），
-    // 交给 fs 在 Windows 上直接读不到。
+    // key 同时当 bundleFile 的入参，要的是可用路径，不是身份令牌
     const key = toNativePath(p);
     return { key, bundle: () => styleProcessor.bundleFile(key) };
   });
 }
 
-/**
- * 一轮分析里需要被样式管线碰到的那部分。
- */
+/** 一轮分析里需要被样式管线碰到的那部分。 */
 type StyleSlice = {
   style: Map<string, string[]>;
   inlineStyle: Map<string, InlineStyleSource[]>;
 };
 
 /**
- * 编译本轮所有组件样式：样式源文件 + 内联样式，两份分开返回。
- *
- * 分开是因为 key 不同域：前者按磁盘路径，后者按合成的组件级 key。
- * 到 `emitStyles` 那里再汇成一份 wxss。
+ * 编译本轮所有组件样式：样式源文件 + 内联样式，两份分开返回（key 不同域）。
  */
 async function compileResolvedStyles(
   options: MiniProgramAssetsPluginOptions,
@@ -272,8 +226,7 @@ async function compileResolvedStyles(
   resolved.style.forEach((sourceList) => files.push(...sourceList));
   const inline: InlineStyleSource[] = [];
   resolved.inlineStyle.forEach((sourceList) => inline.push(...sourceList));
-  // 一个样式都没有就别拉样式编译器：建一次 StylesheetProcessor 要跑
-  // browserslist + postcss 配置探测，纯脚本项目白付这笔钱。
+  // 一个样式都没有就别拉样式编译器，建一次 StylesheetProcessor 要跑 browserslist + postcss 探测
   if (!files.length && !inline.length) {
     return {
       files: new Map<string, string>(),
@@ -300,13 +253,8 @@ async function compileResolvedStyles(
 }
 
 /**
- * wxss 落盘。
- *
- * 一个产物样式可能同时来自样式文件和内联样式（两边都拼，不是二选一），
- * 所以先汇到同一份列表里再写。
- *
- * 拼接完必须过 `transformMiniProgramStyle`：多份样式拼一起正是
- * `@charset` / `@import` 跑到文件中部的原因。
+ * wxss 落盘。一个产物可能同时来自样式文件和内联样式，先汇到同一份列表再写。
+ * 拼接完必须过 `transformMiniProgramStyle`，避免 `@charset` / `@import` 跑到文件中部。
  */
 function emitStyles(
   resolved: StyleSlice,
@@ -342,13 +290,8 @@ function emitStyles(
 }
 
 /**
- * 是不是 page / component / tabbar / library 的入口 chunk。
- *
- * 这类 chunk 必须由小程序运行时在**正确上下文**里加载，不能从 app.js 里
- * require（那等于在 app 上下文调 Page() / Component()）。
- *
- * 入参是**产物路径**（rollup chunk 的 fileName，相对产物根），不是源路径；
- * 前缀就是各类入口的约定产物目录，tabBar 那个由平台给。
+ * 是不是 page / component / tabbar / library 的入口 chunk。这类 chunk 必须由小程序运行时
+ * 在正确上下文里加载，不能从 app.js 里 require。入参是产物路径，不是源路径。
  */
 function isEntryChunk(
   fileName: string,
@@ -408,9 +351,7 @@ export function miniProgramAssetsPlugin(
     return metaMap;
   };
 
-  /**
-   * 样式编译器跳轮复用，所以由闭包持有；具体编译在模块级函数里。
-   */
+  /** 样式编译器跳轮复用，由闭包持有；具体编译在模块级函数里。 */
   const ensureStyleProcessor = () =>
     (styleProcessor ??= createStyleProcessor(options));
 
@@ -426,11 +367,7 @@ export function miniProgramAssetsPlugin(
         analysisPromise = null;
       }
       analysisPromise ??= runAnalysis();
-      /**
-       * 必须 await。不 await 的话这条 promise 在 buildStart 返回后没人接，
-       * 分析一失败就是 unhandled rejection，直接把 node 进程崩掉：
-       * 报错不走 vite 的插件错误通道，用户只看到一坨裸堆栈。
-       */
+      /** 必须 await，否则分析失败就是 unhandled rejection，直接崩掉 node 进程 */
       await analysisPromise;
       if (options.analysisRef) {
         options.analysisRef.current = await analysisPromise;
@@ -450,11 +387,8 @@ export function miniProgramAssetsPlugin(
       );
 
       const emit = (fileName: string, source: string) => {
-        // 不能用 path.normalize：Windows 上它会把 `/` 转成 `\`，
-        // 产物路径就带上反斜杠，进而污染 app.js 的 require 字面量
-        // （`\c` 之类无效转义被吃掉，路径直接废掉）。
+        // 不能用 path.normalize：Windows 上它会把 `/` 转成 `\`，污染 app.js 的 require 字面量。
         // 产物路径一律 posix 正斜杠，并剥掉前导 `/`
-        // （rollup 的 emitFile fileName 不接受绝对路径）。
         const normalized = toPosixPath(fileName);
         if (!normalized || normalized.startsWith('..')) {
           this.warn(`跳过无法归一化的产物路径: ${fileName}`);
@@ -495,9 +429,8 @@ export function miniProgramAssetsPlugin(
         emit(outPath, JSON.stringify(config));
       });
 
-      // 4. otherMetaCollectionGroup -> 把模板 / usingComponents 回注到 scope
-      //    这一步必须在 exportLibraryTemplate() 之前，否则 templateList 是空的，
-      //    library-template/*.wxml 会产出一个空文件。
+      // 4. otherMetaCollectionGroup -> 把模板 / usingComponents 回注到 scope，
+      //    必须在 exportLibraryTemplate() 之前
       for (const [key, element] of Object.entries(
         resolved.otherMetaCollectionGroup,
       )) {
@@ -520,10 +453,8 @@ export function miniProgramAssetsPlugin(
         emit(item.filePath, JSON.stringify(item.content));
       }
 
-      // 6. library 模板
-      // 注意：这里**不再渲染**。库模板已在 library-template.plugin 从 sidecar
-      // 取出时渲染成目标平台文本；这里拼进来的还有 app 自己的 wxml（带真实
-      // `{{hasLoad}}` 插值），再过一遍模板渲染会把它们吃掉。
+      // 6. library 模板：已在 library-template.plugin 从 sidecar 取出时渲染成目标平台文本，
+      //    这里不能再渲染，否则会把 app 自己的 wxml 插值吃掉
       const templateGroup = libraryTemplateScopeService.exportLibraryTemplate();
       for (const [key, element] of Object.entries(templateGroup)) {
         emit(key, element);
@@ -574,10 +505,8 @@ export function miniProgramAssetsPlugin(
         }
       }
 
-      // 9. app.js：小程序没有模块系统，靠 app.js 里一串 require 把启动
-      //    需要的 chunk 拉起来。对应 webpack 的 BootstrapAssetsPlugin：
-      //      'app.js': importTemplate + json.scripts.map(i => `require('./${i.src}')`)
-      // require 顺序必须依赖在前、入口在后（拼接后都是全局作用域）。
+      // 9. app.js：小程序没有模块系统，靠 app.js 里一串 require 把启动需要的 chunk 拉起来。
+      //    require 顺序必须依赖在前、入口在后
       /** Vite 的 bundle 类型和 rollup 的不完全一致，这里只用到这两个字段 */
       interface JsChunk {
         type: 'chunk';
@@ -615,24 +544,11 @@ export function miniProgramAssetsPlugin(
         visit(chunk.fileName, visiting);
       }
       // f 必须过 toPosixPath：Windows 下 chunk fileName 带反斜杠，
-      // 直接塞进 `require('...')` 字面量后 `\c` 这类无效转义会被吃掉，
-      // 路径变成 ./componentscxs.js，运行时找不到模块。
+      // 塞进 `require('...')` 字面量后无效转义会被吃掉
       /**
-       * app.js 只应该 require「app 引导（main.js）可达的 chunk」。
-       *
-       * 不能把 emittedOrder（全部 chunk）都塞进来：page / component /
-       * library entry 各自会在文件顶层调 Page() / Component()，
-       * 那些必须由小程序运行时在**正确上下文**里加载
-       * （导航到页面时 = page 上下文；注册组件时 = 组件初始化阶段）。
-       * 从 app.js 里 require 它们，等于在 app 上下文调 Page()，微信会报
-       *   "Please do not call Page constructor in files that not
-       *    listed in pages section of app.json"
-       * 和非初始化阶段调 Component()：
-       *   "Component constructors should be called while initialization"
-       *
-       * webpack 侧本来就是这个语义：app.js 用的是 json.scripts，
-       * 只含 app 主入口依赖的那几个 chunk（main/runtime/vendor/...），
-       * 不含 page/component entry。
+       * app.js 只 require「app 引导（main.js）可达的 chunk」。page / component / library
+       * entry 各自会在文件顶层调 Page() / Component()，必须由小程序运行时在正确上下文里
+       * 加载，从 app.js 里 require 它们会直接报错。
        */
       // 从 main.js 出发收集可达 chunk（含自身）
       const reachable = new Set<string>();
@@ -655,8 +571,7 @@ export function miniProgramAssetsPlugin(
         reachable.has(toPosixPath(f)),
       );
       if (!byFileName.has(bootstrapChunk)) {
-        // 没有 main 引导入口时退化成「排除 entry 类 chunk」，
-        // 至少不会再把 Page()/Component() 拉进 app 上下文
+        // 没有 main 引导入口时退化成「排除 entry 类 chunk」
         required.push(
           ...emittedOrder.filter(
             (f) => !isEntryChunk(f, bootstrapChunk, tabbarDir),
@@ -664,12 +579,8 @@ export function miniProgramAssetsPlugin(
         );
       }
       /**
-       * polyfill 必须在最前面。
-       *
-       * 它是独立入口，从 main.js 不可达，上面的可达性分析不会把它
-       * 纳入；而它又必须在任何使用 AbortController 的代码之前执行，
-       * 所以在此显式前置（而不是丢给可达性分析）。
-       *
+       * polyfill 必须在最前面。它是独立入口，从 main.js 不可达，可达性分析不会把它纳入，
+       * 而它又必须在任何使用 AbortController 的代码之前执行。
        * 顺序：importTemplate（建 obj）→ polyfills（往 obj 装）→ 其余。
        */
       const POLYFILL_CHUNK = 'polyfills.js';
@@ -689,8 +600,7 @@ export function miniProgramAssetsPlugin(
         `${options.buildPlatform.importTemplate};\n${requireList};`,
       );
 
-      // 10. 全局样式（app 级）。对应 builder 配置里的 styles
-      //     （webpack 侧走 MiniCssExtractPlugin，这里直接过一遍样式管线）。
+      // 10. 全局样式（app 级），来自 builder 配置里的 styles
       if (options.styles?.length) {
         const globalStyleSources = options.styles
           .map((s) => (typeof s === 'string' ? s : s.input))
@@ -718,8 +628,7 @@ export function miniProgramAssetsPlugin(
               ),
           },
         );
-        // 文件名跟着平台走：wx 是 app.wxss，bdzn 是 app.css，
-        // zfb 是 app.acss……写死 wxss 会让其他平台拿不到全局样式。
+        // 文件名跟着平台走：wx 是 app.wxss，zfb 是 app.acss……
         emit('app' + options.buildPlatform.fileExtname.style, globalCss);
       }
 

@@ -4,15 +4,13 @@ import {
 } from '../../test/util/wxml-blocks';
 
 /**
- * 分块器单测。重点：**嵌套具名模板**必须被父块完整带走，
- * 不能在第一个 </template> 处截断，否则闭合残尾会污染根区。
+ * 分块器单测。重点：嵌套具名模板必须被父块完整带走，不能在第一个 </template> 处截断，
+ * 否则闭合残尾会污染根区。
  */
 describe('wxml 分块器', () => {
   /**
-   * 不变量：根区的 <template> 开/闭标签必须**平衡**。
-   *
-   * 注意不能断言「没有 </template>」——`<template is="x">` 调用标签
-   * 本身就带闭合，那是合法的。要防的是**孤儿闭合**（切分不平衡留下的）。
+   * 不变量：根区的 <template> 开/闭标签必须平衡。不能断言「没有 </template>」——
+   * `<template is="x">` 调用标签本身就带闭合，那是合法的。要防的是孤儿闭合（切分不平衡留下的）。
    */
   function assertBalanced(content: string) {
     const opens = (content.match(/<template\b(?![^>]*\/>)/g) || []).length;

@@ -16,16 +16,9 @@ import { PlatformType } from '../platform/platform';
 import { runViteBuilder as runBuilder } from '../vite';
 
 /**
- * 同文件多组件支持。
- *
- * 小程序侧「一个组件 = 一个 js = 一次 Component() 调用」，所以合法形态是
- * 一个组件源文件导出多个组件，各自用独立 entry 注册。
- *
- * 改造前实测（两个组件共用源文件 + 两个独立 entry）：
- *   - 先编译的那个组件模板彻底丢失（A 的 wxml 数 = 0）
- *   - 所有 import 该文件的 entry 都渲染成最后编译的那个组件
- * 原因就是 outputContent / useComponentPath / style 三个 map 按源文件路径做 key，
- * 后写的覆盖先写的。现在 key 改成 `源文件#组件类名`。
+ * 同文件多组件支持。小程序侧「一个组件 = 一个 js = 一次 Component() 调用」，所以合法形态是
+ * 一个组件源文件导出多个组件，各自用独立 entry 注册。key 用 `源文件#组件类名`，
+ * 只按源文件路径做 key 会让后写的覆盖先写的。
  */
 
 const TWO_COMPONENT_TS = `
@@ -63,7 +56,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     it('两个组件各自产出独立模板，且不会互相串', async () => {
       const angularConfig = {
         ...DEFAULT_ANGULAR_CONFIG,
-        platform: PlatformType.wx,
+        platform: PlatformType.wx as const,
         sourceMap: false,
       };
       const root = harness.host.root();
@@ -115,7 +108,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const aWxml = await wxmlOf('entry-a');
       const bWxml = await wxmlOf('entry-b');
 
-      // A 的模板必须存在（改造前这里直接是 0，内容整个丢了）
+      // A 的模板必须存在
       expect(aWxml).toContain('A-input');
       expect(aWxml).not.toContain('B-input');
 

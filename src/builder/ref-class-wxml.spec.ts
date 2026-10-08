@@ -16,22 +16,16 @@ async function compile(html: string): Promise<string> {
   ctx.declaredWxsModules = declared;
   const def = new TemplateDefinition(r.nodes, ctx);
   const t = new WxTransform();
-  // 本文件只关 refClass。`tag-name-*` 会往 class 属性前面插一段字面量，
-  // 开着它断言就变成同时钉两件事，那部分单独立文件测。
+  // 本文件只关 refClass。`tag-name-*` 会往 class 属性前面插一段字面量，开着它断言就变成同时钉两件事。
   t.tagNameClass = 'off';
   t.init();
   return t.compile(def.run().map((n) => n.getNodeMeta())).content;
 }
 
 /**
- * wxml 侧的可查询 class。
- *
- * 与运行时 `refClassOf()` 是同一条件的两侧：**只有带 `#` 的元素**才拼
- * `nodeList[i].refClass`。没 `#` 的元素连这个表达式都不出现，数据侧也
- * 不会发这个字段，两边同进同退。
- *
- * 拼在 class 表达式**末尾**且自带 `|| ''` 兜底：静态 class、动态 class、
- * 下推到渲染层的 class 全都保留，refClass 只是追加一个 token。
+ * wxml 侧的可查询 class。与运行时 `refClassOf()` 是同一条件的两侧：只有带 `#` 的元素才拼
+ * `nodeList[i].refClass`。没 `#` 的元素连这个表达式都不出现，数据侧也不会发这个字段，两边同进同退。
+ * 拼在 class 表达式末尾且自带 `|| ''` 兜底：refClass 只是追加一个 token。
  */
 describe('wxml 可查询 class', () => {
   const REF_EXPR = `(nodeList[0].class || '') + ' ' + (nodeList[0].refClass || '')`;

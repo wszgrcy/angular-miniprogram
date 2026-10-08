@@ -1,28 +1,16 @@
 /**
  * 多平台：一份库产物，通吃非 wx 平台。
  *
- * 这是 schemaVersion 3 架构的核心卖点，之前完全没测：
+ * 库构建产出的是 `${}` 插值模板串（平台中立）：平台相关处写成 `${directivePrefix}` /
+ * `${eventListConvert(["tap"])}`，wxml 自己的 `{{hasLoad}}` 是静态文本原样进出；
+ * 填充发生在主构建，用目标平台的 `LibraryTemplateValues` 跑 `renderLibraryTemplate()`。
+ * 所以库只需要构建一次，平台相关的东西一个都不烘进库里。
  *
- *   库构建产出的是 **`${}` 插值模板串**（平台中立）：平台相关处写成
- *   `${directivePrefix}` / `${eventListConvert(["tap"])}`，wxml 自己的
- *   `{{hasLoad}}` 是静态文本原样进出；填充发生在主构建，用目标平台的
- *   `LibraryTemplateValues` 跑 `renderLibraryTemplate()`。
+ * 这里用 zfb（支付宝）做对照，因为它跟 wx 的差异足够大：指令前缀 `a:if`、事件名 `onTap`、
+ * 模板 `.axml`、样式 `.acss`。
  *
- * 所以库只需要构建一次，wx / zfb / bd / qq 各自的主构建把同一份 `content`
- * 填成各自平台的 wxml + 事件名 + 文件扩展名。平台相关的东西一个都不烘进库里。
- *
- * 这里用 zfb（支付宝）做对照，因为它跟 wx 的差异足够大、一眼能看出来：
- *
- *   | 维度       | wx          | zfb        |
- *   | ---------- | ----------- | ---------- |
- *   | 指令前缀   | `wx:if`     | `a:if`     |
- *   | 事件名     | `bind:tap`  | `onTap`    |
- *   | 模板扩展名 | `.wxml`     | `.axml`    |
- *   | 样式扩展名 | `.wxss`     | `.acss`    |
- *
- * 单独开一个 spec 文件而不是塞进 `library-meta-sidecar.spec.ts`：那个文件里
- * wx 的 `load()` 是 memoize 的，再跑一次 zfb 构建会把同一批 `.js` chunk
- * 覆盖掉，两个平台的断言会互相污染。
+ * 单独开一个 spec 文件而不是塞进 `library-meta-sidecar.spec.ts`：那个文件里 wx 的 `load()` 是
+ * memoize 的，再跑一次 zfb 构建会把同一批 `.js` chunk 覆盖掉，两个平台的断言会互相污染。
  */
 import { join, normalize } from '@angular-devkit/core';
 import * as fs from 'fs';
@@ -69,8 +57,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     await h.moveDir(ALL_COMPONENT_NAME_LIST, '__components', 'components');
     await h.addPageEntry(ALL_PAGE_NAME_LIST);
 
-    // 同 library-meta-sidecar.spec.ts：app harness 跑不了 library target，
-    // test-library 靠外部先构建，这里验一下副本新鲜度，避免假绿灯。
+    // app harness 跑不了 library target，test-library 靠外部先构建，这里验一下副本新鲜度，避免假绿灯
     const installedLib = Buffer.from(
       await harness.host
         .read(
@@ -87,11 +74,10 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         '先跑 `vitest run src/builder/library/library.spec.ts` 重新生成',
     ).toContain('LIB_TEST_LIBRARY_RENDERED');
 
-    // 关键：库**不重新构建**，只是主构建换了平台。
-    // 库产物（含 sidecar）与 wx 那次用的是同一份。
+    // 关键：库不重新构建，只是主构建换了平台。库产物（含 sidecar）与 wx 那次用的是同一份。
     const angularConfig = {
       ...DEFAULT_ANGULAR_CONFIG,
-      platform: PlatformType.zfb,
+      platform: PlatformType.zfb as const,
       sourceMap: false,
     };
     harness.useTarget('build', angularConfig);

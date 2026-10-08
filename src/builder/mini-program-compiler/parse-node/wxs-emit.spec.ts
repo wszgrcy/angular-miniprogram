@@ -7,15 +7,10 @@ import { ComponentContext } from './component-context';
 import { TemplateDefinition } from './template-definition';
 
 /**
- * 端到端：模板 HTML → wxml 产物。
- *
- * 走真实管线 `parseTemplate → rewriteWxsTemplates → TemplateDefinition →
- * WxTransform`，不 mock，断言的就是最终落盘的那串字符。
+ * 端到端：模板 HTML → wxml 产物。走真实管线 `parseTemplate → rewriteWxsTemplates →
+ * TemplateDefinition → WxTransform`，不 mock，断言的就是最终落盘的那串字符。
  * 改写阶段必须跑，否则 walk 读到的和 emit 用的不是同一份 AST。
- *
- * 这里自动把模板里用到的模块补成 `<wxs module src>` 声明，
- * 让本文件的断言集中在「枝叶拆分 / 下标展开」上。
- * 声明机制本身（缺失报错、重名、内联拦截）在 wxs-declare.spec.ts 里单独测。
+ * 这里自动把模板里用到的模块补成 `<wxs module src>` 声明，让断言集中在「枝叶拆分 / 下标展开」上。
  */
 async function compileHtml(html: string): Promise<string> {
   const r: any = parseTemplate(withDeclarations(html), 'p.html');
@@ -24,15 +19,12 @@ async function compileHtml(html: string): Promise<string> {
   }
   const { declared } = await rewriteWxsTemplates(r.nodes);
   const ctx = new ComponentContext(undefined);
-  // 真实管线里这一步由 buildComponentMeta 从改写结果注入；
-  // 测试没有组件身份，直接设上，事件下推才能识别到模块
+  // 真实管线里这一步由 buildComponentMeta 从改写结果注入；测试没有组件身份，直接设上
   ctx.declaredWxsModules = declared;
   const def = new TemplateDefinition(r.nodes, ctx);
   const metas = def.run().map((n) => n.getNodeMeta());
   const transform = new WxTransform();
-  // 本文件只关 wxs 下推。`tag-name-*` 会往 class 属性前面插一段字面量，
-  // 开着它断言就变成同时钉两件事；class/style 通道本身由
-  // class-style-wxml.spec 专门钉。
+  // 本文件只关 wxs 下推。`tag-name-*` 会往 class 属性前面插一段字面量，开着它断言就变成同时钉两件事
   transform.tagNameClass = 'off';
   transform.init();
   return transform.compile(metas).content;
@@ -115,11 +107,8 @@ describe('wxs 端到端产出: 脊柱运算下推（旧架构做不到）', () =
 
 describe('wxs 端到端产出: 插值下推', () => {
   /**
-   * 从产物里反解合成承载属性名。
-   *
-   * 文本节点带不了枝叶数组：`ɵɵtextInterpolate*` → `renderStringify` →
-   * `String(v)` 会把数组 join。所以改写层把它挂到宿主元素的合成普通
-   * property 上，wxml 按宿主下标取。key 是 plan 哈希，只能反解。
+   * 从产物里反解合成承载属性名。文本节点带不了枝叶数组：`renderStringify` 会把数组 join。
+   * 所以改写层把它挂到宿主元素的合成普通 property 上，wxml 按宿主下标取。key 是 plan 哈希，只能反解。
    */
   const carrierOf = (wxml: string) => /property\.(__wx\w+)/.exec(wxml)?.[1];
 
@@ -162,11 +151,8 @@ describe('wxs 端到端产出: 插值下推', () => {
 
 describe('wxs 端到端产出: class / style 整体下推', () => {
   /**
-   * 从产物里反解合成承载属性名。
-   *
-   * `[class]` 走 `ɵɵclassMap` → addClass，不进 `setProperty`，枝叶数组到不了
-   * `property.class`，所以改写层会把它改挂到一个合成普通 property 上。
-   * key 是 plan 哈希，不固定，只能反解。
+   * 从产物里反解合成承载属性名。`[class]` 走 `ɵɵclassMap` → addClass，不进 `setProperty`，
+   * 枝叶数组到不了 `property.class`，所以改写层会把它改挂到一个合成普通 property 上。
    */
   const carrierOf = (wxml: string) => /property\.(__wx\w+)/.exec(wxml)?.[1];
   const carriersOf = (wxml: string) =>
@@ -282,8 +268,7 @@ describe('wxs 端到端产出: 对象语法 class / style（uni-app 主用形态
   });
 
   it('对象里 wxs 被当值使用（非计算键）是合法下推', async () => {
-    // 注：`{[k()]: v}` 这种计算键 Angular 自己就解析不了（Vue 独有），
-    // 不是本框架的差距。
+    // `{[k()]: v}` 这种计算键 Angular 自己就解析不了，不是本框架的差距
     const w = await compileHtml(`<div [class]="{a: m.f(1)}"></div>`);
     expect(w).toContain(`class="{{{'a': m.f(1)}}}"`);
   });
@@ -312,8 +297,7 @@ describe('wxs 端到端产出: 事件旁路', () => {
   });
 
   it('catch 前缀保留，且属性名与普通事件完全一致', async () => {
-    // 不写死大小写：eventAttrName 复用 eventNameConvert，
-    // 下推路径与普通路径的属性名必然相同，这才是真正要锁的不变量。
+    // 不写死大小写：eventAttrName 复用 eventNameConvert，下推路径与普通路径的属性名必然相同
     const wxsPath = await compileHtml(`<div (catchTap)="mod.fn"></div>`);
     const normalPath = await compileHtml(`<div (catchTap)="go()"></div>`);
     const attrOf = (w: string) => /\s([a-z-]*:[A-Za-z]+)="[^"]*"/.exec(w)?.[1];
@@ -397,8 +381,7 @@ describe('wxs 端到端产出: 模块收集', () => {
 
 describe('wxs 端到端产出: 「wxs 结果被上层消费」家族', () => {
   /**
-   * 判据只有一条：上层（逻辑层）需不需要拿到 wxs 的返回值。
-   * 需要 -> 报错；不需要（渲染层自己能算）-> 正常下推。
+   * 判据只有一条：上层（逻辑层）需不需要拿到 wxs 的返回值。需要 -> 报错；不需要 -> 正常下推。
    */
 
   it('管道套结果 -> 报错（管道在逻辑层）', async () => {

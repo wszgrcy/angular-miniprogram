@@ -16,8 +16,7 @@ import type { WorkerRequest, WorkerResponse } from 'vitest/node';
 import type { TestModuleRegistry } from './registry';
 import { MiniProgramTestRunner } from './runner';
 /**
- * 把一帧 payload 发给宿主。信封（kind / frame）由调用方拼，
- * worker 不操心传输层长什么样。
+ * 把一帧 payload 发给宿主。信封（kind / frame）由调用方拼，worker 不操心传输层长什么样。
  */
 export type MpSendFrame = (payload: unknown) => void;
 
@@ -32,8 +31,8 @@ export interface MiniProgramWorkerOptions {
 }
 
 /**
- * CancelReason 的联合里那条 `(string & Record<never, never>)` 兜底分支
- * 不接受字面量，只能显式断言。语义就是「宿主主动取消」。
+ * CancelReason 的联合里那条 `(string & Record<never, never>)` 兜底分支不接受字面量，只能显式断言。
+ * 语义就是「宿主主动取消」。
  */
 const HOST_CANCEL_REASON = 'miniprogram-host-cancel' as CancelReason;
 
@@ -51,11 +50,9 @@ function serializeError(error: unknown): unknown {
 }
 
 /**
- * 设备端的 worker：把 WebSocket 当成 vitest 的 worker 通道。
- *
- * vitest 的宿主 ↔ worker 协议是一对 `WorkerRequest` / `WorkerResponse`，
- * 中间再套一层 birpc 做双向 RPC（`onTaskUpdate` / `onConsoleLog` 等
- * 都由 RPC 反向调用）。只要这两层接上，reporter 完全不知道对端是小程序。
+ * 设备端的 worker：把 WebSocket 当成 vitest 的 worker 通道。vitest 的宿主 ↔ worker 协议是一对
+ * `WorkerRequest` / `WorkerResponse`，中间再套一层 birpc 做双向 RPC（`onTaskUpdate` / `onConsoleLog`
+ * 等都由 RPC 反向调用）。只要这两层接上，reporter 完全不知道对端是小程序。
  */
 export class MiniProgramWorker {
   private readonly rpc: ReturnType<typeof createBirpc<RuntimeRPC, RunnerRPC>>;
@@ -70,8 +67,7 @@ export class MiniProgramWorker {
   constructor(private readonly options: MiniProgramWorkerOptions) {
     this.rpc = createBirpc<RuntimeRPC, RunnerRPC>(
       {
-        // 设备端能响应的反向调用极少，取消是唯一一个必须实现的：
-        // 不实现的话宿主发 cancel 会一直等超时。
+        // 设备端能响应的反向调用极少，取消是唯一一个必须实现的：不实现的话宿主发 cancel 会一直等超时。
         onCancel: async (reason: CancelReason) => {
           for (const listener of this.cancelListeners) {
             await listener(reason);
@@ -101,8 +97,7 @@ export class MiniProgramWorker {
   }
 
   /**
-   * birpc 帧没有显式标记，只能靠形状区分：
-   * worker 请求带 `__vitest_worker_request__`，其余都交给 birpc。
+   * birpc 帧没有显式标记，只能靠形状区分：worker 请求带 `__vitest_worker_request__`，其余都交给 birpc。
    */
   private looksLikeRpc(message: unknown): boolean {
     return (

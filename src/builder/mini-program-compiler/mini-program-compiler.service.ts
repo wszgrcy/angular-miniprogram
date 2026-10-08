@@ -62,21 +62,12 @@ type ComponentTemplateMeta = NonNullable<
 /**
  * inline `template` 的坐标平移量。
  *
- * ngtsc 解析 inline 模板时，把整棵 AST 的 `sourceSpan` 平移到**宿主 .ts 文件**
- * 坐标系里（平移量 = 模板字面量内容起点，即反引号后一位）；`templateUrl` 那条
- * 路不平移，span 就是 .html 自己的偏移。而 `meta.template.content` 两种情况
- * 下都是**模板文本本身**。
+ * ngtsc 解析 inline 模板时把整棵 AST 的 `sourceSpan` 平移到宿主 .ts 文件坐标系
+ * （平移量 = 反引号后一位）；`templateUrl` 那条路不平移。两者下 `meta.template.content`
+ * 都是模板文本本身，不同坐标系下拿 span 去切 `content` 会全部越界，
+ * `slice` 把越界钳成「追加到末尾」，不报错但改写全跑到尾部。
  *
- * 于是 inline 下两边不同坐标系：拿 span 去切 `content`，区间全部落在字符串
- * 尾巴之后，`slice` 把越界钳成「追加到末尾」—— 不报错，产出一份模板结构完好、
- * wxs 改写全跑到尾部的东西，Angular 编出来的 update 函数里留着 `ctx.fmt.xxx()`
- * （逻辑层没有 `fmt`，运行时靠 `ApplicationRef.tick()` 把异常吞了才没暴罱）。
- *
- * 所以这里把平移量算出来，交给 `stripWxsFromAst` 减掉。判定只看装饰器写了
- * `template` 还是 `templateUrl`，不去比对文本 —— 字面量里有转义时求值后的
- * `content` 与原文长度不等，但 ngtsc 的平移仍是同一个常量，比对反而会误判。
- *
- * 返回 `0` = 无需平移（`templateUrl` / 非字面量 `template`）。
+ * 判定只看装饰器写了 `template` 还是 `templateUrl`。返回 `0` = 无需平移。
  */
 function inlineTemplateSpanBase(classDeclaration: ClassDeclaration): number {
   for (const dec of ts.getDecorators(classDeclaration) ?? []) {
@@ -119,14 +110,8 @@ function toStringList(raw: unknown): string[] {
 
 /**
  * 从装饰器里直接读出 `styles: [...]` 的字面量原文。
- *
- * 为什么不能只信 `analysis.inlineStyles`：库构建给 ngtsc 挂的是 ng-packagr
- * 的资源加载器，它会先把内联样式过一遍预处理器再交给 ngtsc；而
- * `CustomStyleSheetProcessor` 把返回内容故意置空（组件 JS 不内联样式）——
- * 于是 ngtsc 收到的是空串，`analysis.inlineStyles` 里只剩 `['']`。
- * 装饰器 AST 才是没被动过的那一份原文。
- *
- * 只认字面量：`styles: [someVar]` 这种求不出值，只能放弃（非要用请写文件）。
+ * 库构建的预处理器会把 `analysis.inlineStyles` 置空，装饰器 AST 才是没被动过的原文。
+ * 只认字面量：`styles: [someVar]` 求不出值，只能放弃。
  */
 function decoratorInlineStyles(classDeclaration: ClassDeclaration): string[] {
   const list: string[] = [];
@@ -171,25 +156,15 @@ const R3_TEMPLATE_DEPENDENCY_KIND_NG_MODULE = 2;
 const R3_TEMPLATE_DEPENDENCY_KIND_PIPE = 1;
 
 /**
- * 管道依赖不进指令匹配表。
- *
- * 管道没有 `selector`，也不产生任何 host 事件/属性绑定 —— 它是纯值变换，
- * 结果在 AST 遍历（`BindingPipe`）里就地算完塞进数据，与「元素上挂了
- * 什么指令」无关。混进来的只有坏处：
- *
- * - `CssSelector.parse(undefined)` 会把 `undefined` 当标签名注册出一个假选择器；
- * - 库元数据缺失诊断会把 AsyncPipe / UpperCasePipe 这类误报成
- *   「不会生成 host 绑定」，把真问题淹掉。
+ * 管道依赖不进指令匹配表。管道没有 selector，也不产生 host 绑定，混进来只会
+ * 注册出假选择器，并污染库元数据缺失诊断。
  */
 function isPipeDependency(dep: { kind?: unknown }): boolean {
   return dep.kind === R3_TEMPLATE_DEPENDENCY_KIND_PIPE;
 }
 
 /**
- * ngtsc 的 `ClassPropertyMapping` 转成 R3 的绑定名数组。
- *
- * R3 的 `inputs` / `outputs` 是模板上能看到的绑定名（`string[]`），而 ngtsc 的
- * `DirectiveMeta` 用的是 `ClassPropertyMapping`，绑定名存在 `reverseMap` 的 key 里。
+ * ngtsc 的 `ClassPropertyMapping` 转成 R3 的绑定名数组（绑定名存在 `reverseMap` 的 key 里）。
  */
 function toBindingNameList(
   mapping: unknown,
@@ -213,15 +188,9 @@ function toBindingNameList(
 }
 
 /**
- * 模板解析错误必须在这里拦下来。
- *
- * Angular 把模板解析错误放进 `meta.template.errors`，**不会**自己抛。
- * 本构建器直接拿 `template.nodes` 产 wxml，错误被忽略的后果是：
- * 节点树为空 → wxml 只剩一个空 `<block wx:if="{{hasLoad}}"></block>`，
- * 构建**静默成功**，页面白屏，日志里一个字都不提。
- *
- * 典型触发：模板正文里写了裸的 `{`（Angular 会当 ICU 消息解析），
- * 比如 `import { ... } from 'x'` 这种示例文案。
+ * 模板解析错误必须在这里拦下来。Angular 只把它放进 `meta.template.errors`，不会自己抛，
+ * 忽略的后果是节点树为空、构建静默成功、页面白屏。
+ * 典型触发：模板正文里写了裸的 `{`（会被当 ICU 消息解析）。
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function assertTemplateParsed(meta: any, where: string): void {
@@ -348,10 +317,8 @@ export class MiniProgramCompilerService {
   }
 
   async exportComponentBuildMetaMap() {
-    // wxs 改写必须赶在任何模板 walk 之前跑完。
-    // walk 阶段读到的表达式和最终 emit 用的必须是同一份，
-    // 否则下标和 wxml 会对不上。
-    // 同时把每个组件用到的模块记下来，驱动后续 .wxs 产物落盘。
+    // wxs 改写必须赶在任何模板 walk 之前跑完，walk 读到的表达式与 emit 用的必须是同一份。
+    // 同时记下每个组件用到的模块，驱动后续 .wxs 产物落盘
     const wxsModules = new Map<string, WxsDeclaration[]>();
     for (const [classDeclaration, meta] of this.componentMap) {
       const componentSourceFile = pathKey(
@@ -368,14 +335,9 @@ export class MiniProgramCompilerService {
         componentSourceFile,
       );
       /**
-       * 就地产出「给 Angular 编译的那份模板」。
-       *
-       * 必须紧跟在 wxs 改写后面：此时 AST 已带枝叶数组，一次走树同时喂给
-       * wxml 和 Angular 两侧，不存在第二个真相源。
-       * 只按内容登记（`file.fileName` 为 null）。
-       *
-       * inline 模板的 span 被 ngtsc 平到了 .ts 坐标系，得把平移量递下去，
-       * 见 `inlineTemplateSpanBase`。
+       * 就地产出「给 Angular 编译的那份模板」，必须紧跟在 wxs 改写后面：
+       * 一次走树同时喂给 wxml 和 Angular 两侧，不存在第二个真相源。
+       * inline 模板的 span 被 ngtsc 平到了 .ts 坐标系，得把平移量递下去。
        */
       if (declarations.length && typeof template?.content === 'string') {
         recordStrippedTemplate(
@@ -451,9 +413,8 @@ export class MiniProgramCompilerService {
         componentBuildMeta.content,
       );
 
-      // 同源记录：此刻组件身份（componentKey）与生成的 wxml 同时已知，
-      // 配对关系是权威的。供「节点下标两端等价性」测试按组件精确比对，
-      // 避免事后从制品反推配对（会被 code-splitting 打败）。
+      // 同源记录：此刻组件身份与生成的 wxml 同时已知，配对关系是权威的，
+      // 供「节点下标两端等价性」测试按组件精确比对
       recordGeneratedWxml(
         componentKey,
         classDeclaration.name?.getText() ?? '',
@@ -492,14 +453,9 @@ export class MiniProgramCompilerService {
   }
 
   /**
-   * 取得组件模板可用的**指令**列表（管道被剔除，见 `isPipeDependency`）。
-   *
-   * standalone 组件的 `imports` 允许直接引入 NgModule，此时 `meta.declarations` 里会出现
-   * `R3TemplateDependencyKind.NgModule`（值为 2）的项。它只带一个指向模块标识符的
-   * `type.node`，没有普通依赖上的 `ref.node`，直接拿去查元数据会炸。
-   *
-   * 这里改用 Angular 自己的 `TypeCheckScope` 拿扁平化之后的作用域（模块会被展开成它
-   * 导出的指令），非 standalone 组件保持原样。
+   * 取得组件模板可用的指令列表（管道被剔除，见 `isPipeDependency`）。
+   * standalone 组件的 `imports` 允许直接引入 NgModule，那种项只带 `type.node`，
+   * 没有 `ref.node`，直接查元数据会炸。这里用 `TypeCheckScope` 拿扁平化后的作用域。
    */
   private resolveTemplateDeclarations(
     classDeclaration: ts.ClassDeclaration,
@@ -509,16 +465,12 @@ export class MiniProgramCompilerService {
   ): any[] {
     const rawDeclarations = meta.declarations as unknown;
     if (!Array.isArray(rawDeclarations)) {
-      // `meta.declarations` 缺失 = 这个组件的 Angular 分析根本没跑成
-      // （典型诱因：上游还有编译错误，比如 standalone 指令被 NgModule
-      // declarations；或者组件 meta 因错被降级）。
-      // 以前这里直接 `declarations.some(...)`，抛出来的是
-      // “Cannot read properties of undefined (reading 'some')”，
-      // 看不出是哪个组件、为什么，排查成本极高。改成带身份的报错。
+      // `meta.declarations` 缺失 = 这个组件的 Angular 分析根本没跑成（典型诱因：上游还有编译错误）。
+      // 报错必须带组件身份，否则只能看到一个 undefined 属性访问
       throw new Error(
         `[mini-program-compiler] 组件 ${
           classDeclaration.name?.getText() ?? '?'
-        }（${path.normalize(
+        }（${toNativePath(
           classDeclaration.getSourceFile().fileName,
         )}）的 meta.declarations 缺失，Angular 组件分析未完成。` +
           `这通常是上游编译错误的连带结果，先把真正的报错修掉再来。`,
@@ -537,11 +489,8 @@ export class MiniProgramCompilerService {
     const scope = scopeRegistry.getTypeCheckScope({
       node: classDeclaration,
     } as never);
-    // TypeCheckScope 里是 ngtsc 的 DirectiveMeta / PipeMeta，而下游
-    // `ComponentContext` 读的是 R3 的 `R3DirectiveDependencyMetadata`，
-    // 两边字段名不一致（主要是 `importedFile`），这里对齐成 R3 的形状。
-    // 只取 scope.directives：scope.pipes 里的 PipeMeta 没有 selector，
-    // 进匹配表只会注册出假选择器，并污染库元数据缺失诊断。
+    // TypeCheckScope 里是 ngtsc 的 DirectiveMeta，下游读的是 R3 的形状，这里对齐字段名。
+    // 只取 scope.directives：PipeMeta 没有 selector，进匹配表只会注册出假选择器
     return [...scope.directives].map((dep) => {
       const node = dep.ref.node as ts.ClassDeclaration;
       return {
@@ -575,12 +524,11 @@ export class MiniProgramCompilerService {
           provide: ComponentContext,
           useFactory: () => {
             const ctx = new ComponentContext(directiveMatcher);
-            // 事件下推在 walk 阶段发生，而事件不改写（没 plan 可挂），
-            // 所以识别集合要从改写阶段带到 walk 阶段
+            // 事件下推在 walk 阶段发生，而事件不改写，所以识别集合要从改写阶段带到 walk 阶段
             ctx.declaredWxsModules = getDeclaredWxs(sourceFile);
             /**
              * 给分析侧留一份解析用的原文，用来数 `i18n-*` 属性占的声明槽。
-             * 必须是 Angular **解析用的那一份**：元素的 `sourceSpan` 是相对它算的。
+             * 必须是 Angular 解析用的那一份：元素的 `sourceSpan` 是相对它算的。
              */
             ctx.templateText = (
               componentMeta.template as ComponentTemplateMeta | undefined
@@ -594,21 +542,13 @@ export class MiniProgramCompilerService {
     return instance.compile();
   }
   private resolveStyleUrl(componentPath: string, styleUrl: string) {
-    // 这里要的是**可用**路径（结果直接给 fs.existsSync / ng-packagr），
-    // 所以是 toNativePath 而不是 pathKey。
+    // 结果直接给 fs 用，要的是可用路径而不是身份令牌
     return toNativePath(path.resolve(path.dirname(componentPath), styleUrl));
   }
   /**
    * 把 `@Component.styleUrls` 解析成绝对路径，逐个验文件在不在。
-   *
-   * 缺文件必须在这当场抛。`@angular/build` 的 compiler host 在
-   * `resourceNameToFileName` 里 `fileExists` 为 false 时直接 `return null`，
-   * ngtsc 就把这条样式整个跳过：不报 diagnostic、不生成 ɵcmp、退出码 0。
-   * 表现是构建全绿，运行时才在小程序里报
-   * `needs to be compiled using the JIT compiler`。
-   *
-   * 和 `assertTemplateParsed` 同一层、同一个理由：Angular 把错误放进数据
-   * 而不抛，本构建器就在消费这份数据的这一层拦下来。
+   * 缺文件必须当场抛：Angular 的 compiler host 在 `fileExists` 为 false 时直接返回 null，
+   * 不报 diagnostic、退出码 0，要到运行时才报 `needs to be compiled using the JIT compiler`。
    */
   private resolveStyleUrls(
     componentPath: string,
@@ -629,7 +569,7 @@ export class MiniProgramCompilerService {
       );
     if (missing.length) {
       throw new Error(
-        `组件 ${className}（${path.normalize(componentPath)}）的 styleUrls 指向的文件不存在：\n` +
+        `组件 ${className}（${toNativePath(componentPath)}）的 styleUrls 指向的文件不存在：\n` +
           missing.map((url) => `  - ${url}`).join('\n'),
       );
     }
@@ -638,17 +578,11 @@ export class MiniProgramCompilerService {
     );
   }
   /**
-   * 收集组件的**内联**样式。
-   *
-   * 三个源，按原文去重后合并：
-   *   1. 装饰器 AST 里的 `styles: [...]` 字面量 —— 唯一在应用构建和库构建
-   *      两边都可靠的原文（理由见 `decoratorInlineStyles`）；
-   *   2. `analysis.inlineStyles` —— ngtsc 求过值的，能接住非字面量写法；
-   *      应用构建（无预处理器）下与 1 完全重合，去重后不重复；
-   *   3. `analysis.template.styles` —— 模板里的 `<style>` 块。
-   *
-   * 这里只拿原文，**不编译** —— 样式编译器（`CustomStyleSheetProcessor`）在消费
-   * 侧，编译后的文本按 `key` 回查 `styleMap`。
+   * 收集组件的内联样式。三个源按原文去重后合并：
+   *   1. 装饰器 AST 里的 `styles: [...]` 字面量（两边都可靠）
+   *   2. `analysis.inlineStyles`（ngtsc 求过值，能接住非字面量写法）
+   *   3. `analysis.template.styles`（模板里的 `<style>` 块）
+   * 这里只拿原文，编译在消费侧。
    */
   private resolveInlineStyles(
     componentPath: string,
@@ -697,12 +631,7 @@ export class MiniProgramCompilerService {
     }
     const sourceFile = classDeclaration.getSourceFile();
 
-    /**
-     * 唯一来源：库构建产出的 sidecar（`<库根>/mp-library-meta.json`）。
-     *
-     * 不做任何版本兼容 —— 旧版把 `declare const X_Listeners` 内联在 d.ts
-     * 里的格式已废弃，不再读。
-     */
+    /** 唯一来源：库构建产出的 sidecar（`<库根>/mp-library-meta.json`）。 */
     const lookup = lookupLibraryMeta(sourceFile.fileName, className);
     if (lookup.record) {
       return {
@@ -712,10 +641,7 @@ export class MiniProgramCompilerService {
       };
     }
 
-    // 查不到：**不再静默返回空数组而不留痕迹**。
-    // 旧行为在这里直接 `{listeners: []}` 覆盖掉 host.listeners，
-    // wxml 一个事件绑定都没有且零报错。现在登记下来，
-    // 由构建器在每轮结束时打汇总日志。
+    // 查不到不能静默返回空数组，登记下来由构建器在每轮结束时打汇总日志
     recordLibraryMetaMiss({
       className,
       sourceFile: sourceFile.fileName,

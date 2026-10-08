@@ -3,26 +3,18 @@ import { isWxsCarrier } from './wxs-expr';
 import { getWxsPlan, syntheticCarrierInputs } from './wxs-rewrite';
 
 /**
- * 从**已改写的 AST** 产出「Angular 可见模板」。
- *
- * 只走一遍：分析层 `rewriteWxsTemplates` 已把表达式换成枝叶数组并存下计划，
+ * 从已改写的 AST 产出「Angular 可见模板」。分析层已把表达式换成枝叶数组并存下计划，
  * 本模块复用同一份 AST 去切原文，不再有第二次解析。
  *
- * ## 坐标系（这块最容易踩坑，务必照做）
- *
- * Angular 里有三套位置，语义完全不同，**不能互为兜底**：
+ * 三套位置坐标系语义不同，不能互为兜底：
  *
  * | 字段 | 坐标系 | 用途 |
  * | --- | --- | --- |
  * | TmplAst 节点 `.sourceSpan` | 原始文件；inline `template` 被 ngtsc 平到宿主 .ts，差一个常量，见 `spanBase` | 替换区间 |
- * | 表达式 `.sourceSpan` | **交给解析器的那段文本**（`preserveWhitespaces:false` 下是折叠后的） | 只能配合 `carrier.source` 用 |
+ * | 表达式 `.sourceSpan` | 交给解析器的那段文本 | 只能配合 `carrier.source` 用 |
  * | 表达式 `.span` | 相对父表达式节点 | 不单独使用 |
  *
- * 所以：
- * - **替换区间**一律取 TmplAst 节点的 `sourceSpan`（原始文件坐标，折叠与否都对）
- * - **枝叶文本**一律在 `carrier` 自己的坐标系里切：
- *   `carrier.source.slice(v.sourceSpan.start - carrier.sourceSpan.start, ...)`
- * - 属性绑定不走插值重解析那条路，`sourceSpan` 本来就是原始文件坐标
+ * 替换区间一律取 TmplAst 节点的 `sourceSpan`；枝叶文本一律在 carrier 自己的坐标系里切。
  */
 interface Edit {
   start: number;
@@ -32,9 +24,7 @@ interface Edit {
 
 /**
  * 剥离结果注册表，供 vite 侧 fileReplacements 消费。
- *
- * **只能按内容建钥匙**：实测 `meta.template.file.fileName` 是 `null`，分析层
- * 拿不到模板文件路径；而 `meta.template.content` 与磁盘原文逐字节相同。
+ * 只能按内容建钥匙：`meta.template.file.fileName` 是 `null`，而 `content` 与磁盘原文逐字节相同。
  */
 const strippedByContent = new Map<string, string>();
 
@@ -66,11 +56,8 @@ function tmplOffset(span: any, end = false): number {
 }
 
 /**
- * 在 carrier 自己的坐标系里取一段表达式文本。
- *
- * `carrier.source` 是交给解析器的那段文本，`carrier.sourceSpan.start` 是它的
- * 锚点（源码里 `span=[0,source.length]` 经 `toAbsolute` 的产物）。两者相减
- * 就是表达式在 `source` 里的下标 —— 与是否折叠空白无关。
+ * 在 carrier 自己的坐标系里取一段表达式文本。`carrier.source` 是交给解析器的那段文本，
+ * `carrier.sourceSpan.start` 是它的锚点，两者相减就是表达式在 `source` 里的下标。
  */
 function leafText(carrier: any, node: any, what: string): string {
   const src: unknown = carrier?.source;
@@ -113,29 +100,21 @@ export function stripWxsFromAst(
   source: string,
   fileName: string,
   /**
-   * 同批要一起应用的外部编辑（目前只有 ICU）。
-   *
-   * 必须同批：两边算的都是**原始文件坐标**，分两轮应用的话第二轮的偏移
-   * 已经被第一轮改过了，会切错位置。
+   * 同批要一起应用的外部编辑（目前只有 ICU）。两边算的都是原始文件坐标，
+   * 分两轮应用的话第二轮的偏移已经被第一轮改过了。
    */
   extraEdits: Edit[] = [],
   /**
-   * `nodes` 的 span 比 `source` 多出的常量平移量，默认 `0`。
-   *
-   * `templateUrl`：两边都是 .html 自己的坐标，`0`。
-   * inline `template`：ngtsc 把整棵 AST 的 span 平到了宿主 .ts 坐标系，而
-   * `source` 仍是模板文本，得减掉。详见调用侧 `inlineTemplateSpanBase`。
-   *
-   * 不减会整批静默切坏：越界被 `slice` 钳成「追加到末尾」，不报错。
+   * `nodes` 的 span 比 `source` 多出的常量平移量，默认 `0`（`templateUrl`）。
+   * inline `template` 的 span 被 ngtsc 平到了宿主 .ts 坐标系，得减掉；
+   * 不减会整批静默切坏。
    */
   spanBase = 0,
 ): string {
   const edits: Edit[] = [...extraEdits];
   /**
-   * 宿主上已经写过的承载位 key。
-   *
-   * `[class]` 被改名成承载位、同宿主又有一个同表达式的插值时，两边算出的
-   * key 相同（key 只由表达式决定）。不去重就会产出重复属性。
+   * 宿主上已经写过的承载位 key。key 只由表达式决定，同表达式会算出相同 key，
+   * 不去重就会产出重复属性。
    */
   const carrierWritten = new Map<any, Set<string>>();
 
@@ -193,10 +172,8 @@ export function stripWxsFromAst(
         if (plan) {
           /**
            * 替换区间用 TmplAst 节点自己的 sourceSpan（原始文件坐标）。
-           *
-           * 必须是**非空白**文本：组件默认 `preserveWhitespaces:false` 会把
-           * 全空白文本节点丢掉，而分析层节点还在，两边下标整体错一位。
-           * 零宽空格不在 `\s` 里，两种设置下都留得住，又不占位。
+           * 必须是非空白文本：`preserveWhitespaces:false` 会把全空白文本节点丢掉，
+           * 导致两边下标整体错一位。零宽空格不在 `\s` 里，两种设置下都留得住。
            */
           const literal: string = (plan as any).literal ?? '';
           edits.push({
@@ -228,11 +205,9 @@ export function stripWxsFromAst(
   rewrite(nodes, null);
 
   /**
-   * `<wxs>` 元素整段删掉。
-   *
-   * 不能靠走 AST：分析层自己的走树早就把 `<wxs>` 从 `meta.template.nodes`
-   * 里摘了，再走一遍什么都取不到，结果就是 `<wxs>` 留在 Angular 可见模板里
-   * —— 多出一个元素节点，`data-node-index` 整体错位。直接扫源文本最稳。
+   * `<wxs>` 元素整段删掉。分析层的走树早就把 `<wxs>` 从 `meta.template.nodes` 里摘了，
+   * 再走一遍什么都取不到，结果就是 `<wxs>` 留在 Angular 可见模板里，节点下标整体错位。
+   * 直接扫源文本最稳。
    */
   const wxsTag = /<wxs\b[^>]*>(?:[\s\S]*?<\/wxs\s*>)?|<wxs\b[^>]*\/>/g;
   for (let m = wxsTag.exec(source); m; m = wxsTag.exec(source)) {

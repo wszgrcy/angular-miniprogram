@@ -44,8 +44,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     return { root, myTestProjectHost };
   };
 
-  // 入口文件 root.entry.ts 的产物路径是 pages/root/root-entry（点转横线），
-  // 与 addPageEntry 写入 app.json 的 pages 命名一致
+  // 入口文件 root.entry.ts 的产物路径是 pages/root/root-entry（点转横线），与 addPageEntry 写入 app.json 的 pages 命名一致
   const builtPages = ALL_PAGE_NAME_LIST.map((n) => `pages/${n}/${n}-entry`);
 
   /** assets 只拷 project.config.json，不带 app.json（避免冲突干扰） */
@@ -120,8 +119,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
     it('appJson 与 assets 静态 app.json 同时存在 → 合并，输出是两份的并集', async () => {
       await setupFixture();
-      // 静态那份（addPageEntry 写的 pages + fixture 自带的 window/style）保留，
-      // appJson 只补 tabBar 和一个静态里没写的字段
+      // 静态那份保留，appJson 只补 tabBar 和一个静态里没写的字段
       await writeAppConfig({
         pages: [builtPages[0]],
         window: { navigationBarTitleText: '会被静态那份盖掉' },

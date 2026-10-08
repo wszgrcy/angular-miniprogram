@@ -9,38 +9,19 @@ import {
 import { TemplateDefinition } from './mini-program-compiler/parse-node/template-definition';
 
 /**
- * wxml 下标 与 Angular 槽位 的一致性。
+ * wxml 下标与 Angular 槽位的一致性。
  *
- * ## 为什么需要这个文件
+ * 同一份模板被两个互不知情的消费者各转一遍：Angular 模板管线 → 指令流，
+ * 本构建器 → wxml（`nodeList[i]`）。两边必须给同一个构造分配同一个下标，
+ * 否则 wxml 的绑定就指到别的节点上。错一位不报错，只是渲染出鬼图。
  *
- * 同一份模板被**两个互不知情的消费者**各转一遍：
+ * Angular 侧「什么占槽」的出处是内部实现，`@angular/compiler` 不导出。
+ * 对外能拿到的权威是 `TmplAstRecursiveVisitor`：每种 AST 节点对应一个 `visit*`，
+ * 而每个 `visit*` 就是我们登记槽位的入口。所以两条腿：
  *
- * - Angular 模板管线 → 指令流（`ɵɵelement` / `ɵɵtext` / `ɵɵi18n` / `ɵɵpipe`…）
- * - 本构建器 → wxml（`nodeList[i]`）
- *
- * 两边必须给同一个构造分配**同一个下标**，否则 wxml 的绑定就指到别的节点上。
- * 错一位不报错，只是渲染出鬼图 —— 最难查的一类 bug。
- *
- * 已经踩过的两个都是这么来的：
- * - `i18n` 静态文本：Angular 那边 `I18nStart` 占一槽，我们没登记，
- *   于是把源文案烘进了 wxml（永远翻不了）
- * - 链式管道 `{{ a | f | b }}`：`CustomAstVisitor.visitPipe` 漏走 `exp`，
- *   少算一个槽，后续节点整体前移一位
- *
- * ## 权威基准
- *
- * Angular 侧「什么占槽」的出处是 `template/pipeline/ir/src/ops/create.ts` 里
- * `TRAIT_CONSUMES_SLOT` 的展开点，加上 `phases/local_refs.ts` 的
- * `numSlotsUsed += localRefs.length`。但那是内部实现，`@angular/compiler`
- * 不导出。对外能拿到的权威是 `TmplAstRecursiveVisitor`：每种 AST 节点
- * 对应一个 `visit*`，而每个 `visit*` 就是我们登记槽位的入口。
- *
- * 所以两条腿：
- *
- * 1. **覆盖率**：`TmplAstRecursiveVisitor` 有的 `visit*`，我们必须都有。
+ * 1. 覆盖率：`TmplAstRecursiveVisitor` 有的 `visit*`，我们必须都有。
  *    Angular 升级新增节点类型时立刻红，而不是等渲染出错。
- * 2. **下标逐字对齐**：下表每条期望值都经真实 `ng build` 产物里的
- *    `ɵɵ*` 指令下标对过（不是照抄本实现的输出）。
+ * 2. 下标逐字对齐：下表每条期望值都经真实 `ng build` 产物里的 `ɵɵ*` 指令下标对过。
  */
 
 /** Angular 公开 AST visitor 的全部 `visit*`。 */
@@ -59,10 +40,8 @@ function angularVisitorMethods(): string[] {
 }
 
 /**
- * 走一遍模板，返回根视图里被分配的下标（升序）。
- *
- * 只算根视图：`<ng-template>` / `@if` / `@for` 的子级是独立 embedded view，
- * 有自己的 0 起始索引空间，`TemplateDefinition` 会给它们另起一个实例。
+ * 走一遍模板，返回根视图里被分配的下标（升序）。只算根视图：`<ng-template>` /
+ * `@if` / `@for` 的子级是独立 embedded view，有自己的 0 起始索引空间。
  */
 function rootSlots(html: string): number[] {
   const r: any = parseTemplate(html, 'p.html');
@@ -86,8 +65,7 @@ function rootSlots(html: string): number[] {
       }
       const fallback = (m as any).fallback;
       if (fallback && typeof fallback.index === 'number') {
-        // 兜底容器占**宿主**视图一格（紧贴投影节点）；兜底内容自己在
-        // 另一个视图里重新从 0 编号，所以不能 walk 它的 children。
+        // 兜底容器占宿主视图一格（紧贴投影节点）；兜底内容自己在另一个视图里重新从 0 编号
         seen.add(fallback.index);
       }
     }
@@ -114,10 +92,8 @@ describe('AST 覆盖率：Angular 有的 visit* 我们必须有', () => {
 
 describe('根视图下标与 Angular 槽位逐字对齐', () => {
   /**
-   * 每条模板末尾都跟一个 `<s></s>` 哨兵：它本身只占一槽，但**它的下标
-   * 等于前面所有构造吃掉的槽数**。管道、`#ref` 这类「占槽不产节点」的
-   * 构造因此也会体现在期望值里，不会被断言漏掉。
-   *
+   * 每条模板末尾都跟一个 `<s></s>` 哨兵：它本身只占一槽，但它的下标等于前面所有构造
+   * 吃掉的槽数。管道、`#ref` 这类「占槽不产节点」的构造因此也会体现在期望值里。
    * 期望值右侧注明了 Angular 侧的占槽依据。
    */
   const cases: [name: string, html: string, slots: number[]][] = [

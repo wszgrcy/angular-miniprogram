@@ -7,13 +7,9 @@ import { rewriteWxsTemplates } from './wxs-rewrite';
 /**
  * `stripWxsFromAst` 的回归钉。
  *
- * 存在的理由是一条踩过的坑：Angular 的表达式 `sourceSpan` 落在**交给解析器的
- * 那段文本**坐标系里，`preserveWhitespaces:false` 折叠过空白后它就不再是原始
- * 文件坐标。当时拿它直接切原文，产出静默切坏（残留 `}}`、枝叶切成 `box'`），
- * 而且不报错 —— 属于最难查的一类。
- *
- * 所以这里同时用两种折叠设置跑同一份模板，**结果必须一致**。
- * 一旦哪天有人把取法改回「按 sourceSpan 切原文」，这条立刻红。
+ * Angular 的表达式 `sourceSpan` 落在交给解析器的那段文本坐标系里，`preserveWhitespaces:false`
+ * 折叠过空白后它就不再是原始文件坐标。拿它直接切原文会静默切坏（残留 `}}`、枝叶切成 `box'`），且不报错。
+ * 所以这里同时用两种折叠设置跑同一份模板，结果必须一致。
  */
 async function strip(
   html: string,
@@ -28,7 +24,7 @@ async function strip(
   return stripWxsFromAst(parsed.nodes, source, 'p.html');
 }
 
-/** 跨行插值 + 带字面量实参的调用 —— 当年切坏的就是这两种写法 */
+/** 跨行插值 + 带字面量实参的调用 */
 const TRICKY = `<div class="card">
   <p class="hint">
     {{ format.money(price()) }}
@@ -41,9 +37,7 @@ const TRICKY = `<div class="card">
 
 /**
  * 把整棵 AST 的 span 整体平移 `n`，模拟 ngtsc 对 inline 模板做的那步平移。
- *
- * 不区分节点类型，见到「带数字偏移的 span」就移：TmplAst 节点的
- * `sourceSpan` / `startSourceSpan` / `endSourceSpan` 是 `{start:{offset},end:{offset}}`，
+ * 不区分节点类型，见到带数字偏移的 span 就移：TmplAst 节点的是 `{start:{offset},end:{offset}}`，
  * 表达式的是 `{start:number,end:number}`，两种都吃。
  */
 function shiftSpans(root: unknown, n: number, seen = new Set<unknown>()): void {
@@ -67,8 +61,8 @@ function shiftSpans(root: unknown, n: number, seen = new Set<unknown>()): void {
       if (typeof pos === 'number') {
         span[side] = pos + n;
       } else if (pos && typeof pos.offset === 'number') {
-        // ParseLocation 在多个 span 之间是共享的（元素的 sourceSpan.end 与
-        // endSourceSpan.end 是同一个对象），不去重就会加好几次。
+        // ParseLocation 在多个 span 之间是共享的（元素的 sourceSpan.end 与 endSourceSpan.end
+        // 是同一个对象），不去重就会加好几次。
         if (seen.has(pos)) {
           continue;
         }
@@ -100,7 +94,7 @@ describe('stripWxsFromAst', () => {
         expect(out).toContain('[price()]');
         // 'wxs-box' 是字面量、不是 wxs 调用，所以枝叶只有 on()
         expect(out).toContain('[on()]');
-        // 曾经出现过的症状：偏移错位切出半截字符串
+        // 偏移错位会切出半截字符串
         expect(out).not.toContain("box'");
         expect(out).not.toContain('wxs-bo');
       });
@@ -139,9 +133,8 @@ describe('stripWxsFromAst', () => {
 
   it('两种折叠设置下枝叶载荷完全一致', async () => {
     /**
-     * 整体输出不该相等：`preserveWhitespaces` 就是管空白留不留的，替换区间
-     * 跟着变是止确的。真正必须不变的是**枝叶文本** —— 它靠「在 carrier
-     * 自己的坐标系里切」保证，跟折叠无关。
+     * 整体输出不该相等：`preserveWhitespaces` 就是管空白留不留的，替换区间跟着变是正确的。
+     * 真正必须不变的是枝叶文本——它靠「在 carrier 自己的坐标系里切」保证，跟折叠无关。
      */
     const payloads = (s: string): string[] =>
       s.match(/\[__wx[a-z0-9]+\]="\[[^\]]*\]"/g) ?? [];
@@ -152,13 +145,9 @@ describe('stripWxsFromAst', () => {
   });
 
   /**
-   * inline `template` 的坐标系钉。
-   *
-   * ngtsc 解析 inline 模板后会把整棵 AST 的 span 平到宿主 .ts 坐标系，
-   * 而 `meta.template.content` 仍是模板文本。两边不同坐标系时，所有替换区间
-   * 都落在字符串尾巴之后，`slice` 把越界钳成「追加到末尾」：不报错，但
-   * wxs 改写全部跑到尾部，Angular 编出来的 update 函数里留着 `ctx.fmt.xxx()`。
-   *
+   * inline `template` 的坐标系钉。ngtsc 解析 inline 模板后会把整棵 AST 的 span 平到宿主 .ts
+   * 坐标系，而 `meta.template.content` 仍是模板文本。两边不同坐标系时所有替换区间都落在字符串
+   * 尾巴之后，`slice` 把越界钳成「追加到末尾」：不报错，但 wxs 改写全部跑到尾部。
    * 所以：平移后的输出必须与不平移逐字节相同。
    */
   it('span 整体平移后，剥离结果与不平移逐字节相同', async () => {
@@ -178,9 +167,7 @@ describe('stripWxsFromAst', () => {
     expect(shifted).not.toContain('format.');
   });
 
-  /**
-   * 反向钉：传了平移量却按 `0` 切，必须能当场发现，不能静默产出坏模板。
-   */
+  /** 反向钉：传了平移量却按 `0` 切，必须能当场发现，不能静默产出坏模板。 */
   it('该平移却按 0 切时，输出会残留 wxs 表达式', async () => {
     const html = withDeclarations(TRICKY);
     const parsed: any = parseTemplate(html, 'p.html', {

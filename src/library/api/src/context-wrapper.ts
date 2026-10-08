@@ -12,10 +12,9 @@ function normalizeEventName(event: string) {
 
 /**
  * 平台上下文对象（RecorderManager / InnerAudioContext / CanvasContext / MapContext 等）的统一包装。
- *
  * - `raw`：原始平台对象，逃生舱
  * - `on(event)`：把平台的 `onXxx` 注册变成可订阅流，退订时自动调对应的 `offXxx`（若存在）
- * - 其余属性 / 方法：透传到原始对象（`play()` / `pause()` / `seek()` …）
+ * - 其余属性 / 方法：透传到原始对象
  */
 export interface MpContext<T extends object = any> {
   readonly raw: T;
@@ -24,10 +23,8 @@ export interface MpContext<T extends object = any> {
 }
 
 /**
- * @param raw  平台原始上下文对象
- *
- * 回调不再需要手动调度变更检测：状态一律走 signal，写入 signal 时
- * Angular 自己会把关联视图标脏并调度一次 tick。
+ * @param raw 平台原始上下文对象
+ * 回调不需要手动调度变更检测：状态一律走 signal，写入 signal 时 Angular 自己会把关联视图标脏并调度 tick。
  */
 export function mpContext<T extends object>(raw: T): MpContext<T> {
   const streams = new Map<string, Observable<any>>();

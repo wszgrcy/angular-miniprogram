@@ -36,15 +36,11 @@ function makeMp() {
 }
 
 /**
- * 可查询 class（`AgentNode.find()` 的定位凭据）。
+ * 可查询 class（`AgentNode.find()` 的定位凭据）。要证明的核心命题：
  *
- * ## 要证明的核心命题
- *
- * 1. 只有模板上带 `#`（`TNode.localNames` 非空）的节点才拿到 class，
- *    没 `#` 的节点连 `refClass` 这个 key 都不进 setData。
- * 2. class 取自 `__pathPrefix` 的下标序列，所以它与被标注的节点出自
- *    同一次遍历、同一次 setData，不可能对不上。
- * 3. 内嵌视图用**全路径**，与外层局部下标不撞；`@for` 多实例天然不撞。
+ * 1. 只有模板上带 `#`（`TNode.localNames` 非空）的节点才拿到 class，没 `#` 的节点连 `refClass` 这个 key 都不进 setData。
+ * 2. class 取自 `__pathPrefix` 的下标序列，所以它与被标注的节点出自同一次遍历、同一次 setData，不可能对不上。
+ * 3. 内嵌视图用全路径，与外层局部下标不撞；`@for` 多实例天然不撞。
  * 4. `find()` 落在渲染该节点的那个 MP 实例上，且拿不到凭据时返回 null。
  */
 describe('可查询 class', () => {
@@ -187,20 +183,18 @@ describe('可查询 class', () => {
 });
 
 /**
- * 真组件实测：`#ref` 的**影子槽**不能把真前缀盖掉。
- *
- * `saveResolvedLocalsInData` 把 local ref 的值写进 `lView[tNode.index + 1]`，
- * 那个槽里是**同一个 AgentNode**（`tView.data` 在该位置是 `undefined`）。
+ * 真组件实测：`#ref` 的影子槽不能把真前缀盖掉。`saveResolvedLocalsInData` 把 local ref 的值写进
+ * `lView[tNode.index + 1]`，那个槽里是同一个 AgentNode（`tView.data` 在该位置是 `undefined`）。
  * 编译期 `prepareRefsArray` 也为它占了一个空槽并跳过，所以 wxml 从不读它。
- *
- * 早期实现遍历到影子槽时又打了一次前缀，于是节点自报的位置比渲染位置大 1：
- * 渲染出来的 class 是 `__ar-5`，`find()` 却去查 `__ar-6`，永远查不到；
- * 路径式 setData 同样落到没人读的那个槽上。这里用真 Ivy 编译产物钉住它。
+ * 早期实现遍历到影子槽时又打了一次前缀，于是节点自报的位置比渲染位置大 1：渲染出来的 class 是
+ * `__ar-5`，`find()` 却去查 `__ar-6`，永远查不到。这里用真 Ivy 编译产物钉住它。
  */
 describe('可查询 class：#ref 影子槽（真组件）', () => {
   @Component({
     standalone: true,
     selector: 'probe-ref',
+    // prettier-ignore
+    // 必须单行：折行会引入空白文本节点，把声明槽位下标搅乱
     template: `<h1 id="a">{{ t }}</h1><div id="r" #ref1>引用</div><span id="b">x</span>`,
   })
   class ProbeRefComponent {

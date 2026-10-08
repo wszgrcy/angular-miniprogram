@@ -1,20 +1,15 @@
 import { PlatformType } from '../platform/platform';
 
 /**
- * 条件编译（define 方案）。
- *
- * 不采用 uni-app 的 `#ifdef` 注释指令（预处理指令绕过类型系统，
- * IDE / lint 全部失效）。改用 bundler 的常量替换 + DCE：
+ * 条件编译（define 方案）。不用 `#ifdef` 注释指令（预处理指令绕过类型系统，IDE / lint 全部失效），
+ * 改用 bundler 的常量替换 + DCE：
  *
  *  - `__MP_PLATFORM__`：当前平台字符串（`"wx"` / `"zfb"` ...）
- *  - `__MP_WX__` / `__MP_ZFB__` / ...：布尔常量，当前平台为 true，
- *    其余为 false。`if (__MP_WX__) {...}` 的死分支在 esbuild/rollup
- *    常量折叠后被整体移除，零运行时开销。
+ *  - `__MP_WX__` / `__MP_ZFB__` / ...：布尔常量，当前平台为 true，其余为 false。
+ *    `if (__MP_WX__) {...}` 的死分支在常量折叠后被整体移除，零运行时开销。
  *
- * 文件级替换见 `plugins/platform-file-resolve.plugin.ts`
- * （`foo.ts` + `foo.wx.ts` → wx 平台优先取后者）。
- *
- * 用户工程需在 tsconfig 引入 `platform-flags.d.ts` 获得类型声明。
+ * 文件级替换见 `plugins/platform-file-resolve.plugin.ts`。用户工程需在 tsconfig 引入
+ * `platform-flags.d.ts` 获得类型声明。
  */
 export const PLATFORM_FLAG_NAMES: Record<PlatformType, string> = {
   [PlatformType.wx]: '__MP_WX__',

@@ -13,13 +13,10 @@ import { withMiniProgramRequest } from './provider';
 import { initMiniProgramTestEnv } from '../test-util/init-env';
 
 /**
- * `provideHttpClient` / `withMiniProgramRequest` 的装配语义。
- *
- * 官方 `withFetch` 的实现是
+ * `provideHttpClient` / `withMiniProgramRequest` 的装配语义。官方 `withFetch` 的实现是
  * `makeHttpFeature(HttpFeatureKind.Fetch, [FetchBackend, {provide: HttpBackend, useExisting: FetchBackend}])`
- * —— backend 走 **feature 机制**，不是在外面往 providers 里追加。
- * 本模块必须同构，否则用户显式传的 backend feature 会被静默覆盖，
- * 且绕过 provideHttpClient 的 devMode 校验。
+ * —— backend 走 feature 机制，不是在外面往 providers 里追加。本模块必须同构，否则用户显式传的
+ * backend feature 会被静默覆盖，且绕过 provideHttpClient 的 devMode 校验。
  */
 describe('http provider（feature 装配）', () => {
   beforeEach(() => {

@@ -2,15 +2,12 @@
  * 库元数据 sidecar（`<库根>/mp-library-meta.json`）→ wxml 事件绑定。
  *
  * 钉住两条相反的方向，缺一不可：
- *
  *   ✅ sidecar 里有正确的 host 元数据，并且真的驱动了 wxml 的 bind:* 事件
- *   ❌ `.d.ts` 里**不再**出现 `declare const X_Listeners` 这类内联标记
+ *   ❌ `.d.ts` 里不出现 `declare const X_Listeners` 这类内联标记
  *
- * 第二条是这次重构的核心承诺：`.d.ts` 是类型契约，不当 key-value 存储用。
- * 旧方案之所以要「构建后补写」，是因为 ng-packagr 22 的 d.ts 扁平化会把
- * 未导出的 `declare const` tree-shake 掉；标记一丢，应用侧拿到空 listeners
- * 并覆盖掉 host.listeners，wxml 一个事件绑定都没有，且毫无报错。
- * 元数据搬到 sidecar 之后，扁平化根本碰不到它。
+ * `.d.ts` 是类型契约，不当 key-value 存储用：ng-packagr 的 d.ts 扁平化会把
+ * 未导出的 `declare const` tree-shake 掉，标记一丢，应用侧拿到空 listeners
+ * 并覆盖掉 host.listeners，且毫无报错。元数据搬到 sidecar 后扁平化碰不到它。
  */
 import { join, normalize } from '@angular-devkit/core';
 import * as fs from 'fs';
@@ -40,7 +37,7 @@ import { runViteBuilder as runBuilder } from './vite';
 
 const angularConfig = {
   ...DEFAULT_ANGULAR_CONFIG,
-  platform: PlatformType.wx,
+  platform: PlatformType.wx as const,
   sourceMap: false,
 };
 
@@ -70,25 +67,18 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     await h.moveDir(ALL_COMPONENT_NAME_LIST, '__components', 'components');
     await h.addPageEntry(ALL_PAGE_NAME_LIST);
 
-    // 本 harness 的 builder 是 **app** builder，跑不了 library target，
-    // 所以 test-library 由 `library/library.spec.ts` 构建后拷进
-    // `test/hello-world-app/node_modules/test-library`，这里读那份副本。
-    // 谁先跑由 `vitest.config.mts` 的 sequencer 保证，不在脚本里排序。
-    //
-    // 但单独跑本文件（`vitest run library-meta-sidecar`）时 sequencer 帮不上忙，
-    // 副本可能缺失或是上一轮残留，所以这里显式验新鲜度：
+    // 本 harness 的 builder 是 app builder，跑不了 library target，所以 test-library
+    // 由 `library/library.spec.ts` 构建后拷进 node_modules，这里读那份副本。
+    // 单独跑本文件时 sequencer 帮不上忙，所以这里显式验新鲜度：
     // 宁可大声报错，也不要静默地测一个旧副本而给出假绿灯。
-    //
-    // 用 devkit host 读，不用 `fs` + host.root()：root 是虚拟路径
-    // `/C/code/...`，Windows 下 Node 的 fs 解析不了。
+    // 用 devkit host 读，不用 `fs`：root 是虚拟路径，Windows 下 Node 的 fs 解析不了。
     const installedLibEntry = join(
       normalize(root),
       'node_modules/test-library/fesm2022/test-library.mjs',
     );
     let installedLib: string;
     try {
-      // host.read() 发的是 ArrayBuffer，`fileBufferToString` 不认（会变成
-      // "[object ArrayBuffer]"），所以走 Buffer.from。
+      // host.read() 发的是 ArrayBuffer，`fileBufferToString` 不认，所以走 Buffer.from
       installedLib = Buffer.from(
         await harness.host.read(installedLibEntry).toPromise(),
       ).toString('utf8');
@@ -166,10 +156,8 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
         'utf8',
       ),
       /**
-       * app 产物里的全部 JS。
-       *
-       * 必须在 `load()` 里就读完：harness 的临时工程目录会在 spec 之间被
-       * 清掉，拿着 `base` 稍后再去 scandir 就是 ENOENT。
+       * app 产物里的全部 JS。必须在 `load()` 里就读完：harness 的临时工程目录
+       * 会在 spec 之间被清掉，拿着 `base` 稍后再去 scandir 就是 ENOENT。
        */
       allAppJs: (() => {
         const out: { name: string; content: string }[] = [];
@@ -196,10 +184,8 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   });
 
   /**
-   * 读 app 产物里的全部 JS。
-   *
-   * 用来验证「库组件的 `amp.propertyChange` 是主构建注进去的」——
-   * 库自己的 fesm 里没有（vanilla），但 app 的 chunk 里有。
+   * 读 app 产物里的全部 JS。用来验证库组件的 `amp.propertyChange` 是主构建注进去的——
+   * 库自己的 fesm 里没有。
    */
   const readAllAppJs = async () => (await load()).allAppJs;
 
@@ -243,7 +229,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
       const meta = await readMeta();
       const directives =
         meta.entries['types/angular-miniprogram-forms.d.ts'].directives;
-      // 监听器 / 输入属性的**集合**要一致，但声明顺序无关，所以两边都排序。
+      // 监听器 / 输入属性的集合要一致，但声明顺序无关，所以两边都排序
       expect([...directives.DefaultValueAccessor.listeners].sort()).toEqual([
         'bindblur',
         'bindinput',
@@ -290,8 +276,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     });
 
     it('反向对照：断言不是恒真（wxml 事件全部能追溯到 sidecar 元数据）', async () => {
-      // 把 sidecar 里的事件名当成集合，与 wxml 中出现的事件一一对应。
-      // 若事件是别处硬编码来的，这个对应关系就不会成立。
+      // 把 sidecar 里的事件名当成集合，与 wxml 中出现的事件一一对应。若事件是别处硬编码来的，这个对应关系就不会成立
       const meta = await readMeta();
       const { wxml } = await load();
 
@@ -324,9 +309,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
   /**
    * 专用 demo 页 `pages/library-meta-demo`：整页都是 test-library 调用。
-   *
-   * 源模板（src/__pages/library-meta-demo/library-meta-demo.component.html）
-   * 与 sidecar 记录的对应关系，逐字段钉住。
+   * 源模板与 sidecar 记录的对应关系，逐字段钉住。
    */
   describe('库元数据 demo 页（test-library 调用）', () => {
     it('库指令 TestLibraryDirective 的 listeners → bind:tap / bind:touchstart', async () => {
@@ -372,7 +355,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
     it('库组件自身产物 wxml 不再是空 block（模板真的编译进去了）', async () => {
       const { libCompWxml } = await load();
-      // 改之前：`<block wx:if="{{hasLoad}}"></block>`，空的，肉眼无法判断渲染了没有。
+      // 空 block 与有子节点的 block 肉眼无法判断渲染了没有
       expect(libCompWxml).not.toMatch(
         /<block wx:if="\{\{hasLoad\}\}"><\/block>/,
       );
@@ -382,8 +365,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
     it('库组件模板文本走运行时数据，wxml 里是 {{nodeList[N].value}}', async () => {
       const { libCompWxml } = await load();
-      // 说明：文本节点不进 wxml 字面量，而是存在 vnode 里由运行时填。
-      // 所以“渲染标记在不在”不能靠 wxml 字面量查，得看 JS 产物 + wxss。
+      // 文本节点不进 wxml 字面量，而是存在 vnode 里由运行时填，所以不能靠 wxml 字面量查
       expect(libCompWxml).toContain('{{nodeList[1].value}}');
     });
 
@@ -393,12 +375,9 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     });
 
     /**
-     * input / output 传值。
-     *
-     * 实测：`<lib-test-library [input1]="x">` 生成的 wxml 与不传时**一模一样**，
-     * input 不以任何属性形式出现在 wxml 里（它走 vnode，运行时由组件自己读）。
-     * 所以这部分只能查编译后的 JS：Angular 会把 input/output 名保留成字符串
-     * 字面量（consts 里的 `[3, 'input1']`、update 里的 `property('input1', ...)`）。
+     * input / output 传值。`<lib-test-library [input1]="x">` 生成的 wxml 与不传时一模一样
+     * （input 走 vnode，运行时由组件自己读），所以这部分只能查编译后的 JS：
+     * Angular 会把 input/output 名保留成字符串字面量。
      */
     it('库组件 input 传值进了编译产物', async () => {
       const { demoJs } = await load();
@@ -426,9 +405,7 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
     });
 
     it('反向对照：demo 页的 bind:* 事件全部在 test-library 的 sidecar 里有记录', async () => {
-      // 注意：demo 页用的是 **test-library（第二个库）**，不是主库
-      // angular-miniprogram。所以这里读的是 test-library 自己的
-      // mp-library-meta.json（由 library.spec.ts 构建后拷进 node_modules）。
+      // demo 页用的是 test-library（第二个库），不是主库，所以读它自己的 mp-library-meta.json
       const libMetaPath = path.resolve(
         __dirname,
         '../../test/hello-world-app/node_modules/test-library/mp-library-meta.json',
@@ -469,14 +446,8 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
   });
 
   /**
-   * 运行时 hook 的所有权：库不管，主构建管。
-   *
-   * 重构前：库构建把 `import * as amp` + `amp.propertyChange(...)` 烘进
-   * 自己的 fesm，库产物不是 vanilla，且运行时 hook 与库版本死锁。
-   * 重构后：库只出 `mp-library-meta.json`，主构建读到 sidecar 后给库组件
-   * 补上注入。
-   *
-   * 两个方向都要钉：
+   * 运行时 hook 的所有权：库不管，主构建管。库只出 `mp-library-meta.json`，
+   * 主构建读到 sidecar 后给库组件补上注入。两个方向都要钉：
    *   ✅ app chunk 里库组件的 template fn 有且仅有一次 propertyChange
    *   ✅ 库 fesm 本身一个 propertyChange 都没有（证明注入来自 app 侧）
    */
@@ -583,13 +554,8 @@ describeBuilder(runBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
   /**
    * 二级出口（`test-library/src/secondary`）走主构建。
-   *
-   * 多 entry point 的库，每个 entry 有自己的 fesm、自己的组件。主构建
-   * 必须按**组件名**把两边分别对上：碰二级 fesm 只处理二级组件，碰一级
-   * fesm 只处理一级组件。
-   *
-   * 重构前这里是 `meta.entry ? [meta.entry] : meta.entries`，碰不到 entry
-   * 就把整包 emit 一遍 —— 多出口包下会把应用根本没 import 的出口也产出来。
+   * 多 entry point 的库，每个 entry 有自己的 fesm、自己的组件。主构建必须按组件名
+   * 把两边分别对上：碰二级 fesm 只处理二级组件，碰一级 fesm 只处理一级组件。
    */
   describe('二级出口在主构建下', () => {
     it('二级出口组件产出自己的 wxml，内容只含它自己的模板', async () => {

@@ -2,9 +2,8 @@ import type { AssetPattern } from '@angular-devkit/build-angular';
 import type { MpEntryType } from './entry-component';
 
 /**
- * `subpackages` 的一项：入口范围 + 这个分包是不是独立分包。
- *
- * `output` 就是分包 root（约定：root 同时是源码目录与产物目录）。
+ * `subpackages` 的一项：入口范围 + 这个分包是不是独立分包。`output` 就是分包 root
+ * （约定：root 同时是源码目录与产物目录）。
  */
 export type MpSubPackagePattern = Exclude<AssetPattern, string> & {
   /** 独立分包：不依赖主包即可运行 */
@@ -14,11 +13,11 @@ export type MpSubPackagePattern = Exclude<AssetPattern, string> & {
 export interface PagePattern extends Exclude<AssetPattern, string> {
   /** 入口名 */
   entryName: string;
-  /** 匹配文件,相对于input */
+  /** 匹配文件，相对于 input */
   fileName: string;
-  /** 要输出的js出口 */
+  /** 要输出的 js 出口 */
   output: string;
-  /** 绝对路径,path.join */
+  /** 绝对路径，path.join */
   src: string;
   outputFiles: {
     content: string;
@@ -33,11 +32,9 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
   /** 入口类型，决定构建器注入哪个注册函数 */
   type: MpEntryType;
   /**
-   * 自动组件的组件类名（只有构建器自己造的那批有）。
-   *
-   * 普通入口靠 `export default` 认组件，自动组件没有入口文件、也就没有
-   * default 可认，只能按类名从源文件具名 import。同时它也是「这个 pattern
-   * 不是用户声明的入口」的标记，分析层靠它区分两种匹配规则。
+   * 自动组件的组件类名（只有构建器自己造的那批有）。普通入口靠 `export default` 认组件，
+   * 自动组件没有入口文件、也就没有 default 可认，只能按类名从源文件具名 import。
+   * 它也是「这个 pattern 不是用户声明的入口」的标记。
    */
   componentClassName?: string;
   /** 分包 pattern 上声明的「独立分包」，只有 subpackages 来源的入口有 */
@@ -45,13 +42,8 @@ export interface PagePattern extends Exclude<AssetPattern, string> {
 }
 
 /**
- * 分析服务真正需要的 compiler 宿主能力。
- *
- * 原先签名是 webpack 的 `Compiler`，但实际只读两处：
- *   - watchMode
- *   - inputFileSystem?.purge()
- * vite 侧由 `createStubWebpackCompiler` 提供最小实现，
- * 所以这里用结构类型即可，不必依赖 webpack 的类型。
+ * 分析服务真正需要的 compiler 宿主能力。实际只读两处：`watchMode` 和 `inputFileSystem?.purge()`，
+ * 所以用结构类型即可，不必依赖构建器的类型。
  */
 export interface CompilerHostLike {
   watchMode: boolean;

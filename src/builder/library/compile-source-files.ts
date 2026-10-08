@@ -40,10 +40,7 @@ import {
   RESOLVED_DATA_GROUP_TOKEN,
 } from './token';
 
-/**
- * ng-packagr 21 删掉了 `src/lib/utils/load-esm`，改成直接 require compiler-cli。
- * 这里自己保留一个懒加载入口，避免在模块顶层就把 compiler-cli 拉进来。
- */
+/** 懒加载入口，避免在模块顶层就把 compiler-cli 拉进来。 */
 async function ngCompilerCli() {
   return import('@angular/compiler-cli');
 }
@@ -81,8 +78,7 @@ export async function compileSourceFiles(
   augmentLibraryMetadata(tsCompilerHost);
   const cache = entryPoint.cache;
   const sourceFileCache = cache.sourcesFileCache;
-  // ng-packagr 19: Angular 诊断缓存从 FileCache 中拆出，
-  // 改为 entryPoint.cache.angularDiagnosticCache（get/update）
+  // Angular 诊断缓存从 FileCache 中拆出，改为 entryPoint.cache.angularDiagnosticCache
   const angularDiagnosticsCache = cache.angularDiagnosticCache;
 
   // Create the Angular specific program that contains the Angular compiler
@@ -96,8 +92,8 @@ export async function compileSourceFiles(
   const angularCompiler = angularProgram.compiler;
   const { ignoreForDiagnostics, ignoreForEmit } = angularCompiler;
 
-  // SourceFile versions are required for builder programs.
-  // The wrapped host inside NgtscProgram adds additional files that will not have versions.
+  // SourceFile versions are required for builder programs. The wrapped host inside NgtscProgram
+  // adds additional files that will not have versions.
   const typeScriptProgram = angularProgram.getTsProgram();
   augmentProgramWithVersioning(typeScriptProgram);
 
@@ -125,17 +121,14 @@ export async function compileSourceFiles(
       const result = builder.getSemanticDiagnosticsOfNextAffectedFile(
         undefined,
         (sourceFile) => {
-          // If the affected file is a TTC shim, add the shim's original source file.
-          // This ensures that changes that affect TTC are typechecked even when the changes
-          // are otherwise unrelated from a TS perspective and do not result in Ivy codegen changes.
-          // For example, changing @Input property types of a directive used in another component's
-          // template.
+          // If the affected file is a TTC shim, add the shim's original source file. This ensures
+          // that changes that affect TTC are typechecked even when the changes are otherwise
+          // unrelated from a TS perspective and do not result in Ivy codegen changes.
           if (
             ignoreForDiagnostics.has(sourceFile) &&
             sourceFile.fileName.endsWith('.ngtypecheck.ts')
           ) {
-            // This file name conversion relies on internal compiler logic and should be converted
-            // to an official method when available. 15 is length of `.ngtypecheck.ts`
+            // 依赖内部编译逻辑：15 是 `.ngtypecheck.ts` 的长度
             const originalFilename = sourceFile.fileName.slice(0, -15) + '.ts';
             const originalSourceFile = builder.getSourceFile(originalFilename);
             if (originalSourceFile) {
@@ -192,22 +185,17 @@ export async function compileSourceFiles(
     ],
   });
   const miniProgramCompilerService = injector.get(MiniProgramCompilerService);
-  // Required to support asynchronous resource loading
-  // Must be done before creating transformers or getting template diagnostics
+  // Required to support asynchronous resource loading. Must be done before creating transformers
+  // or getting template diagnostics
   await angularCompiler.analyzeAsync();
   // inject
   miniProgramCompilerService.init();
   const metaMap =
     await miniProgramCompilerService.exportComponentBuildMetaMap();
   /**
-   * 把内联样式（`@Component.styles` / 模板 `<style>`）先编译完。
-   *
-   * 必须在这里做：`SetupComponentDataService` 挂在 `compilerHost.writeFile`
-   * 上，那是个同步回调，编不了异步的样式。编译结果按组件级的 key
-   * 进 `styleMap`，下游直接查。
-   *
-   * 不能指望 ng-packagr 自己那份：它的 `transformResource` 拿
-   * `containingFile`（组件 .ts）当 key，同文件多条内联样式会互相覆盖。
+   * 把内联样式（`@Component.styles` / 模板 `<style>`）先编译完。必须在这里做：
+   * `SetupComponentDataService` 挂在 `compilerHost.writeFile` 上，那是个同步回调，编不了异步的样式。
+   * 不能指望 ng-packagr 自己那份：它的 `transformResource` 拿组件 .ts 当 key，同文件多条内联样式会互相覆盖。
    */
   if (stylesheetProcessor) {
     const styleProcessor = stylesheetProcessor as CustomStyleSheetProcessor;
@@ -303,21 +291,16 @@ export async function compileSourceFiles(
     }
   }
   /**
-   * 在 `compilerHost.writeFile` 上挂一个**只读采集**钩子。
+   * 在 `compilerHost.writeFile` 上挂一个只读采集钩子。这里不修改任何产物内容，写出去的一律是
+   * 原始 `data`；钩子只在每份产物落盘前认出类/组件，把元数据登记进 sidecar 暂存区。
    *
-   * 关键：这里**不再修改任何产物内容**，写出去的一律是 TS 传进来的原始 `data`。
-   * 钩子只干一件事：在每份产物落盘前，从里面认出类/组件，把元数据登记进
-   * sidecar 暂存区（最终由 `writeLibraryMetaFile` 写成
-   * `<库根>/mp-library-meta.json`）。
+   * 还挂在 writeFile 上：那是唯一能「按正在写的这个源文件」天然圈定当前 entry point 的时机。
+   * 直接去扫 `componentMap` / `directiveMap` 会把上游 entry point 的类一并摄进来。
    *
-   * 为什么还挂在 writeFile 上：那是唯一能「按正在写的这个源文件」天然圈定
-   * 当前 entry point 的时机。直接去扫 `componentMap` / `directiveMap` 会把
-   * 上游 entry point 的类一并摄进来（那个 map 是整个 program 的）。
-   *
-   * 三个 service 现在都是「只登记、原样返回」：
-   *   - `.d.ts`  → `AddDeclarationMetaDataService`：host listeners / properties / outputPath
-   *   - flat module `.js` → `OutputTemplateMetadataService`：全局模板
-   *   - 其余 `.js` → `SetupComponentDataService`：组件模板载荷
+   * 三个 service 都是「只登记、原样返回」：
+   *   - `.d.ts` → host listeners / properties / outputPath
+   *   - flat module `.js` → 全局模板
+   *   - 其余 `.js` → 组件模板载荷
    */
   function augmentLibraryMetadata(compilerHost: ts.CompilerHost) {
     const oldWriteFile = compilerHost.writeFile;

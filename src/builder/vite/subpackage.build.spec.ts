@@ -188,11 +188,9 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     }, 300000);
 
     /**
-     * 「subpackages 选项派生 app.json」与「共享模块只产一份」是同一次构建的两个
-     * 侧面：前者看 app.json 怎么写，后者看 chunk 落在主包还是分包，互不干扰。
-     *
-     * 两个页面的 template 带上 `subpackage <name>` 标记，让「产物内容确实是这个
-     * 页面」那条断言在合过的构建上依旧成立。
+     * 「subpackages 选项派生 app.json」与「共享模块只产一份」是同一次构建的两个侧面。
+     * 两个页面的 template 带上 `subpackage <name>` 标记，让「产物内容确实是这个页面」那条断言
+     * 在合过的构建上依旧成立。
      */
     const loadDerived = memoize(async () => {
       const { root, myTestProjectHost } = await setupBase();
@@ -320,9 +318,8 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
     it('分包只写在静态 app.json 里 → 分包插件照样生效', async () => {
       await setupBase();
       await createSubPackagePage('sub-page');
-      // 不用 appJson 选项：分包信息只在 assets 的静态 app.json 里。
-      // 以前分包插件在构建开始前自己读 appJson 选项的文件，这份它看不见，
-      // 结果就是「写了分包但没拆」且零报错。
+      // 不用 appJson 选项：分包信息只在 assets 的静态 app.json 里。构建器必须两种来源都读到，
+      // 否则会「写了分包但没拆」且零报错。
       await write(
         'src/app.json',
         JSON.stringify({
@@ -364,8 +361,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
         await readOutput('dist/vite-subpkg-static/app.json'),
       ) as { subpackages: Array<{ root: string }> };
       expect(appJson.subpackages[0].root).toBe('packageA');
-      // 分包页面的产物落在分包目录（入口本身按 pattern 就在那里，
-      // 这里要的是分包信息真的被构建器读到了，而不是默默当主包）
+      // 分包页面的产物落在分包目录：要的是分包信息真的被构建器读到了，而不是默默当主包
       expect(
         await readOutput(
           'dist/vite-subpkg-static/packageA/pages/sub-page/sub-page-entry.js',

@@ -59,19 +59,12 @@ export interface MiniProgramTestStack {
 }
 
 /**
- * 测试链路的插件栈。
- *
- * **顺序是硬约束，不是排版偏好**：
+ * 测试链路的插件栈。顺序是硬约束，不是排版偏好：
  *
  *  1. `platformFileResolve` 最先 —— `.wx.ts` 平台后缀要在解析阶段就选对文件。
- *  2. `miniProgramAssets` 必须早于 wxs-strip：分析层产出的模板 AST
- *     是「内联 wxs 从哪来」的唯一真相源，strip 只读不重新解析。
- *  3. `wxsStrip` 必须早于 analog：它往 `fileReplacements` 里 push 替换项，
- *     analog 建 Angular program 之后再 push 就晚了。
+ *  2. `miniProgramAssets` 必须早于 wxs-strip：分析层产出的模板 AST 是「内联 wxs 从哪来」的唯一真相源。
+ *  3. `wxsStrip` 必须早于 analog：它往 `fileReplacements` 里 push 替换项，analog 建 program 之后再 push 就晚了。
  *  4. `libraryTemplate` / `componentTransform` 收尾，处理库模板与组件产物。
- *
- * 顺序约束见下面各插件的注释，改动前先读。
- * 这套顺序约束一模一样；各写一份迟早会改漏一边。
  */
 export function createMiniProgramTestStack(
   options: MiniProgramTestStackOptions,

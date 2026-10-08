@@ -1,22 +1,11 @@
 /**
  * 守卫：`script/*.ts` 的语法检查。
  *
- * ## 为什么需要
+ * `script/` 下的脚本不在任何构建/类型检查路径里：`npm run build` 不会去类型检查它们，
+ * `script/tsconfig.json` 有既有 rootDir 问题不能当门禁。结果就是脚本里的语法错误要等到
+ * 有人跑 `npm run sync` 才炸出来，而 build / lint / test 全绿。
  *
- * `script/` 下的脚本（`package-sync.ts`、`ensure-sync.ts` 等）**不在任何
- * 构建/类型检查路径里**：
- *
- *   - `npm run build` 走 `tsc -p ./tsconfig.builder.json` / `tsx ./script/build-ng-package.ts`，
- *     不会去类型检查 `package-sync.ts`
- *   - `script/tsconfig.json` 有既有 rootDir 问题，不能当门禁
- *   - `package-sync.ts` 只在 `npm run sync` 时由 ts-node 现场编译
- *
- * 结果就是：`package-sync.ts` 里的语法错误要等到有人跑 `npm run sync`
- * 才炸出来（实际发生过：改 changeList 时留下 `])  ]);` 重复闭合，
- * build / lint / test:ci 全绿，sync 直接 TS1005）。
- *
- * 这里用 `ts.transpileModule` 做**纯语法**检查 —— 它不做类型检查，
- * 因此不会被 script/tsconfig.json 那些 rootDir / 类型问题干扰，
+ * 这里用 `ts.transpileModule` 做纯语法检查——它不做类型检查，因此不会被 rootDir / 类型问题干扰，
  * 只抓真正让脚本无法编译的语法错。
  */
 import * as fs from 'fs';

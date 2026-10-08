@@ -1,30 +1,141 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Mini-program Vite build schema",
   "description": "小程序构建 builder（Vite / esbuild 版，替代 webpack 链路）。本文件由 script/gen-builder-schema.ts 从 @angular/build@22.1.8 生成，勿手改。",
   "type": "object",
   "properties": {
-    "assets": {
+    "outputPath": {
+      "type": "string",
+      "description": "The full path for the new output directory, relative to the current workspace."
+    },
+    "main": {
+      "type": "string",
+      "description": "The full path for the main entry point to the app, relative to the current workspace. 内容是 `bootstrapApplication({ providers: [...] })`。"
+    },
+    "tsConfig": {
+      "type": "string",
+      "description": "The full path for the TypeScript configuration file, relative to the current workspace."
+    },
+    "platform": {
+      "enum": [
+        "wx",
+        "zj",
+        "jd",
+        "bdzn",
+        "zfb",
+        "qq",
+        "dd",
+        "ks",
+        "xhs",
+        "fs"
+      ],
+      "type": "string",
+      "description": "小程序平台",
+      "default": "wx"
+    },
+    "pages": {
       "type": "array",
-      "description": "Define the assets to be copied to the output directory. These assets are copied as-is without any further processing or hashing.",
-      "default": [],
       "items": {
         "$ref": "#/definitions/assetPattern"
-      }
+      },
+      "description": "页面配置",
+      "default": []
+    },
+    "subpackages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "glob": {
+            "type": "string",
+            "description": "匹配入口文件的 glob"
+          },
+          "input": {
+            "type": "string",
+            "description": "源目录"
+          },
+          "output": {
+            "type": "string",
+            "description": "分包 root（同时是产物目录）"
+          },
+          "ignore": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "An array of globs to ignore."
+          },
+          "independent": {
+            "type": "boolean",
+            "description": "独立分包：不依赖主包即可运行"
+          }
+        },
+        "required": [
+          "glob",
+          "input",
+          "output"
+        ]
+      },
+      "description": "分包入口：写法与 pages 一样，output 就是分包 root（约定 root 同时是源码目录与产物目录）。配了就不用在 app 配置里写 subpackages：root 取 output，分包页由扫出来的入口算；自己写了同一个 root 就以自己那份为准"
+    },
+    "customTabbar": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/assetPattern"
+      },
+      "description": "自定义 tabBar 入口的源文件位置。产物目录由平台决定（微信系 custom-tab-bar，支付宝 customize-tab-bar），output 字段会被覆盖；不配则默认取 <sourceRoot>/custom-tab-bar 下的 *.entry.ts"
+    },
+    "appJson": {
+      "type": "string",
+      "description": "结构化 app 配置源文件（相对 workspaceRoot）。与 assets 里的静态 app.json 不是二选一：静态那份是底稿，本文件只写要补的字段，已写过的 key 不动，pages 追加。环境不同就换这个文件，平台不同用文件里的 _platform 段。"
+    },
+    "projectConfig": {
+      "type": "string",
+      "description": "结构化 project 配置源文件（相对 workspaceRoot），只影响 project 配置文件。与 appJson 各管一个输出文件，字段不互通；没写的字段由内置默认值打底。"
+    },
+    "appJsonValidate": {
+      "enum": [
+        "error",
+        "warn",
+        "off"
+      ],
+      "type": "string",
+      "description": "app 配置校验严格度。只作用于 appJson 通道；只有静态 app.json 的工程固定 warn（那是从别的项目搬过来的，合规与否不由我们负责）。off 用于先绕过校验把工程跑起来。",
+      "default": "error"
+    },
+    "deriveCondition": {
+      "type": "boolean",
+      "description": "自动生成 project 配置的调试启动项（condition），开发者工具的「编译模式」会列出全部页面。只是方便一下，需要精确控制启动参数仍在 projectConfig 里写。",
+      "default": false
+    },
+    "viteConfig": {
+      "type": "string",
+      "description": "自定义 vite 配置的钩子文件（相对 workspaceRoot）。文件默认导出一个 (config, ctx) => config 的函数：config 是构建器组装完的最终 vite 配置，随便改，返回新对象或就地改都行；构建器不校验钩子的改动。.ts / .mts / .cts 由 jiti 加载，.js / .mjs / .cjs 走原生 import。"
+    },
+    "watch": {
+      "type": "boolean",
+      "description": "Run build when files change.",
+      "default": false
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/assetPattern"
+      },
+      "description": "Define the assets to be copied to the output directory. These assets are copied as-is without any further processing or hashing.",
+      "default": []
     },
     "styles": {
-      "description": "Global styles to be included in the build.",
       "type": "array",
-      "default": [],
       "items": {
-        "oneOf": [
+        "anyOf": [
           {
             "type": "object",
             "properties": {
               "input": {
                 "type": "string",
-                "description": "The file to include.",
-                "pattern": "\\.(?:css|scss|sass|less)$"
+                "pattern": "\\.(?:css|scss|sass|less)$",
+                "description": "The file to include."
               },
               "bundleName": {
                 "type": "string",
@@ -37,85 +148,94 @@
                 "default": true
               }
             },
-            "additionalProperties": false,
             "required": [
               "input"
             ]
           },
           {
             "type": "string",
-            "description": "The file to include.",
-            "pattern": "\\.(?:css|scss|sass|less)$"
+            "pattern": "\\.(?:css|scss|sass|less)$",
+            "description": "The file to include."
           }
         ]
-      }
+      },
+      "description": "Global styles to be included in the build.",
+      "default": []
     },
-    "stylePreprocessorOptions": {
-      "description": "Options to pass to style preprocessors.",
-      "type": "object",
-      "properties": {
-        "includePaths": {
-          "description": "Paths to include. Paths will be resolved to workspace root.",
+    "polyfills": {
+      "anyOf": [
+        {
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "default": []
+          }
         },
-        "sass": {
-          "description": "Options to pass to the sass preprocessor.",
-          "type": "object",
-          "properties": {
-            "fatalDeprecations": {
-              "description": "A set of deprecations to treat as fatal. If a deprecation warning of any provided type is encountered during compilation, the compiler will error instead. If a Version is provided, then all deprecations that were active in that compiler version will be treated as fatal.",
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "silenceDeprecations": {
-              "description": " A set of active deprecations to ignore. If a deprecation warning of any provided type is encountered during compilation, the compiler will ignore it instead.",
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "futureDeprecations": {
-              "description": "A set of future deprecations to opt into early. Future deprecations passed here will be treated as active by the compiler, emitting warnings as necessary.",
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "additionalProperties": false
+        {
+          "type": "string"
         }
-      },
-      "additionalProperties": false
+      ],
+      "description": "Polyfills to be included in the build. 每条都会被 import 进 polyfills 入口，包名和本地文件都收。"
     },
-    "inlineStyleLanguage": {
-      "description": "The stylesheet language to use for the application's inline component styles.",
-      "type": "string",
-      "default": "css",
-      "enum": [
-        "css",
-        "less",
-        "sass",
-        "scss"
-      ]
-    },
-    "fileReplacements": {
-      "description": "Replace compilation source files with other compilation source files in the build.",
+    "dedupe": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/fileReplacement"
+        "type": "string"
       },
+      "description": "Forced single-instance packages, passed straight to Vite `resolve.dedupe`. Empty by default: nothing is injected into your module resolution. Only needed when the library is consumed via `file:` / `npm link`, where the linked copy own node_modules holds a second @angular/core.",
       "default": []
     },
+    "nativeComponentsDir": {
+      "type": "string",
+      "description": "原生小程序自定义组件目录（相对 workspaceRoot，如 wxcomponents）。配置后整个目录拷进产物，模板命中原生标签自动注入 usingComponents。"
+    },
+    "format": {
+      "enum": [
+        "cjs",
+        "es"
+      ],
+      "type": "string",
+      "description": "产物模块格式。小程序 JS 运行时是 CommonJS，默认 cjs；只有在宿主侧确认支持 ESM 时才改成 es。",
+      "default": "cjs"
+    },
+    "optimization": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "scripts": {
+              "type": "boolean",
+              "description": "Enables optimization of the scripts output.",
+              "default": true
+            },
+            "styles": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "minify": {
+                      "type": "boolean",
+                      "description": "Minify CSS definitions by removing extraneous whitespace and comments.",
+                      "default": true
+                    }
+                  }
+                },
+                {
+                  "type": "boolean"
+                }
+              ],
+              "default": true
+            }
+          }
+        },
+        {
+          "type": "boolean"
+        }
+      ],
+      "description": "Enables optimization of the build output: minification of scripts and styles, tree-shaking and dead-code elimination.",
+      "default": false
+    },
     "sourceMap": {
-      "description": "Output source maps for scripts and styles. For more information, see https://angular.dev/reference/configs/workspace-config#source-map-configuration.",
-      "default": false,
-      "oneOf": [
+      "anyOf": [
         {
           "type": "object",
           "properties": {
@@ -144,287 +264,159 @@
               "description": "Output original source content for files within the source map.",
               "default": true
             }
-          },
-          "additionalProperties": false
+          }
         },
         {
           "type": "boolean"
         }
-      ]
-    },
-    "watch": {
-      "type": "boolean",
-      "description": "Run build when files change.",
+      ],
       "default": false
     },
     "outputHashing": {
-      "type": "string",
-      "description": "Define the output filename cache-busting hashing mode.\n\n- `none`: No hashing.\n- `all`: Hash for all output bundles. \n- `media`: Hash for all output media (e.g., images, fonts, etc. that are referenced in CSS files).\n- `bundles`: Hash for output of lazy and main bundles.",
-      "default": "none",
       "enum": [
         "none",
         "all",
         "media",
         "bundles"
-      ]
+      ],
+      "type": "string",
+      "description": "Define the output filename cache-busting hashing mode.\n\n- `none`: No hashing.\n- `all`: Hash for all output bundles. \n- `media`: Hash for all output media (e.g., images, fonts, etc. that are referenced in CSS files).\n- `bundles`: Hash for output of lazy and main bundles.",
+      "default": "none"
     },
     "deleteOutputPath": {
       "type": "boolean",
       "description": "Delete the output path before building.",
       "default": true
     },
-    "preserveSymlinks": {
-      "type": "boolean",
-      "description": "Do not use the real path when resolving modules. If unset then will default to `true` if NodeJS option --preserve-symlinks is set."
-    },
-    "define": {
-      "description": "Defines global identifiers that will be replaced with a specified constant value when found in any JavaScript or TypeScript code including libraries. The value will be used directly. String values must be put in quotes. Identifiers within Angular metadata such as Component Decorators will not be replaced.",
-      "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      }
-    },
-    "conditions": {
-      "description": "Custom package resolution conditions used to resolve conditional exports/imports. Defaults to ['module', 'development'/'production']. The following special conditions are always present if the requirements are satisfied: 'default', 'import', 'require', 'browser', 'node'.",
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "externalDependencies": {
-      "description": "Exclude the listed external dependencies from being bundled into the bundle. Instead, the created bundle relies on these dependencies to be available during runtime. Note: `@foo/bar` marks all paths within the `@foo/bar` package as external, including sub-paths like `@foo/bar/baz`.",
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "default": []
-    },
-    "budgets": {
-      "description": "Budget thresholds to ensure parts of your application stay within boundaries which you set.",
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/budget"
-      },
-      "default": []
-    },
     "statsJson": {
       "type": "boolean",
       "description": "Generates a 'stats.json' file which can be analyzed with https://esbuild.github.io/analyze/.",
       "default": false
     },
-    "tsConfig": {
-      "type": "string",
-      "description": "The full path for the TypeScript configuration file, relative to the current workspace."
-    },
-    "outputPath": {
-      "type": "string",
-      "description": "The full path for the new output directory, relative to the current workspace."
-    },
-    "polyfills": {
-      "description": "Polyfills to be included in the build.",
-      "oneOf": [
-        {
-          "type": "array",
-          "description": "Polyfills to be included in the build.",
-          "items": {
-            "type": "string"
-          }
-        },
-        {
-          "type": "string",
-          "description": "The polyfills to be included in the build."
-        }
-      ]
-    },
-    "optimization": {
-      "description": "Enables optimization of the build output: minification of scripts and styles, tree-shaking and dead-code elimination. `styles.inlineCritical` and `fonts` are web-only and have no effect here.",
-      "default": false,
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "scripts": {
-              "type": "boolean",
-              "description": "Enables optimization of the scripts output.",
-              "default": true
-            },
-            "styles": {
-              "description": "Enables optimization of the styles output.",
-              "default": true,
-              "oneOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "minify": {
-                      "type": "boolean",
-                      "description": "Minify CSS definitions by removing extraneous whitespace and comments.",
-                      "default": true
-                    }
-                  },
-                  "additionalProperties": false
-                },
-                {
-                  "type": "boolean"
-                }
-              ]
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "boolean"
-        }
-      ]
-    },
-    "platform": {
-      "type": "string",
-      "enum": [
-        "wx",
-        "zj",
-        "jd",
-        "bdzn",
-        "zfb",
-        "qq",
-        "dd",
-        "ks",
-        "xhs",
-        "fs"
-      ],
-      "description": "小程序平台",
-      "default": "wx"
-    },
-    "pages": {
-      "type": "array",
-      "description": "页面配置",
-      "default": [],
-      "items": {
-        "$ref": "#/definitions/assetPattern"
-      }
-    },
-    "subpackages": {
-      "type": "array",
-      "description": "分包入口：写法与 pages 一样，output 就是分包 root（约定 root 同时是源码目录与产物目录）。配了就不用在 app 配置里写 subpackages：root 取 output，分包页由扫出来的入口算；自己写了同一个 root 就以自己那份为准",
-      "items": {
-        "type": "object",
-        "properties": {
-          "glob": {
-            "type": "string",
-            "description": "匹配入口文件的 glob"
-          },
-          "input": {
-            "type": "string",
-            "description": "源目录"
-          },
-          "output": {
-            "type": "string",
-            "description": "分包 root（同时是产物目录）"
-          },
-          "ignore": {
-            "description": "An array of globs to ignore.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "independent": {
-            "type": "boolean",
-            "description": "独立分包：不依赖主包即可运行"
-          }
-        },
-        "required": [
-          "glob",
-          "input",
-          "output"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "customTabbar": {
-      "type": "array",
-      "description": "自定义 tabBar 入口的源文件位置。产物目录由平台决定（微信系 custom-tab-bar，支付宝 customize-tab-bar），output 字段会被覆盖；不配则默认取 <sourceRoot>/custom-tab-bar 下的 *.entry.ts",
-      "items": {
-        "$ref": "#/definitions/assetPattern"
-      }
-    },
-    "main": {
-      "type": "string",
-      "description": "The full path for the main entry point to the app, relative to the current workspace."
-    },
-    "appJson": {
-      "type": "string",
-      "description": "结构化 app 配置源文件（相对 workspaceRoot）。与 assets 里的静态 app.json 不是二选一：静态那份是底稿，本文件只写要补的字段，已写过的 key 不动，pages 追加。环境不同就换这个文件，平台不同用文件里的 _platform 段。"
-    },
-    "projectConfig": {
-      "type": "string",
-      "description": "结构化 project 配置源文件（相对 workspaceRoot），只影响 project 配置文件。与 appJson 各管一个输出文件，字段不互通；没写的字段由内置默认值打底。"
-    },
-    "appJsonValidate": {
-      "type": "string",
-      "enum": [
-        "error",
-        "warn",
-        "off"
-      ],
-      "default": "error",
-      "description": "app 配置校验严格度。只作用于 appJson 通道；只有静态 app.json 的工程固定 warn（那是从别的项目搬过来的，合规与否不由我们负责）。off 用于先绕过校验把工程跑起来。"
-    },
-    "deriveCondition": {
-      "type": "boolean",
-      "default": false,
-      "description": "自动生成 project 配置的调试启动项（condition），开发者工具的「编译模式」会列出全部页面。只是方便一下，需要精确控制启动参数仍在 projectConfig 里写。"
-    },
-    "nativeComponentsDir": {
-      "type": "string",
-      "description": "原生小程序自定义组件目录（相对 workspaceRoot，如 wxcomponents）。配置后整个目录拷进产物，模板命中原生标签自动注入 usingComponents。"
-    },
-    "dedupe": {
+    "budgets": {
       "type": "array",
       "items": {
-        "type": "string"
+        "$ref": "#/definitions/budget"
       },
-      "default": [],
-      "description": "Forced single-instance packages, passed straight to Vite `resolve.dedupe`. Empty by default: nothing is injected into your module resolution. Only needed when the library is consumed via `file:` / `npm link`, where the linked copy own node_modules holds a second @angular/core."
-    },
-    "format": {
-      "type": "string",
-      "enum": [
-        "cjs",
-        "es"
-      ],
-      "default": "cjs",
-      "description": "产物模块格式。小程序 JS 运行时是 CommonJS，默认 cjs；只有在宿主侧确认支持 ESM 时才改成 es。"
-    },
-    "viteConfig": {
-      "type": "string",
-      "description": "自定义 vite 配置的钩子文件（相对 workspaceRoot）。文件默认导出一个 (config, ctx) => config 的函数：config 是构建器组装完的最终 vite 配置，随便改，返回新对象或就地改都行；构建器不校验钩子的改动。.ts / .mts / .cts 由 jiti 加载，.js / .mjs / .cjs 走原生 import。"
+      "description": "Budget thresholds to ensure parts of your application stay within boundaries which you set.",
+      "default": []
     },
     "tagNameClass": {
-      "type": "string",
       "enum": [
         "mapped",
         "all",
         "off"
       ],
-      "default": "mapped",
-      "description": "给元素补 `tag-name-<原标签>` 标记的策略。模板写 `div` 而 wxml 里已经是 `view`，`div` 选择器落空，这个 class 就是补回来的把手。mapped（默认）只在映射改写了标签时输出；all 每个元素都输出；off 一律不输出（标记会进 class，也就等于每个元素多一个 token）。"
+      "type": "string",
+      "description": "给元素补 `tag-name-<原标签>` 标记的策略。模板写 `div` 而 wxml 里已经是 `view`，`div` 选择器落空，这个 class 就是补回来的把手。mapped（默认）只在映射改写了标签时输出；all 每个元素都输出；off 一律不输出（标记会进 class，也就等于每个元素多一个 token）。",
+      "default": "mapped"
+    },
+    "stylePreprocessorOptions": {
+      "type": "object",
+      "properties": {
+        "includePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Paths to include. Paths will be resolved to workspace root.",
+          "default": []
+        },
+        "sass": {
+          "type": "object",
+          "properties": {
+            "fatalDeprecations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "A set of deprecations to treat as fatal. If a deprecation warning of any provided type is encountered during compilation, the compiler will error instead. If a Version is provided, then all deprecations that were active in that compiler version will be treated as fatal."
+            },
+            "silenceDeprecations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": " A set of active deprecations to ignore. If a deprecation warning of any provided type is encountered during compilation, the compiler will ignore it instead."
+            },
+            "futureDeprecations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "A set of future deprecations to opt into early. Future deprecations passed here will be treated as active by the compiler, emitting warnings as necessary."
+            }
+          },
+          "description": "Options to pass to the sass preprocessor."
+        }
+      },
+      "description": "Options to pass to style preprocessors."
+    },
+    "inlineStyleLanguage": {
+      "enum": [
+        "css",
+        "less",
+        "sass",
+        "scss"
+      ],
+      "type": "string",
+      "description": "The stylesheet language to use for the application's inline component styles.",
+      "default": "css"
+    },
+    "fileReplacements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/fileReplacement"
+      },
+      "description": "Replace compilation source files with other compilation source files in the build.",
+      "default": []
+    },
+    "define": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Defines global identifiers that will be replaced with a specified constant value when found in any JavaScript or TypeScript code including libraries. The value will be used directly. String values must be put in quotes. Identifiers within Angular metadata such as Component Decorators will not be replaced."
+    },
+    "conditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Custom package resolution conditions used to resolve conditional exports/imports. Defaults to ['module', 'development'/'production']. The following special conditions are always present if the requirements are satisfied: 'default', 'import', 'require', 'browser', 'node'."
+    },
+    "externalDependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Exclude the listed external dependencies from being bundled into the bundle. Instead, the created bundle relies on these dependencies to be available during runtime. Note: `@foo/bar` marks all paths within the `@foo/bar` package as external, including sub-paths like `@foo/bar/baz`.",
+      "default": []
+    },
+    "preserveSymlinks": {
+      "type": "boolean",
+      "description": "Do not use the real path when resolving modules. If unset then will default to `true` if NodeJS option --preserve-symlinks is set."
     }
   },
-  "additionalProperties": false,
   "required": [
     "outputPath",
     "main",
     "tsConfig"
   ],
+  "additionalProperties": false,
   "definitions": {
     "assetPattern": {
-      "oneOf": [
+      "anyOf": [
         {
           "type": "object",
           "properties": {
             "followSymlinks": {
               "type": "boolean",
-              "default": false,
-              "description": "Allow glob patterns to follow symlink directories. This allows subdirectories of the symlink to be searched."
+              "description": "Allow glob patterns to follow symlink directories. This allows subdirectories of the symlink to be searched.",
+              "default": false
             },
             "glob": {
               "type": "string",
@@ -435,19 +427,18 @@
               "description": "The input directory path in which to apply 'glob'. Defaults to the project root."
             },
             "ignore": {
-              "description": "An array of globs to ignore.",
               "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "description": "An array of globs to ignore."
             },
             "output": {
               "type": "string",
-              "default": "",
-              "description": "Absolute path within the output."
+              "description": "Absolute path within the output.",
+              "default": ""
             }
           },
-          "additionalProperties": false,
           "required": [
             "glob",
             "input"
@@ -470,7 +461,6 @@
           "pattern": "\\.(([cm]?[jt])sx?|json)$"
         }
       },
-      "additionalProperties": false,
       "required": [
         "replace",
         "with"
@@ -480,8 +470,6 @@
       "type": "object",
       "properties": {
         "type": {
-          "type": "string",
-          "description": "The type of budget.",
           "enum": [
             "all",
             "allScript",
@@ -490,7 +478,9 @@
             "anyComponentStyle",
             "bundle",
             "initial"
-          ]
+          ],
+          "type": "string",
+          "description": "The type of budget."
         },
         "name": {
           "type": "string",
@@ -525,7 +515,6 @@
           "description": "The threshold for error relative to the baseline (min & max)."
         }
       },
-      "additionalProperties": false,
       "required": [
         "type"
       ]

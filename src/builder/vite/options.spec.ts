@@ -31,8 +31,7 @@ describe('resolveOptimization', () => {
   });
 
   /**
-   * 回归：以前是 `!!options.optimization`，对象写法恒为真，
-   * 「想关压缩」反而开了压缩。
+   * 回归：对象写法恒为真，「想关压缩」反而开了压缩。必须按子项取值。
    */
   it('对象形态按子项取值，不再被真值判断一把梭', () => {
     expect(resolveOptimization({ scripts: false, styles: false })).toEqual({
@@ -179,11 +178,9 @@ describe('toAbsoluteFileReplacements', () => {
   });
 
   /**
-   * 钉住「输出必须是 posix 绝对路径」这条契约。
-   *
-   * Windows 上 `path.join` 会交回 `C:\a\src\environment.ts`，而 analog 的
-   * `replaceFiles` 拿 `resolvedId.endsWith(replace)` 跟 vite 的
-   * `C:/a/src/environment.ts` 比 —— 带反斜杠就永不命中，替换静默失效。
+   * 钉住「输出必须是 posix 绝对路径」这条契约。Windows 上 `path.join` 会交回带反斜杠的路径，
+   * 而 analog 的 `replaceFiles` 拿 `resolvedId.endsWith(replace)` 跟 vite 的 posix 路径比——
+   * 带反斜杠就永不命中，替换静默失效。
    */
   it('输出不含反斜杠（Windows）', () => {
     const [first] = toAbsoluteFileReplacements(

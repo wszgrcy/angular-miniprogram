@@ -6,11 +6,11 @@ import {
 /**
  * 小程序端样式产物的兼容处理，三件事：
  *
- *  1. `@import` / `@charset` 置顶 —— 一个 wxss 由「样式文件 + 内联样式」多份
- *     拼接，`@import` 落在文件中间、`@charset` 不在首行，小程序都不认。
- *  2. `@import"x"` 补回空格 —— 压缩会把 `@import "x"` 的空格吃掉，支付宝不认。
- *  3. HTML 标签选择器告警 —— 模板里 `div` 已经渲染成 `view`，`div{}` 选不中
- *     任何东西。只告警不改写：换选择器是语义决策，编译器不替用户改语义。
+ *  1. `@import` / `@charset` 置顶 —— 一个 wxss 由多份拼接，`@import` 落在文件中间、
+ *     `@charset` 不在首行，小程序都不认。
+ *  2. `@import"x"` 补回空格 —— 压缩会把空格吃掉，支付宝不认。
+ *  3. HTML 标签选择器告警 —— 模板里 `div` 已经渲染成 `view`，`div{}` 选不中任何东西。
+ *     只告警不改写：换选择器是语义决策，编译器不替用户改语义。
  */
 export interface MiniProgramStyleOptions {
   /** 告警通道，一般是 `context.logger.warn` 或 rollup 的 `this.warn` */
@@ -19,9 +19,7 @@ export interface MiniProgramStyleOptions {
 
 const MULTILINE_COMMENTS_RE = /\/\*[\s\S]*?\*\//g;
 const blankReplacer = (s: string) => ' '.repeat(s.length);
-/**
- * 注释换成等长空白：总长不变，所以在掩码上算出的下标可以直接切原文。
- */
+/** 注释换成等长空白：总长不变，所以在掩码上算出的下标可以直接切原文。 */
 function emptyCssComments(raw: string): string {
   return raw.replace(MULTILINE_COMMENTS_RE, blankReplacer);
 }
@@ -36,7 +34,6 @@ const IMPORT_WITHOUT_SPACE_RE = /@import(?=["'])/g;
 
 /**
  * 找「前面是起始/空白/逗号/花括号、后面紧跟 `,` 或 `{`」的小程序不存在的标签。
- *
  * - 第一个分支整体吞掉注释（`match[1]` 为空即跳过），注释里的标签不会误报
  * - 要求标签后紧跟 `,` 或 `{`，所以 `.div` / `[data-div]` / `div.foo` 不会误报
  */
@@ -56,9 +53,7 @@ export function transformMiniProgramStyle(
   return hoistAtRules(css.replace(IMPORT_WITHOUT_SPACE_RE, '@import '));
 }
 
-/**
- * `@import` 全部提到最前并保持原有相对顺序；`@charset` 只保留第一条且放在最前。
- */
+/** `@import` 全部提到最前并保持原有相对顺序；`@charset` 只保留第一条且放在最前。 */
 function hoistAtRules(css: string): string {
   const cleanCss = emptyCssComments(css);
   const removals: [number, number][] = [];

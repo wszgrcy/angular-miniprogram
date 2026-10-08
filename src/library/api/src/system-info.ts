@@ -8,14 +8,9 @@ import {
 import { MpPlatform } from './types';
 
 /**
- * 系统信息增强，参考 uni-mp-core 的 enhanceSystemInfo 族：
- * 各家 getSystemInfo(Sync) 的字段口径不一，这里归一成 uni 同款的
- * device / host / os / platform / safeAreaInsets 字段。
- *
- * 与参考实现的差异：
- * - 平台判断用运行时 MpPlatform 参数，不用编译期常量
- * - 不搬运 uni 身份字段（uniPlatform/uniCompileVersion 等）
- * - deviceId 不做模块级缓存（避免测试串扰），每次读存储
+ * 系统信息增强：各家 getSystemInfo(Sync) 的字段口径不一，这里归一成 device / host / os /
+ * platform / safeAreaInsets 字段。平台判断用运行时 MpPlatform 参数，不用编译期常量；
+ * deviceId 不做模块级缓存（避免测试串扰），每次读存储。
  */
 
 const UUID_KEY = '__AMP_DEVICE_UUID';
@@ -32,7 +27,7 @@ export function addSafeAreaInsets(fromRes: any, toRes: Record<string, any>) {
   }
 }
 
-/** 设备唯一标识：读存储，缺失则生成并异步写入（同 uni 的 __DC_STAT_UUID 策略） */
+/** 设备唯一标识：读存储，缺失则生成并异步写入 */
 export function useDeviceId(global: any) {
   return (_fromRes: any, toRes: Record<string, any>): void => {
     let deviceId: string | undefined;
@@ -54,8 +49,7 @@ export function useDeviceId(global: any) {
 }
 
 /**
- * 解析 osName/osVersion。
- * 各家 system 字段格式不一：微信是「系统 版本」，
+ * 解析 osName/osVersion。各家 system 字段格式不一：微信是「系统 版本」，
  * 支付宝/百度/京东是「版本」需借 platform 字段当 osName。
  */
 export function getOSInfo(
@@ -253,7 +247,7 @@ export function enhanceSystemInfo(
   return toRes;
 }
 
-/** getDeviceInfo 口径（uni：同步 API） */
+/** getDeviceInfo 口径 */
 export function buildDeviceInfo(
   platform: MpPlatform,
   global: any,

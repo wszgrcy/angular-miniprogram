@@ -50,8 +50,7 @@ export function execute(
       const ngPackagrOptions = {
         cacheEnabled,
         cacheDirectory: join(cacheDirectory, 'ng-packagr'),
-        // ng-packagr 自己把它交给 chokidar 的 watchOptions.poll，
-        // 网络盘 / WSL 挂载上没轮询就看不到改动
+        // ng-packagr 自己把它交给 chokidar 的 watchOptions.poll，网络盘 / WSL 挂载上没轮询就看不到改动
         poll: options.poll,
       };
 

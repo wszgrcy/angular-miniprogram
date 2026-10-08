@@ -5,12 +5,9 @@ import { ComponentContext } from './component-context';
 import { CustomAstVisitor, TemplateDefinition } from './template-definition';
 
 /**
- * 权威基准：直接继承 Angular 自己的 `RecursiveAstVisitor`，
- * 只加一个「数管道」的计数。
- *
- * 用它当参照而不是自己写遍历，是因为它就是 Angular 官方定义的
- * 「一个表达式节点的完整子树该怎么走」。我们的 `CustomAstVisitor`
- * 数出来的管道数必须和它逐条一致 —— 不一致就说明我们漏走了某棵子树。
+ * 权威基准：直接继承 Angular 自己的 `RecursiveAstVisitor`，只加一个「数管道」的计数。
+ * 它就是 Angular 官方定义的「一个表达式节点的完整子树该怎么走」，我们的
+ * `CustomAstVisitor` 数出来的管道数必须和它逐条一致——不一致就说明漏走了某棵子树。
  */
 class GroundTruthPipeCounter extends RecursiveAstVisitor {
   count = 0;
@@ -57,10 +54,8 @@ function countWithAngular(ast: any): number {
 
 /**
  * 表达式侧槽位计数 vs Angular 权威基准。
- *
  * 每个 `| pipe` 在 Angular 里编译成一条 `ɵɵpipe`，占当前视图一个声明槽。
- * 我们必须在没有 Angular 编译管线的情况下自己数准，否则后续节点整体错位
- * 且不报错。这里用 Angular 的 `RecursiveAstVisitor` 逐条比对。
+ * 这里用 Angular 的 `RecursiveAstVisitor` 逐条比对。
  */
 describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致', () => {
   // 每项：[说明, 模板片段, 期望管道数]
@@ -123,16 +118,16 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
   }
 
   it('反向对照：旧写法（visitPipe 不走 args + safePropertyRead 空）会少数', () => {
-    // 复刻修复前的行为，证明本测试真的能抓到漏计，而不是恒等式。
+    // 复刻修复前的行为，证明本测试真的能抓到漏计，而不是恒等式
     class OldBrokenVisitor extends RecursiveAstVisitor {
       count = 0;
       override visitPipe(ast: any): any {
         this.count++;
-        // 故意不访问 args —— 就是修复前的 bug
+        // 故意不访问 args
         return undefined;
       }
       override visitSafePropertyRead(_ast: any): any {
-        // 故意空实现 —— 就是修复前的 bug
+        // 故意空实现
         return undefined;
       }
       override visitThisReceiver(_ast: any): any {
@@ -160,10 +155,8 @@ describe('CustomAstVisitor: 管道计数与 Angular RecursiveAstVisitor 一致',
 });
 
 /**
- * 模板侧：不支持的构造必须**抛错**，不能静默丢节点。
- *
- * 静默丢弃的后果是「内容不见了 + 后续槽位错位」，且不报错，
- * 属于最难排查的一类。本 fork 对 @defer / @content 已采用同一策略。
+ * 模板侧：不支持的构造必须抛错，不能静默丢节点。
+ * 静默丢弃的后果是「内容不见了 + 后续槽位错位」，且不报错。
  */
 describe('TemplateDefinition: 不支持的构造显式抛错', () => {
   function run(html: string, options?: { preserveWhitespaces?: boolean }) {
@@ -179,7 +172,7 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
 
   /**
    * ICU 走 Angular 原生 `ɵɵi18n`，与 `{{a}}` 的 `ɵɵtext` 一样只占一个声明槽，
-   * 所以记账必须与等价插值逐字相同 —— 这是 wxml 下标不错位的前提。
+   * 所以记账必须与等价插值逐字相同。
    */
   for (const [name, html] of [
     ['plural', '<p>{count, plural, =1 {one} other {many}}</p>'],
@@ -195,9 +188,8 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
   }
 
   /**
-   * ICU 分支里的插值带管道时，emit 侧会多出 `ɵɵpipe(i, "number")`，
-   * 占一个声明槽。漏数就是 wxml 下标整体前移一位——实测踩过，
-   * 表现是后续所有节点错位一格且零报错。
+   * ICU 分支里的插值带管道时，emit 侧会多出 `ɵɵpipe(i, "number")`，占一个声明槽。
+   * 漏数就是 wxml 下标整体前移一位。
    */
   it('ICU 分支里的管道各占一个声明槽', () => {
     // 把所有节点（含 children）的下标拍平取最大，即「最后一个槽」
@@ -224,10 +216,9 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
   });
 
   /**
-   * `ɵɵi18nAttributes` 占一个独立声明槽，但 i18n pass 在我们拿到 AST 前
-   * 就把 `i18n-*` 消费干净了，AST 里没有任何残留（实测带 i18n 的插值属性
-   * 与普通插值属性逐字相同）。所以只能从模板原文数，这里把规则钉住：
-   * **值含插值的 `i18n-<attr>` → 该元素后多一格**，静态的不算。
+   * `ɵɵi18nAttributes` 占一个独立声明槽，但 i18n pass 在拿到 AST 前就把 `i18n-*`
+   * 消费干净了，AST 里没有残留。所以只能从模板原文数，这里把规则钉住：
+   * 值含插值的 `i18n-<attr>` → 该元素后多一格，静态的不算。
    */
   describe('i18n-* 属性占的声明槽', () => {
     const lastIndex = (html: string) => {
@@ -295,8 +286,8 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
   });
 
   /**
-   * `preserveWhitespaces: true` 时解析器不洗空白，AST 里真的会剩一个
-   * 空白 Text。Angular 的兜底判据不数它，这里跟着数就多占一格。
+   * `preserveWhitespaces: true` 时解析器不洗空白，AST 里真的会剩一个空白 Text。
+   * Angular 的兜底判据不数它，这里跟着数就多占一格。
    */
   it('preserveWhitespaces 下的纯空白 Text 仍不算兜底内容', () => {
     const blank: any = run('<ng-content>   </ng-content>', {
@@ -318,8 +309,7 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
   });
 
   it('visitComponent / visitDirective 被调用即抛错（正常解析路径不产出）', () => {
-    // 这两个节点无法从 parseTemplate 得到（已实测普通标签与 selectorless
-    // 都只出 Element），所以直接构造节点喂进去，验证「出现即报错」。
+    // 这两个节点无法从 parseTemplate 得到，所以直接构造节点喂进去，验证「出现即报错」
     const def: any = new TemplateDefinition(
       [],
       new ComponentContext(undefined),
@@ -336,11 +326,8 @@ describe('TemplateDefinition: 不支持的构造显式抛错', () => {
 });
 
 /**
- * 端到端：整段模板里我们算出的「节点数 + 管道数」应与
- * Angular 基准（节点数 + 权威管道数）一致。
- *
- * 这条把表达式侧与模板侧的计数串起来验证，防止两侧各自正确、
- * 合起来错位。
+ * 端到端：整段模板里我们算出的「节点数 + 管道数」应与 Angular 基准一致。
+ * 这条把表达式侧与模板侧的计数串起来验证，防止两侧各自正确、合起来错位。
  */
 describe('TemplateDefinition: 整模板槽位与 Angular 基准对齐', () => {
   function totals(html: string) {
@@ -370,8 +357,7 @@ describe('TemplateDefinition: 整模板槽位与 Angular 基准对齐', () => {
       new ComponentContext(undefined),
     );
     def.run();
-    // declIndex 是私有字段，用 astVisitor 的副作用反推：
-    // 走完模板后 declIndex 应等于「渲染节点数 + 管道数」
+    // declIndex 是私有字段，用 astVisitor 的副作用反推
     const declIndex: number = (def as any).declIndex;
     return { declIndex, angularPipes: gt.count, nodes: def.list.length };
   }
@@ -400,7 +386,6 @@ describe('TemplateDefinition: 整模板槽位与 Angular 基准对齐', () => {
       // 节点数必须 > 0，且 declIndex 至少覆盖节点数
       expect(t.nodes).toBeGreaterThan(0);
       expect(t.declIndex).toBeGreaterThanOrEqual(t.nodes);
-      // declIndex 与「节点数 + 权威管道数」的差不应超过控制流锚点开销，
       // 关键是不允许出现「管道没数到」导致的欠计
       expect(
         t.declIndex,
@@ -410,8 +395,7 @@ describe('TemplateDefinition: 整模板槽位与 Angular 基准对齐', () => {
   }
 
   it('反向对照：若漏计管道，declIndex 会小于「节点数 + 权威管道数」', () => {
-    // 用参数嵌套管道这条最能暴露漏计的模板做反向验证：
-    // 权威管道数必须严格大于 0，否则本对照无意义。
+    // 用参数嵌套管道这条最能暴露漏计的模板做反向验证：权威管道数必须严格大于 0
     const t = totals('<div>{{ a | date:(b | number) }}</div>');
     expect(t.angularPipes).toBe(2);
     expect(t.declIndex).toBeGreaterThanOrEqual(t.nodes + 2);

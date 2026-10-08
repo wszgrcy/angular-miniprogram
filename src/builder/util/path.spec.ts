@@ -16,11 +16,8 @@ import {
 } from './path';
 
 /**
- * `util/path` 的契约测试。
- *
- * 这里刻意把 Windows 形态和 posix 形态**都**写进断言，而不是只断言「当前平台
- * 跑出来对」——这些函数的价值就在于跨平台把几种形态并成一个，只测当前平台等于
- * 没测（Linux CI 上任何一版实现都能过）。
+ * `util/path` 的契约测试。这里刻意把 Windows 形态和 posix 形态都写进断言，而不是只断言当前平台——
+ * 这些函数的价值就在于跨平台把几种形态并成一个，只测当前平台等于没测（Linux CI 上任何一版实现都能过）。
  */
 
 const IS_WIN = process.platform === 'win32';
@@ -31,9 +28,7 @@ const DOUBLE_DRIVE = /[a-zA-Z]:[\\/][a-zA-Z]:[\\/]/;
 /**
  * 复刻 devkit normalizeAssetPatterns 里的校验：
  *   path.resolve(workspaceRoot, input).startsWith(workspaceRoot)
- *
- * 关键在于它用的是 `node:path`（平台相关），而我们手上的 devkit Path
- * 是 posix 正斜杠。Windows 上这两者分隔符不一致，startsWith 直接 false。
+ * 关键在于它用的是 `node:path`（平台相关），而我们手上的 devkit Path 是 posix 正斜杠。
  */
 function devkitCheck(root: string, input: string, p: typeof path): boolean {
   return p.resolve(root, input).startsWith(root);
@@ -52,6 +47,11 @@ describe('toPosix（只翻分隔符）', () => {
     expect(toPosix('/C:/a')).toBe('/C:/a');
     expect(toPosix('C:\\a\\')).toBe('C:/a/');
   });
+
+  it('重斜杠一并归一，尾斜杠则原样留着', () => {
+    expect(toPosix('a//b\\c')).toBe('a/b/c');
+    expect(toPosix('a/b/')).toBe('a/b/');
+  });
 });
 
 describe('toNativePath（原生绝对路径）', () => {
@@ -59,8 +59,7 @@ describe('toNativePath（原生绝对路径）', () => {
   const input = './src/pages';
 
   it('复现 bug：posix 正斜杠 root 过 win32 resolve，startsWith 为 false', () => {
-    // 这就是用户在 Windows 上看到的
-    // "The ./src/pages asset path must be within the workspace root."
+    // 这就是用户在 Windows 上看到的 "asset path must be within the workspace root."
     expect(devkitCheck(posixRoot, input, path.win32)).toBe(false);
   });
 
@@ -70,8 +69,7 @@ describe('toNativePath（原生绝对路径）', () => {
   });
 
   it('toNativePath 在当前平台下必须让校验成立', () => {
-    // Linux/macOS 上 getSystemPath 不改变分隔符，本来一致；
-    // Windows 上会把 / 换成 \，两边对齐。两个平台都该通过。
+    // Linux/macOS 上 getSystemPath 不改变分隔符；Windows 上会把 / 换成 \，两边对齐。两个平台都该通过。
     const root = toNativePath(posixRoot);
     expect(devkitCheck(root, input, path)).toBe(true);
   });
@@ -103,6 +101,13 @@ describe('isAbsoluteish / resolveNative（devkit posix 化的 /C:/...）', () =>
     expect(isAbsoluteish('/workspace/x')).toBe(true);
     expect(isAbsoluteish('src/tsconfig.spec.json')).toBe(false);
     expect(isAbsoluteish('./src/x')).toBe(false);
+  });
+
+  it('UNC 算绝对，盘符没跟分隔符不算，裸子目录算相对', () => {
+    expect(isAbsoluteish('\\\\server\\share\\x')).toBe(true);
+    expect(isAbsoluteish('C:')).toBe(false);
+    expect(isAbsoluteish('a/b')).toBe(false);
+    expect(isAbsoluteish('')).toBe(false);
   });
 
   it('resolveNative：绝对输入不再跟 base 拼，且不会双盘符', () => {

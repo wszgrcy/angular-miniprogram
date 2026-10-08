@@ -6,12 +6,8 @@ type ChannelListener = {
 };
 
 /**
- * 页面间事件通道，参考 uni-shared 的 EventChannel。
- *
- * 机制平台无关：navigateTo 时创建通道并把 `__id__` 拼进 url，
- * 目标页从 query 里取 id 调 `getEventChannel(id)` 消费，
- * 之后 opener 与 target 通过同一通道互发事件。
- *
+ * 页面间事件通道。机制平台无关：navigateTo 时创建通道并把 `__id__` 拼进 url，
+ * 目标页从 query 里取 id 调 `getEventChannel(id)` 消费，之后 opener 与 target 通过同一通道互发事件。
  * emit 早于监听的事件进缓存，注册监听时冲刷（解决两端启动时序不确定）。
  */
 export class MpEventChannel {

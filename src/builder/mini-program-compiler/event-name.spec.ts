@@ -9,10 +9,8 @@ import { TemplateDefinition } from './parse-node/template-definition';
 
 /**
  * 事件修饰符：模板写法 → wxml 属性。
- *
- * 编译期一张表，运行期（`src/library/platform/default/event-name.ts`）
- * 另一张表，两张表必须落在同一个事件上，所以这里把「模板写法 → wxml 属性 →
- * 逻辑层监听键」三段一次断言完。
+ * 编译期一张表，运行期（`src/library/platform/default/event-name.ts`）另一张表，两张表必须落在
+ * 同一个事件上，所以这里把「模板写法 → wxml 属性 → 逻辑层监听键」三段一次断言完。
  */
 function compile(html: string, transform = new WxTransform()): string {
   const r: any = parseTemplate(html, 'p.html');

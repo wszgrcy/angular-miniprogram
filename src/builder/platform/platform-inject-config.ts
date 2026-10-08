@@ -24,9 +24,8 @@ import { ZjBuildPlatform } from './zjtd/zj-platform';
 import { ZjTransform } from './zjtd/zj.transform';
 
 /**
- * `TemplateTransformBase` 用 `useExisting` 而不是 `useClass`：
- * 保证 `XxxTransform` 在同一个 injector 里只有一个实例，
- * 不会因为两个 provider 各 new 一份而状态不一致。
+ * `TemplateTransformBase` 用 `useExisting` 而不是 `useClass`：保证 `XxxTransform` 在同一个
+ * injector 里只有一个实例，不会因为两个 provider 各 new 一份而状态不一致。
  */
 export function getBuildPlatformInjectConfig(platform: PlatformType) {
   switch (platform) {

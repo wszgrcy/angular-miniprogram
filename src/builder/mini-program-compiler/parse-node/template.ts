@@ -11,8 +11,8 @@ export class ParsedNgTemplate implements ParsedNode<NgTemplateMeta> {
   private children: ParsedNode<NgNodeMeta>[] = [];
 
   /**
-   * @param node 真实的 `<ng-template>` 节点；内建控制流（`@if`/`@for`/`@switch`）
-   * 没有对应的 `Template` AST，传 `null` 并用 `templateName` 指定模板名。
+   * @param node 真实的 `<ng-template>` 节点；内建控制流（`@if`/`@for`/`@switch`）没有对应的
+   * `Template` AST，传 `null` 并用 `templateName` 指定模板名。
    * @param templateName 显式模板名，优先级高于从 AST 推导。
    */
   constructor(

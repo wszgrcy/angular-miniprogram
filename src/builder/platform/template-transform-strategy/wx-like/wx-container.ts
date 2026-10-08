@@ -34,10 +34,7 @@ export interface WxContainerGlobalConfig {
 
 /**
  * 把翻译计划里的 `@@n@@` 占位换成实际物化路径。
- *
- * 逻辑层只负责把枝叶数组写到 `base` 上，wxs 在渲染层按下标取。
- * 这是「逻辑层→渲染层」单向数据通道的具体形态：
- * 渲染层拿得到枝叶，但它的返回值逻辑层永远拿不到。
+ * 逻辑层只把枝叶数组写到 `base` 上，wxs 在渲染层按下标取。
  */
 function wxsSubstitute(wxml: string, base: string): string {
   return wxml.replace(/@@(\d+)@@/g, (_, n) => `${base}[${n}]`);
@@ -106,12 +103,8 @@ export class WxContainer {
     }>${children.join('')}</${node.tagName}>`;
   }
   /**
-   * `[innerHTML]` 的 wxml 承载体。
-   *
-   * 对齐 uni-app 的 `v-html`：原元素保留，子级整段换成
-   * `<rich-text nodes="{{...}}"/>`。取值仍走宿主元素的
-   * `property.innerHTML`（`renderer.setProperty` 天然写在那里），
-   * 所以运行时不需要任何特例。
+   * `[innerHTML]` 的 wxml 承载体：原元素保留，子级整段换成
+   * `<rich-text nodes="{{...}}"/>`。取值仍走宿主元素的 `property.innerHTML`。
    */
   private richTextChild(node: NgElementMeta): string {
     const base = `nodeList[${node.index}].property.innerHTML`;
@@ -129,9 +122,7 @@ export class WxContainer {
     const plan = node.wxsText;
     if (plan) {
       useWxsPlanModules(plan, (m) => this.useWxsModule(m));
-      // plan.wxml 已是完整 wxml 文本（含 {{}} 块与前后缀字面文本），
-      // 只需把占位换成路径，不再走框架默认的 {{nodeList[i].value}}。
-      // 枝叶挂在宿主元素的合成 property 上，不是本文本节点的 value。
+      // plan.wxml 已是完整 wxml 文本，只需把占位换成路径；枝叶挂在宿主元素的合成 property 上
       return wxsSubstitute(
         plan.wxml,
         `nodeList[${node.wxsHost ?? node.index}].property.${plan.carrier ?? 'value'}`,
@@ -140,19 +131,11 @@ export class WxContainer {
     return this.interp(`nodeList[${node.index}].value`);
   }
   /**
-   * 内容投影。
-   *
-   * 无兜底内容时就是一个 `<slot>`。带兜底时小程序没有原生能力，
-   * 改成「兜底容器有没有视图」二选一：Angular 只在插槽空着时
-   * 才往兜底容器里塞视图（`ɵɵprojection` 的 isEmpty 分支），
-   * 所以 `nodeList[兜底槽].length` 为真就等价于「没投影到东西」。
-   *
-   * 两个分支天然互斥，不会同时渲染，也不会同时空着。
-   *
-   * 兜底容器里**最多一份**视图（`insertFallbackContent` 每次 create
-   * pass 只塞一份），所以这里直接取 `[0]`，不走 `ngTemplateTransform`
-   * 那套 `wx:for` —— 那套是给份数运行时才知道的容器用的，
-   * 用在这儿只会多一层空转的列表渲染。
+   * 内容投影。无兜底内容时就是一个 `<slot>`。
+   * 小程序没有兜底能力，带兜底时改成「兜底容器有没有视图」二选一：
+   * Angular 只在插槽空着时才往兜底容器里塞视图，所以 `nodeList[兜底槽].length`
+   * 为真就等价于「没投影到东西」。
+   * 兜底容器里最多一份视图，直接取 `[0]`，不需要 `wx:for`。
    */
   private ngContentTransform(node: NgContentMeta): string {
     const slot = node.name
@@ -177,9 +160,7 @@ export class WxContainer {
   }
   /**
    * 把嵌入视图的内容编成 `<template name="…">` 定义并登记，返回模板名。
-   *
-   * 只管「定义」，不管「在哪实例化」——实例化形状由调用方决定
-   * （通用容器用 `wx:for`，投影兜底直接取 `[0]`）。
+   * 只管定义，实例化形状由调用方决定。
    */
   private defineTemplate(node: NgTemplateMeta): string {
     const defineTemplateName = node.defineTemplateName;
@@ -223,11 +204,8 @@ export class WxContainer {
       </block>`;
   }
   /**
-   * 静态文本节点。
-   *
-   * 不带 `i18n` 时烘成字面量（少一个 setData 字段，也是本来就应该的）。
-   * 带 `i18n` 时必须改成绑定：译文在 `nodeList[i].value` 上，烘进 wxml
-   * 就等于「切语言永远看不到效果」。见 `NgTextMeta.i18n`。
+   * 静态文本节点。不带 `i18n` 时烘成字面量；带 `i18n` 时必须改成绑定，
+   * 因为译文在 `nodeList[i].value` 上。
    */
   private ngTextTransform(node: NgTextMeta): string {
     return node.i18n
@@ -242,15 +220,8 @@ export class WxContainer {
   }
 
   /**
-   * 包一层 wxml 插值。
-   *
-   * **所有 wxml 插值必须走这里**，不要直接写 `{{ }}` 字面量。
-   *
-   * 目的是把「wxml 插值长什么样」收收拢到一个出口：将来无论换分隔符、
-   * 还是库构建需要特殊处理，只改 `templateInterpolation` 一处就行。
-   *
-   * 注：库模板用 `${}` 作插槽分隔符，与 wxml 的 `{{ }}` 不撞，所以
-   * `LibraryTransform` **不需要**覆盖 `templateInterpolation`。
+   * 包一层 wxml 插值。所有 wxml 插值都走这里，把「插值长什么样」收拢到一个出口，
+   * 库构建需要特殊处理时只改 `templateInterpolation` 一处。
    */
   private interp(text: string): string {
     const [open, close] = WxContainer.globalConfig.templateInterpolation;
@@ -280,33 +251,22 @@ export class WxContainer {
 
     /**
      * 属性值表达式：命中下推时走渲染层翻译结果，否则走物化路径。
-     *
-     * 下推后 `property.<key>` 存的是**枝叶数组**而不是最终值
-     * （最终值在渲染层算），所以同一个 key 只会走一条路，不冲突。
-     * 框架的 `diffNodeData` 对数组做结构化比较，数组未变则不重发。
+     * 下推后 `property.<key>` 存的是枝叶数组而不是最终值，同一个 key 只会走一条路。
      */
     const propExpr = (key: string): string => {
       const plan = wxsProps[key];
       if (plan) {
         useWxsPlanModules(plan, (m) => this.useWxsModule(m));
-        // 只返回裸表达式，`{{ }}` 由容器统一包，与普通路径一致。
+        // 只返回裸表达式，`{{ }}` 由容器统一包
         return wxsSubstitute(plan.wxml, `nodeList[${index}].property.${key}`);
       }
       return `nodeList[${index}].property.${key}`;
     };
 
     /**
-     * class / style 下推。
-     *
-     * `[class]` / `[style]` 整体绑定在 Angular 里本来就是 type=0 Property
-     * （name 就是 `class`/`style`），走的是和 `foo` 完全相同的
-     * `setProperty` 通道——所以改写层根本不需要为它们特事特办，
-     * 只是容器原先把这两个 key 硬编码成了 AgentNode 的聚合串。
-     *
-     * 静态部分用字符串相加合并：class 用 `' '`，style 用 `';'`。
-     *
-     * 没用到这个通道的元素整个属性都不输出（`needsClass` / `needsStyle`），
-     * 数据侧也不会发这个字段。
+     * class / style 下推。`[class]` / `[style]` 整体绑定本来就是普通 property，
+     * 走同一套 `setProperty` 通道。静态部分用字符串相加合并：class 用 `' '`，style 用 `';'`。
+     * 没用到这个通道的元素整个属性都不输出。
      */
     const tagClass = tagNameClassOf(
       node.sourceTag,
@@ -331,16 +291,9 @@ export class WxContainer {
     }
 
     /**
-     * 可查询 class。
-     *
-     * 只给带 `#` 的元素拼，没 `#` 的元素 wxml 里根本不出现这个表达式，
-     * 数据侧也不会发这个字段（两边同进同退，见 `refClassOf()`）。
-     *
-     * 拼在末尾、单独一个 `|| ''` 兜底：万一某条路径上数据没送到，
-     * 丢的只是一个查询能力，不会把 `undefined` 拼成一个假 class。
-     *
-     * class 那一半也得兜：空 class 现在不发（见 `AgentNode.toView()`），
-     * 而 `{{}}` 里的字符串拼接会把缺字段当 `undefined` 拼出字面量。
+     * 可查询 class。只给带 `#` 的元素拼，数据侧也只在那种节点上发这个字段。
+     * 拼在末尾、单独一个 `|| ''` 兜底：数据没送到时丢的只是一个查询能力，
+     * 不会把 `undefined` 拼成假 class。
      */
     if (node.hasRef) {
       propertyMap.set(
@@ -371,14 +324,9 @@ export class WxContainer {
         attributeMap.set(key, value);
       });
     /**
-     * 静态 `i18n-<attr>` 的属性必须从字面量改成绑定。
-     *
-     * 译文只有运行时知道（`$localize` 查表），wxml 里内联源文案就等于
-     * **永远翻不了**——不是翻错，是根本不翻。Angular 在建元素时把它
-     * `setAttribute` 到 `attribute` 上，所以这里改读那个通道。
-     *
-     * 值含插值的不在列：那条走 `ɵɵi18nAttributes` + `setProperty`，
-     * 下面的 `inputs` 循环已经把绑定指到 `property` 了。
+     * 静态 `i18n-<attr>` 的属性必须从字面量改成绑定：译文只有运行时知道，
+     * Angular 把它 `setAttribute` 到 `attribute` 上，这里改读那个通道。
+     * 值含插值的不在列，那条已经走 `property`。
      */
     for (const name of node.i18nAttrs ?? []) {
       if (attributeMap.has(name)) {
@@ -411,11 +359,7 @@ export class WxContainer {
         propertyMap.set(key, propExpr(key));
       });
     /**
-     * `tag-name-*` 标记。
-     *
-     * 有 class 绑定时拼在绑定前面（字面量 + 插值），没绑定时直接就是一个
-     * 字面量 class——映射改写过的标签保得住「按原名字选中」，又不用为它
-     * 留一条数据通道。
+     * `tag-name-*` 标记。有 class 绑定时拼在绑定前面，没绑定时直接是字面量 class。
      */
     if (tagClass && !propertyMap.has('class')) {
       attributeMap.set('class', tagClass);
@@ -441,8 +385,7 @@ export class WxContainer {
     }
 
     /**
-     * 下推到渲染层的事件：直接绑 wxs 函数，不生成 `data-node-*`，
-     * 也就不进 `bindEvent` 的反查链路。整条事件在视图层闭环。
+     * 下推到渲染层的事件：直接绑 wxs 函数，不生成 `data-node-*`，整条事件在视图层闭环。
      */
     const wxsEventAttrs = Object.keys(wxsEvents)
       .map((eventName) => {
@@ -468,10 +411,8 @@ export class WxContainer {
     ];
   }
   /**
-   * 本模板用到的 wxs 模块名。
-   *
-   * 由产出过程收集，最后由 transform 负贡在 wxml 头部补
-   * `<wxs module="x" src="./x.wxs"/>`，并驱动资源产出。
+   * 本模板用到的 wxs 模块名，由产出过程收集，最后由 transform 在 wxml 头部补
+   * `<wxs module="x" src="./x.wxs"/>`。
    */
   usedWxsModules = new Set<string>();
 

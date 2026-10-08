@@ -15,8 +15,8 @@ import {
 
 describe('参数校验管道', () => {
   function setup(schemas: Record<string, MpApiSchema> = {}, devMode = true) {
-    // 必须自己调。之前没调也能过，是因为 isolate:false 下别的 spec
-    // 已经把 TestBed 环境建好了 —— 那是靠执行顺序借来的，不是真的能用。
+    // 必须自己调：isolate:false 下别的 spec 可能已经把 TestBed 环境建好了，
+    // 但那靠执行顺序借来，不可靠。
     initMiniProgramTestEnv();
     const existing = (globalThis as any).ngDevMode;
     (globalThis as any).ngDevMode = devMode ? existing ?? {} : null;
@@ -36,9 +36,8 @@ describe('参数校验管道', () => {
     return { service: TestBed.inject(MpApiService), fake };
   }
 
-  // captureWarn 里的 spyOn 不 restore 就会跨用例累积：console.warn 被
-  // 反复 spyOn 拿回的是同一个 spy，calls 一直往上加，于是「不产生告警」
-  // 这类用例会读到上一个用例留下的文本。之前没暴露同样是靠执行顺序兜着。
+  // captureWarn 里的 spyOn 不 restore 就会跨用例累积：console.warn 被反复 spyOn
+  // 拿回的是同一个 spy，calls 一直往上加，于是「不产生告警」这类用例会读到上一个用例留下的文本。
   afterEach(() => {
     vi.restoreAllMocks();
   });

@@ -6,9 +6,8 @@ import {
 } from './fake-document';
 
 /**
- * 模拟小程序环境：没有 global document。
- * 这才是微信里 NG0210 的真实条件——测试跑在 Node 时 global.document
- * 可能存在，所以必须手动删掉才能复现。
+ * 模拟小程序环境：没有 global document。这才是微信里 NG0210 的真实条件——测试跑在 Node 时
+ * global.document 可能存在，所以必须手动删掉才能复现。
  */
 describe('fake-document (无 document 环境)', () => {
   const g = globalThis as any;

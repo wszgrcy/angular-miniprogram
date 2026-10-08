@@ -2,15 +2,13 @@ import { MpApiResultMap } from './domain-types';
 import { MpApiName, MpApiNameInput } from './types';
 
 /**
- * Promise 化规则，参考 uni-app（uni-mp-core/src/api/promise.ts）：
+ * Promise 化规则：
  *
  * - task 类 API 返回 task，不 Promise 化
- * - 同步 API（`*Sync`）、上下文对象（`create*` / `*Manager`）、
- *   事件注册（`on*` / `off*`）不 Promise 化
+ * - 同步 API（`*Sync`）、上下文对象（`create*` / `*Manager`）、事件注册（`on*` / `off*`）不 Promise 化
  * - 其余 API 返回 Promise
  *
- * 运行时用正则判定，类型层用 `MpApiReturn` 镜像同一套规则，
- * 两者需保持一致。
+ * 运行时用正则判定，类型层用 `MpApiReturn` 镜像同一套规则，两者需保持一致。
  */
 
 export type MpTaskApiName =
@@ -20,8 +18,7 @@ export type MpTaskApiName =
   | 'connectSocket';
 
 /**
- * 从 `MpApiName` 里抽出同步类名字。
- * 用 `Extract` 而非裸模板模式，避免任意字符串被误判。
+ * 从 `MpApiName` 里抽出同步类名字。用 `Extract` 而非裸模板模式，避免任意字符串被误判。
  */
 export type MpSyncApiName = Extract<
   MpApiName,
@@ -61,8 +58,7 @@ export type MpResultOf<N extends MpApiNameInput> =
       any;
 
 /**
- * `invoke(name)` 的返回类型：按名字把 task / 同步 / Promise 三分，
- * 结果类型查 `MpApiResultMap`。
+ * `invoke(name)` 的返回类型：按名字把 task / 同步 / Promise 三分，结果类型查 `MpApiResultMap`。
  */
 export type MpApiReturn<
   N extends MpApiNameInput,

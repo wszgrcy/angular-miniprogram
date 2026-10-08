@@ -27,15 +27,9 @@ const angularConfig = {
 };
 
 /**
- * Vite watch 模式。
- *
- * 小程序没有浏览器 dev-server——微信开发者工具本身就是「服务器」，
- * 它盯 dist 目录。所以 watch 就是原来的 dev 流程：
- * builder 监听源码重构建写 dist，DevTools 自动刷新。
- *
- * 实现上不用 Vite 原生 watch（Rolldown watch 不支持动态加 input），
- * 而是「发现变动就重算入口 + 重跑一次 vite.build」，
- * 顺带把 watch 期间新增入口这个坑一起解决掉。
+ * Vite watch 模式。小程序没有浏览器 dev-server——微信开发者工具本身就是「服务器」，它盯 dist 目录。
+ * 所以 watch 就是 builder 监听源码重构建写 dist，DevTools 自动刷新。
+ * 实现上不用 Vite 原生 watch（Rolldown watch 不支持动态加 input），而是「发现变动就重算入口 + 重跑一次 vite.build」。
  */
 describeBuilder(
   runViteBuilder,
@@ -68,9 +62,7 @@ describeBuilder(
 
       /**
        * 「改模板能重出 wxml」与「新增入口能被拉进来」是同一次 watch 会话的两个侧面。
-       *
-       * 两处改动在同一个批次里写完（writeFiles 内部是同步落盘，watcher 回调要等一个
-       * 微任务），所以只会触发一轮重建；会话从两次降到一次，构建从四轮降到两轮。
+       * 两处改动在同一个批次里写完，所以只会触发一轮重建。
        */
       const session = memoize(async () => {
         await setup();
@@ -94,12 +86,8 @@ describeBuilder(
                   path.join(base, 'pages/watch-new/watch-new-entry.wxml'),
                 );
                 /**
-                 * 改的是**源模板**。
-                 *
-                 * 早先这里读的是产物 `control-flow-entry.wxml`、再把它写回
-                 * 源 `.html`。产物里带着改写后的 `[nodeList[1][index]]` 这类
-                 * 片段，当模板喂回去就是 `[...nodeList[1][index] ]` 展开语法，
-                 * 增量构建必然「Parser Error: Unexpected token ...」。
+                 * 改的是源模板。产物里带着改写后的 `[nodeList[1][index]]` 这类片段，
+                 * 当模板喂回去就是展开语法，增量构建必然「Parser Error: Unexpected token ...」。
                  */
                 const source = harness.readFile(htmlFile);
                 sourceHasMarkerBefore = source.includes(marker);
@@ -161,14 +149,11 @@ export default WatchNewComponent;
       it('watch 下改模板能重新产出 wxml', async () => {
         const r = await session();
         expect(r.sourceHasMarkerBefore).toBe(false);
-        // 先确认构建成功：少了这一步，构建失败只会变成一个莫名其妙的
-        // path.join(undefined) TypeError
+        // 先确认构建成功：少了这一步，构建失败只会变成一个莫名其妙的 path.join(undefined) TypeError
         expect(r.success).toBe(true);
         expect(r.controlFlowWxml).toContain('VITE_WATCH_MARKER');
 
-        // watch 轮次不能只重编改动的页面：库组件产物（走 library-meta
-        // 那条旁路）也得在。以前由 builder.watch.spec.ts 守，那个文件
-        // 与本文件跑的是同一个 builder，已合到这里。
+        // watch 轮次不能只重编改动的页面：库组件产物（走 library-meta 那条旁路）也得在。
         expect(r.libComp).toBe(true);
       }, 180000);
 

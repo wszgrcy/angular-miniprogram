@@ -23,11 +23,7 @@ export interface CopiedAsset {
 
 /**
  * 把 builder 配置里的 assets 展开成「输出相对路径 -> 源文件」列表。
- *
- * webpack 侧由 copy-webpack-plugin 处理，Vite 侧没有对应物，
- * 但 normalizeAssetPatterns 这套 devkit 逻辑跟 webpack 无关，可以直接复用。
- *
- * app.json / project.config.json 就是通过这里进产物的。
+ * 复用 devkit 的 normalizeAssetPatterns。app.json / project.config.json 就是通过这里进产物的。
  */
 export async function collectAssets(
   assets: AssetPattern[] | undefined,

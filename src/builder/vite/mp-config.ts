@@ -1,12 +1,11 @@
 /**
  * 配置文件清单与解析。
  *
- * 每个输出文件登记一条：叫什么（各平台不同）、能不能合并、用户手写那份从哪来、
- * 构建器允许补哪些字段、输出前怎么按平台改写。生成逻辑只能往登记过的字段写，
- * 没登记就没有写入入口 —— 从代码结构上堵住构建器随手往用户配置里塞东西。
+ * 每个输出文件登记一条：叫什么、能不能合并、用户手写那份从哪来、构建器允许补哪些字段、
+ * 输出前怎么按平台改写。没登记的字段就没有写入入口。
  *
  * 合并顺序（前面写过的后面都不动）：
- *   静态文件 → 静态文件的 _platform 段 → 结构化配置 → 它的 _platform 段
+ *   静态文件 → 它的 _platform 段 → 结构化配置 → 它的 _platform 段
  *   → 内置默认值 → 构建器补的 → 当前平台的写法要求
  */
 
@@ -68,10 +67,8 @@ export interface MpDeriveContext {
 
 /**
  * 构建器补字段的一条登记。
- *
  * `deep` 是「只补空」的唯一例外通道：默认整个 key 写过了就不动，
  * 只有自定义 tabBar 开关需要往用户已写的 `tabBar` 里补一个子字段。
- * 没登记的字段就没有写入入口。
  */
 export interface MpDeriveEntry {
   /** 要补的内容；返回 undefined 表示本次不补 */
@@ -101,11 +98,8 @@ export interface MpConfigSpec {
 }
 
 /**
- * 永远原样拷贝、绝不参与合并的文件。
- *
- * `project.private.config.json` 是本地私有文件（一般不进 git），合并它等于
- * 把别人机器上的配置写进用户产物；`sitemap.json` / `theme.json` / `ext.json`
- * 是平台原样读取的文件，动它没有任何收益。
+ * 永远原样拷贝、绝不参与合并的文件。`project.private.config.json` 是本地私有文件，
+ * 合并它等于把别人机器上的配置写进用户产物；其余是平台原样读取的文件。
  */
 export const COPY_ONLY_CONFIG_FILES = [
   'project.private.config.json',
@@ -125,10 +119,7 @@ export interface MpSubPackageEntry {
 }
 
 /**
- * 按入口目录归出分包声明。
- *
- * root 就是 pattern 的 output（约定：root 同时是源码目录与产物目录），
- * pages 是剔掉 root 前缀的入口路径——app.json 里分包页本来就是相对 root 的。
+ * 按入口目录归出分包声明。root 就是 pattern 的 output，pages 是剔掉 root 前缀的入口路径。
  */
 export function groupSubPackages(entries: MpSubPackageEntry[]): MpSubPackage[] {
   const byRoot = new Map<string, MpSubPackage>();
@@ -159,9 +150,7 @@ export function groupSubPackages(entries: MpSubPackageEntry[]): MpSubPackage[] {
 
 /**
  * 分包声明：`subpackages` pattern 扫出来的入口直接产声明。
- *
- * 用户已经写过的 root 以他那份为准：他的页在前，扫出来的追加在后面；
- * 只写了 root 没写 pages 时由这里填上。
+ * 用户已经写过的 root 以其为准：他的页在前，扫出来的追加在后面。
  */
 function deriveSubPackages(ctx: MpDeriveContext): MpConfigObject | undefined {
   if (!ctx.derivedSubPackages.length) {
@@ -191,9 +180,7 @@ function deriveCondition(ctx: MpDeriveContext): MpConfigObject | undefined {
 
 /**
  * 自定义 tabBar 的开关：本次有没有产出这个入口只有构建器知道。
- *
- * 用户没写开关且本次有产出 → 补 true；显式写了 false → 不补不改（入口当普通
- * 组件）；写了 true 但没产出 → 也不动、不报错，用户写什么就输出什么。
+ * 没写开关且有产出 → 补 true；显式写了 false → 不补不改。
  */
 function deriveCustomTabbarFlag(
   ctx: MpDeriveContext,
@@ -545,7 +532,7 @@ export function checkReferencedFiles(
     if (typeof value !== 'string' || !value) {
       continue;
     }
-    if (!emitted.has(path.posix.normalize(value))) {
+    if (!emitted.has(toPosixPath(value))) {
       errors.push(
         `app 配置的 ${key} 指向 ${value}，但产物里没有这个文件（检查 assets 是否把它拷进来）`,
       );

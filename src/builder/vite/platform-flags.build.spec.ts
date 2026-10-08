@@ -15,7 +15,7 @@ import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
 /**
- * #3 条件编译（define 方案）构建集成验证：
+ * 条件编译（define 方案）构建集成验证：
  *  - 文件级：foo.ts + foo.wx.ts → wx 构建取 wx 变体
  *  - 代码级：__MP_WX__ 常量替换后死分支被 DCE 移除
  *  - 非 wx 平台（zfb）：无变体文件时回落 foo.ts，走 else 分支

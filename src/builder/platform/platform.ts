@@ -23,12 +23,9 @@ export enum PlatformType {
 }
 
 /**
- * 自定义 tabBar 的平台事实。
- *
- * 产物目录名和开关字段都是平台写死的，而且各平台并不一致：微信系（wx / qq / jd）
- * 是 `custom-tab-bar/index` + `tabBar.custom`，支付宝是 `customize-tab-bar/index`
- * + `tabBar.customize`。所以只能由平台声明，定死在构建器里就会在另一个平台上
- * 产出一个没人加载的目录。undefined = 该平台没有自定义 tabBar。
+ * 自定义 tabBar 的平台事实。产物目录名和开关字段都是平台写死的，而且各平台并不一致：
+ * 微信系是 `custom-tab-bar/index` + `tabBar.custom`，支付宝是 `customize-tab-bar/index` + `tabBar.customize`。
+ * 只能由平台声明，定死在构建器里就会在另一个平台上产出一个没人加载的目录。undefined = 不支持。
  */
 export interface CustomTabbarSpec {
   /** 平台写死的产物目录（产物落这里才算自定义 tabBar） */
@@ -38,12 +35,8 @@ export interface CustomTabbarSpec {
 }
 
 /**
- * 平台对配置文件的影响，全部写成数据，不在构建器里写 if。
- *
- * 平台之间的差别（文件名、分包 key 的写法、字段改名）由平台自己声明，
- * 构建器只负责按声明输出。这里只声明「当前平台应该怎么写」，
- * 不做跨平台翻译——把 wx 的配置翻成 zfb 的配置是另一个量级的事，
- * 出错还极难排查。
+ * 平台对配置文件的影响，全部写成数据，不在构建器里写 if。平台之间的差别由平台自己声明，
+ * 构建器只负责按声明输出。这里只声明「当前平台应该怎么写」，不做跨平台翻译。
  */
 export interface MpPlatformConfig {
   /** project 配置文件名：微信系 project.config.json / 支付宝 mini.project.json / 百度 project.swan.json */
@@ -55,10 +48,8 @@ export interface MpPlatformConfig {
   /** project 配置的内置默认值（用户文件里有的按文件，没有的补默认） */
   projectDefaults?: () => MpConfigObject;
   /**
-   * 这个平台支持哪些能力。
-   *
-   * 只有显式写 `false` 才参与校验：各家字段一直在加，「列出来才允许」会随平台
-   * 更新不断漏，表现成「新字段写了但输出里没有」，最难查。
+   * 这个平台支持哪些能力。只有显式写 `false` 才参与校验：各家字段一直在加，
+   * 「列出来才允许」会随平台更新不断漏，表现成「新字段写了但输出里没有」。
    */
   capabilities?: MpConfigCapabilities;
   /** app 配置输出前按平台改写（字段改名、写法转换） */
@@ -87,9 +78,7 @@ const CAPABILITY_KEYS: Record<keyof MpConfigCapabilities, string[]> = {
 
 /**
  * 平台不支持却被写进 app 配置的字段，返回可读的错。
- *
- * `customTabbar` 看的是 `tabBar` 里的自定义开关（字段名由平台给），
- * 其余按能力名对应的字段判定。
+ * `customTabbar` 看的是 `tabBar` 里的自定义开关（字段名由平台给），其余按能力名对应的字段判定。
  */
 export function findUnsupportedCapabilities(
   config: MpConfigObject,
@@ -159,8 +148,7 @@ export class BuildPlatform {
   /** 配置文件相关的平台事实（文件名、分包 key、字段改写） */
   mpConfig?: MpPlatformConfig;
   /**
-   * 具体实现由各平台的 provider 通过
-   * `{ provide: TemplateTransformBase, useExisting: XxxTransform }` 绑定。
+   * 具体实现由各平台的 provider 通过 `{ provide: TemplateTransformBase, useExisting: XxxTransform }` 绑定。
    * 放在基类注入而不是子类构造参数里，是为了避免子类字段初始化晚于 `super()`。
    */
   templateTransform = inject(TemplateTransformBase);

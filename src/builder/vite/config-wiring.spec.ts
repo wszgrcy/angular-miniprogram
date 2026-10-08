@@ -4,27 +4,24 @@ import * as os from 'os';
 import * as path from 'path';
 import { PlatformType } from '../platform/platform';
 import { createVitestViteConfig } from '../vitest/vite/index';
-import { createMiniProgramViteConfig, getBuildPlatform, mpConfigWatchFiles } from './index';
+import {
+  createMiniProgramViteConfig,
+  getBuildPlatform,
+  mpConfigWatchFiles,
+} from './index';
 
 /**
- * 两条构建链路对 `viteConfig` 的接线。
- *
- * 钩子本身的加载/应用在 `config-hook/index.spec.ts` 里已经验透了，这里只钉
- * 一件事：**两个 builder 组装完的配置确实经过了钩子**。所以直接调
- * `create*ViteConfig` 拿返回的 config，不跑 vite build。
- *
- * 工程夹具用 `test/hello-world-app`（只读），钩子文件放临时目录并用绝对路径
- * 引用，免得往夹具里落脏文件。
+ * 两条构建链路对 `viteConfig` 的接线。钩子本身的加载/应用在 `config-hook/index.spec.ts` 里已经验透了，
+ * 这里只钉一件事：两个 builder 组装完的配置确实经过了钩子。所以直接调 `create*ViteConfig` 拿返回的
+ * config，不跑 vite build。工程夹具用 `test/hello-world-app`（只读），钩子文件放临时目录。
  */
 
 const FIXTURE = path.resolve(__dirname, '../../../test/hello-world-app');
 
 function makeContext(): { context: BuilderContext; logs: string[] } {
   const logs: string[] = [];
-  const push =
-    (level: string) =>
-    (message: string) =>
-      void logs.push(`${level}:${message}`);
+  const push = (level: string) => (message: string) =>
+    void logs.push(`${level}:${message}`);
   const logger = {
     info: push('info'),
     warn: push('warn'),
@@ -65,9 +62,7 @@ function writeHook(content: string): string {
 /** vite 的 PluginOption 是一堆形状的和，这里只关心「顶层有没有这个 name」 */
 function hasPlugin(config: { plugins?: unknown }, name: string): boolean {
   const list = Array.isArray(config.plugins) ? config.plugins : [];
-  return list.some(
-    (p) => !!p && (p as { name?: string }).name === name,
-  );
+  return list.some((p) => !!p && (p as { name?: string }).name === name);
 }
 
 const MARKER_HOOK = `export default (config: any) => {
@@ -84,7 +79,9 @@ const appViteOptions = (viteConfig?: string) =>
     pages: [{ glob: '**/*.entry.ts', input: './src/spec', output: 'pages' }],
     sourceMap: false,
     viteConfig,
-  }) as unknown as Parameters<typeof createMiniProgramViteConfig>[0]['viteOptions'];
+  }) as unknown as Parameters<
+    typeof createMiniProgramViteConfig
+  >[0]['viteOptions'];
 
 const vitestOptions = (viteConfig?: string) =>
   ({
@@ -94,7 +91,9 @@ const vitestOptions = (viteConfig?: string) =>
     pages: [{ glob: '**/*.entry.ts', input: './src/spec', output: 'pages' }],
     include: ['**/*.spec.ts'],
     viteConfig,
-  }) as unknown as Parameters<typeof createVitestViteConfig>[0]['vitestOptions'];
+  }) as unknown as Parameters<
+    typeof createVitestViteConfig
+  >[0]['vitestOptions'];
 
 describe('application builder：viteConfig', () => {
   it('钩子的改动确实进了交给 vite 的配置', async () => {

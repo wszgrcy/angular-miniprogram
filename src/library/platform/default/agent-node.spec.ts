@@ -46,12 +46,8 @@ describe('AgentNode', () => {
     expect(parent1.children[1].nextSibling).toBe(parent1.children[2]);
   });
   /**
-   * `refChild` 为 null 时是 append，不是报错。
-   *
-   * DOM 的 `insertBefore(x, null)` 就是追加，而 `ɵɵi18nStart` 恰恰传 null
-   * （只有 `parentTNode.type & ElementContainer` 才有 insertInFrontOf）。
-   * 之前这里抛「未找到引用子节点null」，挡住的是**所有** i18n 模板，
-   * 与 ICU 无关。
+   * `refChild` 为 null 时是 append，不是报错。DOM 的 `insertBefore(x, null)` 就是追加，而
+   * `ɵɵi18nStart` 恰恰传 null（只有 `parentTNode.type & ElementContainer` 才有 insertInFrontOf）。
    */
   it('insertBefore(child, null) 等价于 appendChild', () => {
     const parent = getAgentNode();
@@ -118,11 +114,8 @@ describe('AgentNode', () => {
   });
 
   /**
-   * 空串不发。
-   *
-   * 绝大多数元素从头到尾没碰过 class / style，发一个空串就是白占 setData
-   * 体积，也是每轮全量 diff 白比一次。wxml 那边同样只在编译期判定
-   * 「用到了」才读这个 key，两边同进同退。
+   * 空串不发。绝大多数元素从头到尾没碰过 class / style，发一个空串就是白占 setData 体积，
+   * 也是每轮全量 diff 白比一次。wxml 那边同样只在编译期判定「用到了」才读这个 key，两边同进同退。
    */
   it('toView 不发空的 class / style', () => {
     expect(new AgentNode('element').toView()).toEqual({

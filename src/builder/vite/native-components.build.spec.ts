@@ -15,7 +15,7 @@ import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
 /**
- * #4 原生自定义组件接入构建集成验证：
+ * 原生自定义组件接入构建集成验证：
  *  - 原生组件目录整体拷进产物
  *  - 页面 wxml 命中原生标签 → 页面 json 注入 usingComponents
  */

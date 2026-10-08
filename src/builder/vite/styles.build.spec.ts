@@ -18,18 +18,14 @@ import { runViteBuilder } from './index';
 /**
  * 样式产出集成验证：全局样式 → app.wxss，组件 styleUrls / 内联 styles → 各自 wxss。
  *
- * ## 为什么要单独钉住
+ * `CustomStyleSheetProcessor` 把编译结果存进自己的 `styleMap`，返回给调用方的 `contents`
+ * 是故意置空的（组件 JS 不内联样式）。消费侧一旦去读返回值而不是 styleMap，拿到的就是空串：
+ * 构建照样绿，产物里所有 .wxss 全是 0 字节。
  *
- * `CustomStyleSheetProcessor` 把编译结果存进自己的 `styleMap`，
- * 返回给调用方的 `contents` 是**故意置空**的（组件 JS 不内联样式）。
- * 消费侧一旦去读返回值而不是 styleMap，拿到的就是空串：
- * 构建照样绿，产物里所有 .wxss 全是 0 字节，只有跑到页面上才发现没样式。
+ * 内联样式踩的是同一个坑的另一半：ngtsc 把它存在 `analysis.inlineStyles`，
+ * `analysis.styleUrls` 里一个字都没有，只看 styleUrls 的构建器会把它整个丢掉。
  *
- * 内联样式（`@Component.styles`）踩的正是同一个坑的另一半：ngtsc 把它存在
- * `analysis.inlineStyles`，而 `analysis.styleUrls` 里一个字都没有，
- * 只看 styleUrls 的构建器会把它整个丢掉 —— 产物里那个 wxss 存在但是空的。
- *
- * 所以这里断言的是**「产物里有编译后的内容」**，而不是「构建成功」。
+ * 所以这里断言的是「产物里有编译后的内容」，而不是「构建成功」。
  */
 
 /** 构建一次，多个用例复用同一份产物（sandbox 随用例销毁，产物先读进内存） */
@@ -201,7 +197,6 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
   /**
    * 默认参数那一次构建：全局样式 / styleUrls / 内联 css 三条用例共用。
-   *
    * 每个用例跑完 sandbox 会被 restore，所以产物必须在第一次就全读进内存。
    */
   const load = memoize(async () => {
@@ -221,11 +216,9 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
   });
 
   /**
-   * `inlineStyleLanguage: 'scss'` 那一次。
-   *
-   * 语言选项是全局的，跟默认（css）那次共用不了产物，只能再建一遍。
-   * 不钉这条的话，「选项声明了但没往下传」这种问题永远测不出来 ——
-   * scss 嵌套当 css 编，esbuild 不报错，只是那条规则整个消失。
+   * `inlineStyleLanguage: 'scss'` 那一次。语言选项是全局的，跟默认那次共用不了产物。
+   * 不钉这条的话，「选项声明了但没往下传」这种问题永远测不出来——scss 嵌套当 css 编，
+   * esbuild 不报错，只是那条规则整个消失。
    */
   const loadScss = memoize(async () => {
     await setupBase();

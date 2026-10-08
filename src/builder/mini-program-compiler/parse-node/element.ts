@@ -24,11 +24,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   staticClass = '';
   /** 模板上写死的 style，下推时参与合并 */
   staticStyle = '';
-  /**
-   * 开始标签上带了 `#xxx`（模板引用变量）。
-   *
-   * 只有这种节点需要可查询 class，详见 `NgElementMeta.hasRef`。
-   */
+  /** 开始标签上带了 `#xxx`（模板引用变量）。只有这种节点需要可查询 class。 */
   hasRef = false;
   /** class / style 通道是否被用到，见 `NgElementMeta.needsClass` */
   needsClass = false;
@@ -52,27 +48,21 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     public index: number,
     private directiveMeta: MatchedDirective | undefined,
     /**
-     * 已声明的 wxs 模块集合。由 TemplateDefinition 注入（它从
-     * ComponentContext 拿，能自动穿过嵌套子模板）。
+     * 已声明的 wxs 模块集合。由 TemplateDefinition 注入（能自动穿过嵌套子模板），
      * 没注入时退回按组件源文件反查。
      */
     private declaredWxs?: DeclaredWxsModules,
     /** 静态 `i18n-<attr>` 的属性名，见 `NgElementMeta.i18nAttrs` */
     private i18nAttrs: string[] = [],
     /**
-     * 开始标签上带了裸 `i18n`（不是 `i18n-xxx`）。
-     *
-     * 子级里的静态文本因此变成运行时文本节点，见 `NgTextMeta.i18n`。
-     * 公开是因为 `visitText` 只能从 `parentNode` 读到它。
+     * 开始标签上带了裸 `i18n`（不是 `i18n-xxx`），子级里的静态文本因此变成运行时文本节点。
      */
     public i18nHost = false,
   ) {}
   private analysis() {
     this.getTagName();
     this.hasRef = (this.node.references?.length ?? 0) > 0;
-    // 静态 class / style 单独捕获：它们不进 attributeObject（会被
-    // 当成普通属性重复输出），但 class/style 下推时需要它们参与
-    // 合并——否则 `class="a" [class]="wxs.f()"` 会把静态类抹掉。
+    // 静态 class / style 单独捕获：不进 attributeObject（会重复输出），但下推时需要参与合并
     this.staticClass =
       this.node.attributes.find((item) => item.name === 'class')?.value ?? '';
     this.staticStyle =
@@ -88,13 +78,11 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
         return;
       }
       this.collectWxsProp(input);
-      // 合成承载 property 只是枝叶数组的运输通道，不是业务属性，
-      // 落到 wxml 上只会多一条无用的 `__wxXXXX="{{...}}"`
+      // 合成承载 property 只是枝叶数组的运输通道，不是业务属性
       if (isWxsCarrier(input.name)) {
         return;
       }
-      // `innerHTML` 不落到宿主标签上：小程序没有这个属性，值由子级的
-      // `<rich-text nodes>` 消费。数据链路不变，仍走 property 通道。
+      // `innerHTML` 不落到宿主标签上：小程序没有这个属性，值由子级的 `<rich-text nodes>` 消费
       if (this.isRichTextHost && input.name === 'innerHTML') {
         this.richText = true;
         return;
@@ -102,9 +90,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       this.inputs.push(input.name);
     });
     this.node.outputs.forEach((output) => {
-      // `(tap.stop)` 之类的小程序修饰符在这里落地成 `catch:tap`。
-      // 修饰符只存在于模板写法，wxml 与逻辑层监听键都得用解析后的名字，
-      // 所以解析一次，两边共用。
+      // `(tap.stop)` 之类的小程序修饰符在这里落地成 `catch:tap`，解析一次，wxml 与逻辑层共用
       const event = parseMpEvent(output.name, {
         isOwnEvent: this.isOwnEvent(output.name),
       });
@@ -124,20 +110,14 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       this.singleClosedTag = true;
     }
   }
-  /**
-   * 只有普通元素才把 `[innerHTML]` 当富文本处理。
-   *
-   * 组件/指令自己声明的 `innerHTML` @Input 是业务属性，不该被劫持。
-   */
+  /** 只有普通元素才把 `[innerHTML]` 当富文本处理。组件/指令自己声明的同名 @Input 是业务属性。 */
   private get isRichTextHost() {
     return !this.componentMeta && !this.directiveMeta;
   }
 
   /**
-   * 这个事件名是不是宿主自己声明的。
-   *
-   * 自定义组件（以及声明了同名 `@Output` 的指令）上的 `click` 是它自己的
-   * 输出，不是原生 tap，映射成 tap 就把这条绑定解掉了。
+   * 这个事件名是不是宿主自己声明的。自定义组件上的 `click` 是它自己的输出，
+   * 映射成 tap 就把这条绑定解掉了。
    */
   private isOwnEvent(name: string): boolean {
     return (
@@ -147,23 +127,19 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   }
 
   private getTagName() {
-    // 映射规则抽到 tag-mapping.ts 作为唯一真相源，
-    // 等价性测试要用同一套规则交叉校验两端标签。
+    // 映射规则的唯一真相源在 tag-mapping.ts，等价性测试也用同一套规则
     this.tagName = mapAngularTagToWxml(this.node.name);
   }
 
   /**
-   * class / style 通道到底用没用。
-   *
-   * 判据必须盖住全部来源，漏一条就是「运行时改了 class，wxml 却不读」的
-   * 静默丢样式，而不是省下一字节：
+   * class / style 通道到底用没用。判据必须盖住全部来源，漏一条就是静默丢样式：
    *
    * | 写法 | AST 形态 |
    * | --- | --- |
    * | `class="a"` / `style="a:b"` | 静态 attribute |
    * | `[class]` / `[style]` | Property，名字就是 class / style |
-   * | `class="a {{x}}"` | 同上（编译器把整条当成整体绑定） |
-   * | `[class.x]` / `[style.x]` | Class / Style 类型，名字是那个 token / 属性 |
+   * | `class="a {{x}}"` | 同上（整条当成整体绑定） |
+   * | `[class.x]` / `[style.x]` | Class / Style 类型 |
    * | `[attr.class]` / `[attr.style]` | Attribute 类型 |
    * | `[class]="mod.f(x)"` | 已被改写层换成合成 property，只能认 plan |
    * | `#box` | 查询用 class 拼在 class 通道上 |
@@ -202,12 +178,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
     });
   }
 
-  /**
-   * 属性绑定下推。
-   *
-   * 表达式已由 `rewriteWxsTemplates` 换成枝叶数组，这里只是把
-   * 当时存下的翻译计划取回来交给容器生成 wxml。
-   */
+  /** 属性绑定下推。表达式已由 `rewriteWxsTemplates` 换成枝叶数组，这里把存下的翻译计划取回来。 */
   private collectWxsProp(input: Element['inputs'][number]): void {
     const plan = getWxsPlan((input as any).value);
     if (!plan) {
@@ -230,10 +201,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
   }
 
   /**
-   * 事件下推到渲染层。
-   *
-   * 命中后 wxml 直接 `bind:tap="{{mod.fn}}"`，不再输出
-   * `data-node-index` + `bindEvent`，整条事件链路不过桥。
+   * 事件下推到渲染层。命中后 wxml 直接 `bind:tap="{{mod.fn}}"`，整条事件链路不过桥。
    */
   private collectWxsEvent(
     output: Element['outputs'][number],
@@ -269,8 +237,7 @@ export class ParsedNgElement implements ParsedNode<NgElementMeta> {
       kind: NgNodeKind.Element,
       tagName: this.tagName,
       sourceTag: this.node.name,
-      // 命中富文本时子节点整段丢弃：声明槽位已由 TemplateDefinition 计过，
-      // 这里只是不再为它们产出 wxml，后续节点的下标不受影响。
+      // 命中富文本时子节点整段丢弃；声明槽位已计过，后续节点的下标不受影响
       children: this.richText ? [] : this.children.map((c) => c.getNodeMeta()),
       inputs: this.inputs,
       i18nAttrs: this.i18nAttrs,

@@ -1,41 +1,38 @@
+import * as v from 'valibot';
 import {
   DEFAULT_MP_VITEST_PORT,
   MP_VITEST_PROTOCOL_VERSION,
 } from '../protocol';
 
-export interface MiniProgramVitestPluginOptions {
-  /**
-   * WebSocket 监听端口。必须和编译期 `define` 进产物的 `MP_VITEST_PORT`
-   * 是同一个来源，否则小程序去连 A、宿主在 B，表现为永远连不上。
-   */
-  port?: number;
-  /** 监听地址，默认 127.0.0.1。开发者工具在同机，不需要对外。 */
-  host?: string;
-  /** 等小程序连上来的毫秒数，默认 120_000（开发者工具冷启动慢）。 */
-  connectTimeout?: number;
-  /** 要跑的 spec，默认由 builder 生成。 */
-  include?: string[];
-  exclude?: string[];
-}
+/**
+ * `miniProgramVitest()` 的选项形状。这里没有 JSON Schema 消费者，valibot 负责的是
+ * 「默认值只写一处」和「vitest.config 里配错类型当场报错」，而不是补全。
+ */
+const pluginOptionsSchema = v.looseObject({
+  // 必须和编译期 define 进产物的 MP_VITEST_PORT 同一个来源，
+  // 否则小程序去连 A、宿主在 B，表现为永远连不上
+  port: v.optional(v.number(), DEFAULT_MP_VITEST_PORT),
+  // 开发者工具在同机，不需要对外
+  host: v.optional(v.string(), '127.0.0.1'),
+  // 开发者工具冷启动慢，等得久一点
+  connectTimeout: v.optional(v.number(), 120_000),
+  // 缺省由 builder 生成
+  include: v.optional(v.array(v.string())),
+  exclude: v.optional(v.array(v.string())),
+});
 
-export interface ResolvedMiniProgramVitestPluginOptions {
-  port: number;
-  host: string;
-  connectTimeout: number;
-  include?: string[];
-  exclude?: string[];
-}
+export type MiniProgramVitestPluginOptions = v.InferInput<
+  typeof pluginOptionsSchema
+>;
+/** 补齐默认值之后的形状。 */
+export type ResolvedMiniProgramVitestPluginOptions = v.InferOutput<
+  typeof pluginOptionsSchema
+>;
 
 export function resolveMiniProgramVitestPluginOptions(
   options: MiniProgramVitestPluginOptions = {},
 ): ResolvedMiniProgramVitestPluginOptions {
-  return {
-    port: options.port ?? DEFAULT_MP_VITEST_PORT,
-    host: options.host ?? '127.0.0.1',
-    connectTimeout: options.connectTimeout ?? 120_000,
-    include: options.include,
-    exclude: options.exclude,
-  };
+  return v.parse(pluginOptionsSchema, options);
 }
 
 /** 编译期注入小程序产物的三个常量，宿主与设备共用同一份解析结果。 */

@@ -1,11 +1,8 @@
 import { emitWxs } from './mini-program-assets.plugin';
 
 /**
- * wxs 落盘 + watch 登记。
- *
- * wxs 不是 ES module，没有任何 import 指向它，Vite 的模块图看不见。
- * 不显式 addWatchFile 的话，watch 模式下改 .wxs 不会触发重建 ——
- * 改了没反应，是最容易被当成「编译器坏了」的那类问题。
+ * wxs 落盘 + watch 登记。wxs 不是 ES module，没有任何 import 指向它，Vite 的模块图看不见。
+ * 不显式 addWatchFile 的话，watch 模式下改 .wxs 不会触发重建。
  */
 describe('wxs 落盘: emitWxs', () => {
   const run = (resolved: {

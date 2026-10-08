@@ -8,13 +8,9 @@ import { NgElementMeta, NgNodeKind } from './interface';
 import { TemplateDefinition } from './template-definition';
 
 /**
- * `i18n-*` 属性在 wxml 里的产出。
- *
- * 译文只有运行时知道（`$localize` 查表），所以**凡是 i18n 过的属性都不能
- * 内联源文案**，否则不是翻错、是根本不翻。两条通道：
- *
- * - 值含插值 → `ɵɵi18nAttributes` + `setProperty` → `property.<name>`
- *   （普通插值属性本来就走这条，无需特判）
+ * `i18n-*` 属性在 wxml 里的产出。译文只有运行时知道（`$localize` 查表），所以凡是 i18n 过的属性
+ * 都不能内联源文案，否则不是翻错、是根本不翻。两条通道：
+ * - 值含插值 → `ɵɵi18nAttributes` + `setProperty` → `property.<name>`（普通插值属性本来就走这条）
  * - 纯静态 → 建元素时 `setAttribute` → `attribute.<name>`，必须显式改成绑定
  */
 async function compileHtml(html: string): Promise<string> {
@@ -89,15 +85,10 @@ describe('i18n 属性的 wxml 产出', () => {
 });
 
 /**
- * 元素级 `i18n`（裸属性，带消息 id）在 wxml 里的产出。
- *
- * 与 `i18n-*` 是同一个坑的另一半：静态文本被烘进 wxml 后，
- * `loadTranslations` 就再也影响不到渲染结果——切语言永远看不到效果。
- * Angular 会为它发 `ɵɵtext` + `ɵɵi18nApply`，译文落在
- * `nodeList[i].value`，所以 wxml 必须改成读它。
- *
- * 这个坑特别容易漏：`nodeList` 里的译文一直是对的，只查 `nodeList`
- * 的测试永久绿，而屏上始织是源文案。
+ * 元素级 `i18n`（裸属性，带消息 id）在 wxml 里的产出。静态文本被烘进 wxml 后，`loadTranslations`
+ * 就再也影响不到渲染结果——切语言永远看不到效果。Angular 会为它发 `ɵɵtext` + `ɵɵi18nApply`，
+ * 译文落在 `nodeList[i].value`，所以 wxml 必须改成读它。
+ * 这个坑特别容易漏：`nodeList` 里的译文一直是对的，只查 `nodeList` 的测试永久绿，而屏上始终是源文案。
  */
 describe('元素级 i18n 文本的 wxml 产出', () => {
   it('静态 i18n 文本改成读 value 的绑定', async () => {

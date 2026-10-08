@@ -18,13 +18,10 @@ import { PlatformType } from '../platform/platform';
 import { runViteBuilder } from './index';
 
 /**
- * 入口注册自动注入的构建集成验证。
- *
- * 入口文件只声明「我是哪个组件」（`export default`），
+ * 入口注册自动注入的构建集成验证。入口文件只声明「我是哪个组件」（`export default`），
  * `bootstrapPage` / `componentRegistry` / `bootstrapCustomTabbar` 由构建器补：
  *  - 入口类型由来源决定：pages 是页面，customTabbar 是 tabBar，其余全是组件
  *  - 自定义 tabBar 的产物路径固定为 `custom-tab-bar/index`
- *  - 老写法（入口里自己调）仍然可用，且不会被重复注入
  */
 describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
   const setupFixture = async () => {
@@ -119,8 +116,7 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
   /**
    * 「default export 注入 + 自定义 tabBar」与「不配组件范围 / 不招 tsconfig 外入口」
-   * 是同一次构建的两个侧面：前者看注入与 tabBar 落盘，后者看 widgets 被收进来、
-   * spec 入口被挡在外面，互不干扰。
+   * 是同一次构建的两个侧面：前者看注入与 tabBar 落盘，后者看 widgets 被收进来、spec 入口被挡在外面。
    */
   const load = memoize(async () => {
     await setupFixture();
@@ -198,9 +194,8 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
 
     const base = result.result!.baseOutputPath as string;
     /**
-     * `readdirSync(..., { recursive: true })` 在 Windows 上交回的是
-     * `pages\base-tap\base-tap-entry.js`，而下面全按 `a/b/c` 查表，
-     * 不归一就会「构建绿了但文件一个也找不到」。Linux/macOS 上是恒等变换。
+     * `readdirSync(..., { recursive: true })` 在 Windows 上交回的是反斜杠路径，
+     * 而下面全按 `a/b/c` 查表，不归一就会「构建绿了但文件一个也找不到」。
      */
     const names = fs
       .readdirSync(base, { recursive: true })
@@ -303,20 +298,17 @@ describeBuilder(runViteBuilder, BROWSER_BUILDER_INFO, (harness) => {
       // 常规组件目录照旧产出（镜像路径与源目录同名）
       expect(names).toContain('components/component1/component1-entry.js');
 
-      // sourceRoot 下还躺着测试工程的 spec / spec-component 入口，
-      // 它们不在 tsconfig.app.json 的编译单元里，必须被过滤掉
+      // sourceRoot 下还躺着测试工程的 spec / spec-component 入口，它们不在 tsconfig.app.json
+      // 的编译单元里，必须被过滤掉
       expect(names.filter((f) => f.startsWith('spec'))).toEqual([]);
       expect(names.filter((f) => f.startsWith('spec-component'))).toEqual([]);
     }, 300000);
 
     /**
-     * 一个文件多个组件。
-     *
-     * 小程序的组件身份是「一个路径 + 同名的 js/json/wxml/wxss」，同一目录放多个
-     * 组件合法，撞名才非法，所以同文件多组件拆成同目录下的多个产物就行。
-     *
-     * 回归点：虚拟入口模块 id 一度只按源文件编码，同文件的第二个组件会和第一个
-     * 塌进同一个 rollup 模块——前者注册了对方的类，后者只剩一句 require。
+     * 一个文件多个组件。小程序的组件身份是「一个路径 + 同名的 js/json/wxml/wxss」，
+     * 同一目录放多个组件合法，撞名才非法，所以同文件多组件拆成同目录下的多个产物就行。
+     * 回归点：虚拟入口模块 id 一度只按源文件编码，同文件的第二个组件会和第一个塌进同一个
+     * rollup 模块——前者注册了对方的类，后者只剩一句 require。
      */
     it('一个文件多个组件：拆成同目录多个产物，各注册各的类', async () => {
       const { files } = await load();

@@ -1,16 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * 探针：不 patch NgTemplateOutlet，能否在 fork 自己的代码里
- * 从 viewRef 侧算出 wxml 需要的 __templateName。
- *
- * patch 读的是：
- *   this.ngTemplateOutlet._declarationTContainer.localNames[0]
- *
- * 候选替代（lViewToWXView 已持有 viewRef）：
- *   viewRef._lView[1].declTNode.localNames[0]
- *
- * 这里直接验证两者指向同一个 TNode —— 若同一，则取值必然相同，
- * patch 可用 fork 内一行替代。
+ * 探针：不 patch NgTemplateOutlet，能否在 fork 自己的代码里从 viewRef 侧算出 wxml 需要的 __templateName。
+ * patch 读的是 `this.ngTemplateOutlet._declarationTContainer.localNames[0]`；
+ * 候选替代（lViewToWXView 已持有 viewRef）是 `viewRef._lView[1].declTNode.localNames[0]`。
+ * 这里直接验证两者指向同一个 TNode——若同一，则取值必然相同，patch 可用 fork 内一行替代。
  */
 import { Component, TemplateRef, ViewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';

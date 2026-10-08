@@ -17,30 +17,17 @@ export type {
 /**
  * 自定义 vite 配置的加载与应用。
  *
- * angular.json 是 JSON，装不下函数，所以「改 vite 配置」只能走**文件**：
- * 选项给路径，文件默认导出一个 `(config, ctx) => config` 的钩子，构建器在
- * 组装完默认配置之后把 config 交出去，拿回来什么就用什么。
- *
- * 这里**不做任何守卫**：默认配置是构建器自己组装的，本来就是对的；钩子里
- * 改坏了是钩子的事，报错会自然落在 vite / rolldown 那一层。本模块只负责
- * 「读得到、报错认得出是哪个文件」这两件事。
+ * angular.json 是 JSON，装不下函数，所以「改 vite 配置」只能走文件：选项给路径，
+ * 文件默认导出一个 `(config, ctx) => config` 的钩子。
+ * 这里不做任何守卫：钩子里改坏了是钩子的事。本模块只负责「读得到、报错认得出是哪个文件」。
  */
 
-/**
- * 恒等函数，只为让钩子文件里能推断参数类型。
- *
- * 没有它用户就得自己 `export default ((config) => ...) satisfies MpViteConfigHook`
- * 或者手写参数类型，写一个文件抄一次，不值当。
- */
+/** 恒等函数，只为让钩子文件里能推断参数类型，不用手写 `satisfies`。 */
 export function defineMpViteConfig(hook: MpViteConfigHook): MpViteConfigHook {
   return hook;
 }
 
-/**
- * 需不需要 jiti：只有 TS 家族要，`.js` / `.mjs` / `.cjs` 走原生 import。
- *
- * 原生那条路顺带解决了「纯 JS 钩子的工程压根不需要 jiti」。
- */
+/** 需不需要 jiti：只有 TS 家族要，`.js` / `.mjs` / `.cjs` 走原生 import。 */
 export function needsJiti(file: string): boolean {
   return /\.[cm]?tsx?$/.test(file);
 }
@@ -70,10 +57,8 @@ function messageOf(error: unknown): string {
 }
 
 /**
- * 包一层错误并留住 cause。
- *
- * `new Error(msg, { cause })` 要 ES2022 的 lib，本仓库编译目标是 ES2015，
- * 所以手动挂。Node 打堆栈认这个属性，被包裹的原始错误不会被弄丢。
+ * 包一层错误并留住 cause。本仓库编译目标是 ES2015，用不了 `new Error(msg, { cause })`，
+ * 所以手动挂；Node 打堆栈认这个属性。
  */
 function wrapError(message: string, cause: unknown): Error {
   const error = new Error(message);
@@ -82,14 +67,8 @@ function wrapError(message: string, cause: unknown): Error {
 }
 
 /**
- * 读文件模块本体。
- *
- * TS 走 jiti（`moduleCache: false`，watch 每轮都要重新求值；transform 结果
- * 仍进它的 fs 缓存）。实例 id 直接用钩子文件自己：我们传给 `jiti.import`
- * 的一直是绝对路径，实例 id 只影响相对解析与 tsconfig 自动发现。
- *
- * JS 走原生 `import()`，但必须带 `?t=` 破缓存 —— Node 的 ESM 缓存按完整
- * URL 算，watch 期间改了文件不破缓存就会一直拿到第一轮那份。
+ * 读文件模块本体。TS 走 jiti（`moduleCache: false`，watch 每轮都要重新求值）。
+ * JS 走原生 `import()`，但必须带 `?t=` 破缓存，否则 watch 期间会一直拿到第一轮那份。
  */
 async function importConfigModule(
   configPath: string,
@@ -119,11 +98,8 @@ async function importConfigModule(
 }
 
 /**
- * 默认导出 → 钩子函数。
- *
- * 三种写法都要认：ESM `export default fn`（拿到命名空间对象，取 `.default`）、
- * CJS `module.exports = fn`（jiti 的 interop 下 `typeof` 就是 function）、
- * 以及原生 `import()` 引 CJS 文件时的 `{ default: fn }`。
+ * 默认导出 → 钩子函数。三种写法都要认：ESM `export default fn`、
+ * CJS `module.exports = fn`、以及原生 `import()` 引 CJS 文件时的 `{ default: fn }`。
  */
 export function toViteConfigHook(
   loaded: unknown,
@@ -156,9 +132,7 @@ export interface ApplyMpViteConfigOptions {
 
 /**
  * 把组装好的 config 交给用户的钩子，返回最终要交给 vite 的配置。
- *
- * 返回 `undefined` / `null` 视为「就地改完了」，用原对象；返回别的对象就用
- * 返回值；返回非对象直接报错（那一定是写错了，静默下去只会变成「改了没效果」）。
+ * 返回 `undefined` / `null` 视为就地改完了，用原对象；返回非对象直接报错。
  */
 export async function applyMpViteConfig(
   config: InlineConfig,

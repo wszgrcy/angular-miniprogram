@@ -6,15 +6,9 @@ const DEFINE_COMPONENT = 'ɵɵdefineComponent';
 
 /**
  * 找到所有 `ɵɵdefineComponent({...})` 的元数据对象字面量。
- *
- * 不用 createCssSelectorForTs 的
- * `PropertyAccessExpression[name=ɵɵdefineComponent]~SyntaxList ObjectLiteralExpression`：
- * 那个相邻兄弟（`~`）组合符在同文件多组件时兄弟关系会错位，导致后面按名字取
- * template 时拿到完全不相干的节点（实测会拿到一个 StringLiteral），
- * 于是整个组件被静默跳过、不注入。
- *
- * webpack 还可能把调用包成 `(0, mod["ɵɵdefineComponent"])(...)`，所以按 callee
- * 文本包含来判断。
+ * 不用 createCssSelectorForTs 的相邻兄弟（`~`）组合符：它在同文件多组件时会错位，
+ * 导致后面按名字取 template 时拿到完全不相干的节点，整个组件被静默跳过。
+ * webpack 还可能把调用包成 `(0, mod["ɵɵdefineComponent"])(...)`，所以按 callee 文本包含来判断。
  */
 function findDefineComponentMetaList(
   sf: ts.SourceFile,
@@ -23,8 +17,8 @@ function findDefineComponentMetaList(
   const walk = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
       const callee = node.expression.getText(sf);
-      // 无参调用时 arguments[0] 是 undefined，而 TS 把 Node 索引结果的类型
-      // 标成非空，isXxx 系列运行时并不兜底，必须先显式判空
+      // 无参调用时 arguments[0] 是 undefined，而 TS 把 Node 索引结果的类型标成非空，
+      // isXxx 系列运行时并不兜底，必须先显式判空
       const first: ts.Node | undefined = node.arguments[0];
       if (
         callee.includes(DEFINE_COMPONENT) &&
@@ -54,8 +48,8 @@ function pickProperty(
 }
 
 /**
- * 取组件真正的主模板函数（`template: function Xxx_Template(rf, ctx) {...}`）。
- * 必须是函数，不能是字符串——选择器版本就是在这里拿到了 StringLiteral 还没察觉。
+ * 取组件真正的主模板函数。必须是函数，不能是字符串——选择器版本就是在这里拿到了
+ * StringLiteral 还没察觉。
  */
 function getTemplateFunction(
   sf: ts.SourceFile,
@@ -82,8 +76,7 @@ function isRfBitTest(expr: ts.Expression, bit: number): boolean {
 }
 
 /**
- * 在模板函数体的**顶层**找 `if (rf & bit) { ... }` 的块。
- * 只扫顶层，不递归进嵌套的嵌入式模板函数（Foo_div_1_Template 那种），
+ * 在模板函数的顶层找 `if (rf & bit) { ... }` 的块。只扫顶层，不递归进嵌套的嵌入式模板函数，
  * 否则会命中别人的 rf & 1 / rf & 2。
  */
 function findTopLevelRfBlock(
@@ -127,8 +120,7 @@ export function changeComponent(data: string) {
     if (componentName) {
       componentNames.push(componentName);
     }
-    // 空模板（`template: function X_Template(rf, ctx) {}`）没有 rf & 1，
-    // 没有可注入的位置，跳过
+    // 空模板没有 rf & 1，没有可注入的位置，跳过
     const initBlock = findTopLevelRfBlock(templateFn, 1);
     if (!initBlock) {
       continue;
@@ -148,9 +140,8 @@ export function changeComponent(data: string) {
         'end',
       );
     } else {
-      // 分支 B：没有更新块（或更新块是空的——老逻辑取 statements[length - 1]
-      // 会得到 undefined，在 insertNode 里读 getStart 直接崩），
-      // 在 init 块后面补一个完整的
+      // 分支 B：没有更新块（或更新块是空的——取 statements[length - 1] 会得到 undefined，
+      // 在 insertNode 里读 getStart 直接崩），在 init 块后面补一个完整的
       updateInsertChange = change.insertNode(
         initBlock,
         `if(rf & 2){${updateContent}}`,
@@ -162,14 +153,12 @@ export function changeComponent(data: string) {
   }
 
   if (!injectedCount) {
-    // 没有注入点也要按原契约返回 { content, componentName }：
-    // SetupComponentDataService 靠返回值是否为 undefined 决定要不要产出组件元数据，
-    // 这里提前 return undefined 会让空模板组件（如 TestLibraryComponent）
-    // 整个不产出。只有「本文件根本没有组件」才返回 undefined。
+    // 没有注入点也要按原契约返回 { content, componentName }：调用方靠返回值是否为 undefined
+    // 决定要不要产出组件元数据，这里提前 return undefined 会让空模板组件整个不产出。
+    // 只有「本文件根本没有组件」才返回 undefined。
     changeList.length = 0;
   } else {
-    // import 只需要一份。放在循环里 push 会给每个组件都加一遍，
-    // 同文件多组件时就是重复的 `import * as amp ...`。
+    // import 只需要一份。放在循环里 push 会给每个组件都加一遍
     changeList.unshift(
       new InsertChange(0, `import * as ampNgCore from '@angular/core';\n`),
     );
@@ -182,20 +171,13 @@ export function changeComponent(data: string) {
     content: RawUpdater.update(data, changeList),
     /** 本文件所有组件的类名，顺序与源文件中 ɵɵdefineComponent 出现顺序一致 */
     componentNames,
-    /**
-     * @deprecated 用 componentNames。保留是为了不破坏已有调用方，
-     * 等于 componentNames[0]。
-     */
+    /** @deprecated 用 componentNames。等于 componentNames[0]。 */
     componentName: componentNames[0] ?? '',
   };
 }
 
 /**
- * 只检测本文件里的组件类名，**不改代码**。
- *
- * 库构建侧现在只需要「这个文件有哪些组件」来定位元数据，不再往产物里注
- * `amp.propertyChange` —— 那个注入已移到主构建
- * （`vite/plugins/component-transform.plugin.ts`），库产物保持 vanilla。
+ * 只检测本文件里的组件类名，不改代码。库产物保持 vanilla，注入在主构建做。
  */
 export function detectComponentNames(data: string): string[] {
   const sf = ts.createSourceFile('', data, ts.ScriptTarget.Latest, true);

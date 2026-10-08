@@ -1,12 +1,7 @@
 /**
- * app.json 的语义校验与产物生成。
+ * app.json 的语义校验与产物生成。形状校验在 `config-schema.ts`，合并规则在 `merge-config.ts`。
  *
- * 之前 app.json 是静态 asset 直接拷进产物，构建器对内容零感知：页面不存在、
- * tabBar 指向野路径、分包 root 冲突，全部要等到开发者工具打开才炸。这一层把
- * app 配置升级为「编译期校验」，形状校验在 `config-schema.ts`，合并规则在
- * `merge-config.ts`。
- *
- * 校验对象是**合并后的最终对象**：用户手写的、结构化配置补的、构建器算出来的，
+ * 校验对象是合并后的最终对象：用户手写的、结构化配置补的、构建器算出来的，
  * 到这一步已经是一份内容，没必要按来源分别校验。
  */
 
@@ -57,13 +52,11 @@ function preloadPackagesOf(packages: MpPreloadRuleEntry['packages']): string[] {
 
 /**
  * 编译期语义校验。返回错误列表（空数组 = 通过）。
- *
  * 只查「形状对但内容不对」的东西：页面本次真的产出了吗、tabBar 的页面在主包吗、
- * preloadRule 引用的分包存在吗。类型错误在这之前就该被形状校验拦掉。
+ * preloadRule 引用的分包存在吗。
  *
  * @param config 合并后的 app 配置
- * @param builtPagePaths 本次构建实际产出的页面路径（不含扩展名，分包页为
- *   已拼上 root 的全路径），来自 PagePattern.outputFiles.path
+ * @param builtPagePaths 本次构建实际产出的页面路径（不含扩展名，分包页为已拼上 root 的全路径）
  */
 export function validateAppConfig(
   config: MpAppConfig,
@@ -158,9 +151,8 @@ export function validateAppConfig(
     }
   }
 
-  // 声明了但本次构建没产出入口：漏写 *.entry.ts，或源文件所在目录不在
-  // angular.json 的 pages pattern 覆盖范围内。这类错落到开发者工具里只剩
-  // 一句「页面不存在」，最难查，所以在构建期按页面逐条点名。
+  // 声明了但本次构建没产出入口：漏写 *.entry.ts，或源文件目录不在 pages pattern 覆盖范围内。
+  // 这类错落到开发者工具里只剩一句「页面不存在」，最难查，所以在构建期按页面逐条点名。
   if (builtPagePaths.length) {
     const built = new Set(builtPagePaths);
     for (const page of [...mainPages, ...fullSubPages]) {
@@ -192,9 +184,7 @@ export function validateAppConfig(
 }
 
 /**
- * 生成 app.json 文本。
- *
- * 输出保留用户写法（分包 key 已由平台归一），只做格式化，不做平台方言转换。
+ * 生成 app.json 文本。输出保留用户写法（分包 key 已由平台归一），只做格式化。
  */
 export function generateAppJson(config: MpAppConfig): string {
   return `${JSON.stringify(config, null, 2)}\n`;
@@ -212,7 +202,6 @@ export interface ResolvedSubPackage {
 
 /**
  * 从 app 配置解析出分包列表（归一化 subpackages/subPackages + 拼全路径）。
- *
  * 供分包产物改写插件消费：判断某个产物路径属于哪个分包、是否独立分包。
  */
 export function resolveSubPackages(config: MpAppConfig): ResolvedSubPackage[] {
@@ -231,8 +220,7 @@ export function resolveSubPackages(config: MpAppConfig): ResolvedSubPackage[] {
 }
 
 /**
- * 判断一个产物路径（不含扩展名，posix）属于哪个分包。
- * 返回 undefined 表示属于主包。
+ * 判断一个产物路径（不含扩展名，posix）属于哪个分包。返回 undefined 表示属于主包。
  */
 export function findSubPackageByPath(
   subPackages: ResolvedSubPackage[],

@@ -4,11 +4,8 @@ import { wxEventNamesOf } from './event-name';
 import { MiniProgramCore } from './platform-core';
 
 /**
- * 支付宝事件派发时的键反查。
- *
- * 编译期把 `(touchstart)` 写成 `onTouchStart`，事件打过来 `e.type` 是
- * `touchStart`，而监听键是按模板原文登记的（`touchstart`）。
- * 这里验的就是「属性名对了之后，监听到底查不查得到」。
+ * 支付宝事件派发时的键反查。编译期把 `(touchstart)` 写成 `onTouchStart`，事件打过来 `e.type` 是
+ * `touchStart`，而监听键是按模板原文登记的（`touchstart`）。这里验的就是「属性名对了之后，监听到底查不查得到」。
  */
 
 /** `getListenerEventMapping` 是 protected，测试从外部取派发候选 */

@@ -4,11 +4,8 @@ import {
 } from '../../test/util/node-manifest';
 
 /**
- * 提取器的最小单测。
- *
- * 目的：在改 walk 之前先把「提取器对各种 codegen 形态的行为」钉死。
- * 上一轮直接改 walk 再跑 100+ spec 的大测试，在噪音里定位不动，
- * 所以这次先要一个能秒级反馈的小闭环。
+ * 提取器的最小单测。目的：在改 walk 之前先把「提取器对各种 codegen 形态的行为」钉死，
+ * 要一个能秒级反馈的小闭环。
  */
 describe('node-manifest 提取器：codegen 形态', () => {
   const wrap = (body: string) =>
@@ -35,8 +32,7 @@ describe('node-manifest 提取器：codegen 形态', () => {
   });
 
   it('链式调用：ɵɵelementStart(a)(b) 应识别出两个节点下标', () => {
-    // 真实 codegen：ɵɵelementStart 返回 typeof ɵɵelementStart，
-    // 所以连续调用会被写成链
+    // 真实 codegen：ɵɵelementStart 返回 typeof ɵɵelementStart，所以连续调用会被写成链
     const src = wrap(
       [
         'ɵɵelementStart(0, "div");',

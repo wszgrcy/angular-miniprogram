@@ -4,25 +4,18 @@ import { toPosix } from '../util/path';
 
 /**
  * 生成「给 Angular 编译的那份组件文件」。
- *
- * 替换是**文件级**的（fileReplacements 只能整档换），所以一个 .ts 里
- * 只要有任何一个组件带 wxs 模板，整个文件都要重新生成。重新生成会挪
- * 位置，于是三类引用必须一起处理：
+ * 替换是文件级的（fileReplacements 只能整档换），所以一个 .ts 里只要有任何一个组件
+ * 带 wxs 模板，整个文件都要重新生成。重新生成会挪位置，于是三类引用必须一起处理：
  *
  *   templateUrl（带 wxs 的那个） → template: "<剥离后的文本>"
  *   templateUrl（同文件其它组件） → 原样留着，把 html 复制过来
  *   styleUrl / styleUrls          → 原样留着，把样式复制过来
  *   import { A } from './a'       → 绝对路径
  *
- * 资源为什么走复制而不是绝对化：ngtsc 把资源串当 URL 看，
- * `^[a-zA-Z][a-zA-Z\d+\-.]*?:` 会把 Windows 盘符认成 scheme，
- * `C:/.../x.scss` 直接被当成外部 URL 解析失败，组件被 poison，
- * AOT 静默退化成 JIT。相对路径 + 同结构目录没有这个雷。
+ * 资源走复制而不是绝对化：ngtsc 把资源串当 URL 看，Windows 盘符会被认成 scheme，
+ * 组件被 poison，AOT 静默退化成 JIT。import 绝对化不受影响，那是 TS 模块解析。
  *
- * import 绝对化不受影响 —— 那是 TS 模块解析，不吃 URL 规则。
- *
- * 全部走「AST 定位 + 原文按 span 拼接」，不用 createPrinter 重印 ——
- * 重印会把整个文件格式化掉，改动面失控。
+ * 全部走「AST 定位 + 原文按 span 拼接」，不用 createPrinter 重印，重印会把整个文件格式化掉。
  */
 export interface ResourceCopy {
   /** 资源原文件绝对路径 */
@@ -103,10 +96,7 @@ function applyEdits(source: string, edits: Edit[]): string {
 }
 
 /**
- * 重写组件源文件。
- *
- * `templates` 一个都没命中时返回 `null`，调用方据此跳过生成。
- *
+ * 重写组件源文件。`templates` 一个都没命中时返回 `null`，调用方据此跳过生成。
  * `cachedFileName` 是生成文件将要落到的绝对路径，用来算资源该复制到哪。
  */
 export function rewriteComponentForWxs(
@@ -151,17 +141,13 @@ export function rewriteComponentForWxs(
       if (name === TEMPLATE_URL && ts.isPropertyAssignment(prop)) {
         const url = stringLiteralValue(prop.initializer);
         if (url === undefined) {
-          // 非字面量 templateUrl：无从判断它指不指 wxs 模板，跳过。
-          // 在这里报错会为了一个无关组件卡住整个构建。
+          // 非字面量 templateUrl：无从判断它指不指 wxs 模板，跳过。在这里报错会为了一个无关组件卡住整个构建
           continue;
         }
         const abs = toPosix(path.resolve(dir, url));
         const stripped = strippedForFile(abs);
         if (stripped === undefined) {
-          /**
-           * 同文件里其他组件的模板：没 wxs，不动源码，把 html 复制过来，
-           * 相对路径在新位置照样能解析到。
-           */
+          /** 同文件里其他组件的模板：没 wxs，不动源码，把 html 复制过来，相对路径在新位置照样能解析到 */
           trackResource(url);
           continue;
         }
@@ -175,11 +161,8 @@ export function rewriteComponentForWxs(
       }
 
       /**
-       * inline `template`：模板文本就在本文件里，没有外部路径可查，
-       * 所以按「原文字面量全文」去 `inlineTemplates` 里查剥离结果。
-       *
-       * 整条属性替换（不是按偏移切）：模板字符串里可能有 `\n`、`\`` 这类
-       * 转义，源码偏移和 Angular 看到的求值后文本偏移不等，做偏移运算必错。
+       * inline `template`：模板文本就在本文件里，按原文字面量全文去查剥离结果。
+       * 整条属性替换（不是按偏移切）：模板字符串里可能有转义，源码偏移与求值后文本偏移不等。
        */
       if (name === TEMPLATE && ts.isPropertyAssignment(prop)) {
         const raw = stringLiteralValue(prop.initializer);
@@ -220,11 +203,8 @@ export function rewriteComponentForWxs(
   }
 
   /**
-   * 相对 import 绝对化。
-   *
-   * 只在真的内联了模板之后才做 —— 没挪文件就没有挪路径的理由。
-   * 覆盖 `import ... from` 与 `export ... from`；动态 import() 里写
-   * 相对路径的极少，且绝对化它会改变 chunk 语义，不在这里动。
+   * 相对 import 绝对化。只在真的内联了模板之后才做——没挪文件就没有挪路径的理由。
+   * 覆盖 `import ... from` 与 `export ... from`；动态 import() 不在这里动。
    */
   const absolutizeSpecifier = (node: ts.Expression): void => {
     const v = stringLiteralValue(node);

@@ -5,13 +5,11 @@ import { TemplateTransformBase } from './template-transform-strategy/transform.b
 import { WxTransformLike } from './template-transform-strategy/wx-like/wx-transform.base';
 
 /**
- * 平台注册表：每加一家都要同时补齐的四张表，漏一处不会编译报错，
- * 只会在构建或运行时以「未能匹配到相关平台」「xxx is not a function」
- * 的形式冒出来，所以这里用一张表统一钉死。
+ * 平台注册表：每加一家都要同时补齐的四张表，漏一处不会编译报错，只会在构建或运行时以
+ * 「未能匹配到相关平台」「xxx is not a function」的形式冒出来，所以这里用一张表统一钉死。
  *
- * `globalObject` 是 vite define 里 `wx -> <global>` 的来源，写错等于
- * 整个运行时调不到任何宿主 API；`directivePrefix` 写错则模板能产出、
- * 小程序读不到指令，页面白屏且不报错。这两列必须逐字核对。
+ * `globalObject` 是 vite define 里 `wx -> <global>` 的来源，写错等于整个运行时调不到任何宿主 API；
+ * `directivePrefix` 写错则模板能产出、小程序读不到指令，页面白屏且不报错。这两列必须逐字核对。
  */
 interface PlatformExpectation {
   type: PlatformType;

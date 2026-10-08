@@ -3,8 +3,7 @@ import { parseTemplate } from '@angular/compiler';
 import { containsWxsRoot, matchWxsCall, matchWxsHandler } from './wxs-call';
 
 /**
- * 测试用声明集合：识别靠声明，裸名必须先声明才算 wxs 模块。
- * 真实管线里这个集合来自模板的 `<wxs module=...>` 声明。
+ * 测试用声明集合：识别靠声明，裸名必须先声明才算 wxs 模块。真实管线里这个集合来自模板的 `<wxs module=...>` 声明。
  */
 const DECLARED = new Set([
   'mod',
@@ -84,8 +83,7 @@ describe('wxs-call: 属性绑定精确匹配', () => {
   });
 
   it('未声明的名字不认（走逻辑层，不是 wxs）', () => {
-    // 新架构下识别集合就是定义：没声明过的名字永远是普通 Angular 属性访问。
-    // 这里 `ghostFn` 不在 DECLARED 里，即使形状完全一致也不能认。
+    // 识别集合就是定义：没声明过的名字永远是普通 Angular 属性访问。`ghostFn` 不在 DECLARED 里，即使形状完全一致也不能认。
     const ast = firstAst(`<div [foo]="ghost.fn()"></div>`, 'input');
     expect(matchWxsCall(ast, DECLARED)).toBeNull();
   });
@@ -137,10 +135,8 @@ describe('wxs-call: containsWxsRoot', () => {
 
 describe('wxs-call: containsWxsRoot 容器覆盖', () => {
   /**
-   * CHILD_KEYS 漏一个字段 = 漏一类节点。
-   *
-   * 漏检的后果是「写了 wxs 但被当成普通表达式」，静默产出错误代码，
-   * 比报错糟糕得多。这里把各类容器逐个锁住。
+   * CHILD_KEYS 漏一个字段 = 漏一类节点。漏检的后果是「写了 wxs 但被当成普通表达式」，静默产出错误代码。
+   * 这里把各类容器逐个锁住。
    */
   const detects = (html: string) => {
     const ast = firstAst(html, 'input');

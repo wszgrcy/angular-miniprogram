@@ -7,9 +7,7 @@ import {
 import { mpListenerKeys, mpListenerOnce } from './event-name';
 
 /**
- * `zIndex` → `z-index`。
- *
- * `[style]` 映射的键可以是 camelCase，而 wxml 的行内样式只认 CSS 写法。
+ * `zIndex` → `z-index`。`[style]` 映射的键可以是 camelCase，而 wxml 的行内样式只认 CSS 写法。
  * 已经带 `-` 的一律原样返回，CSS 自定义属性（`--myColor`）靠这条免遭改写。
  */
 function dashCase(prop: string): string {
@@ -25,12 +23,8 @@ export class MiniProgramRenderer implements Renderer2 {
   destroy() {}
 
   /**
-   * 把一次「叶子写入」翻译成一条路径式 setData key。
-   *
-   * 前缀 `node.__pathPrefix` 与目标 `node.__mpRef` 由上一次全量序列化
-   * （`lViewToWXView`）打上。拿不到前缀说明这个节点从没被序列化过，
-   * 路径无从得知 —— 此时**强制走全量兜底**，绝不猜路径。
-   *
+   * 把一次叶子写入翻译成一条路径式 setData key。前缀 `node.__pathPrefix` 与目标 `node.__mpRef`
+   * 由上一次全量序列化打上。拿不到前缀说明这个节点从没被序列化过，路径无从得知——此时强制走全量兜底。
    * 热路径成本：一次属性读 + 一次缓存查表（命中后不再拼串）。
    */
   private emit(node: AgentNode, suffix: string, value: unknown) {
@@ -73,28 +67,17 @@ export class MiniProgramRenderer implements Renderer2 {
   destroyNode() {}
   appendChild(parent: AgentNode, newChild: AgentNode) {
     // 结构变更：容器内序号会漂移，其他节点的路径前缀随之失效 → 本周期走全量。
-    // 注意「新建节点」必然经过这里，所以不存在「写到一个还没 stamp 的新节点」的窗口。
+    // 「新建节点」必然经过这里，所以不存在「写到一个还没 stamp 的新节点」的窗口。
     markStructuralChange();
     parent.appendChild(newChild);
   }
-  insertBefore(
-    parent: AgentNode,
-    newChild: AgentNode,
-    refChild: AgentNode,
-    isMove?: boolean,
-  ) {
-    if (isMove) {
-      // todo 应该没用
-    }
+  insertBefore(parent: AgentNode, newChild: AgentNode, refChild: AgentNode) {
     markStructuralChange();
     if (parent) {
       parent.insertBefore(newChild, refChild);
     }
   }
-  removeChild(parent: AgentNode, oldChild: AgentNode, isHostElement?: boolean) {
-    if (isHostElement) {
-      // todo 应该没用
-    }
+  removeChild(parent: AgentNode, oldChild: AgentNode) {
     markStructuralChange();
     if (parent) {
       parent.removeChild(oldChild);
@@ -119,8 +102,7 @@ export class MiniProgramRenderer implements Renderer2 {
     namespace?: string | null,
   ) {
     el.attribute[name] = value;
-    // `toView()` 只把 attribute 里的 class / style 纳入渲染数据，
-    // 其他 attribute 不进 nodeList，因此也不需要发。
+    // `toView()` 只把 attribute 里的 class / style 纳入渲染数据，其他 attribute 不进 nodeList，因此也不需要发。
     if (name === 'class') {
       this.emitClass(el);
     } else if (name === 'style') {
@@ -149,8 +131,7 @@ export class MiniProgramRenderer implements Renderer2 {
     value: string,
     flags?: RendererStyleFlags2,
   ) {
-    // Angular 把 `!important` 从值里剔掉、改用 flag 传（DOM renderer 拿它去调
-    // `setProperty(prop, value, 'important')`），这里得拼回来。
+    // Angular 把 `!important` 从值里剔掉、改用 flag 传（DOM renderer 拿它去调 `setProperty(prop, value, 'important')`），这里得拼回来。
     el.style[dashCase(style)] =
       (flags ?? 0) & RendererStyleFlags2.Important
         ? `${String(value).trim()} !important`
@@ -177,8 +158,7 @@ export class MiniProgramRenderer implements Renderer2 {
     if (!(target instanceof AgentNode)) {
       throw new Error('不支持其他类型监听');
     }
-    // 模板原文（`tap.stop`）与小程序语义键（`catchtap`）一起登记：
-    // 事件派发时只查后者，前者保证既有写法不变。
+    // 模板原文（`tap.stop`）与小程序语义键（`catchtap`）一起登记：事件派发时只查后者，前者保证既有写法不变。
     const keys = mpListenerKeys(eventName);
     let fn = callback;
     if (mpListenerOnce(eventName)) {

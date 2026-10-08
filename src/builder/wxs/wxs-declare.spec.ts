@@ -96,8 +96,7 @@ describe('wxs 声明: 缺失字段必须报错', () => {
 
 describe('wxs 声明: 内联形式明确拦截', () => {
   /**
-   * Angular 解析器会把裸 JS 的 `{` 当 ICU / 插值起始符，
-   * 内联写法根本过不了 parse；`<script lang="wxs">` 则被整块剥掉。
+   * Angular 解析器会把裸 JS 的 `{` 当 ICU / 插值起始符，内联写法根本过不了 parse；`<script lang="wxs">` 则被整块剥掉。
    * 这里拦的是「写了内联但侥幸过了 parse」的形态，给出明确指引。
    */
   it('带子节点的 <wxs> 报错并指向文件写法', async () => {
@@ -136,9 +135,8 @@ describe('wxs 声明: 重名检查', () => {
 
 describe('wxs 声明: 声明集合就是定义', () => {
   /**
-   * 新架构下识别完全靠声明集合，所以不存在「漏声明要报错」：
-   * 没声明的名字就是普通 Angular 属性访问，走逻辑层，不报错也不下推。
-   * 这与 uni-app 一致（`filters.includes` 不命中就当普通表达式）。
+   * 识别完全靠声明集合，所以不存在「漏声明要报错」：没声明的名字就是普通 Angular 属性访问，
+   * 走逻辑层，不报错也不下推。
    */
   it('未声明的名字不报错，也不被当成 wxs', async () => {
     const nodes = parse(`<view [foo]="ghost.fn(a)"></view>`);
